@@ -29,9 +29,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 檢查有沒有 API key
+      # fail-open 的處理：沒有 key 時**明確標示「沒有審查」**，
+      # 而不是靜默通過 —— 否則分不出「審過沒問題」和「根本沒審」。
+      - name: 沒有 API key
         if: env.HAS_KEY != 'true'
-        run: echo "::notice::未設定 GEMINI_API_KEY，跳過 Gemini 審查。設定方式見 .github/workflows/gemini-review.yml"
+        run: |
+          echo "::warning title=未執行 Gemini 審查::沒有設定 GEMINI_API_KEY，這個 PR 沒有經過 LLM 審查。"
+          echo "### ⚠️ 這個 PR 沒有經過 Gemini 審查" >> "$GITHUB_STEP_SUMMARY"
+          echo "未設定 \`GEMINI_API_KEY\`。合併前請自行判斷是否需要人工加強審查。" >> "$GITHUB_STEP_SUMMARY"
 
       # 版本釘死，不用 @v0。浮動 tag 會讓 CI 在跟這次修改無關的 PR 上突然壞掉。
       - uses: google-github-actions/run-gemini-cli@v0.1.22
@@ -47,6 +52,12 @@ jobs:
             **這個專案的假想敵是「AI agent 會做沒被要求的事、會宣稱做完但沒做完」。**
             三個人都用 AI coding agent 寫程式。請針對這個失效模式審查，
             不要花時間在風格與命名偏好上。
+
+            **先判斷這是哪一階段的 PR**（看 diff 的檔案路徑），只用對應的 rubric：
+
+            - **規格階段**（只動 `openspec/`）：只檢查下面第 4 項，
+              以及規格本身的可測試性。**不要評論不存在的實作。**
+            - **實作階段**（動了 `src/` 等）：檢查全部六項。
 
             依序檢查，每一項給出「有／沒有／不適用」加證據：
 
@@ -69,14 +80,24 @@ jobs:
                被寫進 React state 或 Zustand？（`CONTEXT.md` 明訂禁止，
                違反時不會有錯誤訊息，只會變慢）
 
-            最後給一段「合併前必須處理」的清單。沒有就明講沒有。
-            **不要因為找不到問題就編一個出來。**
+            ## 輸出格式
 
-# 為什麼是 advisory 而不是 required check
+            分成兩段，**嚴重度低的不要放在前面**：
+
+            1. **合併前必須處理** —— 只放你有具體證據（檔案 + 行號）的項目。
+               沒有就寫「沒有」。
+            2. **其他觀察** —— 收在 `<details>` 摺疊區。
+
+            **不要因為找不到問題就編一個出來。** 空的第一段是好結果，不是失職。
+            風格與命名偏好不要寫，那些交給 lint。
+
+# 為什麼永遠是 advisory
 #
-# LLM 的審查結果是非決定性的 —— 同一份 code 跑兩次可能給出不同結論。
-# 一個會隨機變紅的 required check，團隊幾週內就會想辦法把它關掉，
-# 那時你會同時失去審查和閘門。
+# LLM 的審查結果是非決定性的。**低誤報率不會變成決定性** ——
+# 不該因為跑一陣子看似穩定，就讓模型判決直接掌握合併權。
+# 這一關不會被加進 ruleset 的 required checks。
 #
-# 先跑一陣子，看它的誤報率。確認穩定之後再加進 ruleset 的 required checks：
-#   gh api repos/travelwithwork-GuildHub/GuildHub-frontend/rulesets/21930388 -X PUT ...
+# 「審完沒問題再合併」是靠流程順序達成的：意見留在 PR 上，
+# 人讀完再按合併。決定權在人，機器只負責把該看的攤在面前。
+#
+# 真正該擋的東西用決定性的檢查擋（見 ci.yml 的 Phase 與 Spec 兩關）。
