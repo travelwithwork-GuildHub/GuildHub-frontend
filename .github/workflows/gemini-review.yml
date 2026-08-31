@@ -1,0 +1,82 @@
+# Gemini 自動審查 PR。
+#
+# **這一關目前是 advisory，不是 required check。** 它會留下 review 意見，
+# 但不會擋合併 —— 人看過意見再決定。理由見本檔最後。
+#
+# 需要 repo secret `GEMINI_API_KEY`（https://aistudio.google.com/apikey）。
+# 沒設的話這個 workflow 會跳過並留下 notice，不會變成紅燈噪音。
+
+name: Gemini Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    name: gemini-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HAS_KEY: ${{ secrets.GEMINI_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: 檢查有沒有 API key
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::未設定 GEMINI_API_KEY，跳過 Gemini 審查。設定方式見 .github/workflows/gemini-review.yml"
+
+      # 版本釘死，不用 @v0。浮動 tag 會讓 CI 在跟這次修改無關的 PR 上突然壞掉。
+      - uses: google-github-actions/run-gemini-cli@v0.1.22
+        if: env.HAS_KEY == 'true'
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |-
+            你在審查 GuildHub-frontend 的一個 Pull Request。用繁體中文回覆。
+
+            先讀 `AGENTS.md` 與 `CONTEXT.md`，那是這個專案的規範與詞彙。
+            規格在 `openspec/changes/<change>/`，系統現況在 `openspec/specs/`。
+
+            **這個專案的假想敵是「AI agent 會做沒被要求的事、會宣稱做完但沒做完」。**
+            三個人都用 AI coding agent 寫程式。請針對這個失效模式審查，
+            不要花時間在風格與命名偏好上。
+
+            依序檢查，每一項給出「有／沒有／不適用」加證據：
+
+            1. **範圍蔓延**：有沒有 `specs` 沒寫、但這個 PR 做了的東西？
+               列出具體檔案與行號。
+
+            2. **規格被實作反向修改**：這個 PR 有沒有同時改 `specs` 又改實作？
+               如果有，規格的改動是「發現規格有問題」還是「把規格調整成已經寫出來的樣子」？
+
+            3. **Scenario 沒有對應測試**：把 `specs` 裡每個 `#### Scenario:` 列出來，
+               標出哪些找不到對應的測試。**這是這個專案最常見的破口。**
+
+            4. **失敗路徑**：新增的 Requirement 有沒有涵蓋錯誤情境
+               （輸入不合法、權限不足、資源不存在、超過上限）？
+
+            5. **無證據的完成宣稱**：PR 描述裡有沒有「已完成／測試通過」
+               但沒有貼實際指令輸出？
+
+            6. **高頻資料進了 React**：有沒有 position / rotation / 動畫相位
+               被寫進 React state 或 Zustand？（`CONTEXT.md` 明訂禁止，
+               違反時不會有錯誤訊息，只會變慢）
+
+            最後給一段「合併前必須處理」的清單。沒有就明講沒有。
+            **不要因為找不到問題就編一個出來。**
+
+# 為什麼是 advisory 而不是 required check
+#
+# LLM 的審查結果是非決定性的 —— 同一份 code 跑兩次可能給出不同結論。
+# 一個會隨機變紅的 required check，團隊幾週內就會想辦法把它關掉，
+# 那時你會同時失去審查和閘門。
+#
+# 先跑一陣子，看它的誤報率。確認穩定之後再加進 ruleset 的 required checks：
+#   gh api repos/travelwithwork-GuildHub/GuildHub-frontend/rulesets/21930388 -X PUT ...
