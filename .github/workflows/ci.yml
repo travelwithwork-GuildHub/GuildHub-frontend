@@ -48,16 +48,24 @@ jobs:
       - name: Spec
         run: npx openspec validate --all --strict
 
-      # 每一步都獨立列出來，不要串成一行 ——
-      # 串起來的話，看 log 分不出是哪一關紅的。
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
+      # ⚠️ Lint / Typecheck / Test / Build 暫時移除。
+      #
+      # 這個 repo 還沒有任何程式碼，package.json 那四個 script 是刻意會失敗的佔位。
+      # 留著它們，CI 會永遠是紅的 —— 而永遠紅的 CI 等於沒有 CI，
+      # 團隊很快就會開始無視紅燈。
+      #
+      # W1（FE-C01）建立 Next.js 專案並設好四個 script 之後，把下面這段加回來：
+      #
+      #   - name: Lint
+      #     run: npm run lint
+      #
+      #   - name: Typecheck
+      #     run: npm run typecheck
+      #
+      #   - name: Test
+      #     run: npm test
+      #
+      #   - name: Build
+      #     run: npm run build
+      #
+      # 每一關獨立列出，不要串成一行 —— 串起來看 log 分不出是哪一關紅的。
