@@ -58,7 +58,7 @@ jobs:
           # 走官方的 github-mcp-server，只開三個必要的工具。
           settings: |-
             {
-              "model": { "maxSessionTurns": 25 },
+              "model": { "maxSessionTurns": 60 },
               "mcpServers": {
                 "github": {
                   "command": "docker",
@@ -80,9 +80,14 @@ jobs:
           prompt: |-
             你在審查 GuildHub-frontend 的一個 Pull Request。用繁體中文回覆。
 
-            **先用 `pull_request_read` 取得這個 PR 的 diff 與檔案清單，
-            最後用 `pull_request_review_write` 把結果張貼成一則 review。
-            只分析而不張貼等於沒有審。**
+            **流程**：先用 `pull_request_read` 取得 diff 與檔案清單，
+            最後用 `pull_request_review_write` 張貼成一則 review。
+
+            **張貼是最後一步，也是最重要的一步。只分析而不張貼等於沒有審。**
+            你有 60 個 turn。**用掉大約一半還沒開始寫結論時，立刻停止調查，
+            用手上已有的資訊張貼。** 一份不完整但貼出來的審查，
+            比一份完整但因為 turn 用光而消失的審查有用。
+            調查不完的部分就在 review 裡寫明「這部分沒查完」。
 
             先讀 `AGENTS.md` 與 `CONTEXT.md`，那是這個專案的規範與詞彙。
             規格在 `openspec/changes/<change>/`，系統現況在 `openspec/specs/`。
