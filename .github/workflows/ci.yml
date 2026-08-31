@@ -24,11 +24,22 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
+
+      # 規格階段的 PR 不得包含產品程式碼。
+      #
+      # 這一關是決定性的：只看檔案路徑，不做任何判斷。
+      # 沒有它之前實測過 —— 一個「合法規格 + 產品程式碼」的 PR
+      # 可以直接通過所有 required check（PR #5）。
+      - name: Phase
+        if: github.event_name == 'pull_request'
+        run: bash .github/scripts/check-pr-phase.sh "${{ github.base_ref }}"
 
       - run: npm ci
 
