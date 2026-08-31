@@ -47,10 +47,42 @@ jobs:
       # 版本釘死，不用 @v0。浮動 tag 會讓 CI 在跟這次修改無關的 PR 上突然壞掉。
       - uses: google-github-actions/run-gemini-cli@v0.1.22
         if: env.HAS_KEY == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          # issue_comment 觸發時 GitHub 當成 issue，PR number 要明講。
+          github_pr_number: ${{ github.event.pull_request.number }}
+          # 模型需要「能張貼 review」的工具，否則審完的結果會直接丟掉
+          # ——第一次實跑就是這樣，workflow 綠但 PR 上什麼都沒有。
+          # 走官方的 github-mcp-server，只開三個必要的工具。
+          settings: |-
+            {
+              "model": { "maxSessionTurns": 25 },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": [
+                    "run", "-i", "--rm",
+                    "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+                    "ghcr.io/github/github-mcp-server:v0.27.0"
+                  ],
+                  "includeTools": [
+                    "add_comment_to_pending_review",
+                    "pull_request_read",
+                    "pull_request_review_write"
+                  ],
+                  "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+                }
+              },
+              "tools": { "core": ["list_directory", "read_file", "grep_search"] }
+            }
           prompt: |-
             你在審查 GuildHub-frontend 的一個 Pull Request。用繁體中文回覆。
+
+            **先用 `pull_request_read` 取得這個 PR 的 diff 與檔案清單，
+            最後用 `pull_request_review_write` 把結果張貼成一則 review。
+            只分析而不張貼等於沒有審。**
 
             先讀 `AGENTS.md` 與 `CONTEXT.md`，那是這個專案的規範與詞彙。
             規格在 `openspec/changes/<change>/`，系統現況在 `openspec/specs/`。
