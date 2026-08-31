@@ -24,6 +24,12 @@ jobs:
     timeout-minutes: 15
     env:
       HAS_KEY: ${{ secrets.GEMINI_API_KEY != '' }}
+      # Gemini CLI 預設會拒絕在「不受信任的資料夾」執行。
+      # CI runner 每次都是全新的一次性容器，checkout 出來的就是要審的東西，
+      # 所以在這裡信任它是安全的。
+      # 沒有這一行的實際錯誤：
+      #   Gemini CLI is not running in a trusted directory.
+      GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
       - uses: actions/checkout@v7
         with:
