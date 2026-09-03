@@ -189,7 +189,7 @@ change id 與 slice 的分界，不需要任何消歧邏輯。
 
 | 機制 | 真的保證 | **不**保證 |
 |---|---|---|
-| ruleset：1 個 approval + code owner review | 每個 PR 有第二個人簽章（作者不能批准自己） | 那個人真的看了。橡皮圖章偵測不出來 |
+| ruleset：1 個 approval + code owner review | **除 @fergusKe 外**，每個 PR 有第二個人簽章（作者不能批准自己） | 那個人真的看了。橡皮圖章偵測不出來。**而且 @fergusKe 有 bypass，可以繞過全部** |
 | required check 綁 `integration_id` | 外部拿 write token 直接 POST 一個假 `ci: success` 會被拒 | **workflow 檔案的內容**。在 PR 裡把某一步改成 `run: true`，綠燈來源完全合法 |
 | `check-pr-branch.sh` 的 `feat/` 那條 | phase ordering：規格已經在 main 上、實作沒有回頭改它 | **diff 真的對應那份規格**。引用 `fe-c01` 然後塞 FE-R05 的程式碼會全綠 |
 | `chore/` 的 bytes 上界 | review 面積小到人讀得完 | 「這不是功能」。80 行的功能可以冒充 chore |
@@ -205,6 +205,47 @@ PR 分支上的 workflow，所以 CI 保護不了 CI。能機械封住的是 rul
 「Require workflows to pass」（workflow 檔從 main 取），但那需要
 org ruleset + Team/Enterprise 方案，這個 org 是 free。
 所以看到 file list 裡有 `.github/` 的時候，那就是要用眼睛的時候。
+
+## GitHub 上的設定在哪裡看
+
+**ruleset 不在版控裡。** 它是 GitHub 上的設定，clone 這個 repo 看不到它。
+所以有一份快照：
+
+| 檔案 | 是什麼 |
+|---|---|
+| `.github/ruleset.json` | 實際設定的快照，就是 API payload 本身 |
+| `.github/scripts/check-ruleset.sh` | 把線上設定抓下來跟快照比對，不一致就列出差在哪 |
+
+```bash
+bash .github/scripts/check-ruleset.sh
+```
+
+**那份快照不是執法。** 改它不會改變 GitHub 上任何東西；有人在 UI 上改了設定，
+它也不會自己更新。它存在的理由是**讓漂移查得出來** ——
+這個 repo 發生過：`AGENTS.md` 寫著「CODEOWNERS review 擋得住東西」，
+而實際設定是 `require_code_owner_review: false`，那三行 CODEOWNERS 完全沒有效力。
+**沒有任何東西會告訴你這件事。**
+
+### 誰能繞過
+
+`@fergusKe`（org owner 兼 repo admin）在 PR 頁面會看到一個勾選框：
+
+> ☐ Merge without waiting for requirements to be met (bypass rules)
+
+勾了就能直接合併，**包含 CI 紅的時候**。GitHub 的 ruleset 沒辦法只繞過 review
+而保留 required status check —— bypass 是整組的。
+
+其他協作者看不到那個勾選框。要確認自己有沒有：
+
+```bash
+gh api repos/travelwithwork-GuildHub/GuildHub-frontend/rulesets/21930388 \
+  --jq .current_user_can_bypass
+```
+
+`always` 就是有，`null` 就是沒有。
+
+**這代表上面那張閘門表的第一列對 @fergusKe 不成立。**
+所有「一定要有第二個人看過」的推論，在他身上都是自願的，不是機制。
 
 ## 測試
 
