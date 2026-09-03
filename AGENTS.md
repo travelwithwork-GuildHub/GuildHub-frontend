@@ -125,6 +125,10 @@ ruleset 只保護 main，別處的綠燈可以被帶過來。
 `<id>` 只准小寫、數字、單個連字號，**不得含 `--`**。這樣 `--` 就永遠是
 change id 與 slice 的分界，不需要任何消歧邏輯。
 
+**change id 要以 `docs/WBS.md` 的工作項目 ID 開頭（小寫）**，
+例如 `fe-c01-appshell` 對應 `FE-C01`。這不是美觀問題 ——
+`progress.sh` 靠它把 change 對回 WBS，對不上的會被單獨列成紅字。
+
 判定在 `.github/scripts/check-pr-branch.sh`，它的測試在旁邊：
 
 ```bash

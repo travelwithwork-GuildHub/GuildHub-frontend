@@ -3,8 +3,18 @@
 Claude Code 進入此 Repository 後：
 
 1. 先讀 `AGENTS.md`；它是唯一 normative workflow 規範。
-2. 跑 `git branch --show-current` 與 `openspec list`，確認你在哪個 change 上。
+2. 跑 `git branch --show-current`，以及：
+
+   ```bash
+   bash .github/scripts/progress.sh      # 61 個 WBS 項目現在各自在什麼狀態
+   ```
+
+   **那份是算出來的，沒有人維護它**，所以它不會漂。資料來自
+   `docs/WBS.md`、`openspec/changes/`、遠端分支。
 3. 讀 `CONTEXT.md` 與那個 change 的 artifacts。
+   **`CONTEXT.md` 有一節〈後端在哪、合約的真實來源〉—— 一定要讀。**
+   後端已經存在，而 `docs/ROADMAP.md` 與 `docs/WBS.md` 是在它存在之前寫的，
+   即時層的敘述**對不上至少七處**。寫規格以 `protocol.py` 為準。
 4. 確認規格在 PR 上談定了沒有 —— **沒有就不要寫產品程式碼**。
 5. 除非使用者指定其他語言，對人類使用繁體中文。
 
