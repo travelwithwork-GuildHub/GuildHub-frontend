@@ -1,12 +1,12 @@
 
 # 預設：所有變更都要有人看過
-*                       @fergusKe @harperzzzzz @willylee714-coder
+*                       @fergusKe @harperzzzzz @willylee714-coder @hyc7180-create
 
 # 執法層自己。CI 與 CODEOWNERS 若能被自由修改，
 # required check 與 required review 都能被安靜地拆掉。
-/.github/               @fergusKe @harperzzzzz @willylee714-coder
+/.github/               @fergusKe @harperzzzzz @willylee714-coder @hyc7180-create
 
 # 規格與決策。改這些等於改已經談定的範圍。
-/openspec/              @fergusKe @harperzzzzz @willylee714-coder
-/docs/adr/              @fergusKe @harperzzzzz @willylee714-coder
-/AGENTS.md              @fergusKe @harperzzzzz @willylee714-coder
+/openspec/              @fergusKe @harperzzzzz @willylee714-coder @hyc7180-create
+/docs/adr/              @fergusKe @harperzzzzz @willylee714-coder @hyc7180-create
+/AGENTS.md              @fergusKe @harperzzzzz @willylee714-coder @hyc7180-create
