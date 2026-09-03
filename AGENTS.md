@@ -198,7 +198,7 @@ bash .github/scripts/test-check-pr-branch.sh
 
 | 機制 | 真的保證 | **不**保證 |
 |---|---|---|
-| ruleset：1 個 approval + code owner review | **除 @fergusKe 外**，每個 PR 有第二個人簽章（作者不能批准自己） | 那個人真的看了。橡皮圖章偵測不出來。**而且 @fergusKe 有 bypass，可以繞過全部** |
+| ruleset 的 review 要求 | **目前是 0。什麼都不保證。** | 任何人都能合併自己的 PR。CODEOWNERS 那份檔案現在沒有效力 —— 見下一節 |
 | required check 綁 `integration_id` | 外部拿 write token 直接 POST 一個假 `ci: success` 會被拒 | **workflow 檔案的內容**。在 PR 裡把某一步改成 `run: true`，綠燈來源完全合法 |
 | `check-pr-branch.sh` 的 `feat/` 那條 | phase ordering：規格已經在 main 上、實作沒有回頭改它（含 rename 搬走） | **diff 真的對應那份規格**。引用 change A 然後寫 change B 的程式碼會全綠 |
 | `check-pr-branch.sh` 的 `spec/` 那條 | 每個 Scenario 有唯一且格式正確的 ID | ID 取得對不對、Scenario 寫得好不好 |
@@ -244,6 +244,31 @@ bash .github/scripts/check-ruleset.sh
 這個 repo 發生過：`AGENTS.md` 寫著「CODEOWNERS review 擋得住東西」，
 而實際設定是 `require_code_owner_review: false`，那三行 CODEOWNERS 完全沒有效力。
 **沒有任何東西會告訴你這件事。**
+
+### ⚠️ 目前不需要任何人批准
+
+```
+required_approving_review_count: 0
+require_code_owner_review:       false
+```
+
+**2026-09-04 起改成這樣**，因為四個人的團隊在開發初期跑不動 ——
+每個 PR 都要另一個人在線上按批准。
+
+**這代表 `.github/CODEOWNERS` 目前是一份沒有效力的檔案。**
+它列的四個人不會被要求 review，作者可以自己合併自己的 PR。
+
+還在的保護只有：
+
+- required check `ci`（綁定 GitHub Actions，外部偽造的 status 不算數）
+- 不能直接推 main、不能 force push、不能刪 main
+- `check-pr-branch.sh` 的分支類別判定
+
+**所以上面那張表關於「有第二個人看過」的每一列都不成立。**
+規格會不會被人看過、chore 會不會被逐行讀，現在**完全靠自覺**。
+
+要收緊的時候：把 `.github/ruleset.json` 的那兩個值改回 `1` / `true`，
+重新套用，然後跑 `check-ruleset.sh` 確認。
 
 ### 誰能繞過
 

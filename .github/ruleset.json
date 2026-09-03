@@ -18,6 +18,14 @@
   "target": "branch",
   "enforcement": "active",
 
+  "_review_note": [
+    "2026-09-04：required_approving_review_count 由 1 改為 0、require_code_owner_review 由 true 改為 false。",
+    "原因是四個人的團隊在開發初期跑不動 —— 每個 PR 都要另一個人在線上批准。",
+    "**代價：作者可以自己合併自己的 PR。** CODEOWNERS 那份檔案目前沒有效力。",
+    "還在的保護：required check ci（綁 GitHub Actions）、不能直接推 main、不能 force push、不能刪 main。",
+    "未來要收緊就把這兩個值改回 1 / true 並重新套用這份快照。"
+  ],
+
   "bypass_actors": [
     {
       "_why": "fergusKe 是 org owner 兼 repo admin，可以勾 PR 頁面的『Merge without waiting for requirements to be met (bypass rules)』直接合併，包含自己開的 PR。注意 bypass 是整組的：它同時繞過 required status check，也就是 CI 紅的時候一樣按得下去。GitHub 的 ruleset 沒有辦法只繞過 review 而保留 CI。其他三位協作者沒有 bypass，看不到那個勾選框。驗證：gh api repos/OWNER/REPO/rulesets/21930388 --jq .current_user_can_bypass",
@@ -46,9 +54,9 @@
     {
       "type": "pull_request",
       "parameters": {
-        "required_approving_review_count": 1,
-        "require_code_owner_review": true,
-        "require_last_push_approval": true,
+        "required_approving_review_count": 0,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
         "dismiss_stale_reviews_on_push": true,
         "required_review_thread_resolution": false,
         "allowed_merge_methods": ["merge", "squash", "rebase"]
