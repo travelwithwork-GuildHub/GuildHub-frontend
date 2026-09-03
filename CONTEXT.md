@@ -59,6 +59,11 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 - 後端已經有壓測工具：`python tools/run_swarm.py --n 40 --seconds 300`
   （40 個會走動的假人，拿來調插值）、`--n 5 --idle`（驗證靜止時封包數為 0）
 
+**FE-R06 的 40 browser 壓測只准打自己本機起的後端。** 後端就在隔壁目錄，
+`./run.sh` 起來就是自己的一份 —— 沒有理由去打任何共用的實例。
+一次 40 個連線的壓測足以把同時在用那份後端的人全部踢下線。
+判準見 `AGENTS.md`〈測試環境隔離〉。
+
 ## 一條原則
 
 > **3D 負責空間、Presence 與探索；DOM / React 負責搜尋、表單、詳細資料與高效率操作。**
