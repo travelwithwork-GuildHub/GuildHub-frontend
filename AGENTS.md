@@ -125,6 +125,15 @@ ruleset 只保護 main，別處的綠燈可以被帶過來。
 `<id>` 只准小寫、數字、單個連字號，**不得含 `--`**。這樣 `--` 就永遠是
 change id 與 slice 的分界，不需要任何消歧邏輯。
 
+判定在 `.github/scripts/check-pr-branch.sh`，它的測試在旁邊：
+
+```bash
+bash .github/scripts/test-check-pr-branch.sh
+```
+
+**改那支腳本之前跑一次，改完再跑一次。** 它是執法層本體，
+而它壞掉的方式是安靜的 —— 不會有東西變紅，只會有本來該紅的東西變綠。
+
 ## 平行開發
 
 一個 change = 一個目錄。一個 phase = 一個分支 = 一個 PR。
