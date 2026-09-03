@@ -20,8 +20,15 @@
 #   git branch -r            有沒有人正在某個 change 上開分支
 #
 # change 與 WBS 的對應靠**命名**：change id 要以 WBS ID 開頭（小寫），
-# 例如 fe-c01-appshell 對應 FE-C01。這條寫在 AGENTS.md 與 docs/WBS.md。
+# 例如 fe-c01-appshell 對應 FE-C01。這條寫在 AGENTS.md。
 # 對不起來的 change 會單獨列在最後，那通常代表命名沒照規矩。
+#
+# **沒有 docs/WBS.md 也能用** —— 那時就只列 change 本身與它們的進度，
+# 不做對應（沒有東西可以對，把每個 change 都說成「命名錯誤」是錯的訊號）。
+#
+# 要讓它認得你的 WBS，表格的**第一欄放工作項目 ID**、第四欄是週次、
+# 第五欄是點數，ID 的格式是 `<大寫字母>-<大寫字母><數字>`（例如 FE-C01、API-W03）。
+# 同一個項目的續行第一欄留空。
 
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -156,7 +163,30 @@ for wid in order:
     rows.append((colour, wid, info["name"][:18], weeks, info["pts"], state, detail))
 
 if not wbs:
-    print(f"{D}（沒有 docs/WBS.md，只列 OpenSpec 的狀態）{X}\n")
+    # 沒有工作分解表 —— 只列 change 本身。
+    if not changes:
+        print(f"{D}還沒有任何 OpenSpec change。{X}")
+        print(f"{D}用 /opsx:propose 開第一個，或看 prompts/01-discovery.md。{X}")
+    else:
+        print(f"{B}{'change':<34} {'狀態':<10} {'tasks'}{X}")
+        print("─" * 60)
+        for cid in sorted(changes):
+            c = changes[cid]
+            br = branches.get(cid, set())
+            prog = c.get("prog")
+            bar = f"{prog[0]}/{prog[1]}" if prog and prog[1] else "—"
+            if c["state"] == "archived":
+                st, colour = "已封存", G
+            elif "feat" in br or "fix" in br:
+                st, colour = "實作中", Y
+            elif "spec" in br:
+                st, colour = "規格審查中", Y
+            else:
+                st, colour = "規格已合併", Y
+            print(f"{colour}{cid:<34} {st:<10} {bar}{X}")
+        print()
+        print(f"{D}（沒有 docs/WBS.md，所以沒有「還有哪些沒做」的視角。{X}")
+        print(f"{D} 有工作分解表的話把它放在 docs/WBS.md，格式見這支腳本的開頭註解。）{X}")
 elif rows:
     print(f"{B}{'ID':<9} {'項目':<20} {'週':<8} {'點':>3}  {'狀態':<12} {'change'}{X}")
     print("─" * 78)
@@ -172,9 +202,11 @@ if total:
     if not SHOW_ALL and tally.get("未開始"):
         print(f"{D}（{tally['未開始']} 項未開始沒有列出，用 --all 看全部）{X}")
 
-# 對不上 WBS 的 change：命名沒照規矩
+# 對不上 WBS 的 change：命名沒照規矩。
+# **沒有 WBS 的時候不做這件事** —— 沒有東西可以對，
+# 把每個 change 都說成「命名錯誤」是錯的訊號。
 matched = {change_for(w) for w in order} - {None}
-orphan = sorted(set(changes) - matched)
+orphan = sorted(set(changes) - matched) if wbs else []
 if orphan:
     print()
     print(f"{R}對不上任何 WBS ID 的 change{X}（change id 要以 WBS ID 開頭，小寫）：")
