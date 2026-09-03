@@ -11,6 +11,54 @@ GuildHub 的前端。有空間感的自由工作者／專案媒合平台：使�
 後端是 FastAPI，另一個 repository。本 repo 不落 DB、不做認證判斷 ——
 所有持久資料與授權由後端負責。
 
+## 後端在哪、合約的真實來源
+
+```
+後端 repo   ~/Desktop/workshop/fergus/GuildHub-backend
+啟動        ./run.sh        REST http://localhost:8000   WS ws://localhost:8000/ws
+整合指南    GuildHub-backend/API-前端整合指南.md      ← 先讀這份
+```
+
+| 東西 | 真實來源 | 不要看哪裡 |
+|---|---|---|
+| REST 欄位與型別 | `http://localhost:8000/docs`（OpenAPI，自動產生） | 任何手寫的複述 |
+| WebSocket 協定 | `GuildHub-backend/app/realtime/protocol.py` | 同上 |
+
+**不要在本 repo 複述後端的欄位定義。** 複述一定會漂，而漂掉的合約比沒有合約危險。
+規格寫「行為與驗收條件」，欄位指過去。理由見 `docs/adr/0001-backend-contract.md`。
+
+REST client 用產的，不要手寫：
+
+```bash
+npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
+```
+
+**大廳的 WebSocket 不需要登入、不需要資料庫。** `./run.sh` 之後直接連得上，
+所以即時層可以先開工，不必等身分系統。
+
+## ⚠️ ROADMAP 與 WBS 是在後端存在之前寫的
+
+`docs/ROADMAP.md` 與 `docs/WBS.md` 描述的即時層，與實際協定**對不上至少七處**。
+寫規格的時候以 `protocol.py` 為準，不是以 WBS 的敘述為準：
+
+| WBS / 舊 CONTEXT 寫的 | 實際協定 |
+|---|---|
+| `snapshot` / `player_joined` / `player_left` / `positions` | `hello` / `snapshot` / **`pos`** / **`presence`（join 與 leave 合併成一則）** / `status` / `chat` / `err` |
+| FE-R03「position / **rotation** 取樣」 | `f` 是 **0–3 的離散朝向**（0 下 1 左 2 右 3 上），沒有 rotation |
+| 「移動限 **X/Z** 平面」 | 協定是 **`x` / `y` 整數像素**。送浮點會被 `StrictInt` 擋下，**整則訊息丟棄** |
+| 沒提 | **自己的 `move` 會原路廣播回自己**。後端不做逐人過濾，前端要以本地預測為準、收到自己的 id 就忽略 |
+| 沒提 | **握手失敗不會有 `err` 訊息**，直接 close `1008` —— 連線根本沒 accept。前端只看得到「被關掉」 |
+| 沒提 | **狀態文字超過 12 字會被靜默丟棄**，舊狀態不變。前端一定要 `maxlength=12`，否則使用者以為壞了 |
+| 沒提 | **一條連線只屬於一個 scene。切場景等於關掉重開**，沒有 switch 訊息 |
+| 沒提 | **不合法的訊息一律靜默丟棄**，不回錯誤。送出去沒反應就是格式不對 |
+
+另外兩件跟 W1 驗收直接相關的：
+
+- **靜止時完全收不到 `pos`** —— 沒有人移動時整則訊息不送，不是送空陣列。
+  **不要拿它當心跳**
+- 後端已經有壓測工具：`python tools/run_swarm.py --n 40 --seconds 300`
+  （40 個會走動的假人，拿來調插值）、`--n 5 --idle`（驗證靜止時封包數為 0）
+
 ## 一條原則
 
 > **3D 負責空間、Presence 與探索；DOM / React 負責搜尋、表單、詳細資料與高效率操作。**
@@ -67,7 +115,8 @@ recruiting → active → closed
   違反這條不會有錯誤訊息，只會變慢。
 - **Camera 固定。** Orthographic、Elevated、固定角度與距離、平滑跟隨。
   **不提供玩家自由旋轉**（FE-W04）。
-- **移動限 X/Z 平面**（FE-W02）。3D rendering + 2D gameplay logic。
+- **移動是 2D gameplay logic**（FE-W02）。3D rendering + 2D 邏輯。
+  **座標見上面〈後端在哪〉那張表** —— 協定用的是 `x`/`y` 整數像素。
 - **不自建音視訊。** Meeting 是外部 URL。
 - **GuildHub 管人與入口，不重做 GitHub / Figma / Notion。**
 - **外部 GLB 預設不排入 MVP 工時**（FE-W16）。只有程式生成成本過高才用，
