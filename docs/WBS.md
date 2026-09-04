@@ -51,12 +51,33 @@ bash .github/scripts/progress.sh --check    # 有規則違規就以非零結束
 bash .github/scripts/wbs-page.sh --open
 ```
 
-兩個工具的分工：**`progress.sh` 是每天用的**（現在做到哪裡、被什麼擋住、有沒有違規），
-**那一頁是 review 時用的**（整份計畫長什麼樣、每週負荷、跨項依賴）。
+要把這份表寫進 Excel 管理表：
 
-那一頁**是從這個檔案產出來的，而且產物不進版控** ——
-一份「從 WBS.md 產出來、卻自己存在版控裡」的 HTML 會漂，
-而漂掉的那一份沒有人會發現。改了這個檔案就重跑一次。
+```bash
+bash .github/scripts/wbs-excel.sh
+```
+
+三個工具的分工：
+
+| | |
+|---|---|
+| `progress.sh` | **每天用的。** 現在做到哪裡、被什麼擋住、有沒有違規 |
+| `wbs-page.sh` | **review 時用的。** 整份計畫長什麼樣、每週負荷、跨項依賴 |
+| `wbs-excel.sh` | **給 Excel 管理表用的。** 覆蓋「前端」工作表，保留你的欄位與下拉 |
+
+### 三個工具吃同一份
+
+**狀態只算一次。** `progress.sh --json` 吐出解析結果與算好的狀態，
+另外兩個吃它 —— 它們自己不解析、也不重算。
+
+這一條是被實測逼出來的：三個地方曾經各自算過一次，
+**同一份 WBS 給出三個不同的答案**（等外部 19 / 9、已取消 6 / 8）。
+原因是各自對「標記要不要看續行」「阻塞欄要不要看原文」做了不同的假設。
+
+> **同一件事寫在兩個地方一定會漂。**
+> 這裡的解法不是「寫個文件提醒兩邊要同步」，是**讓它只有一份**。
+
+產物（`docs/wbs.html`）**不進版控** —— 從來源產，就沒有第二份要對齊的東西。
 
 ### 這些規則是機器在驗的，不是建議
 
@@ -110,10 +131,13 @@ bash .github/scripts/wbs-page.sh --open
 
 | | 例子 |
 |---|---|
-| **被別的項目取代** | `FE-S07 TeamFormation` → 由 `FE-M09 洽談` ＋ `FE-M10 Offer` 取代 |
-| **後端明文排除** | `FE-Q04 GuestMode` → 後端 `CLAUDE.md` 排除「訪客唯讀模式與相關 gate」 |
+| **被別的項目取代** | 2026-09-04 那次重切，六個項目被新的取代 —— 去向列在〈舊 ID 去哪了〉 |
+| **後端明文排除** | `BE-G15` moderation → 後端 `CLAUDE.md` 排除 `/api/admin/*` |
 
 第二種**在本地後端做得出來，但上不了線**。要做之前先把這件事講清楚。
+
+> 拿已經不存在的 ID 當例子會斷掉 —— `--check` 現在會驗全文提到的每一個 ID
+> 是不是真的在表裡（〈舊 ID 去哪了〉那一節例外，它的工作就是提舊 ID）。
 
 ### 標記的意思
 
@@ -188,7 +212,7 @@ bash .github/scripts/wbs-page.sh --open
 > 每一項附：需要什麼、最晚什麼時候要對齊（再晚就會累積回頭成本）、
 > 對不上的話前端怎麼降級。
 >
-> ⚠️ **`FE-D06` 會自動產生真正的銜接清單**（本地後端有、真後端沒有的操作）。
+> ⚠️ **`FE-O07` 會自動產生真正的銜接清單**（本地後端有、真後端沒有的操作）。
 > 下面這份是人寫的、給後端讀的版本 —— **兩份對不起來的時候，信機器產的那份。**
 >
 > `BE-拒` 是後端 `CLAUDE.md`〈不要實作的功能〉明文排除的。
@@ -239,13 +263,13 @@ bash .github/scripts/wbs-page.sh --open
 | BE-G05 | **沒有搜尋與篩選** | `profiles.py:16` docstring 明寫「只做翻頁，不做搜尋與篩選」；`projects.py:92` 只能用 `status` 篩。`PAGE_SIZE=20`，**沒有 total／`has_more`**，也沒有穩定排序的第二鍵。前端只能過濾**已載入的那 20 筆** —— **不可以叫它搜尋**，符合條件的人可能在下一頁，那是假陰性 —— **最晚 W2 開工前要答案。** 沒答案就把介面誠實地叫「瀏覽」，不放搜尋框。 **【沒答案就】**介面誠實地叫「瀏覽」，**不放搜尋框**。 | 決策≤W1 | — | 待銜接 | Alarm｜這是 Marketplace 的核心價值 |
 | BE-G06 | **沒有標記已讀的端點** | `read_at` 在回傳裡，但 `messages.py` 只有 POST / GET，沒有任何端點寫得到它。只能做 session-local 的「本次看過」，重整就沒了 —— **不是可靠的未讀** **【沒答案就】**不做未讀，Inbox 只有清單與詳情。 | 決策≤W1 | — | 待銜接 | Pending｜等後端提供寫得到 `read_at` 的端點 |
 | BE-G07 | **沒有釋放座位的端點** | `seats.py:29`「已於 WBS v0.2 砍除」；`test_contract.py` 的 `FORBIDDEN` 明列 DELETE。只有結案會整批清座位 | — | — | `BE-拒` | Cancelled｜「Owner Release Seat」不做 |
-| BE-G08 | **沒有訪客唯讀模式** | `CLAUDE.md`〈不要實作的功能〉：「訪客唯讀模式與相關 gate」。Guest 只能是 UI 上的說明，**不是權限邊界** —— 純前端禁用按鈕擋不住任何人 | — | — | `BE-拒` | Cancelled｜FE-Q04 不做 |
-| BE-G09 | **scene 只有 `lobby` 與 `room:{id}`** | `scenes.py:11`，而且一條連線只屬於一個 scene，切場景＝關掉重開。**先裁決用詞**：Marketplace／Office 要的是「視覺分區」（前端可做）還是「有獨立 Presence、隔音、各自 online count 的伺服器 scene」（後端不支援）。**同一個詞混用會讓 W4 之後整組規劃失真** —— **最晚 W4 開工前要答案。** 沒答案就一律做成 `lobby` 的視覺分區，並在 CONTEXT 寫明 online count 是全世界的。 **【沒答案就】**一律做成 `lobby` 的視覺分區，並在 `CONTEXT.md` 寫明 online count 是全世界的。 | 決策≤W3 | — | 待銜接 + `待裁決` | Alarm｜擋住 FE-S02/03/04/10/12 |
+| BE-G08 | **沒有訪客唯讀模式** | `CLAUDE.md`〈不要實作的功能〉：「訪客唯讀模式與相關 gate」。Guest 只能是 UI 上的說明，**不是權限邊界** —— 純前端禁用按鈕擋不住任何人 | — | — | `BE-拒` | Cancelled｜Guest 模式整個不做，計畫裡沒有這一項 |
+| BE-G09 | **scene 只有 `lobby` 與 `room:{id}`** | `scenes.py:11`，而且一條連線只屬於一個 scene，切場景＝關掉重開。**先裁決用詞**：Marketplace／Office 要的是「視覺分區」（前端可做）還是「有獨立 Presence、隔音、各自 online count 的伺服器 scene」（後端不支援）。**同一個詞混用會讓 W4 之後整組規劃失真** —— **最晚 W4 開工前要答案。** 沒答案就一律做成 `lobby` 的視覺分區，並在 CONTEXT 寫明 online count 是全世界的。 **【沒答案就】**一律做成 `lobby` 的視覺分區，並在 `CONTEXT.md` 寫明 online count 是全世界的。 | 決策≤W3 | — | 待銜接 + `待裁決` | Alarm｜影響 `FE-W17` 視覺分區、`FE-V05` 群體訊號、`FE-V11` 世界導覽、`FE-V12` 技能場景 |
 | BE-G10 | **沒有 team／role／application／invitation 任何模型** | `form-team`（`projects.py:132`）只是把 project 改成 active 並產生房間密碼。`deps.py:23` 明定「不做成員制，只有發起人與其他人兩種身分」。W7–W9 **不是少一顆按鈕，是整個 domain model 不存在** **【沒答案就】**接案維持「寄信給發起人」，不做組隊。 | 決策≤W5 | — | 待銜接 | Pending｜本地先做（FE-M 整組），等後端對齊 |
 | BE-G11 | **沒有新訊息通知** | `protocol.py` 裡只有場景 chat。只能輪詢 `GET /api/messages`，但沒有增量游標、收發混在同一份清單、又沒有已讀 mutation **【沒答案就】**不做通知，並在 UI 明說「狀態變化要自己重新整理」。 | 決策≤W3 | — | 待銜接 | Pending｜等後端加通知訊息，或改用輪詢 |
-| BE-G12 | **沒有 Project Resources / Meeting URL 欄位** | `sql/001_schema.sql` 的 projects 表沒有。FE-P12 與 FE-S08 **首先是資料來源不存在**，不是 UI 問題 **【沒答案就】**Meeting 與 Project Resources 都不做。 | 決策≤W3 | — | 待銜接 | Pending｜等後端加欄位 |
+| BE-G12 | **沒有 Project Resources / Meeting URL 欄位** | `sql/001_schema.sql` 的 projects 表沒有。`FE-N03` 約時間與 `FE-J14` 專案資源 **首先是資料來源不存在**，不是 UI 問題 **【沒答案就】**Meeting 與 Project Resources 都不做。 | 決策≤W3 | — | 待銜接 | Pending｜等後端加欄位 |
 | BE-G13 | **沒有 Events 模型** | 同上。W11 社群活動整個沒有地基 **【沒答案就】**不做社群活動。 | 決策≤W10 | — | 待銜接 | Pending｜本地先做（FE-V06 共享儀式），等後端對齊 |
-| BE-G14 | **沒有 Personal Desk / Looking For 欄位** | 同上。W6–W7 同上 **【沒答案就】**不做 Personal Desk 與 Looking For。 | 決策≤W5 | — | 待銜接 | Pending｜本地先做（FE-M14 媒合意圖），等後端對齊 |
+| BE-G14 | **沒有 Personal Desk / Looking For 欄位** | 同上。W6–W7 同上 **【沒答案就】**不做 Personal Desk 與 Looking For。 | 決策≤W5 | — | 待銜接 | Pending｜本地先做（`FE-M10` 媒合意圖、`FE-V13` Personal Desk），等後端對齊 |
 | BE-G15 | **沒有 moderation／封鎖／檢舉／admin** | `CLAUDE.md`：「任何 `/api/admin/*`」。陌生人可以無限寄信與聊天，而且**沒有任何處置管道** | — | — | `BE-拒` | Cancelled｜要翻案得先翻後端的產品決策 |
 | BE-G16 | **沒有 rate limit；chat 沒有長度限制** | `protocol.py` 的 `ChatIn.body: str` 無限制；廣播是逐連線 `await`。前端自己節流，但那只擋住守規矩的人 | — | — | 待銜接 | Alarm｜洗版沒有任何東西擋得住 |
 | BE-G17 | **「任何形式的活動追蹤——永久不做」** | `CLAUDE.md`。可觀測性**只能做技術 telemetry**（錯誤、FPS、斷線率），**不能做使用者行為 analytics**。兩者不要混在同一個提案裡 | — | — | `BE-拒` | Cancelled｜只限行為 analytics |
