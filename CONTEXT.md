@@ -62,10 +62,11 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 **大廳的 WebSocket 不需要登入、不需要資料庫。** `./run.sh` 之後直接連得上，
 所以即時層可以先開工，不必等身分系統。
 
-## ⚠️ ROADMAP 與 WBS 是在後端存在之前寫的
+## ⚠️ 早期規劃描述的即時層與實際協定對不上
 
-`docs/ROADMAP.md` 與 `docs/WBS.md` 描述的即時層，與實際協定**對不上至少七處**。
-寫規格的時候以 `protocol.py` 為準，不是以 WBS 的敘述為準：
+`docs/WBS.md` 已經照實際後端改過，但**敘述裡仍可能留有舊詞**；
+寫規格的時候一律以 `protocol.py` 為準，不是以文件的敘述為準。
+對不上的至少有這幾處：
 
 | WBS / 舊 CONTEXT 寫的 | 實際協定 |
 |---|---|
@@ -220,10 +221,12 @@ recruiting → active → closed
 - **GuildHub 管人與入口，不重做 GitHub / Figma / Notion。**
 - **外部 GLB 預設不排入 MVP 工時**（FE-W16）。只有程式生成成本過高才用，
   且需符合統一色票與風格。
-- **階段邊界**：MVP（W1–W5）不再塞新功能；W11–W12 **不做 MMORPG 化**。
+- **不做 MMORPG 化**：沒有等級、裝備、經濟系統。空間功能必須服務媒合。
+- **MVP 之後不再塞新功能。** 哪一週交什麼看 `docs/WBS.md` 的〈里程碑〉，
+  **這裡不複製週次** —— 複製過的那次，兩邊立刻就漂了。
 
 ## 詳細規劃
 
-- `docs/ROADMAP.md` —— 場景設計、功能地圖、12 週演進、階段邊界
+- `docs/ROADMAP.md` —— 場景設計、功能地圖、不做的事。**裡面沒有排程**
 - `docs/WBS.md` —— 工作分解。**群組是照「誰擁有這個產品能力」切的**，
   不是照技術層 —— 見那份文件開頭的〈舊 ID 去哪了〉

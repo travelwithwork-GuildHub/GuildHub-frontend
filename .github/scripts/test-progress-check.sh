@@ -47,6 +47,22 @@ FE-Z99 已經改名。**這一節提到不存在的 ID 是它的工作**，不�
 | | | 搜尋與篩選 | W2 | 3 | BE-G01 `BE-缺` | Pending｜後端沒有 |
 | FE-O10 | 文件維護 | 常態 | 常態 | — | | Regular｜沒有完成點 |
 WBS
+  # 產品意圖那一份。它沒有工作分解表，只靠 ID 指過來 ——
+  # 檢查要掃它、而且**不能**因為它沒有表就報「找不到工作分解表」。
+  cat > "$W/docs/ROADMAP.md" <<'RM'
+# 測試用的產品全貌
+
+## 舊 ID 去哪了
+
+FE-Z98 已經改名。這一節在兩份文件裡都是例外。
+
+## 功能地圖
+
+| 功能域 | WBS |
+|---|---|
+| 骨架 | `FE-C01` |
+| 探索 | `FE-P03` |
+RM
   ( cd "$W" && git init -q 2>/dev/null; git -C "$W" add -A 2>/dev/null; ) >/dev/null 2>&1
 }
 
@@ -73,8 +89,11 @@ run() {
 # **代換失敗一定要當場停下來。** 找不到要改的字串卻繼續跑，
 # 後面那個 run 會拿沒被改過的檔案去測 —— 它會報「期望紅、實際綠」，
 # 讓人以為是被測的檢查壞了，其實是測試腳本自己壞了。（踩過。）
-edit() {
-  python3 - "$W/docs/WBS.md" "$1" "$2" <<'PY'
+edit() { edit_in docs/WBS.md "$1" "$2"; }
+edit_roadmap() { edit_in docs/ROADMAP.md "$1" "$2"; }
+
+edit_in() {
+  python3 - "$W/$1" "$2" "$3" <<'PY'
 import io, sys
 path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
 t = io.open(path, encoding="utf-8").read()
@@ -249,6 +268,25 @@ run 1 "第一筆資料列沒有 ID：紅" "還沒有任何項目可以續行"
 baseline
 edit "列表與翻頁" "列表與翻頁（由 FE-Z99 取代）"
 run 1 "敘述裡提到不存在的項目：紅" "不存在"
+
+# ── docs/ROADMAP.md ───────────────────────────────────────────────
+# 產品意圖那一份靠指向 WBS 的 ID 活著。它曾經自己養了一份排程表，
+# WBS 重排之後沒跟著改 —— 同一個 W8 在兩份文件裡變成兩件事，
+# 而且頂端加了警告也沒用，讀的人滑過警告就看表了。
+# 表已經刪掉；剩下的 ID 由這裡看著。
+baseline
+edit_roadmap "| 探索 | \`FE-P03\` |" "| 探索 | \`FE-Z99\` |"
+run 1 "ROADMAP 指向不存在的項目：紅" "ROADMAP"
+
+# ROADMAP 沒有工作分解表是正常的。**不可以**因此報「找不到工作分解表」——
+# 那會把兩件事混在一起，而且會在真的沒有表時失去這個訊號。
+baseline
+run 0 "ROADMAP 沒有工作分解表：不影響綠燈" ""
+
+# 〈舊 ID 去哪了〉的例外在兩份文件裡都要成立
+baseline
+edit_roadmap "FE-Z98 已經改名。" "FE-Z98 與 FE-Z97 都已經改名。"
+run 0 "ROADMAP 的〈舊 ID 去哪了〉可以提舊 ID：綠" ""
 
 echo
 if [ "$FAIL" -gt 0 ]; then

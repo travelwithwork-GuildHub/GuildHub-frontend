@@ -86,7 +86,7 @@ npx openspec list
 |---|---|
 | `AGENTS.md` | 給 AI coding agent 的規範（git / PR / CI 那一半） |
 | `CONTEXT.md` | **domain 詞彙。** 進 change 之前先讀 |
-| `docs/ROADMAP.md` | 場景設計、功能地圖、12 週演進、階段邊界 |
+| `docs/ROADMAP.md` | 場景設計、功能地圖、不做的事。**裡面沒有排程** —— 週次只在 `docs/WBS.md` |
 | `docs/WBS.md` | 工作分解（Work Breakdown Structure）。**前端工作**：FE-A 身分與個人資料 / FE-B 探索 / FE-M 媒合 / FE-N 洽談與成立 / FE-J 專案營運與生命週期 / FE-K 通訊與通知 / FE-T 信任、安全與隱私 / FE-W 3D 世界與角色 / FE-R 即時同步 / FE-V 場景與空間活動 / FE-X 產品體驗共用 / FE-O 平台與交付；**後端銜接清單**：BE-G（不擋任何前端工作 —— 前端有自己的後端） |
 | `.github/scripts/progress.sh` | **現在做到哪裡。** 算出來的，沒有人維護。`--check` 在 CI 裡跑 |
 | `.github/scripts/wbs-page.sh` | 把 `docs/WBS.md` 產成一頁可以點開收合的網頁 |
@@ -103,4 +103,5 @@ npx openspec list
 - GuildHub 管人與入口，**不重做 GitHub / Figma / Notion**，不自建音視訊
 - 高頻資料（position / rotation / 動畫相位）**不得寫入 React state 或 Zustand**
 - 40 Browser 壓測與單 Browser 39 remote 渲染測試 **分開驗證**
-- 階段邊界要守：MVP（W1–W5）不再塞新功能；W11–W12 **不做 MMORPG 化**
+- **不做 MMORPG 化**：沒有等級、裝備、經濟系統。MVP 之後不再塞新功能
+- **週次只有一份**：`docs/WBS.md` 的〈里程碑〉。別的文件要提就用 ID 指過去
