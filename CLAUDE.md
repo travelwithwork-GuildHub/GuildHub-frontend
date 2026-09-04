@@ -12,6 +12,13 @@ Claude Code 進入此 Repository 後：
    bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版（要 review 時用）
    ```
 
+   **三個工具吃同一份** —— `progress.sh --json` 算一次狀態，網頁與 Excel 都吃它。
+   **不要在別的地方重算** —— 那樣做過一次，三邊給出三個答案。
+
+   ```bash
+   bash .github/scripts/wbs-excel.sh            # 寫進 Excel 管理表
+   ```
+
    **那份是算出來的，沒有人維護它**，所以它不會漂。資料來自
    `docs/WBS.md`、`openspec/changes/`、遠端分支。
 

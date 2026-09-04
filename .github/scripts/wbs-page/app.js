@@ -2,18 +2,13 @@ const D = JSON.parse(document.getElementById("wbs-data").textContent);
 const ITEMS = D.items, GROUPS = D.groups, AFFECTS = D.affects;
 const GID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
 
-// progress.sh 的狀態邏輯，原樣搬過來 —— 兩邊講的必須是同一件事
-const EXCL = ["TBD", "Pending", "Cancelled", "Regular"];
-function state(it) {
-  const m = it.marks, ex = m.filter(x => EXCL.includes(x))[0] || "";
-  if (ex === "Regular") return { k: "reg", t: "常態" };
-  if (ex === "Cancelled") return { k: "stop", t: "已取消" };
-  const sched = it.weeks.length > 0;
-  if (!sched && (it.blockers.length || ex === "Pending" || ex === "TBD"))
-    return ex === "TBD" ? { k: "wait", t: "待裁決" } : { k: "wait", t: "等外部" };
-  return { k: "", t: "未開始" };
-}
-ITEMS.forEach(it => { it.st = state(it); it.alarm = it.marks.includes("Alarm"); });
+// **狀態是 progress.sh 算好送過來的，這裡不重算。**
+// 曾經在這裡重寫過一次，於是網頁跟指令講出不同的答案。
+const KIND = { "等外部": "wait", "待裁決": "wait", "已取消": "stop", "常態": "reg", "未開始": "" };
+ITEMS.forEach(it => {
+  it.st = { k: KIND[it.state] ?? "", t: it.state };
+  it.alarm = it.marks.includes("Alarm");
+});
 
 const FE = ITEMS.filter(i => i.group !== "BE-G");
 const GAPS = ITEMS.filter(i => i.group === "BE-G");
