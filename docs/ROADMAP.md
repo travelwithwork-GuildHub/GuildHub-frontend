@@ -1,107 +1,123 @@
-# GuildHub 12 週產品全貌與場景設計
+# GuildHub 產品全貌與場景設計
 
-> 定位：有空間感的自由工作者／專案媒合平台。
-> **3D 負責空間、Presence 與探索；DOM / React 負責搜尋、表單、詳細資料與高效率操作。**
+> 定位：**可旁觀、可漸進加入的團隊媒合市場**，不是「可以走路的接案網站」。
+> 3D 負責空間、Presence 與探索；DOM / React 負責搜尋、表單、詳細資料與高效率操作。
 
-技術實作細節見 `docs/WBS.md`；產品功能與場景以本檔為主。
+## 這份檔案裡沒有排程
 
-> ## ⚠️ 這份是在後端存在之前寫的，而且 W6–W12 已經被換掉了
->
-> 後端（`GuildHub-backend`）已經寫完第一版，它不支援這裡描述的大部分東西。
-> **但那不擋任何事** —— 前端有自己的後端（`docs/WBS.md` 的 `FE-O01`–`FE-O08`），
-> 功能先做完，之後再銜接。
->
-> 更重要的是：**這份漏掉了整個媒合閉環。**
-> 「接案」在這裡只有一個動作 —— 寄站內信給發起人。
-> 沒有應徵、沒有申請狀態、沒有洽談、沒有 offer、沒有錢與時間、沒有信任訊號。
->
-> 所以 `docs/WBS.md` 把 **W6–W12 換成了媒合閉環**，
-> 原本排在那裡的 Skill Spaces、Looking For、Team Formation、世界導覽、社群活動
-> 被往後挪或被取代。
->
-> **這份讀作「產品意圖與場景設計」，不是「排程」。**
-> 排程看 `docs/WBS.md` 的〈里程碑〉那一節。
->
-> ```bash
-> bash .github/scripts/progress.sh --blocked
-> ```
->
-> ## ⚠️ 而且這份漏掉了整個媒合閉環
->
-> 「接案」在這份規劃裡只有一個動作：**寄站內信給發起人**。
-> 沒有應徵、沒有申請狀態、沒有洽談、沒有雙方承諾、沒有合作條件（錢與時間）、
-> 沒有信任訊號、`closed` 也分不出「停止招募」與「專案完成」。
->
-> 缺的東西補在 `docs/WBS.md` 的 `FE-M`（媒合）、`FE-N`（洽談與成立）、
-> `FE-J`（專案營運）、`FE-K`（通知）、`FE-T`（信任）、`FE-V`（空間活動）。
-> **全部排進 W6–W12**，建在前端自己的後端上。
+**週次、里程碑、階段邊界一律只寫在 `docs/WBS.md`。** 這裡只寫產品意圖：
+世界長什麼樣、每個場景為什麼存在、有哪些功能域、哪些事我們不做。
+
+這不是分工偏好，是踩過的坑。這份檔案曾經有自己的〈12 週演進〉與〈階段邊界〉兩張表，
+WBS 重排之後它們沒跟著改，於是同一個 W8 在兩份文件裡是兩件事
+（這裡寫「案件變成隊伍」，WBS 寫「主動邀請」）。**頂端加了警告也沒用** ——
+讀的人滑過警告就看表了，我自己也是。所以表刪掉，不是修好。
+
+```bash
+bash .github/scripts/progress.sh --all     # 現在做到哪裡
+bash .github/scripts/wbs-page.sh --open    # 整份計畫、每週負荷、跨項依賴
+```
+
+下面每一列都指向 WBS 的群組或項目。**那些 ID 由 `progress.sh --check` 驗**，
+指到不存在的東西 CI 會紅 —— 這份檔案跟 WBS 的關係是索引，不是副本。
 
 ## 核心使用流程
 
 ```
-1 建立身分 → 2 進入世界 → 3 發現機會 → 4 媒合聯絡 → 5 組成團隊 → 6 進入專案房 → 7 協作 → 8 回訪
-暱稱+Avatar   Guild Hall   Marketplace/Office  Profile/Inbox/Chat  Team Formation  Project Room  Resources/Meeting  Events/未讀/最近專案
+1 建立身分 → 2 進入世界 → 3 發現機會 → 4 應徵或受邀 → 5 洽談與 Offer → 6 成軍進房 → 7 協作 → 8 結案與回訪
+暱稱+Avatar   Guild Hall   Marketplace/Office   Open Role/候選名單   洽談串/雙方確認   Project Room   Seat/資源   聲譽/通知
 ```
+
+**第 4、5 步是這個產品的核心。** 早期規劃裡它只有一個動作 —— 寄站內信給發起人：
+沒有應徵、沒有申請狀態、沒有洽談、沒有雙方承諾、沒有錢與時間、沒有信任訊號。
+求職者最痛的是「已讀不回」，而那份規劃連「已讀」都沒有。
+現在整條閉環在 `FE-M`（媒合）、`FE-N`（洽談與成立）、`FE-J`（專案營運）、
+`FE-T`（信任）。
 
 ## 場景設計
 
-| 場景 | 產品目的 | 主要行為 | 3D 空間元素 | 主要功能 | 導入 | 強化 |
-|---|---|---|---|---|---|---|
-| **Guild Hall** | 世界首頁／中央樞紐 | 看線上玩家、前往其他場景、查看熱門內容 | 中央大廳、入口、公告區、傳送點、Project Doors | Presence、Status、場景入口、熱門案件/場景 | W3 | W10–W12 |
-| **Marketplace** | 發案／接案／找人才 | 瀏覽、搜尋、篩選、查看人才、發案 | Project Board、Talent Board、案件區、人才區 | Project Board、Talent Board、Project Detail、Create Project | W4 | W12 |
-| **Office** | 工作 Presence／輕社交 | 選工作桌、看誰在線、查看狀態、找人聊天 | 工作桌、座位、休息區、玩家區 | Presence、Profile、Message、Personal Desk | W4–W5 | W6–W7 |
-| **Skill Spaces** | 按技能分流的人才空間 | 前往 Developer / Design / AI 等空間找同領域人才 | Developer Office、Design Studio、AI Lab | Skills 推薦、Looking For、人才探索 | W6 | W7 |
-| **Project Room** | 成軍後的專案空間 | 進房、看隊員、坐席、聊天、開會、開資源 | 專案桌、Seat、Team Board、Resources Board | Password、Seat、Room Chat、Meeting Link、Team Presence | W4 | W8–W9 |
-| **Event Space** | 社群活動／留存 | 參加 Demo Day、Networking、Meetup | 舞台、觀眾區、活動看板 | Event Detail、Participants、Presence、Chat | W11 | W12 |
+| 場景 | 產品目的 | 主要行為 | 3D 空間元素 | WBS |
+|---|---|---|---|---|
+| **Guild Hall** | 世界首頁／中央樞紐 | 看線上玩家、前往其他場景、查看熱門內容 | 中央大廳、入口、公告區、傳送點、Project Doors | `FE-W11`、`FE-R10`、`FE-B08` |
+| **Marketplace** | 發案／接案／找人才 | 瀏覽、搜尋、篩選、查看人才、發案 | Project Board、Talent Board、案件區、人才區 | `FE-B02`–`FE-B05`、`FE-J01` |
+| **Office** | 工作 Presence／輕社交 | 看誰在線、查看狀態、找人聊天 | 工作桌、座位、休息區 | `FE-V07`、`FE-K04` |
+| **Project Room** | 成軍後的專案空間 | 進房、看隊員、坐席、聊天、開資源 | 專案桌、Seat、Team Board、Resources Board | `FE-W16`、`FE-V08`、`FE-J13`、`FE-J14`、`FE-N08` |
+| **Skill Spaces** | 按技能分流的人才空間 | 前往 Developer / Design / AI 等空間找同領域人才 | Developer Office、Design Studio、AI Lab | `FE-V12` |
+| **Event Space** | 社群活動／留存 | 參加 Demo Day、Networking、Meetup | 舞台、觀眾區、活動看板 | `FE-V14` |
 
-備註：所有場景都可回到 Guild Hall。Marketplace 的 3D 用於探索，**真正搜尋／篩選使用 DOM**。
+所有場景都可回到 Guild Hall。Marketplace 的 3D 用於探索，**真正搜尋／篩選使用 DOM**。
 Project Room 不重做 GitHub / Figma / Notion。
+
+### 3D 憑什麼存在
+
+空間**不能**提供普通網站技術上做不到的事。列表網站也能顯示誰在線、熱門案件與聊天室，
+而且更快更便宜更清楚。如果主要行為都是「走到物件、按 E、打開 DOM 面板」，
+那 3D 就是一條很貴的導覽列。
+
+空間唯一真正的優勢，是把**「看見 → 靠近 → 旁聽 → 打招呼 → 正式申請」變得低摩擦** ——
+不必一開始就寄陌生私訊。要成立，空間裡必須有正在發生、可旁觀、可加入的東西：
+`FE-V02` 公開活動物件、`FE-V03` 可旁觀、`FE-V04` 漸進式接近、`FE-V05` 群體訊號。
+
+這整組依賴 `BE-G27`（後端沒有任何公開活動的模型）。詳見 `CONTEXT.md`。
 
 ## 功能地圖
 
-| 功能域 | 完整功能 | 產品價值 | 場景／介面 | 週數 | MVP | 依賴 |
-|---|---|---|---|---|---|---|
-| 帳號與 Onboarding | 暱稱登入、Session、Guest/Member、首次 Avatar Creator | 降低進入門檻並建立世界身分 | 登入 / Avatar Preview | W1–W2 | 是 | Session / Avatar Schema |
-| Avatar | Body、Hair、Hair Color、Outfit、Outfit Color、Skin、即時 Preview | 每個人外觀不同且風格一致 | 所有 3D 場景 | W2–W3 | 是 | ProceduralAvatar |
-| Profile | Display Name、Skills、Hours、Bio、Avatar | 快速判斷合作對象 | DOM Panel | W2 | 是 | REST / Zod |
-| 發案 | Create Project、需求技能、Project Detail、狀態 | 形成案件供給 | Marketplace / DOM | W2 | 是 | Project API |
-| 接案 | 瀏覽 recruiting、搜尋/篩選、Detail、聯絡發起人 | 形成需求端 | Marketplace | W2–W4 | 是 | Project Board / Inbox |
-| 找人才 | Talent Board、Skills filter、Available Hours、Profile、聯絡 | 讓發案者主動找人 | Marketplace / Office / Skill Spaces | W2–W7 | 是 | Profile / Inbox |
-| Inbox | List、Detail、Send、Read/Unread | 陌生人第一接觸的持久溝通 | DOM | W2 | 是 | Message API |
-| Presence | Online、Status、Display Name、Online Count | 建立「大家同時在這裡」 | 所有場景 | W1–W5 | 是 | WebSocket |
-| Realtime Chat | Lobby / Room Chat、近期記憶 | 場景內即時輕量交流 | Guild Hall / Office / Room / Event | W3–W11 | 是 | WebSocket |
-| 場景切換 | Guild Hall / Marketplace / Office / Room / Skill / Event | 讓世界結構承載不同目的 | 3D World | W4–W11 | 是 | SceneNavigation / WS membership |
-| Office 工作桌 | Claim/Leave Desk、Avatar、Skills、Status | 讓工作狀態可視化 | Office | W4–W6 | 部分 | Seat / Presence |
-| Looking For | Available for Work、Hiring、技能/角色需求 | 把 Presence 轉成媒合訊號 | Office / Skill Spaces / Profile | W7 | 否 | Profile / Presence |
-| Team Formation | Founder、Team、Open Roles、Role Slot、邀請 | 從「刊登」進入「組隊」 | Project Detail / Room | W7–W8 | 否 | Projects / Talent / Inbox |
-| Project Door | Active Project Door、Project Name、Online Count、Password | 把專案變成世界中的入口 | Guild Hall Corridor | W4 | 是 | Project lifecycle / Room |
-| Project Room | Seat、Team、Room Chat、Meeting | 成軍後的共同空間 | Project Room | W4–W9 | 是 | Room / Seat / WS |
-| Project Resources | GitHub/Figma/Notion/Drive/Meeting 外部資源 | 專案工具集中於同一入口 | Project Room | W9 | 否 | Project Room |
-| 世界導覽 | 場景地圖、快速移動、Online Count | 世界變大後仍可導航 | Guild Hall / Global UI | W10 | 否 | Scene registry |
-| Community Events | 活動列表、Demo Day、Networking、Meetup | 增加社群與回訪理由 | Event Space | W11 | 否 | Event model / Presence |
-| Discovery / Retention | 熱門案件、缺人 Project、熱門場景、新手導覽、最近 Project、未讀 Inbox | 提高啟動與回訪效率 | Guild Hall / Global UI | W12 | 否 | 多個模組 |
-
-## 12 週演進
-
-| 週 | 階段 | 這週完成後產品長什麼樣 | 驗收重點 | 不是這週做的 |
+| 功能域 | 完整功能 | 產品價值 | 場景／介面 | WBS |
 |---|---|---|---|---|
-| **W1** | 世界技術成立 | 玩家能進 3D 世界、移動、碰撞、互動，兩個以上 browser 看得到彼此 | 10Hz network → 60FPS render；單 browser 顯示 39 remote | 正式美術、產品 CRUD |
-| **W2** | 媒合產品成立 | **關掉 3D 也能**建身分、發案、找案、找人才、寄訊息 | 首次登入可完成暱稱與角色建立；完整發案／找人流程可用 | 正式場景美化 |
-| **W3** | Guild Hall 成形 | 風格統一的世界，看得到其他玩家與狀態 | 風格一致；Board 可從 3D 入口開 DOM | 更多場景 |
-| **W4** | 世界開始分區 | 可去 Marketplace、Office、Project Room | 場景切換時 WS membership 正確；發案→成軍→進房走得通 | 技能場景、社群活動 |
-| **W5** | **MVP 可發表** | Office 有 Presence，Project Room 可協作，Guest / Loading / Error / 效能完成 | 完整 E2E Demo；壓測與渲染測試分開驗證 | 新功能膨脹 |
-| **W6** | 職能社群形成 | 可進 Developer Office / Design Studio / AI Lab，可認領工作桌 | 技能與場景推薦合理；共用同一 3D 元件系統 | Team Formation |
-| **W7** | Presence 變成媒合訊號 | 能表示 Available、Hiring、正在找什麼角色 | 媒合狀態清楚但頭頂不過載 | 專案資源整合 |
-| **W8** | 案件變成隊伍 | Project 可視覺化 Founder / Team / Open Roles，可從人才頁邀請 | 角色缺口與成員狀態一致；成軍後空間同步 | Community |
-| **W9** | Project Room 變成工作入口 | 房內看得到 Team/Presence/Seats，集中外部資源 | 外部資源可管理與開啟 | 內建文件／影音協作 |
-| **W10** | 世界可導航 | 可透過地圖、快速移動、Online Count 找目的地 | 不必靠走路完成高頻任務 | 活動功能 |
-| **W11** | 社群活動成立 | 可辦 Demo Day、Networking、Meetup | 活動列表→進場→Presence/Chat 流程完整 | 複雜直播系統 |
-| **W12** | 完整產品閉環 | 新手知道怎麼玩，舊使用者知道回來做什麼 | 新手首輪與回訪流程清楚 | 再新增大型模組 |
+| 帳號與 Onboarding | 暱稱登入、Session、持續身分、首次 Avatar Creator | 降低進入門檻並建立世界身分 | 登入 / Avatar Preview | `FE-A01`–`FE-A06` |
+| Avatar | Body、Hair、Hair Color、Outfit、Outfit Color、Skin、即時 Preview | 每個人外觀不同且風格一致 | 所有 3D 場景 | `FE-A05`、`FE-W08` |
+| Profile | Display Name、Skills、Hours、Bio、Avatar | 快速判斷合作對象 | DOM Panel | `FE-A04`、`FE-B04` |
+| 發案與案件營運 | 建立案件、Open Roles、編輯已發布、我的案件、招募狀態、有效期 | 形成案件供給，且發案者管得動 | Marketplace / DOM | `FE-J01`–`FE-J04`、`FE-J11`、`FE-M01` |
+| 探索 | 案件與人才列表、搜尋篩選、匹配訊號、收藏與儲存搜尋、深連結 | 找得到、也回得來 | Marketplace | `FE-B01`–`FE-B09` |
+| 應徵 | 對單一 Open Role 應徵、七種申請狀態、我的應徵、應徵者管理與批次婉拒 | 求職端看得到進度，發案端比較得了 | Marketplace / DOM | `FE-M02`–`FE-M05` |
+| 主動邀請 | 候選名單、邀請、我的邀請、邀請的邊界 | 發案者不必等人上門 | 人才頁 / DOM | `FE-M06`–`FE-M09` |
+| 媒合意圖 | 結構化的「正在找什麼」、可暫停、會過期 | 把 Presence 轉成媒合訊號 | Office / Profile | `FE-M10` |
+| 洽談與成立 | 綁在應徵上的對話串、條件修訂、約時間、Offer、失敗路徑、雙方確認 | 從有意願走到真的成軍 | DOM | `FE-N01`–`FE-N06` |
+| 團隊與生命週期 | 執行狀態、狀態轉移規則、團隊名單與角色、退出與移除、結案確認、團隊脈搏 | 專案有始有終，不只有「刊登」 | Project Detail / Room | `FE-J05`–`FE-J10` |
+| 通訊與通知 | Inbox、交易必要通知、回訪通知、場景 chat、狀態文字 | 陌生人第一接觸 ＋ 進度不用自己重整 | DOM / 所有場景 | `FE-K01`–`FE-K05` |
+| 信任與邊界 | 事實型聲譽、作品與外部身分、封鎖靜音、檢舉、合作後回饋 | 匿名不是問題，可被任意冒充才是 | Profile / DOM | `FE-T01`–`FE-T05` |
+| Presence 與即時 | Online、Status、Online Count、位置同步、斷線復原 | 建立「大家同時在這裡」 | 所有場景 | `FE-R01`–`FE-R12` |
+| 空間裡正在發生的事 | 公開活動物件、可旁觀、漸進式接近、群體訊號、分級可見度、共享儀式、冷啟動 | **3D 存在的理由** | 所有場景 | `FE-V02`–`FE-V06`、`FE-V09`、`FE-V10` |
+| 專案空間 | Project Door、Seat、Team、Room Chat、外部資源、房間門禁 | 成軍後的共同空間 | Project Room | `FE-W16`、`FE-J13`、`FE-J14`、`FE-N07`、`FE-N08` |
+| 世界導覽 | 場景地圖、快速移動、Online Count | 世界變大後仍可導航 | Guild Hall / Global UI | `FE-V11` |
+| 平台與交付 | 資料層契約、本地後端、契約測試、效能預算、部署、可觀測性 | **功能不必等後端** | — | `FE-O01`–`FE-O18` |
 
-## 階段邊界
+## 資料從哪裡來
 
-| 階段 | 週 | 必須交付 | 可以延後 | 核心指標 | 原則 |
-|---|---|---|---|---|---|
-| **MVP** | W1–W5 | 發案/接案/找人才、Avatar、Presence、Chat、四大場景 | Skill Spaces、Looking For、Events | 核心流程走通、多人穩定 | **不再塞新功能** |
-| **媒合深化** | W6–W10 | 技能場景、工作桌、Looking For、Team Formation、Project Resources、世界導覽 | Community Events | 媒合互動率、組隊完成率 | 空間功能必須服務媒合 |
-| **社群閉環** | W11–W12 | Events、Event Space、Discovery、Retention | 更大型社群／遊戲化 | 回訪、活動參與、未讀/最近專案回流 | **不做 MMORPG 化** |
+後端（`GuildHub-backend`）已經寫完第一版，它不支援上面大部分東西。**但那不擋任何事。**
+
+前端有自己的後端：`FE-O01` 一份契約、`FE-O02` 唯一的資料存取路徑、
+`FE-O03` Next.js Route Handlers、`FE-O04` 可拋棄的 Postgres、
+`FE-O05` 同一組契約測試對本地與真後端各跑一次、`FE-O08` 定期切過去演練。
+功能先做完，之後再銜接。
+
+**這條路唯一的危險**：本地後端什麼都做得到，於是會養成真後端永遠滿足不了的期待。
+防它的只有三條，缺一條就垮 —— 一份契約兩個實作、元件裡不准出現 `fetch`、
+同一組測試跑兩邊。而且本地版要**刻意複製真後端的怪癖**
+（狀態超過 12 字靜默丟棄、自己的 `move` 會廣播回自己、握手失敗不給 `err`）。
+本地版比真後端好用，就是在製造假象。
+
+真後端現在做不到的 27 件事列在 WBS 的 `BE-G` —— 那是給後端讀的銜接清單，
+不是我們的待辦。
+
+## 不做的事
+
+| 不做 | 為什麼 |
+|---|---|
+| 金流、託管、收付款 | 明確排除（`BE-G18`）。但**預算欄位跟金流是兩件事** —— 案子沒有預算、應徵沒有報價，兩邊無從判斷要不要談，所以欄位要做（`BE-G20`） |
+| 推薦演算法 | 資料量不足時它只是把稀少內容重新排序。先做可解釋的匹配訊號：技能符合 3/4、工時符合、時區重疊、預算符合（`FE-B06`） |
+| 五星評價 | 容易失真、互相做人情、懲罰新手。先做事實型聲譽：完成專案數、準時或中途退出、回覆率、帳號年齡（`FE-T01`） |
+| MMORPG 化 | 沒有等級、裝備、經濟系統。空間功能必須服務媒合，服務不到就砍 |
+| 內建文件／影音協作 | Project Room 不重做 GitHub / Figma / Notion，只集中入口（`FE-J14`） |
+| 複雜直播系統 | Event Space 是聚會場所，不是串流平台 |
+| 活動追蹤 | 後端明文永久不做（`BE-G17`）。這條會連帶影響可觀測性的做法 |
+
+## 相關文件
+
+| 檔案 | 放什麼 |
+|---|---|
+| `docs/WBS.md` | **工作項目、週次、里程碑、跨項依賴。排程只有這一份** |
+| `CONTEXT.md` | domain 詞彙、前後端語彙落差、3D 憑什麼存在 |
+| `docs/DECISIONS.md` | 難逆轉的決策與當時的理由 |
+| `docs/adr/` | 架構決策紀錄 |
+| `workflow/STATE.md` | 目前階段與允許的下一個動作 |
