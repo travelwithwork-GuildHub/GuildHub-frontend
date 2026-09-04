@@ -63,13 +63,24 @@ run() {
 }
 
 # sed 在 macOS 與 GNU 上的 -i 語意不同，改用 python 做代換。
-edit() { python3 - "$W/docs/WBS.md" "$1" "$2" <<'PY'
+#
+# **代換失敗一定要當場停下來。** 找不到要改的字串卻繼續跑，
+# 後面那個 run 會拿沒被改過的檔案去測 —— 它會報「期望紅、實際綠」，
+# 讓人以為是被測的檢查壞了，其實是測試腳本自己壞了。（踩過。）
+edit() {
+  python3 - "$W/docs/WBS.md" "$1" "$2" <<'PY'
 import io, sys
 path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
 t = io.open(path, encoding="utf-8").read()
-assert old in t, f"測試腳本自己壞了：找不到 {old!r}"
+if old not in t:
+    sys.exit(1)
 io.open(path, "w", encoding="utf-8").write(t.replace(old, new, 1))
 PY
+  if [ $? -ne 0 ]; then
+    echo "✗ 測試腳本自己壞了：edit 找不到要代換的字串"
+    echo "    $1"
+    exit 1
+  fi
 }
 
 echo "progress.sh --check 的負向測試"
