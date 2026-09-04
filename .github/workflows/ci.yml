@@ -81,6 +81,27 @@ jobs:
       - name: Spec
         run: npx openspec validate --all --strict
 
+      # 工作分解表自己訂的規則。
+      #
+      # 為什麼它在 CI 而 check-ruleset.sh 不在：這一支**不需要任何額外權限**，
+      # 只讀 repo 裡的檔案；ruleset 那支要 administration:read，為它擴大
+      # CI 的權限面不划算。判準是權限，不是重要性。
+      #
+      # 驗的是：標記要附理由、互斥的處置不得並存、缺口要有決策期限與
+      # fallback、**工作的週次必須嚴格晚於它依賴的裁決期限**、依賴不得懸空、
+      # 第一欄不是合法 ID 不得被當成續行。
+      #
+      # 加它的證據（依〈新增流程閘門的門檻〉，要有可重現的繞法）：
+      # 第一次跑就抓到 42 條真實違規；而且上面每一條都有負向測試
+      # （`test-progress-check.sh`），實測過在修好之前**全部靜默通過**。
+      - name: WBS
+        run: bash .github/scripts/progress.sh --check
+
+      # 上面那支閘門自己的測試。**閘門壞掉的方式是安靜的** ——
+      # 不會有東西變紅，只會有本來該紅的東西變綠。
+      - name: WBS gate tests
+        run: bash .github/scripts/test-progress-check.sh
+
       # ⚠️ Lint / Typecheck / Test / Build 暫時移除。
       #
       # 這個 repo 還沒有任何程式碼，package.json 那四個 script 是刻意會失敗的佔位。

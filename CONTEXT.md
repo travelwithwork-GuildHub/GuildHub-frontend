@@ -51,6 +51,17 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 | 沒提 | **狀態文字超過 12 字會被靜默丟棄**，舊狀態不變。前端一定要 `maxlength=12`，否則使用者以為壞了 |
 | 沒提 | **一條連線只屬於一個 scene。切場景等於關掉重開**，沒有 switch 訊息 |
 | 沒提 | **不合法的訊息一律靜默丟棄**，不回錯誤。送出去沒反應就是格式不對 |
+| FE-W09「顯示 Display Name」 | **世界裡每個人的名字都是「訪客」。** `main.py` 讀 `session["name"]`，而那個鍵在整個後端**從來沒有被設定過** |
+| FE-W10「六維 Avatar」 | **遠端玩家一律 avatar 0。** `presence.join()` 沒收 avatar；而且 `avatar_id` 的合約語意是「前端據此挑角色圖」，是**索引**，不是六維設定的編碼欄位 |
+| FE-P03/P05「搜尋 / 篩選 / Skills filter」 | **後端只有 offset 翻頁**（`PAGE_SIZE=20`，沒有 total／`has_more`），`list_profiles` 的 docstring 明寫「不做搜尋與篩選」。前端只能過濾**已載入的那 20 筆** —— 那不是搜尋，符合條件的人可能在下一頁 |
+| W12「未讀 Inbox」「回訪」 | **沒有寫得到 `read_at` 的端點**；而且 `POST /api/login` 每次都新建一張名片，**換裝置就永久失去身分** —— 回訪在後端層面不成立 |
+
+> **完整的缺口清單、證據、阻塞類型在 `docs/WBS.md` 的 `BE-G` 那一組。**
+> 其中有幾項是後端 `CLAUDE.md`〈不要實作的功能〉**明文排除**的
+> （釋放座位、訪客唯讀模式、moderation、OAuth、金流、行為追蹤）——
+> 那些不是漏做，**不要再提案**。
+>
+> 開任何 change 之前先跑：`bash .github/scripts/progress.sh --blocked`
 
 另外兩件跟 W1 驗收直接相關的：
 
@@ -72,14 +83,27 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 
 ## 場景
 
-| 場景 | 產品目的 | 導入 |
+**「場景」這個詞有兩個意思，混用會讓整組規劃失真：**
+
+| 用詞 | 意思 | 後端 |
 |---|---|---|
-| **Guild Hall** | 世界首頁／中央樞紐。所有場景都可以回到這裡 | W3 |
-| **Marketplace** | 發案／接案／找人才 | W4 |
-| **Office** | 工作 Presence／輕社交。讓「人正在工作」可被看見 | W4–W5 |
-| **Skill Spaces** | 按技能分流的人才空間（Developer Office / Design Studio / AI Lab） | W6 |
-| **Project Room** | 成軍後的專案空間 | W4 |
-| **Event Space** | 社群活動／留存 | W11 |
+| **視覺分區** | 同一個 `lobby` 裡走得到的不同區域。換的是地板、家具、React 面板 | **支援**（不用動後端） |
+| **伺服器 scene** | 有獨立成員名單、聊天隔音、各自 online count | **只有 `lobby` 與 `room:{id}`** |
+
+後端的 `_SCENE_ID` 是 `^(lobby|room:[0-9a-zA-Z\-]+)$`，而且**一條連線只屬於
+一個 scene，切場景＝關掉重開**。下表「導入」欄位的週次是原始規劃寫的，
+**不代表後端支援得了** —— 先看最後一欄。
+
+| 場景 | 產品目的 | 導入 | 後端 |
+|---|---|---|---|
+| **Guild Hall** | 世界首頁／中央樞紐。所有場景都可以回到這裡 | W3 | 就是 `lobby` |
+| **Project Room** | 成軍後的專案空間 | W4 | 就是 `room:{id}`。**唯一另一個真的 scene** |
+| **Marketplace** | 發案／接案／找人才 | W4 | 只能是 `lobby` 的**視覺分區** |
+| **Office** | 工作 Presence／輕社交 | W4–W5 | 同上 |
+| **Skill Spaces** | 按技能分流的人才空間 | W6 | 同上，而且「同領域的人聚在這裡」需要獨立 Presence —— **做不出原本的產品意圖** |
+| **Event Space** | 社群活動／留存 | W11 | 同上，而且沒有 Events 資料模型 |
+
+**用詞先裁決**（BE-G09），再寫任何場景的規格。
 
 ## 詞彙
 
@@ -88,7 +112,8 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 | **Presence** | 誰在線、在哪個場景、什麼狀態 | **不是** chat。也不是「最後上線時間」—— 它是即時的 |
 | **Realtime 資料** | position、presence、chat | **不落 DB。** refresh 後清空，這是刻意的，不是還沒做 |
 | **持久資料** | Profile、Project、Inbox、Room、Seat | **不是**全部資料。上面那三種不算 |
-| **Avatar Configuration** | Body / Hair / Hair Color / Outfit / Outfit Color / Skin 的設定值 | **不是**模型檔。DB 存設定，不存 `.glb` |
+| **`avatar_id`** | 後端存的**單一 `smallint`**。整合指南寫「前端據此挑角色圖」，所以它是**角色索引** | **不是**六維設定的編碼欄位，也**不是**模型檔。把它當成位元編碼是**重新詮釋合約**（BE-G04） |
+| **Avatar Configuration** | Body / Hair / Hair Color / Outfit / Outfit Color / Skin 的設定值 | **不是**模型檔。**目前後端沒有地方存這六維**，而且 Presence 也不傳 avatar（BE-G03） |
 | **Procedural Avatar** | 由 primitive（RoundedBox / Capsule / Sphere）組出來的 Chibi 角色 | **不是**載入外部模型。Local 與 Remote 共用同一套 |
 | **Project Door** | Guild Hall 走廊上，一個 active project 的空間入口 | **不是** Project Room 本身。它是門，不是房間 |
 | **Seat** | Project Room 裡的座位 | **不是** Personal Desk |
@@ -100,7 +125,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 | **40 Browser Gate** | 40 個真實 Chromium / R3F browser 的 E2E 壓測 | **不是** 40 個 WebSocket fake client。那是另一條 network baseline 測試 |
 | **39 Remote** | 單一 browser 同畫面渲染 1 local + 39 remote 的**渲染**測試 | **不是**壓測。跟 40 Browser Gate **分開驗證**，不要混在一起 |
 | **Room Password** | 成軍時強制設定，進 Project Room 要輸入 | **不是**帳號密碼。它綁專案，不綁人 |
-| **Guest** | 可移動、看玩家、看板的訪客 | **不是**「還沒填暱稱的人」。Guest 有暱稱和 avatar，只是不能發案 / 寄信 / 進房 |
+| **Guest** | ~~可移動、看玩家、看板的訪客~~ | **後端沒有這個角色，而且明文排除「訪客唯讀模式與相關 gate」**（BE-G08）。`/api/login` 只要暱稱就發正式身分。前端把按鈕變灰**不是權限邊界** —— 做了只會給人虛假的安全感 |
 
 ## Project lifecycle
 
