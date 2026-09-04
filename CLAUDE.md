@@ -6,7 +6,8 @@ Claude Code 進入此 Repository 後：
 2. 跑 `git branch --show-current`，以及：
 
    ```bash
-   bash .github/scripts/progress.sh      # 61 個 WBS 項目現在各自在什麼狀態
+   bash .github/scripts/progress.sh      # 每個 WBS 項目現在各自在什麼狀態
+   bash .github/scripts/progress.sh --blocked   # 現在做不了的，以及被什麼擋住
    ```
 
    **那份是算出來的，沒有人維護它**，所以它不會漂。資料來自

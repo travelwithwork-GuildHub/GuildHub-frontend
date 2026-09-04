@@ -129,6 +129,35 @@ change id 與 slice 的分界，不需要任何消歧邏輯。
 例如 `fe-c01-appshell` 對應 `FE-C01`。這不是美觀問題 ——
 `progress.sh` 靠它把 change 對回 WBS，對不上的會被單獨列成紅字。
 
+### 開 change 之前先看它擋在哪
+
+`docs/WBS.md` 有兩欄是**人寫的**，其他狀態都是 `progress.sh` 算的：
+
+| 欄 | 放什麼 |
+|---|---|
+| `阻塞` | `BE-缺`（後端還沒提供）／`BE-拒`（後端**明文不做**）／`待裁決`／`外部` |
+| `標記` | `Cancelled`／`Pending`／`TBD`／`Alarm`／`Regular`，**後面接 `｜` 與理由** |
+
+規則：
+
+- **週次是排程的證據。** 沒有週次（寫 `—`）的項目就是現在做不了 ——
+  不要替它開 change
+- **`BE-拒` 不要再提案。** 那是後端 `CLAUDE.md`〈不要實作的功能〉裡明列的，
+  要翻案得先翻後端的產品決策，不是前端寫個 workaround
+- **`Cancelled` 的列不刪。** 「考慮過並決定不做」跟「沒想到」是兩件事，
+  刪掉之後沒有人分得出來
+- **`BE-G` 那一組沒有週次也沒有點數**，因為完成時間不由前端控制。
+  給它排週次就是在假裝我們排得動
+
+```bash
+bash .github/scripts/progress.sh --blocked   # 現在做不了的，以及被什麼擋住
+bash .github/scripts/progress.sh --check     # 有規則違規就以非零結束
+```
+
+`--check` 驗的是這張表自己訂的規則：標記要附理由、互斥的處置不得並存、
+缺口要有決策期限與 fallback、**工作的週次必須嚴格晚於它依賴的裁決期限**。
+**改了 `docs/WBS.md` 就跑一次。** 那些規則如果只寫在文件裡，它們就只是規範。
+
 判定在 `.github/scripts/check-pr-branch.sh`，它的測試在旁邊：
 
 ```bash
@@ -149,11 +178,15 @@ bash .github/scripts/test-check-pr-branch.sh
 
 ## 注意力預算
 
-**這套流程最終的信任錨是三個人的 approval，而 agent 的產出速度沒有上限。**
+**這套流程最終的信任錨是有人真的把 diff 讀過，而 agent 的產出速度沒有上限。**
 
-上面所有的閘門都在保護「人類有批准」這件事，但**沒有任何機制能保護
-「人類批准的時候真的有在看」** —— approve 的簽章永遠是真的，
-橡皮圖章偵測不出來。所以稀缺資源不是 CI 算力，是人的注意力。
+**而且現在連「有人按過批准」都沒有機制保證** —— ruleset 的
+`required_approving_review_count` 是 0，作者可以自己合併（見上面那張表第一列）。
+所以閘門擋得住的只有形狀（分支、路徑、結構），擋不住的是內容。
+
+就算把批准要求加回來，也**沒有任何機制能保護「批准的時候真的有在看」** ——
+approve 的簽章永遠是真的，橡皮圖章偵測不出來。
+所以稀缺資源不是 CI 算力，是人的注意力。
 
 | 上限 | 值 | 為什麼 |
 |---|---|---|
@@ -209,6 +242,7 @@ bash .github/scripts/test-check-pr-branch.sh
 | `check-pr-branch.sh` 的 `archive/` 那條 | 封存的內容跟 main 上那份**逐檔 blob 相同**（不是只看檔案有沒有被刪） | `openspec/specs/` 有沒有被另一個 change 覆蓋掉 |
 | `chore/` 的 bytes 上界 | review 面積小到人讀得完（lockfile 另有上界，不是無限） | 「這不是功能」。80 行的功能可以冒充 chore |
 | `openspec validate --strict` | 規格的**結構**：有沒有 Scenario、Purpose 夠不夠長 | 規格的**內容**對不對 |
+| `progress.sh --check` | 工作分解表的**形式**：標記附了理由、互斥的處置沒有並存、缺口有決策期限與 fallback、工作沒有排在它依賴的裁決之前、依賴不懸空；以及**解析本身 fail-closed**（表頭畸形、表格被截斷、欄數對不上、ID 重複或漏掉都會紅，不會安靜跳過） | **那些理由與 fallback 寫得對不對**。「`Pending｜等後端`」格式完全合法，內容等於沒說 |
 | `archive/` 的雙重 validate | tasks 全部完成、archive 後 main spec 不會紅 | `openspec/specs/` 有沒有被另一個 change 覆蓋掉 |
 
 **最重要的那一格是空的：沒有任何機制能證明 diff 對應規格。**
@@ -350,9 +384,22 @@ gh api repos/travelwithwork-GuildHub/GuildHub-frontend/rulesets/21930388 \
 3. `tasks.md` 沒有殘留的 `- [ ]`
 4. lint / typecheck / tests / build 全綠，**貼出實際輸出**
 5. CI 在 PR 上綠燈
-6. CODEOWNERS review 通過
+6. **橫向面在這一項裡就處理完，不是留給以後**：
+   - 使用者輸入的顯示沒有走 `dangerouslySetInnerHTML`；外開連結有 `rel="noopener noreferrer"`
+   - 鍵盤走得完（含 Escape 與 focus trap），而且**沒有跟 WASD 打架**
+   - 有空狀態與錯誤狀態，不是只有 happy path
+   - 送出的每個欄位都有前置驗證（**後端刻意不擋長度**，超長只會拿到資料庫錯誤）
+
+   `docs/WBS.md` 的 `FE-X` 那一組是**共用機制與稽核**，
+   **不是**把上面這幾條延後的地方。一旦允許「之後 FE-X 再補」，它們就不會被補。
 
 散文式的「已完成」不算證據。
+
+> **目前沒有「要別人批准」這一條。** ruleset 的
+> `required_approving_review_count` 是 `0`，作者可以自己合併 ——
+> 這是 2026-09-04 刻意放寬的，理由與代價寫在 `.github/ruleset.json` 的
+> `_review_note`。**不要憑記憶寫「要 CODEOWNERS 批准」**，
+> 實際設定用 `bash .github/scripts/check-ruleset.sh` 查。
 
 合併之後才 `/opsx:archive`，讓 delta 同步進 `openspec/specs/`。
 **沒 archive 的 change 等於這次的成果沒有進入系統的現況描述。**
