@@ -4,7 +4,7 @@
 #     bash .github/scripts/progress.sh            # 只看有動靜的
 #     bash .github/scripts/progress.sh --all      # 連還沒開始的一起列
 #     bash .github/scripts/progress.sh --week W1
-#     bash .github/scripts/progress.sh --blocked  # 現在做不了的，以及被什麼擋住
+#     bash .github/scripts/progress.sh --blocked  # 不在自己手上的，以及誰依賴它
 #     bash .github/scripts/progress.sh --check    # 有規則違規就以非零結束
 #
 # **這份是算出來的，不是寫出來的。** 沒有任何人維護它。
@@ -34,7 +34,9 @@
 #
 # 第六、七欄是選填的**阻塞**與**標記**：
 #
-#   阻塞  這一項被什麼擋住（例如 `BE-缺`、`待裁決`、`外部`）。非空就算被擋住。
+#   阻塞  這一項被什麼擋住。**分兩種，差很多**：
+#         「還沒規劃到」是需求，不是牆 —— 這種項目照樣排週次；
+#         「明文不做」才是牆。詳見 docs/WBS.md 的阻塞類型表。
 #   標記  算不出來的人為決定：Cancelled / Pending / TBD / Alarm，後面接理由。
 #
 # 為什麼要有這兩欄：**有些狀態機器永遠猜不到。** git 看得出「有沒有開分支」，
@@ -295,7 +297,7 @@ if wbs_path.exists():
             # `BE-GO1`（字母 O）、`BE-GXX` 這種**看起來像依賴、卻不是合法 ID**
             # 的東西，原本會直接從 blockers 消失 —— 既不報格式錯，
             # 後面「工作不得排在裁決之前」那條也就跟著不驗。
-            # 阻塞類型（`BE-缺`、`BE-拒`）是中文，配不到下面這個 pattern。
+            # 阻塞類型的名稱是中文，配不到下面這個 pattern。
             for tok in re.findall(r"[A-Za-z]+-[A-Za-z0-9]+", plain(blocked)):
                 if not re.fullmatch(r"[A-Z]+-[A-Z][0-9]+", tok):
                     violations.append(
@@ -414,7 +416,7 @@ for wid in order:
         else:
             state, detail, colour = "已取消", reason, D
     elif cid is None and not schedulable and (blocked or mark_word in ("Pending", "TBD")):
-        state = "待裁決" if mark_word == "TBD" else "被擋住"
+        state = "待裁決" if mark_word == "TBD" else "等外部"
         detail, colour = blocked or mark, R
     elif cid is None:
         state, detail, colour = "未開始", "", D
@@ -450,7 +452,7 @@ for wid in order:
 
     tally[state] += 1
     by_group[re.sub(r"[0-9]+$", "", wid)][state] += 1
-    if ONLY_BLOCKED and state not in ("被擋住", "待裁決"):
+    if ONLY_BLOCKED and state not in ("等外部", "待裁決"):
         continue
     if state == "未開始" and not (SHOW_ALL or ONLY_BLOCKED):
         continue
@@ -550,20 +552,20 @@ if total:
     if blocks:
         # 「這個缺口解掉，會解鎖幾件事」—— 這是決定先問哪一個的依據。
         print()
-        print(f"{B}缺口擋住了什麼{X}（依解鎖數排序）：")
+        print(f"{B}哪些項目依賴外部{X}（依影響範圍排序）：")
         for gap, ids in sorted(blocks.items(), key=lambda kv: (-len(kv[1]), kv[0])):
             names = "、".join(sorted(ids))
-            print(f"{R}  {gap:<8}{X} 解鎖 {len(ids)} 項：{D}{names}{X}")
+            print(f"{R}  {gap:<8}{X} 影響 {len(ids)} 項：{D}{names}{X}")
         print()
     if tally.get("矛盾"):
         print(f"{R}⚠ {tally['矛盾']} 項標記與實際狀態打架{X}"
               f"（標了 Cancelled 卻已經封存）—— 兩邊只有一邊是對的，去改。")
-    stuck = tally.get("被擋住", 0) + tally.get("待裁決", 0)
+    stuck = tally.get("等外部", 0) + tally.get("待裁決", 0)
     if stuck:
-        print(f"{R}其中 {stuck} 項現在做不了{X}（阻塞或待裁決）——"
-              f" 用 --blocked 看是被什麼擋住的。")
-        print(f"{D}把它們算進「未開始」會讓進度看起來只是慢，"
-              f"其實是**卡住**，而那是兩件事。{X}")
+        print(f"{R}其中 {stuck} 項不在自己手上{X}（等外部或待裁決）——"
+              f" 用 --blocked 看是哪些。")
+        print(f"{D}把它們算進「未開始」會讓進度看起來只是慢 ——"
+              f"「還沒做」跟「不由我決定」是兩件事。{X}")
     if not (SHOW_ALL or ONLY_BLOCKED) and tally.get("未開始"):
         print(f"{D}（{tally['未開始']} 項未開始沒有列出，用 --all 看全部）{X}")
 
