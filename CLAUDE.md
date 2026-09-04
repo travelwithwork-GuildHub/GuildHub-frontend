@@ -6,16 +6,30 @@ Claude Code 進入此 Repository 後：
 2. 跑 `git branch --show-current`，以及：
 
    ```bash
-   bash .github/scripts/progress.sh      # 每個 WBS 項目現在各自在什麼狀態
+   bash .github/scripts/progress.sh             # 每個工作項目現在各自在什麼狀態
    bash .github/scripts/progress.sh --blocked   # 現在做不了的，以及被什麼擋住
+   bash .github/scripts/progress.sh --check     # 工作分解表自己的規則（CI 也在跑）
    ```
 
    **那份是算出來的，沒有人維護它**，所以它不會漂。資料來自
    `docs/WBS.md`、`openspec/changes/`、遠端分支。
-3. 讀 `CONTEXT.md` 與那個 change 的 artifacts。
-   **`CONTEXT.md` 有一節〈後端在哪、合約的真實來源〉—— 一定要讀。**
-   後端已經存在，而 `docs/ROADMAP.md` 與 `docs/WBS.md` 是在它存在之前寫的，
-   即時層的敘述**對不上至少七處**。寫規格以 `protocol.py` 為準。
+
+   **改了 `docs/WBS.md` 一定要跑 `--check`。** 它會擋下沒寫理由的標記、
+   互斥的處置、缺口少了決策期限或 fallback、
+   **工作排在它依賴的裁決之前**，以及各種讓整段表格靜默消失的格式錯誤。
+3. 讀 `CONTEXT.md` 與那個 change 的 artifacts。**這兩節一定要讀**：
+   - 〈後端在哪、合約的真實來源〉—— 後端已經存在，而 `docs/ROADMAP.md`
+     是在它存在之前寫的，即時層的敘述**對不上至少十處**。
+     寫規格以 `protocol.py` 為準
+   - 〈⚠️ 3D 憑什麼存在〉—— 如果做出來的東西是「走過去按 E 開面板」，
+     那 3D 就是一條很貴的導覽列。要做的是**可旁觀、可漸進加入**的那一種
+
+   **沒有任何一項在等後端。** 前端有自己的後端（`docs/WBS.md` 的 `FE-D`）：
+   Next.js Route Handlers ＋ 一個可拋棄的資料庫。功能先做完，之後再銜接。
+   `待銜接` 的意思是「之後要跟真後端對齊」，不是「現在做不了」。
+
+   **元件裡不准出現 `fetch`。** 所有資料存取走 `src/api/`，
+   環境變數決定連本地後端還是真後端 —— 散在各處的話，之後銜接是重寫不是切換。
 4. 確認規格在 PR 上談定了沒有 —— **沒有就不要寫產品程式碼**。
 5. 除非使用者指定其他語言，對人類使用繁體中文。
 

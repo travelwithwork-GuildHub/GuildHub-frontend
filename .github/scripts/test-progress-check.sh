@@ -38,7 +38,7 @@ baseline() {
 | FE-C01 | AppShell | 專案骨架 | W1 | 3 | | |
 | | | 全域 Layout | W1 | 2 | | |
 | FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | |
-| | | 搜尋與篩選 | — | — | BE-G01 `BE-缺` | Pending｜後端沒有 |
+| | | 搜尋與篩選 | W2 | 3 | BE-G01 `BE-缺` | Pending｜後端沒有 |
 | FE-O10 | 文件維護 | 常態 | 常態 | — | | Regular｜沒有完成點 |
 WBS
   ( cd "$W" && git init -q 2>/dev/null; git -C "$W" add -A 2>/dev/null; ) >/dev/null 2>&1
@@ -63,13 +63,24 @@ run() {
 }
 
 # sed 在 macOS 與 GNU 上的 -i 語意不同，改用 python 做代換。
-edit() { python3 - "$W/docs/WBS.md" "$1" "$2" <<'PY'
+#
+# **代換失敗一定要當場停下來。** 找不到要改的字串卻繼續跑，
+# 後面那個 run 會拿沒被改過的檔案去測 —— 它會報「期望紅、實際綠」，
+# 讓人以為是被測的檢查壞了，其實是測試腳本自己壞了。（踩過。）
+edit() {
+  python3 - "$W/docs/WBS.md" "$1" "$2" <<'PY'
 import io, sys
 path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
 t = io.open(path, encoding="utf-8").read()
-assert old in t, f"測試腳本自己壞了：找不到 {old!r}"
+if old not in t:
+    sys.exit(1)
 io.open(path, "w", encoding="utf-8").write(t.replace(old, new, 1))
 PY
+  if [ $? -ne 0 ]; then
+    echo "✗ 測試腳本自己壞了：edit 找不到要代換的字串"
+    echo "    $1"
+    exit 1
+  fi
 }
 
 echo "progress.sh --check 的負向測試"
@@ -110,6 +121,8 @@ edit "**【沒答案就】**介面誠實地叫「瀏覽」" "**【沒答案就�
 run 1 "貼了 fallback 標籤但沒寫處置：紅" "沒有寫出實質的處置"
 
 # ── 排程自我矛盾 ──────────────────────────────────────────────────
+# **被擋住的那一列自己要有週次**才會進入這條檢查 —— 阻塞寫在列上，
+# 所以比對也是逐列的。沒有週次的列代表沒排程，沒有矛盾可言。
 baseline
 edit "| 決策≤W1 |" "| 決策≤W2 |"
 run 1 "工作排在它依賴的裁決同一週：紅" "之前或同週"
