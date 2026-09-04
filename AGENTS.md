@@ -131,7 +131,8 @@ change id 與 slice 的分界，不需要任何消歧邏輯。
 
 ### 開 change 之前先看它擋在哪
 
-`docs/WBS.md` 有兩欄是**人寫的**，其他狀態都是 `progress.sh` 算的：
+`docs/WBS.md` 有兩欄是**人寫的**，其他狀態都是 `progress.sh` 算的。
+**算出來的那些狀態各自是什麼意思**，見 `docs/WBS.md` 開頭的對照表：
 
 | 欄 | 放什麼 |
 |---|---|

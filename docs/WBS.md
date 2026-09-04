@@ -59,6 +59,35 @@ bash .github/scripts/progress.sh --check    # 有規則違規就以非零結束
 
 `決策≤Wn` 是**決策期限**，不是後端的交付估時 —— 兩者不衝突。
 
+### `progress.sh` 印出來的狀態是什麼意思
+
+**這些字沒有人寫，全部是算出來的。** 下面是它們各自代表什麼、從哪裡推導的：
+
+| 狀態 | 意思 | 怎麼算出來的 |
+|---|---|---|
+| `未開始` | 有排週次，還沒有人動 | 找不到對應的 change，也沒有分支 |
+| `規格審查中` | 規格 PR 開著 | 有 `spec/<id>` 遠端分支 |
+| `規格已合併` | 規格進 main 了，還沒開始實作 | `openspec/changes/<id>/` 存在 |
+| `實作中` | 有人正在寫 | 有 `feat/` 或 `fix/` 遠端分支 |
+| `已封存` | 做完並 archive 了 | 在 `openspec/changes/archive/` 裡 |
+| `等外部` | **不在我們手上。** 排不了週次，在等別人 | 沒有週次 ＋ 標記 `Pending` 或有 `阻塞` |
+| `待裁決` | **還沒決定要不要做。** 需求本身沒定案 | 沒有週次 ＋ 標記 `TBD` |
+| `已取消` | 決定不做，或被別的項目取代 | 標記 `Cancelled` |
+| `常態` | 沒有完成點的持續性工作 | 標記 `Regular` |
+| `矛盾` | 標了不做、卻有 change 已經封存 | 兩份紀錄打架，**腳本不挑一邊信** |
+
+前五個是**事實**（git 與 OpenSpec 證明得了），後五個來自**人寫的標記**。
+分野就在這裡：可以算的不要讓人寫，算不出來的才由人寫。
+
+**`已取消` 有兩種，理由欄會寫明是哪一種**：
+
+| | 例子 |
+|---|---|
+| **被別的項目取代** | `FE-S07 TeamFormation` → 由 `FE-M09 洽談` ＋ `FE-M10 Offer` 取代 |
+| **後端明文排除** | `FE-Q04 GuestMode` → 後端 `CLAUDE.md` 排除「訪客唯讀模式與相關 gate」 |
+
+第二種**在本地後端做得出來，但上不了線**。要做之前先把這件事講清楚。
+
 ### 標記的意思
 
 寫法固定是 **`標記｜理由`**。沒有理由的標記等於沒有標記 ——
@@ -152,11 +181,11 @@ bash .github/scripts/progress.sh --check    # 有規則違規就以非零結束
 | BE-G07 | **沒有釋放座位的端點** | `seats.py:29`「已於 WBS v0.2 砍除」；`test_contract.py` 的 `FORBIDDEN` 明列 DELETE。只有結案會整批清座位 | — | — | `BE-拒` | Cancelled｜「Owner Release Seat」不做 |
 | BE-G08 | **沒有訪客唯讀模式** | `CLAUDE.md`〈不要實作的功能〉：「訪客唯讀模式與相關 gate」。Guest 只能是 UI 上的說明，**不是權限邊界** —— 純前端禁用按鈕擋不住任何人 | — | — | `BE-拒` | Cancelled｜FE-Q04 不做 |
 | BE-G09 | **scene 只有 `lobby` 與 `room:{id}`** | `scenes.py:11`，而且一條連線只屬於一個 scene，切場景＝關掉重開。**先裁決用詞**：Marketplace／Office 要的是「視覺分區」（前端可做）還是「有獨立 Presence、隔音、各自 online count 的伺服器 scene」（後端不支援）。**同一個詞混用會讓 W4 之後整組規劃失真** —— **最晚 W4 開工前要答案。** 沒答案就一律做成 `lobby` 的視覺分區，並在 CONTEXT 寫明 online count 是全世界的。 **【沒答案就】**一律做成 `lobby` 的視覺分區，並在 `CONTEXT.md` 寫明 online count 是全世界的。 | 決策≤W3 | — | 待銜接 + `待裁決` | Alarm｜擋住 FE-S02/03/04/10/12 |
-| BE-G10 | **沒有 team／role／application／invitation 任何模型** | `form-team`（`projects.py:132`）只是把 project 改成 active 並產生房間密碼。`deps.py:23` 明定「不做成員制，只有發起人與其他人兩種身分」。W7–W9 **不是少一顆按鈕，是整個 domain model 不存在** **【沒答案就】**接案維持「寄信給發起人」，不做組隊。 | 決策≤W5 | — | 待銜接 | TBD｜要不要做組隊還沒裁決，而且後端明定「不做成員制」 |
+| BE-G10 | **沒有 team／role／application／invitation 任何模型** | `form-team`（`projects.py:132`）只是把 project 改成 active 並產生房間密碼。`deps.py:23` 明定「不做成員制，只有發起人與其他人兩種身分」。W7–W9 **不是少一顆按鈕，是整個 domain model 不存在** **【沒答案就】**接案維持「寄信給發起人」，不做組隊。 | 決策≤W5 | — | 待銜接 | Pending｜本地先做（FE-M 整組），等後端對齊 |
 | BE-G11 | **沒有新訊息通知** | `protocol.py` 裡只有場景 chat。只能輪詢 `GET /api/messages`，但沒有增量游標、收發混在同一份清單、又沒有已讀 mutation **【沒答案就】**不做通知，並在 UI 明說「狀態變化要自己重新整理」。 | 決策≤W3 | — | 待銜接 | Pending｜等後端加通知訊息，或改用輪詢 |
 | BE-G12 | **沒有 Project Resources / Meeting URL 欄位** | `sql/001_schema.sql` 的 projects 表沒有。FE-P12 與 FE-S08 **首先是資料來源不存在**，不是 UI 問題 **【沒答案就】**Meeting 與 Project Resources 都不做。 | 決策≤W3 | — | 待銜接 | Pending｜等後端加欄位 |
-| BE-G13 | **沒有 Events 模型** | 同上。W11 社群活動整個沒有地基 **【沒答案就】**不做社群活動。 | 決策≤W10 | — | 待銜接 | TBD｜社群活動要不要做還沒裁決 |
-| BE-G14 | **沒有 Personal Desk / Looking For 欄位** | 同上。W6–W7 同上 **【沒答案就】**不做 Personal Desk 與 Looking For。 | 決策≤W5 | — | 待銜接 | TBD｜工作桌與媒合訊號要不要做還沒裁決 |
+| BE-G13 | **沒有 Events 模型** | 同上。W11 社群活動整個沒有地基 **【沒答案就】**不做社群活動。 | 決策≤W10 | — | 待銜接 | Pending｜本地先做（FE-V06 共享儀式），等後端對齊 |
+| BE-G14 | **沒有 Personal Desk / Looking For 欄位** | 同上。W6–W7 同上 **【沒答案就】**不做 Personal Desk 與 Looking For。 | 決策≤W5 | — | 待銜接 | Pending｜本地先做（FE-M14 媒合意圖），等後端對齊 |
 | BE-G15 | **沒有 moderation／封鎖／檢舉／admin** | `CLAUDE.md`：「任何 `/api/admin/*`」。陌生人可以無限寄信與聊天，而且**沒有任何處置管道** | — | — | `BE-拒` | Cancelled｜要翻案得先翻後端的產品決策 |
 | BE-G16 | **沒有 rate limit；chat 沒有長度限制** | `protocol.py` 的 `ChatIn.body: str` 無限制；廣播是逐連線 `await`。前端自己節流，但那只擋住守規矩的人 | — | — | 待銜接 | Alarm｜洗版沒有任何東西擋得住 |
 | BE-G17 | **「任何形式的活動追蹤——永久不做」** | `CLAUDE.md`。可觀測性**只能做技術 telemetry**（錯誤、FPS、斷線率），**不能做使用者行為 analytics**。兩者不要混在同一個提案裡 | — | — | `BE-拒` | Cancelled｜只限行為 analytics |
