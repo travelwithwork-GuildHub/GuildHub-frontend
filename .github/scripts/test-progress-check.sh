@@ -36,6 +36,14 @@ baseline() {
 
 FE-Z99 已經改名。**這一節提到不存在的 ID 是它的工作**，不該被當成違規。
 
+## BE-G 外部缺口
+
+## FE-C 應用
+
+## FE-P 清單
+
+## FE-O 平台與交付
+
 ## 工作項目
 
 | ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 |
@@ -47,6 +55,21 @@ FE-Z99 已經改名。**這一節提到不存在的 ID 是它的工作**，不�
 | | | 搜尋與篩選 | W2 | 3 | BE-G01 `BE-缺` | Pending｜後端沒有 |
 | FE-O10 | 文件維護 | 常態 | 常態 | — | | Regular｜沒有完成點 |
 WBS
+  # 給 agent 的規範。它會直接點名「哪一組是本地後端」這種群組 ID，
+  # 而群組 ID 沒有數字，原本整套檢查都看不到它們。
+  cat > "$W/AGENTS.md" <<'AG'
+# 測試用的規範
+
+前端有自己的後端（`FE-O`）。缺口清單見 `BE-G`。
+`BE-拒` 是分類詞，不是群組 —— 不該被當成引用。
+`FE-C01` 是工作項目，`FE-C` 是它的群組。
+
+圍籬裡是格式範例，不是引用：
+
+```markdown
+| XYZ-Q99 | 範例 | 示範表格長相 | W1 | 3 | | |
+```
+AG
   # 產品意圖那一份。它沒有工作分解表，只靠 ID 指過來 ——
   # 檢查要掃它、而且**不能**因為它沒有表就報「找不到工作分解表」。
   cat > "$W/docs/ROADMAP.md" <<'RM'
@@ -84,6 +107,27 @@ run() {
   PASS=$((PASS + 1))
 }
 
+# run_absent <期望退出碼> <說明> <訊息裡**不該**出現的字>
+#
+# 只斷言「該出現的出現了」不夠 —— 一個誤報會照樣讓那種斷言通過。
+# 群組檢查最可能的誤報是把 `FE-C01` 的前四個字當成群組引用。
+run_absent() {
+  local want="$1" desc="$2" needle="$3"
+  local out rc
+  out="$(cd "$W" && bash .github/scripts/progress.sh --check 2>&1)"; rc=$?
+  if [ "$rc" != "$want" ]; then
+    echo "✗ ${desc} —— 期望退出碼 ${want}，實際 ${rc}"
+    FAIL=$((FAIL + 1)); return
+  fi
+  if printf '%s' "$out" | grep -q "$needle"; then
+    echo "✗ ${desc} —— 訊息裡不該出現「${needle}」，但它出現了"
+    echo "$out" | sed 's/^/      /' | head -20
+    FAIL=$((FAIL + 1)); return
+  fi
+  echo "✓ $desc"
+  PASS=$((PASS + 1))
+}
+
 # sed 在 macOS 與 GNU 上的 -i 語意不同，改用 python 做代換。
 #
 # **代換失敗一定要當場停下來。** 找不到要改的字串卻繼續跑，
@@ -91,6 +135,7 @@ run() {
 # 讓人以為是被測的檢查壞了，其實是測試腳本自己壞了。（踩過。）
 edit() { edit_in docs/WBS.md "$1" "$2"; }
 edit_roadmap() { edit_in docs/ROADMAP.md "$1" "$2"; }
+edit_agents()  { edit_in AGENTS.md "$1" "$2"; }
 
 edit_in() {
   python3 - "$W/$1" "$2" "$3" <<'PY'
@@ -287,6 +332,38 @@ run 0 "ROADMAP 沒有工作分解表：不影響綠燈" ""
 baseline
 edit_roadmap "FE-Z98 已經改名。" "FE-Z98 與 FE-Z97 都已經改名。"
 run 0 "ROADMAP 的〈舊 ID 去哪了〉可以提舊 ID：綠" ""
+
+# ── 群組 ID ───────────────────────────────────────────────────────
+# 群組 ID 沒有數字，原本整套檢查都看不到它們。重切群組之後 `FE-D`／`FE-I`
+# 這類引用在四個地方躺著沒人發現，其中兩個就在 docs/WBS.md 自己裡面。
+baseline
+edit_agents "前端有自己的後端（\`FE-O\`）" "前端有自己的後端（\`FE-D\`）"
+run 1 "AGENTS.md 提到不存在的群組：紅" "群組 FE-D 不存在"
+
+baseline
+edit "## FE-C 應用" "## FE-C 應用（改名了）"
+run 0 "群組標題後面的說明可以改：綠" ""
+
+# 工作項目的 ID 不可以被誤判成群組 —— `FE-C01` 的前四個字是 `FE-C`
+baseline
+edit_agents "\`FE-C01\` 是工作項目" "\`FE-C01\` 與 \`FE-C02\` 是工作項目"
+run 1 "項目不存在要報出來" "FE-C02 不存在"
+run_absent 1 "但不該順便把它的前四個字當成不存在的群組" "群組 FE-C 不存在"
+
+# `BE-拒` 是分類詞不是群組，不該被當成引用
+baseline
+edit_agents "\`BE-拒\` 是分類詞" "\`BE-拒\` 與 \`BE-缺\` 是分類詞"
+run 0 "非 A-Z 結尾的分類詞不算群組引用：綠" ""
+
+# 圍籬裡的 ID 是格式範例。**不跳過的話，每個複製模板的專案一開工就是紅的**
+# —— README 用 `APP-C01` 示範表格長相，而那個專案的 ID 是 `FE-`。
+baseline
+run_absent 0 "圍籬裡的範例 ID 不算引用：綠" "XYZ-Q99"
+
+# 但圍籬外的同一個 ID 要照樣被抓 —— 免得「跳過圍籬」變成一個萬用消音器
+baseline
+edit_agents "圍籬裡是格式範例，不是引用：" "圍籬外提到 \`XYZ-Q99\`："
+run 1 "圍籬外的同一個 ID 照樣要紅" "XYZ-Q99 不存在"
 
 echo
 if [ "$FAIL" -gt 0 ]; then
