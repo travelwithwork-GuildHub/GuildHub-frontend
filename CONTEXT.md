@@ -31,7 +31,7 @@ src/app/api/**        本地後端：Route Handlers
 3. **同一組契約測試對兩個 adapter 都跑。** 只跑本地的話，
    這整套會退化成「自己寫給自己看的假後端」
 
-工作項目在 `docs/WBS.md` 的 `FE-D`。
+工作項目在 `docs/WBS.md` 的 `FE-O01`–`FE-O08`。
 
 > 這是 L3 講義那兩個東西的組合：**MockDB**（模擬外部系統的回應格式）
 > 與 **TestDB**（自己系統專用、動了也沒關係的資料庫）。
@@ -79,7 +79,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 | 沒提 | **不合法的訊息一律靜默丟棄**，不回錯誤。送出去沒反應就是格式不對 |
 | FE-W09「顯示 Display Name」 | **世界裡每個人的名字都是「訪客」。** `main.py` 讀 `session["name"]`，而那個鍵在整個後端**從來沒有被設定過** |
 | FE-W10「六維 Avatar」 | **遠端玩家一律 avatar 0。** `presence.join()` 沒收 avatar；而且 `avatar_id` 的合約語意是「前端據此挑角色圖」，是**索引**，不是六維設定的編碼欄位 |
-| FE-P03/P05「搜尋 / 篩選 / Skills filter」 | **後端只有 offset 翻頁**（`PAGE_SIZE=20`，沒有 total／`has_more`），`list_profiles` 的 docstring 明寫「不做搜尋與篩選」。前端只能過濾**已載入的那 20 筆** —— 那不是搜尋，符合條件的人可能在下一頁 |
+| FE-B05「搜尋與篩選」 | **後端只有 offset 翻頁**（`PAGE_SIZE=20`，沒有 total／`has_more`），`list_profiles` 的 docstring 明寫「不做搜尋與篩選」。前端只能過濾**已載入的那 20 筆** —— 那不是搜尋，符合條件的人可能在下一頁 |
 | W12「未讀 Inbox」「回訪」 | **沒有寫得到 `read_at` 的端點**；而且 `POST /api/login` 每次都新建一張名片，**換裝置就永久失去身分** —— 回訪在後端層面不成立 |
 
 > **完整的缺口清單、證據、阻塞類型在 `docs/WBS.md` 的 `BE-G` 那一組。**
@@ -133,7 +133,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 
 **這條鏈不成立的話，Presence 只是裝飾。**
 
-對應的工作項目是 `docs/WBS.md` 的 `FE-V`，排在 W11。
+對應的工作項目是 `docs/WBS.md` 的 `FE-V02`–`FE-V06`，排在 W11。
 
 **它需要後端有「公開活動」的概念**（誰在辦、在哪、什麼時候、誰在旁聽）——
 那是 `BE-G27`。後端現在沒有，但**那是後端還沒規劃到，不是後端拒絕**：
@@ -225,4 +225,5 @@ recruiting → active → closed
 ## 詳細規劃
 
 - `docs/ROADMAP.md` —— 場景設計、功能地圖、12 週演進、階段邊界
-- `docs/WBS.md` —— 工作分解：FE-C / FE-W / FE-R / FE-P / FE-Q / FE-S
+- `docs/WBS.md` —— 工作分解。**群組是照「誰擁有這個產品能力」切的**，
+  不是照技術層 —— 見那份文件開頭的〈舊 ID 去哪了〉

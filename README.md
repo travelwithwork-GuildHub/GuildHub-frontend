@@ -76,7 +76,7 @@ npx openspec list
 | `AGENTS.md` | 給 AI coding agent 的規範（git / PR / CI 那一半） |
 | `CONTEXT.md` | **domain 詞彙。** 進 change 之前先讀 |
 | `docs/ROADMAP.md` | 場景設計、功能地圖、12 週演進、階段邊界 |
-| `docs/WBS.md` | 工作分解（Work Breakdown Structure）。**前端工作**：**FE-D 資料層與本地後端** / FE-I 整合工程 / FE-C 基礎架構 / FE-W 3D / FE-R 即時 / FE-P 產品 / **FE-M 接案與發案的完整流程** / FE-T 信任與邊界 / FE-V 空間裡正在發生的事 / FE-S 場景 / FE-X 品質與安全 / FE-O 工程交付 / FE-Q 發表準備；**後端銜接清單**：BE-G（不擋任何前端工作 —— 前端有自己的後端） |
+| `docs/WBS.md` | 工作分解（Work Breakdown Structure）。**前端工作**：FE-A 身分與個人資料 / FE-B 探索 / FE-M 媒合 / FE-N 洽談與成立 / FE-J 專案營運與生命週期 / FE-K 通訊與通知 / FE-T 信任、安全與隱私 / FE-W 3D 世界與角色 / FE-R 即時同步 / FE-V 場景與空間活動 / FE-X 產品體驗共用 / FE-O 平台與交付；**後端銜接清單**：BE-G（不擋任何前端工作 —— 前端有自己的後端） |
 | `docs/adr/` | 難逆轉的決策 |
 | `openspec/config.yaml` | 規格要寫到什麼程度 |
 | `openspec/specs/` | 系統現在是什麼樣子（archive 時自動同步） |
