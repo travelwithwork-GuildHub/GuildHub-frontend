@@ -107,11 +107,19 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 
 **這條鏈不成立的話，Presence 只是裝飾。**
 
-對應的工作項目是 `docs/WBS.md` 的 `FE-V`，而它整組被 `BE-G27` 擋著 ——
-後端沒有任何「公開活動物件」的模型。
+對應的工作項目是 `docs/WBS.md` 的 `FE-V`，排在 W11。
+
+**它需要後端有「公開活動」的概念**（誰在辦、在哪、什麼時候、誰在旁聽）——
+那是 `BE-G27`。後端現在沒有，但**那是後端還沒規劃到，不是後端拒絕**：
+它是一則需求，決策期限 W3。
 
 > **定位是「可旁觀、可漸進加入的團隊媒合市場」，不是「可以走路的接案網站」。**
 > 前者能說明為什麼需要空間；後者的 3D 最後只會變成高摩擦的首頁。
+
+### 這條路已經選定了
+
+要做 3D，而且要做成有活動的那一種。所以 `BE-G27` 不是「要不要做」的問題，
+是「後端什麼時候提供」的問題。**W11 之前要有。**
 
 ## 場景
 
@@ -157,6 +165,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 | **40 Browser Gate** | 40 個真實 Chromium / R3F browser 的 E2E 壓測 | **不是** 40 個 WebSocket fake client。那是另一條 network baseline 測試 |
 | **39 Remote** | 單一 browser 同畫面渲染 1 local + 39 remote 的**渲染**測試 | **不是**壓測。跟 40 Browser Gate **分開驗證**，不要混在一起 |
 | **Room Password** | 成軍時強制設定，進 Project Room 要輸入 | **不是**帳號密碼。它綁專案，不綁人 |
+| **後端待規劃** | 後端還沒規劃到的能力。**它是一則需求，不是一堵牆** —— 前端照樣排週次，週次就是後端的交付期限 | **不是** `BE-拒`。後者是後端 `CLAUDE.md` 明文排除的，要翻案得先翻產品決策 |
 | **Guest** | ~~可移動、看玩家、看板的訪客~~ | **後端沒有這個角色，而且明文排除「訪客唯讀模式與相關 gate」**（BE-G08）。`/api/login` 只要暱稱就發正式身分。前端把按鈕變灰**不是權限邊界** —— 做了只會給人虛假的安全感 |
 
 ## Project lifecycle

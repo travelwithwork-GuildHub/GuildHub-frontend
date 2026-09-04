@@ -251,7 +251,7 @@ if wbs_path.exists():
             cur = wid
             wbs[wid] = {"name": name, "weeks": set(), "pts": 0,
                         "blocked": "", "mark": "", "blockers": set(),
-                        "deadline": None, "fallback": False}
+                        "deadline": None, "fallback": False, "rows": []}
             order.append(wid)
         if cur is None:
             # 表格的第一筆資料列沒有 ID —— 漏貼或誤刪都很平常，
@@ -284,8 +284,14 @@ if wbs_path.exists():
         # 每一列的阻塞都要收 —— 一個項目底下常常只有某幾列被擋住
         # （Inbox 的清單做得了、「已讀」沒有端點），只記第一個會讓反向索引漏掉。
         if blocked:
-            wbs[cur]["blockers"].update(
-                re.findall(r"[A-Z]+-[A-Z][0-9]+", plain(blocked)))
+            found = re.findall(r"[A-Z]+-[A-Z][0-9]+", plain(blocked))
+            wbs[cur]["blockers"].update(found)
+            # **逐列記下「這一列排在哪一週、被什麼擋著」。**
+            # 阻塞是寫在列上的，用整個項目最早的週次去比會誤報 ——
+            # 一個項目常常前幾列早、後幾列晚，而擋住的只是後面那幾列。
+            if found:
+                wk_here = [int(m) for m in re.findall(r"W([0-9]+)", week)]
+                wbs[cur]["rows"].append((min(wk_here) if wk_here else None, found))
             # `BE-GO1`（字母 O）、`BE-GXX` 這種**看起來像依賴、卻不是合法 ID**
             # 的東西，原本會直接從 blockers 消失 —— 既不報格式錯，
             # 後面「工作不得排在裁決之前」那條也就跟著不驗。
@@ -505,23 +511,25 @@ for wid in order:
 
 for wid in order:
     info = wbs[wid]
-    start = week_min(info["weeks"])
-    if start is None:
-        continue
-    for gap in info["blockers"]:
-        if gap not in wbs:
-            # 打錯的依賴（`BE-G99`）原本靜默通過，第五條也就跟著不驗。
-            violations.append(f"{wid}：依賴的 {gap} 在這張表裡不存在")
-            continue
-        dl = wbs[gap].get("deadline")
-        if dl is None:
-            continue
-        # 「這件事排在 W4，而它依賴的裁決最晚也是 W4」不是排程，是碰運氣。
-        # 裁決要**嚴格早於**用得到它的第一週。
-        if start <= dl:
-            violations.append(
-                f"{wid}（{'、'.join(sorted(info['weeks']))}）排在 {gap} 的決策期限"
-                f"（決策≤W{dl}）之前或同週 —— 要嘛提前裁決，要嘛把工作往後挪")
+    seen = set()
+    for start, gaps in info["rows"]:
+        for gap in gaps:
+            if gap not in wbs:
+                if (wid, gap) not in seen:
+                    # 打錯的依賴（`BE-G99`）原本靜默通過，
+                    # 而且第五條也就跟著不驗。
+                    violations.append(f"{wid}：依賴的 {gap} 在這張表裡不存在")
+                    seen.add((wid, gap))
+                continue
+            dl = wbs[gap].get("deadline")
+            if dl is None or start is None:
+                continue
+            # 「這件事排在 W4，而它依賴的裁決最晚也是 W4」不是排程，是碰運氣。
+            # 裁決要**嚴格早於**用得到它的那一週。
+            if start <= dl:
+                violations.append(
+                    f"{wid}（W{start} 那一列）排在 {gap} 的決策期限"
+                    f"（決策≤W{dl}）之前或同週 —— 要嘛提前裁決，要嘛把工作往後挪")
 
 if violations:
     print()
