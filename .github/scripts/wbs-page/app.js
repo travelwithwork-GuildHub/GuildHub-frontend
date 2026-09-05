@@ -64,6 +64,18 @@ const $ = id => document.getElementById(id);
 
 /* ── 銜接清單 ── */
 (() => {
+  // **組名是算出來的，頁面上的字也要跟著算。** 副標寫死 `BE-G`、
+  // 面板標題寫死「後端」，就是這一頁到處在抓的那種「同一件事寫兩個地方」。
+  const gname = [...GAP_GROUPS].sort().join("／");
+  if ($("gapname")) $("gapname").textContent = gname || "（沒有）";
+  if ($("gaph")) $("gaph").textContent = gname ? `後端銜接清單 ${gname}` : "後端銜接清單（目前沒有）";
+  // 一組都沒有的時候要**說出來**。留一個空的 <ul> 等於頁面在說謊：
+  // 標題說有這一組，底下什麼都沒有，讀的人只會以為是還沒載入。
+  if (!GAPS.length) {
+    $("gaps").innerHTML = `<li class="none">沒有任何項目被寫進別的項目的「阻塞」欄
+      —— 所以算不出銜接清單。要嘛真的沒有外部缺口，要嘛阻塞欄還沒填。</li>`;
+    return;
+  }
   $("gaps").innerHTML = GAPS.map(g => {
     const n = (AFFECTS[g.id] || []).length, dead = g.st.k === "stop";
     return `<li><button data-g="${g.id}" aria-pressed="false">
@@ -109,8 +121,8 @@ function match(it) {
 
 function rowHTML(it) {
   const hit = ui.gap && it.blockers.includes(ui.gap);
-  // BE-G 沒有週次 —— 它的「週」欄放的是決策期限，不是工期。
-  // 少了這一行，那 27 項在清單裡看起來像「忘了排」。
+  // 銜接清單沒有週次 —— 它的「週」欄放的是決策期限，不是工期。
+  // 少了這一行，那一整組在清單裡看起來像「忘了排」。
   const wks = it.weeks.length
     ? it.weeks.map(w => `<span class="wk">${w}</span>`).join("")
     : (it.deadline ? `<span class="wk dl">決策≤W${it.deadline}</span>` : "");
@@ -142,8 +154,8 @@ function render() {
   [...$("bars").children].forEach(b => b.setAttribute("aria-pressed", +b.dataset.w === ui.week));
   [...$("gaps").querySelectorAll("button")].forEach(b => b.setAttribute("aria-pressed", b.dataset.g === ui.gap));
 
-  // **BE-G 也在清單裡。** 側欄那份只有 ID 與名稱，
-  // 於是 27 項的實際內容在整頁上一個字都讀不到。側欄留著當索引與篩選器。
+  // **銜接清單也在主清單裡。** 側欄那份只有 ID 與名稱，
+  // 於是那一組的實際內容在整頁上一個字都讀不到。側欄留著當索引與篩選器。
   const shown = ITEMS.filter(match);
   $("count").textContent = shown.length === ITEMS.length
     ? ITEMS.length + " 項" : shown.length + " / " + ITEMS.length + " 項";
