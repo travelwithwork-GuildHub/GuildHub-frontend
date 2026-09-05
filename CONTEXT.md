@@ -62,10 +62,11 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 **大廳的 WebSocket 不需要登入、不需要資料庫。** `./run.sh` 之後直接連得上，
 所以即時層可以先開工，不必等身分系統。
 
-## ⚠️ ROADMAP 與 WBS 是在後端存在之前寫的
+## ⚠️ 早期規劃描述的即時層與實際協定對不上
 
-`docs/ROADMAP.md` 與 `docs/WBS.md` 描述的即時層，與實際協定**對不上至少七處**。
-寫規格的時候以 `protocol.py` 為準，不是以 WBS 的敘述為準：
+`docs/WBS.md` 已經照實際後端改過，但**敘述裡仍可能留有舊詞**；
+寫規格的時候一律以 `protocol.py` 為準，不是以文件的敘述為準。
+對不上的至少有這幾處：
 
 | WBS / 舊 CONTEXT 寫的 | 實際協定 |
 |---|---|
@@ -80,7 +81,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 | FE-W09「顯示 Display Name」 | **世界裡每個人的名字都是「訪客」。** `main.py` 讀 `session["name"]`，而那個鍵在整個後端**從來沒有被設定過** |
 | FE-W10「六維 Avatar」 | **遠端玩家一律 avatar 0。** `presence.join()` 沒收 avatar；而且 `avatar_id` 的合約語意是「前端據此挑角色圖」，是**索引**，不是六維設定的編碼欄位 |
 | FE-B05「搜尋與篩選」 | **後端只有 offset 翻頁**（`PAGE_SIZE=20`，沒有 total／`has_more`），`list_profiles` 的 docstring 明寫「不做搜尋與篩選」。前端只能過濾**已載入的那 20 筆** —— 那不是搜尋，符合條件的人可能在下一頁 |
-| W12「未讀 Inbox」「回訪」 | **沒有寫得到 `read_at` 的端點**；而且 `POST /api/login` 每次都新建一張名片，**換裝置就永久失去身分** —— 回訪在後端層面不成立 |
+| FE-K01「標記已讀」、FE-A02「身分恢復」 | **沒有寫得到 `read_at` 的端點**；而且 `POST /api/login` 每次都新建一張名片，**換裝置就永久失去身分** —— 回訪在後端層面不成立 |
 
 > **完整的缺口清單、證據、阻塞類型在 `docs/WBS.md` 的 `BE-G` 那一組。**
 > 其中有幾項是後端 `CLAUDE.md`〈不要實作的功能〉**明文排除**的
@@ -89,7 +90,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 >
 > 開任何 change 之前先跑：`bash .github/scripts/progress.sh --blocked`
 
-另外兩件跟 W1 驗收直接相關的：
+另外兩件跟最早的連線驗收直接相關的：
 
 - **靜止時完全收不到 `pos`** —— 沒有人移動時整則訊息不送，不是送空陣列。
   **不要拿它當心跳**
@@ -133,11 +134,11 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 
 **這條鏈不成立的話，Presence 只是裝飾。**
 
-對應的工作項目是 `docs/WBS.md` 的 `FE-V02`–`FE-V06`，排在 W11。
+對應的工作項目是 `docs/WBS.md` 的 `FE-V02`–`FE-V06`。
 
 **它需要後端有「公開活動」的概念**（誰在辦、在哪、什麼時候、誰在旁聽）——
 那是 `BE-G27`。後端現在沒有，但**那是後端還沒規劃到，不是後端拒絕**：
-它是一則需求，決策期限 W3。
+它是一則需求，有決策期限 —— 期限寫在 `BE-G27` 的週欄，不在這裡。
 
 > **定位是「可旁觀、可漸進加入的團隊媒合市場」，不是「可以走路的接案網站」。**
 > 前者能說明為什麼需要空間；後者的 3D 最後只會變成高摩擦的首頁。
@@ -145,7 +146,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 ### 這條路已經選定了
 
 要做 3D，而且要做成有活動的那一種。所以 `BE-G27` 不是「要不要做」的問題，
-是「後端什麼時候提供」的問題。**W11 之前要有。**
+是「後端什麼時候提供」的問題。**`FE-V02` 開工之前要有**（期限見 `BE-G27`）。
 
 ## 場景
 
@@ -157,17 +158,17 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 | **伺服器 scene** | 有獨立成員名單、聊天隔音、各自 online count | **只有 `lobby` 與 `room:{id}`** |
 
 後端的 `_SCENE_ID` 是 `^(lobby|room:[0-9a-zA-Z\-]+)$`，而且**一條連線只屬於
-一個 scene，切場景＝關掉重開**。下表「導入」欄位的週次是原始規劃寫的，
-**不代表後端支援得了** —— 先看最後一欄。
+一個 scene，切場景＝關掉重開**。這張表回答的是「後端支不支援」，
+**沒有週次** —— 哪一週交什麼看 `docs/WBS.md`，這裡放一份副本就會漂。
 
-| 場景 | 產品目的 | 導入 | 後端 |
+| 場景 | 產品目的 | WBS | 後端 |
 |---|---|---|---|
-| **Guild Hall** | 世界首頁／中央樞紐。所有場景都可以回到這裡 | W3 | 就是 `lobby` |
-| **Project Room** | 成軍後的專案空間 | W4 | 就是 `room:{id}`。**唯一另一個真的 scene** |
-| **Marketplace** | 發案／接案／找人才 | W4 | 只能是 `lobby` 的**視覺分區** |
-| **Office** | 工作 Presence／輕社交 | W4–W5 | 同上 |
-| **Skill Spaces** | 按技能分流的人才空間 | W6 | 同上，而且「同領域的人聚在這裡」需要獨立 Presence —— **做不出原本的產品意圖** |
-| **Event Space** | 社群活動／留存 | W11 | 同上，而且沒有 Events 資料模型 |
+| **Guild Hall** | 世界首頁／中央樞紐。所有場景都可以回到這裡 | `FE-V01` | 就是 `lobby` |
+| **Project Room** | 成軍後的專案空間 | `FE-W01` | 就是 `room:{id}`。**唯一另一個真的 scene** |
+| **Marketplace** | 發案／接案／找人才 | `FE-B02`、`FE-B03` | 只能是 `lobby` 的**視覺分區** |
+| **Office** | 工作 Presence／輕社交 | `FE-V13` | 同上 |
+| **Skill Spaces** | 按技能分流的人才空間 | `FE-V12` | 同上，而且「同領域的人聚在這裡」需要獨立 Presence —— **做不出原本的產品意圖** |
+| **Event Space** | 社群活動／留存 | `FE-V14` | 同上，而且沒有 Events 資料模型 |
 
 **用詞先裁決**（BE-G09），再寫任何場景的規格。
 
@@ -183,7 +184,7 @@ npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 | **Procedural Avatar** | 由 primitive（RoundedBox / Capsule / Sphere）組出來的 Chibi 角色 | **不是**載入外部模型。Local 與 Remote 共用同一套 |
 | **Project Door** | Guild Hall 走廊上，一個 active project 的空間入口 | **不是** Project Room 本身。它是門，不是房間 |
 | **Seat** | Project Room 裡的座位 | **不是** Personal Desk |
-| **Personal Desk** | Office 裡認領的工作桌 | **不是** Seat。兩者的認領與釋放規則不同（W6 才做） |
+| **Personal Desk** | Office 裡認領的工作桌 | **不是** Seat。兩者的認領與釋放規則不同（`FE-V13`） |
 | **Looking For** | Available for Work / Hiring / 正在找什麼角色 | **不是** Status。Status 是自由文字（12 字上限），Looking For 是結構化媒合訊號 |
 | **Board** | Project Board / Talent Board，3D 場景裡的看板 | **不是**搜尋介面。它是**入口**，點了開 DOM Panel |
 | **Interaction Range** | 走近可互動物件的觸發範圍（Rapier sensor） | **不是** click。玩家用 E 互動，不是滑鼠點 3D 物件 |
@@ -220,10 +221,12 @@ recruiting → active → closed
 - **GuildHub 管人與入口，不重做 GitHub / Figma / Notion。**
 - **外部 GLB 預設不排入 MVP 工時**（FE-W16）。只有程式生成成本過高才用，
   且需符合統一色票與風格。
-- **階段邊界**：MVP（W1–W5）不再塞新功能；W11–W12 **不做 MMORPG 化**。
+- **不做 MMORPG 化**：沒有等級、裝備、經濟系統。空間功能必須服務媒合。
+- **MVP 之後不再塞新功能。** 哪一週交什麼看 `docs/WBS.md` 的〈里程碑〉，
+  **這裡不複製週次** —— 複製過的那次，兩邊立刻就漂了。
 
 ## 詳細規劃
 
-- `docs/ROADMAP.md` —— 場景設計、功能地圖、12 週演進、階段邊界
+- `docs/ROADMAP.md` —— 場景設計、功能地圖、不做的事。**裡面沒有排程**
 - `docs/WBS.md` —— 工作分解。**群組是照「誰擁有這個產品能力」切的**，
   不是照技術層 —— 見那份文件開頭的〈舊 ID 去哪了〉

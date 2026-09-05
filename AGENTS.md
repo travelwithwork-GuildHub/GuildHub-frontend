@@ -84,7 +84,7 @@ WebSocket、interpolation 與 40-browser gate，在 400 行上限下不可能塞
   - **Foundation spike**：有時限、有 Go/No-Go 驗收、成果**預期合併**，
     是後面幾週的地基。**它要走完整的 OpenSpec 與 PR 流程。**
     W1 是這一類 —— `docs/WBS.md` 的標題寫「W1 技術 Spike」，
-    但 `docs/ROADMAP.md` 把它的產出當 W2 以後的地基。
+    但它的〈里程碑〉把 W1 的產出當 W2 以後的地基。
     這種 change 的規格只固定**已知的 Go/No-Go 可觀察結果**，
     把還不知道的常數（threshold、係數、collider 形狀）列成
     design 的待答問題，**不要假裝它們是事前需求**。
@@ -143,7 +143,7 @@ change id 與 slice 的分界，不需要任何消歧邏輯。
 
 - **週次是排程的證據。** 沒有週次（寫 `—`）的項目就是現在做不了 ——
   不要替它開 change
-- **沒有任何一項會因為後端而停下來。** 前端有自己的後端（`FE-D`）——
+- **沒有任何一項會因為後端而停下來。** 前端有自己的後端（`FE-O`）——
   功能先做完，之後再銜接。`待銜接` 的意思是「之後要跟真後端對齊」，
   不是「現在做不了」
 - **`BE-拒` 例外：本地做得出來，但上不了線。** 那是後端 `CLAUDE.md`
@@ -260,7 +260,7 @@ approve 的簽章永遠是真的，橡皮圖章偵測不出來。
 | `check-pr-branch.sh` 的 `archive/` 那條 | 封存的內容跟 main 上那份**逐檔 blob 相同**（不是只看檔案有沒有被刪） | `openspec/specs/` 有沒有被另一個 change 覆蓋掉 |
 | `chore/` 的 bytes 上界 | review 面積小到人讀得完（lockfile 另有上界，不是無限） | 「這不是功能」。80 行的功能可以冒充 chore |
 | `openspec validate --strict` | 規格的**結構**：有沒有 Scenario、Purpose 夠不夠長 | 規格的**內容**對不對 |
-| `progress.sh --check` | 工作分解表的**形式**：標記附了理由、互斥的處置沒有並存、缺口有決策期限與 fallback、工作沒有排在它依賴的裁決之前、依賴不懸空；以及**解析本身 fail-closed**（表頭畸形、表格被截斷、欄數對不上、ID 重複或漏掉都會紅，不會安靜跳過） | **那些理由與 fallback 寫得對不對**。「`Pending｜等後端`」格式完全合法，內容等於沒說 |
+| `progress.sh --check` | 工作分解表的**形式**：標記附了理由、互斥的處置沒有並存、缺口有決策期限與 fallback、工作沒有排在它依賴的裁決之前、依賴不懸空；**引用不懸空** —— `docs/WBS.md`、`docs/ROADMAP.md`、`AGENTS.md`、`CLAUDE.md`、`README.md`、`CONTEXT.md` 裡提到的每一個工作項目 ID **與群組 ID** 都要真的存在（圍籬程式碼區塊與〈舊 ID 去哪了〉除外）；以及**解析本身 fail-closed**（表頭畸形、表格被截斷、欄數對不上、ID 重複或漏掉都會紅，不會安靜跳過） | **那些理由與 fallback 寫得對不對**。「`Pending｜等後端`」格式完全合法，內容等於沒說。**也不驗前端項目彼此的先後** —— 跨項依賴那張表靠人維護 |
 | `archive/` 的雙重 validate | tasks 全部完成、archive 後 main spec 不會紅 | `openspec/specs/` 有沒有被另一個 change 覆蓋掉 |
 
 **最重要的那一格是空的：沒有任何機制能證明 diff 對應規格。**
