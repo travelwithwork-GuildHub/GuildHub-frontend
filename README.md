@@ -43,12 +43,15 @@
 ```bash
 bash .github/scripts/progress.sh --all       # 161 項各自在什麼狀態
 bash .github/scripts/progress.sh --blocked   # 不在自己手上的，以及誰依賴它
+bash .github/scripts/progress.sh --check     # 改了 docs/WBS.md 就跑（CI 也在跑）
 bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
 bash .github/scripts/wbs-excel.sh            # 寫進 Excel 管理表
 ```
 
-**前兩個是每天用的**（現在做到哪裡）、**第三個是 review 時用的**（整份計畫長什麼樣）。
-兩者都是從 `docs/WBS.md` 算出來的，沒有人手動維護 —— 所以不會漂。
+**前三個是每天用的**（現在做到哪裡、改完有沒有壞），
+**後兩個是 review 時用的**（整份計畫長什麼樣）。
+全部從 `docs/WBS.md` 算出來，沒有人手動維護 —— 所以不會漂。
+`--check` 守的東西見下面那一節。
 網頁版的產物 `docs/wbs.html` **不進版控**，改了 WBS 就重跑一次。
 
 ## 怎麼開發
@@ -106,7 +109,7 @@ CI 每次都跑它。它讀 `docs/WBS.md`，有違規就讓 build 紅。守的�
 判準因此不是「測試全綠」，是 **「把防禦拿掉，測試要變紅」**：
 
 ```bash
-bash .github/scripts/test-progress-check.sh   # 117 條負向測試
+bash .github/scripts/test-progress-check.sh   # 每條規則各造一次違規，驗它真的會紅
 ```
 
 每一條都對一條規則各造一次違規、斷言它真的會紅。
@@ -122,6 +125,7 @@ bash .github/scripts/test-progress-check.sh   # 117 條負向測試
 | `docs/ROADMAP.md` | 場景設計、功能地圖、不做的事。**裡面沒有排程** —— 週次只在 `docs/WBS.md` |
 | `docs/WBS.md` | 工作分解（Work Breakdown Structure）。**前端工作**：FE-A 身分與個人資料 / FE-B 探索 / FE-M 媒合 / FE-N 洽談與成立 / FE-J 專案營運與生命週期 / FE-K 通訊與通知 / FE-T 信任、安全與隱私 / FE-W 3D 世界與角色 / FE-R 即時同步 / FE-V 場景與空間活動 / FE-X 產品體驗共用 / FE-O 平台與交付；**後端銜接清單**：BE-G（不擋任何前端工作 —— 前端有自己的後端） |
 | `.github/scripts/progress.sh` | **現在做到哪裡。** 算出來的，沒有人維護。`--check` 在 CI 裡跑 |
+| `.github/scripts/test-progress-check.sh` | 上面那些規則**自己的負向測試**。改 `progress.sh` 前後都要跑 |
 | `.github/scripts/wbs-page.sh` | 把 `docs/WBS.md` 產成一頁可以點開收合的網頁 |
 | `.github/scripts/wbs-excel.sh` | 把 `docs/WBS.md` 寫進 Excel 管理表的「前端」工作表 |
 | `docs/adr/` | 難逆轉的決策 |
