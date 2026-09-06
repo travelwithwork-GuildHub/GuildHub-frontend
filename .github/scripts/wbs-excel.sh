@@ -80,6 +80,18 @@ def put(row, style, cells):
     for col, v in cells.items():
         ws.cell(row=row, column=col, value=v)
 
+# **認不得群組的項目不准靜靜消失。** 下面的迴圈是照 groups 走的，
+# 一個項目的組沒有對應的 `## XX-Y 標題`（改成全形冒號、多一個空格⋯⋯）
+# 就永遠不會被寫進去 —— 而檔案照樣產得出來、列數照樣印得漂亮。
+# 網頁那邊已經有「認不得群組」的區塊，這裡是第三個會吞掉它們的地方。
+_orphan = sorted(i["id"] for i in items
+                 if i["group"] not in {g["id"] for g in groups})
+if _orphan:
+    sys.stderr.write("✗ 這些項目的群組認不出來，Excel 會漏掉它們："
+                     + "、".join(_orphan) + "\n")
+    sys.stderr.write("  群組標題要長成 `## FE-C 名稱`（見 progress.sh 開頭）\n")
+    raise SystemExit(1)
+
 r = 2
 for g in groups:
     its = [i for i in items if i["group"] == g["id"]]
