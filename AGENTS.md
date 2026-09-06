@@ -26,10 +26,15 @@ Repository 內其他文件與本檔衝突時，以本檔為準。
 ## Session 啟動
 
 ```bash
-git branch --show-current      # 你在哪個 change 上
-openspec list                  # 有哪些 change
+git branch --show-current                  # 你在哪個 change 上
+openspec list                              # 有哪些 change
 openspec status --change <name>
+bash .github/scripts/progress.sh           # 做到哪裡；還沒設定的東西也會列出來
 ```
+
+最後那一個除了狀態，還會列出**這個 repo 還沒設定完的事**
+（`package.json` 的 script 還是佔位、`SETUP-GITHUB.md` 還在⋯⋯）。
+那些沒做的話，後面的閘門有一半是空轉的。
 
 讀 `AGENTS.md` → `CONTEXT.md` → 那個 change 的 artifact。
 除非使用者指定其他語言，對人類使用繁體中文。
