@@ -41,13 +41,28 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 
 | 類 | 值 | 誰決定 | 放哪 |
 |---|---|---|---|
-| **事實** | `Done` / `On-going` / `Next-going` / `Debug` | git + OpenSpec + CI | **`progress.sh` 算的，沒有人手寫** |
+| **事實** | `Done` / `On-going` / `Next-going` / `Debug` | 遠端分支 ＋ OpenSpec change 目錄 ＋ `tasks.md` 的勾 | **`progress.sh` 算的，沒有人手寫** |
 | **意圖** | `Cancelled` / `Pending` / `TBD` / `Delay` / `Alarm` | 人 | 本表 `標記` 欄，**必須附理由** |
 | **屬性** | `Regular` | — | 常態性工作，沒有完成點 |
 
 為什麼要拆：**手寫的狀態一定會漂。** 這個 repo 一天之內漂過三次
 （見 `docs/DECISIONS.md`）。可以從 git 與 OpenSpec 推導的，就不要讓人來寫；
 推導不出來的（「這件事我們決定不做了」），機器永遠猜不到，才由人寫 —— 而且要寫理由。
+
+**這一欄自己漂過。** 它原本寫「git + OpenSpec + CI」，而 `progress.sh`
+**完全沒有查過 CI** —— 沒有 `gh`、沒有 `api.github.com`、沒有任何 check run。
+一張宣告「狀態是算出來的所以不會漂」的表，自己就在說一件可證明為假的事
+（2026-09-07 由外部審查實測指出）。所以下面把不是來源的東西也寫出來：
+
+| 不是來源 | 所以 |
+|---|---|
+| **CI 的紅綠** | 「已封存」不代表那個 change 的 CI 是綠的。要看 CI 去看 GitHub |
+| **PR 開著還是關了** | 「實作中」只代表遠端有 `feat/` 分支，分支可能早就沒人動了 |
+| **`tasks.md` 的勾是不是真的** | 勾是人打的。它算的是「打了幾個勾」，不是「真的做完幾件事」 |
+
+還有一件事：**「規格審查中」與「實作中」是從遠端分支推的**，而遠端 refs 要
+`git fetch` 抓得到才新鮮。抓不到的時候 `progress.sh` 會在最上面說，並在
+`--json` 標記 `remote_fresh: false` —— 它不會假裝那個狀態是當下的。
 
 ```bash
 bash .github/scripts/progress.sh            # 有動靜的
