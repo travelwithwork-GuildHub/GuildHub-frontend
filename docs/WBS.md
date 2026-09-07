@@ -64,6 +64,56 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 `git fetch` 抓得到才新鮮。抓不到的時候 `progress.sh` 會在最上面說，並在
 `--json` 標記 `remote_fresh: false` —— 它不會假裝那個狀態是當下的。
 
+<!-- progress:start 這一段由 `progress.sh --render` 產生，不要手改 -->
+
+### 目前做到哪裡（機器產生）
+
+**沒有列出來的項目就是「未開始」。**「規格審查中」「實作中」不在這裡 —— 那兩個是從遠端分支推的，不是這份 tree 重建得出來的，寫進版控當下就會過期。要看那兩個狀態跑 `bash .github/scripts/progress.sh`。
+
+| 項目 | 狀態 | 依據 |
+|---|---|---|
+| FE-W01 | 已封存 | `fe-w01-worldcanvas` |
+| FE-W02 | 已封存 | `fe-w02-coords` |
+| FE-W03 | 已封存 | `fe-w03-player` |
+| FE-W04 | 已封存 | `fe-w04-physics` |
+| FE-W05 | 已封存 | `fe-w05-camera` |
+| FE-X01 | 已封存 | `fe-x01-appshell` |
+| FE-O10 | 已完成 | `ae78a12c2af7` |
+| FE-O18 | 常態 | — |
+| BE-G04 | 待裁決 | — |
+| BE-G25 | 待裁決 | — |
+| BE-G01 | 等外部 | — |
+| BE-G02 | 等外部 | — |
+| BE-G03 | 等外部 | — |
+| BE-G05 | 等外部 | — |
+| BE-G06 | 等外部 | — |
+| BE-G09 | 等外部 | — |
+| BE-G10 | 等外部 | — |
+| BE-G11 | 等外部 | — |
+| BE-G12 | 等外部 | — |
+| BE-G13 | 等外部 | — |
+| BE-G14 | 等外部 | — |
+| BE-G16 | 等外部 | — |
+| BE-G20 | 等外部 | — |
+| BE-G21 | 等外部 | — |
+| BE-G22 | 等外部 | — |
+| BE-G23 | 等外部 | — |
+| BE-G24 | 等外部 | — |
+| BE-G26 | 等外部 | — |
+| BE-G27 | 等外部 | — |
+| BE-G07 | 已取消 | — |
+| BE-G08 | 已取消 | — |
+| BE-G15 | 已取消 | — |
+| BE-G17 | 已取消 | — |
+| BE-G18 | 已取消 | — |
+| BE-G19 | 已取消 | — |
+
+共 161 項：未開始 126、等外部 19、已取消 6、已封存 6、待裁決 2、已完成 1、常態 1
+
+來源指紋 `da3d8dadb70fa6d7`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+
+<!-- progress:end -->
+
 ```bash
 bash .github/scripts/progress.sh            # 有動靜的
 bash .github/scripts/progress.sh --all      # 連沒開始的
