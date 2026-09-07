@@ -123,6 +123,10 @@ jobs:
       - name: Workflow contract tests
         run: bash .github/scripts/test-ci-workflow.sh
 
+      # 提示檔自己的合約測試：文件教的操作，閘門收不收得下。
+      - name: Prompts contract tests
+        run: bash .github/scripts/test-prompts.sh
+
       # ⚠️ Lint / Typecheck / Test / Build 暫時移除。
       #
       # 這個 repo 還沒有任何程式碼，package.json 那四個 script 是刻意會失敗的佔位。
