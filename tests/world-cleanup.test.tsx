@@ -53,8 +53,24 @@ function instrumentWindowListeners() {
   }
 }
 
+// **這個檔案用 fake timer，理由不是速度。**
+//
+// R3F 的 <Canvas> 用 react-use-measure，而 R3F 給它的設定是
+// `debounce: { scroll: 50, resize: 0 }`。react-use-measure 的 debounce 是
+// `setTimeout(fn, 0)`，而且**沒有在卸載時取消它**（那個 helper 沒有
+// 對外暴露 cancel）。實測：掛載時排 1 個 timer，卸載後仍未清除。
+//
+// 那個孤兒 timer 會在 jsdom 被拆掉之後才觸發，然後炸
+// `ReferenceError: HTMLElement is not defined`，並且算成 **unhandled error**
+// —— 34 個測試全過、整個 run 卻非零結束。CI 上實際發生過一次
+// （run 34120594174），本機幾乎重現不了，因為它是時序相依的。
+//
+// 用 fake timer 之後那個真的 timer 根本不會存在，所以不是跟它賽跑，
+// 而是讓它不可能發生。**這是測試環境的問題，不是產品問題** ——
+// 瀏覽器裡頁面不會被拆掉，那個 timer 觸發只是個 no-op。
 describe('卸載時釋放資源', () => {
   it('[FE-W01-S08] 卸載後沒有殘留的全域監聽', () => {
+    vi.useFakeTimers()
     HTMLCanvasElement.prototype.getContext = vi.fn((id: string) =>
       id === 'webgl2' ? ({} as RenderingContext) : null,
     ) as typeof HTMLCanvasElement.prototype.getContext
@@ -74,6 +90,10 @@ describe('卸載時釋放資源', () => {
     const after = listeners.live
     listeners.restore()
 
+    // 證明這個檔案沒有留下任何真的 timer 給 jsdom 拆掉之後去踩
+    const pendingFakeTimers = vi.getTimerCount()
+    vi.useRealTimers()
+
     // 防恆真：掛載期間必須真的掛上東西，否則這條驗證什麼都沒證明
     expect(
       peakDuringMount,
@@ -82,5 +102,11 @@ describe('卸載時釋放資源', () => {
 
     // 第二輪之後應該回到第一輪之後的水準 —— 也就是**沒有逐次疊加**
     expect(after, `第二次進出之後多了 ${after - baseline} 個殘留監聽（會逐次疊加）`).toBe(baseline)
+
+    // 這一行不是在測產品，是在**證明上面那段註解講的事真的發生了**：
+    // react-use-measure 確實排了 timer 而且沒有清掉它。
+    // 數字變成 0 的話，代表這個 fake timer 的防護已經沒有保護對象了 ——
+    // 那時應該回來把它拿掉，而不是留一個沒有意義的機制。
+    expect(pendingFakeTimers, 'react-use-measure 已經不再留下未清除的 timer 了嗎？').toBeGreaterThan(0)
   })
 })
