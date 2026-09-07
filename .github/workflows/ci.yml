@@ -163,6 +163,12 @@ jobs:
       - name: Test
         run: npm test
 
+      # **每一條 Scenario 都要有一個真的跑過而且通過的測試指著它。**
+      # 排在 Test 之後 —— 它自己會再跑一次 vitest（要 JSON 報告），
+      # 但先讓 Test 那一步給出一般人看得懂的輸出。
+      - name: Scenario coverage
+        run: bash .github/scripts/check-scenario-coverage.sh
+
       # NEXT_TELEMETRY_DISABLED：CI 不對外回報建置遙測。
       # 這不是效能考量，是「CI 不該在沒有人要求的情況下把資料送出去」。
       - name: Build

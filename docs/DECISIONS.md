@@ -29,7 +29,7 @@
 
 ---
 
-## Scenario 覆蓋閘門先落地，但暫時不接進 CI
+## Scenario 覆蓋閘門：先落地、清完缺口才接進 CI（已完成）
 
 **決定**：`check-scenario-coverage.sh` 與它的 19 條負向測試先合併，
 測試接進 CI；**閘門本身等 8 條缺口清掉再接**。
@@ -66,7 +66,20 @@ Scenario：
 
     bash .github/scripts/check-scenario-coverage.sh   rc=0
 
-做完就把它加進 `ci.yml`，並在 `test-ci-workflow.sh` 的必跑清單裡加一行。
+**已達成。** `fe-o11-coverage`（#55／#57／#58）把八條缺口清掉：四條補了真的
+測試（`FE-W03-S13`、`FE-W04-S08`、`FE-W05-S08`、`FE-X01-S11`），四條在規格上
+標了驗證方式（三條 `manual-browser`、一條 `ci-job`）。
+
+    ✓ Scenario 覆蓋：64 條規格，60 條有通過的測試、4 條豁免    rc=0
+
+閘門已經是 `ci.yml` 的一步，而且被 `test-ci-workflow.sh` 的必跑清單鎖住 ——
+刪掉那一步、或給它加 `if:`／`|| true`，workflow 合約測試會紅。
+
+往後任何一條新的 Scenario 沒有測試也沒有 `VERIFY-BY`，PR 就過不了。
+
+**跟模板的分岔（宣告過的）**：模板 `ai-team-starter` 的必跑清單裡**沒有**
+`check-scenario-coverage.sh`。剛複製的模板沒有任何規格，那支閘門會紅在
+「一份規格檔都沒掃到」—— 而那個判斷是對的。衍生專案有規格之後自己加。
 
 
 ## 每個 PR 不需要走兩輪 review
