@@ -58,6 +58,15 @@ for i in range(c + 1, len(lines)):
         end = i; break
 job = lines[c:end]
 
+# 認不得的 key 寫法一律 parse-fail。
+# 2026-09-07 審查實測：`"i\u0066": false` 被真的 YAML parser 解成 `if: false`，
+# 而這支只認 bare 與單純 quoted 的 key，於是「沒看見就通過」——那是 fail-open。
+# 這裡不去支援 YAML 的全部跳脫語法（支援不完），改成**看到就拒**。
+for l in job:
+    if re.search(r"""^\s*['"][^'"]*\\[uUx][0-9A-Fa-f]""", l) or re.search(r"^\s*[?&*]", l):
+        die("YAML key 用了這支 parser 不支援的寫法（跳脫序列／anchor／複雜 key）：\n    "
+            + l.strip() + "\n  認不得就拒，不要猜。")
+
 steps, cur = [], None
 for l in job:
     if re.match(r"^      - ", l):
@@ -74,8 +83,12 @@ if cur is not None: steps.append(cur)
 if not steps: die("ci job 裡抽不到任何步驟")
 
 def field(raw, key):
+    # bare 與 quoted 都要認。只認 bare 的話，`"continue-on-error": true`
+    # 會「沒看見而通過」—— 那是 fail-open，不是 fail-closed。
+    pat = re.compile(r"^\s*(?:%s|\"%s\"|\'%s\'):\s?(.*)$"
+                     % (re.escape(key), re.escape(key), re.escape(key)))
     for l in raw:
-        m = re.match(r"^\s*%s:\s?(.*)$" % re.escape(key), l)
+        m = pat.match(l)
         if m: return m.group(1)
     return None
 
@@ -94,6 +107,21 @@ def envmap(raw):
 names   = [(field(s, "name") or "").strip() for s in steps]
 runs    = [field(s, "run") or "" for s in steps]
 coe     = [field(s, "continue-on-error") for s in steps]
+ifs     = [field(s, "if") for s in steps]
+# 自訂 shell 可以整步中和：`shell: bash {0} || true` 讓 run 怎麼寫都不會紅。
+shells  = [field(s, "shell") for s in steps]
+
+# job 層的鍵（縮排 4 格，不在 steps: 底下）。
+# 2026-09-07 審查抓到：原本只掃 step 層，`ci:` 底下加一行
+# `continue-on-error: true` 整個 job 失敗都不算失敗，而測試全綠。
+job_keys = {}
+in_steps = False
+for l in job:
+    if re.match(r"^    steps:\s*$", l): in_steps = True; continue
+    if in_steps and re.match(r"^    [A-Za-z_-]+:", l): in_steps = False
+    if in_steps: continue
+    m = re.match(r"""^    (?:([A-Za-z_-]+)|"([^"]+)"|'([^']+)'):\s?(.*)$""", l)
+    if m: job_keys[m.group(1) or m.group(2) or m.group(3)] = m.group(4)
 
 f = open(out, "w", encoding="utf-8")
 def put(k, v): f.write("%s\t%s\n" % (k, v))
@@ -111,10 +139,36 @@ if not inst: die("ci job 裡找不到 `run: npm ci`")
 put("install_before_branch", "1" if min(inst) < bi else "0")
 put("install_idx", str(min(inst))); put("branch_idx", str(bi))
 
-for t in ("test-progress-check.sh", "test-check-pr-branch.sh", "test-ci-workflow.sh"):
+for t in ("test-progress-check.sh", "test-check-pr-branch.sh", "test-ci-workflow.sh", "test-prompts.sh"):
     put("has_" + t, "1" if any(t in r for r in runs) else "0")
 
 put("continue_on_error", "1" if any(v is not None for v in coe) else "0")
+put("job_continue_on_error", "1" if "continue-on-error" in job_keys else "0")
+# job 層的 `if: false` 會讓整個 job 被 skip，而 skip 在 required check 上算通過。
+put("job_if", "1" if "if" in job_keys else "0")
+# job 層的 defaults.run.shell 會套用到每一步，效果跟逐步加 shell: 一樣。
+put("job_defaults", "1" if "defaults" in job_keys else "0")
+
+# env 值要**完全相等**，不是「包含」。`prefix-${{ github.head_ref }}` 也含那串字，
+# 但傳進閘門的就不是分支名了（2026-09-07 審查的存活突變之一）。
+put("branch_env_base_exact", "1" if e.get("BASE_REF", "").strip() == "${{ github.base_ref }}" else "0")
+put("branch_env_head_exact", "1" if e.get("HEAD_REF", "").strip() == "${{ github.head_ref }}" else "0")
+
+# 每一支必跑的測試：不得有 if:（會被 skip）、run 不得被 `|| true` 之類中和。
+# **精確 allow-list**，不是「列舉會忽略失敗的寫法」。
+# deny-list 列不完：`|| true`、`|| :`、`|| echo x`、`|| exit 0`、`; true`…
+# 只要 run 不是剛好那一句，就當作被動過。
+for t_ in ("test-progress-check.sh", "test-check-pr-branch.sh", "test-ci-workflow.sh", "test-prompts.sh"):
+    want = "bash .github/scripts/%s" % t_
+    idxs = [i for i, r in enumerate(runs) if t_ in r]
+    put("exact_" + t_, "1" if any(
+        runs[i].strip() == want and ifs[i] is None and shells[i] is None
+        for i in idxs) else "0")
+    put("actual_" + t_, (runs[idxs[0]].strip() if idxs else ""))
+
+# npm ci 那一步也不得被 if: 關掉（關掉再在後面放一個真的，順序檢查會被騙過）。
+inst_live = [i for i in inst if ifs[i] is None]
+put("install_live_before_branch", "1" if inst_live and min(inst_live) < bi else "0")
 f.close()
 PARSE
 if [ $? -ne 0 ]; then
@@ -126,16 +180,35 @@ get() { awk -F'\t' -v k="$1" '$1==k{sub(/^[^\t]*\t/,""); print; exit}' "$FACTS";
 
 echo "── ci.yml 合約 ──"
 
+# ── ok()/bad() 自己的陽性對照 ───────────────────────────────────────────────
+#
+# 這支測試唯一的紅燈來源就是 `bad()` 把失敗計進 $FAIL。它壞掉（例如 +1 被寫成
+# +0）的話，**真的有失敗也會報綠** —— 2026-09-07 實測：把 +1 改成 +0、同時
+# 製造一個真的失敗，整支仍然 rc=0。
+#
+# 所以先驗它還活著：叫一次 bad，看 $FAIL 有沒有真的加一，然後撤銷。
+_fail_before=$FAIL
+bad "自測（不計入）" >/dev/null 2>&1
+if [ "$FAIL" -eq "$((_fail_before + 1))" ]; then
+  FAIL=$_fail_before
+  ok "bad() 自測：失敗真的會被計進去"
+else
+  FAIL=$((_fail_before + 1))
+  printf '  \033[31m✗\033[0m %s\n' "bad() 自測：它沒有把失敗計進去 —— 這支測試的綠燈是假的"
+fi
+
+
 # T1：Branch 那一步的 run 不得直接含 GitHub expression
 BRUN="$(get branch_run)"
 case "$BRUN" in
-  *'${{'*) bad "Branch 的 run 不含 \${{ }}（要走 env 中介變數）" "run: $BRUN" ;;
+  *'${{'*) bad "Branch 的 run 不含 \${{ }}（要走 env 中介變數）" "run: ${BRUN}" ;;
   *)       ok "Branch 的 run 不含 \${{ }}（走 env 中介變數）" ;;
 esac
 
 # T2：env 有把兩個 ref 綁成中介變數
-case "$(get branch_env_base)" in *github.base_ref*) ok "env.BASE_REF 綁 github.base_ref" ;; *) bad "env.BASE_REF 綁 github.base_ref" ;; esac
-case "$(get branch_env_head)" in *github.head_ref*) ok "env.HEAD_REF 綁 github.head_ref" ;; *) bad "env.HEAD_REF 綁 github.head_ref" ;; esac
+# 完全相等，不是包含 —— `prefix-${{ github.head_ref }}` 也「包含」那串字。
+[ "$(get branch_env_base_exact)" = "1" ] && ok "env.BASE_REF 完全等於 github.base_ref" || bad "env.BASE_REF 完全等於 github.base_ref" "實際：$(get branch_env_base)"
+[ "$(get branch_env_head_exact)" = "1" ] && ok "env.HEAD_REF 完全等於 github.head_ref" || bad "env.HEAD_REF 完全等於 github.head_ref" "實際：$(get branch_env_head)"
 
 # T3：實際跑一次，斷言分支名逐字傳進閘門（假 checker 只記錄 argv）
 EVIL='chore/$(printf CI_WORKFLOW_TEST_INJECTED)'
@@ -149,24 +222,42 @@ FAKE
 ( cd "$W/repo" && BASE_REF="main" HEAD_REF="$EVIL" bash -c "$BRUN" ) >/dev/null 2>&1
 GOT_N="$(cat "$W/repo/argv.count" 2>/dev/null || echo 0)"
 GOT_2="$(sed -n '2p' "$W/repo/argv.list" 2>/dev/null || true)"
-[ "$GOT_N" = "2" ] && ok "閘門收到剛好 2 個參數" || bad "閘門收到剛好 2 個參數" "實際 $GOT_N 個"
+[ "$GOT_N" = "2" ] && ok "閘門收到剛好 2 個參數" || bad "閘門收到剛好 2 個參數" "實際 ${GOT_N} 個"
 [ "$GOT_2" = "$EVIL" ] && ok "分支名逐字傳入（\$() 沒有被執行）" \
-                       || bad "分支名逐字傳入（\$() 沒有被執行）" "送進去：$EVIL／收到：$GOT_2"
+                       || bad "分支名逐字傳入（\$() 沒有被執行）" "送進去：${EVIL}／收到：${GOT_2}"
 
 # T4：npm ci 要排在 Branch 之前（否則 Branch 內部那次 npx 會繞過 lockfile）
-[ "$(get install_before_branch)" = "1" ] \
-  && ok "npm ci 排在 Branch 之前" \
-  || bad "npm ci 排在 Branch 之前" "npm ci 在第 $(get install_idx) 步、Branch 在第 $(get branch_idx) 步"
+[ "$(get install_live_before_branch)" = "1" ] \
+  && ok "有一步「真的會跑的」npm ci 排在 Branch 之前" \
+  || bad "有一步「真的會跑的」npm ci 排在 Branch 之前" "npm ci 在第 $(get install_idx) 步、Branch 在第 $(get branch_idx) 步（帶 if: 的不算）"
 
-# T5：三支閘門測試都要在 ci job 裡
-for t in test-progress-check.sh test-check-pr-branch.sh test-ci-workflow.sh; do
-  [ "$(get "has_$t")" = "1" ] && ok "ci job 有跑 $t" || bad "ci job 有跑 $t" "workflow 裡找不到這一步"
+# T5：四支閘門測試都要在 ci job 裡
+for t in test-progress-check.sh test-check-pr-branch.sh test-ci-workflow.sh test-prompts.sh; do
+  if [ "$(get "exact_$t")" = "1" ]; then
+    ok "ci job 跑 ${t}，run 剛好是那一句、沒有 if:／shell:"
+  else
+    bad "ci job 跑 ${t}，run 剛好是那一句、沒有 if:／shell:" \
+        "實際 run：$(get "actual_$t")（預期剛好 bash .github/scripts/${t}）"
+  fi
 done
 
 # T6：ci job 不得有 continue-on-error（失敗要真的失敗）
+# step 層與 **job 層**都要掃。job 層的 continue-on-error 是 Actions 正式支援的
+# 失敗處理面，設了之後整個 job 失敗都不算失敗 —— 原本只掃 step 層，它存活。
 [ "$(get continue_on_error)" = "0" ] \
-  && ok "ci job 沒有 continue-on-error" \
-  || bad "ci job 沒有 continue-on-error" "有步驟設了 continue-on-error"
+  && ok "沒有步驟設 continue-on-error" \
+  || bad "沒有步驟設 continue-on-error" "有步驟設了 continue-on-error"
+[ "$(get job_continue_on_error)" = "0" ] \
+  && ok "ci job 自己沒有 continue-on-error" \
+  || bad "ci job 自己沒有 continue-on-error" "job 層設了 continue-on-error，整個 job 紅了也不算失敗"
+# job 層的 if: false 會讓整個 job 被 skip —— 而 skipped 在 required check 上算通過。
+[ "$(get job_if)" = "0" ] \
+  && ok "ci job 自己沒有 if:" \
+  || bad "ci job 自己沒有 if:" "job 層設了 if:，整個 job 可能被 skip 而算通過"
+# defaults.run.shell 會套到每一步，等於一次中和全部。
+[ "$(get job_defaults)" = "0" ] \
+  && ok "ci job 沒有 defaults:（不能用 defaults.run.shell 一次中和全部）" \
+  || bad "ci job 沒有 defaults:" "job 層設了 defaults，可能用 defaults.run.shell 中和每一步"
 
 echo
 printf '通過 %s / 失敗 %s / 共 %s\n' "$PASS" "$FAIL" "$((PASS+FAIL))"
