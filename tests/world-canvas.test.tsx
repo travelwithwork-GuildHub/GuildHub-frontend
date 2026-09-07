@@ -13,6 +13,13 @@ import WorldCanvas from '@/world/WorldCanvas'
 // 這個 mock 換來的是「分支與輸出正確」，不是「畫面上真的有東西」——
 // 後者由 design.md〈驗證方式〉的 V1–V3 在 production build 上驗。
 vi.mock('@react-three/fiber', () => ({
+    // WorldCamera 會用 useThree／useFrame。jsdom 裡沒有 render loop，
+    // 所以這裡給最小的替身 —— 被 mock 的仍然是**第三方的邊界**。
+    useThree: (selector?: (s: unknown) => unknown) => {
+      const state = { set: () => {}, size: { width: 800, height: 600 } }
+      return selector ? selector(state) : state
+    },
+    useFrame: () => {},
   Canvas: ({ children, onCreated }: { children?: ReactNode; onCreated?: () => void }) => {
     onCreated?.() // 真的 Canvas 建好 renderer 之後會呼叫它；殼也要，否則 S05 測不到
     return <div data-testid="r3f-canvas-stub">{children}</div>

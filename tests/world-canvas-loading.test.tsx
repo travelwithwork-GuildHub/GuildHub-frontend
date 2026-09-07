@@ -6,6 +6,13 @@ import WorldCanvas from '@/world/WorldCanvas'
 // 這個檔案的 mock **刻意不呼叫 `onCreated`** —— 模擬 renderer 還沒建好。
 // 跟 world-canvas.test.tsx 分開是因為 `vi.mock` 是整檔生效的。
 vi.mock('@react-three/fiber', () => ({
+    // WorldCamera 會用 useThree／useFrame。jsdom 裡沒有 render loop，
+    // 所以這裡給最小的替身 —— 被 mock 的仍然是**第三方的邊界**。
+    useThree: (selector?: (s: unknown) => unknown) => {
+      const state = { set: () => {}, size: { width: 800, height: 600 } }
+      return selector ? selector(state) : state
+    },
+    useFrame: () => {},
   Canvas: ({ children }: { children?: ReactNode }) => (
     <div data-testid="r3f-canvas-stub">{children}</div>
   ),

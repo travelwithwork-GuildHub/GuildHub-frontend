@@ -7,6 +7,13 @@ import WorldPage from '@/app/world/page'
 // `Not implemented: HTMLCanvasElement's getContext()`。
 // 被 mock 的是第三方的邊界，斷言的仍然是我們的路由與邊界輸出。
 vi.mock('@react-three/fiber', () => ({
+    // WorldCamera 會用 useThree／useFrame。jsdom 裡沒有 render loop，
+    // 所以這裡給最小的替身 —— 被 mock 的仍然是**第三方的邊界**。
+    useThree: (selector?: (s: unknown) => unknown) => {
+      const state = { set: () => {}, size: { width: 800, height: 600 } }
+      return selector ? selector(state) : state
+    },
+    useFrame: () => {},
   Canvas: ({ children }: { children?: ReactNode }) => (
     <div data-testid="r3f-canvas-stub">{children}</div>
   ),
