@@ -41,13 +41,79 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 
 | 類 | 值 | 誰決定 | 放哪 |
 |---|---|---|---|
-| **事實** | `Done` / `On-going` / `Next-going` / `Debug` | git + OpenSpec + CI | **`progress.sh` 算的，沒有人手寫** |
+| **事實** | `Done` / `On-going` / `Next-going` / `Debug` | 遠端分支 ＋ OpenSpec change 目錄 ＋ `tasks.md` 的勾 | **`progress.sh` 算的，沒有人手寫** |
 | **意圖** | `Cancelled` / `Pending` / `TBD` / `Delay` / `Alarm` | 人 | 本表 `標記` 欄，**必須附理由** |
 | **屬性** | `Regular` | — | 常態性工作，沒有完成點 |
 
 為什麼要拆：**手寫的狀態一定會漂。** 這個 repo 一天之內漂過三次
 （見 `docs/DECISIONS.md`）。可以從 git 與 OpenSpec 推導的，就不要讓人來寫；
 推導不出來的（「這件事我們決定不做了」），機器永遠猜不到，才由人寫 —— 而且要寫理由。
+
+**這一欄自己漂過。** 它原本寫「git + OpenSpec + CI」，而 `progress.sh`
+**完全沒有查過 CI** —— 沒有 `gh`、沒有 `api.github.com`、沒有任何 check run。
+一張宣告「狀態是算出來的所以不會漂」的表，自己就在說一件可證明為假的事
+（2026-09-07 由外部審查實測指出）。所以下面把不是來源的東西也寫出來：
+
+| 不是來源 | 所以 |
+|---|---|
+| **CI 的紅綠** | 「已封存」不代表那個 change 的 CI 是綠的。要看 CI 去看 GitHub |
+| **PR 開著還是關了** | 「實作中」只代表遠端有 `feat/` 分支，分支可能早就沒人動了 |
+| **`tasks.md` 的勾是不是真的** | 勾是人打的。它算的是「打了幾個勾」，不是「真的做完幾件事」 |
+
+還有一件事：**「規格審查中」與「實作中」是從遠端分支推的**，而遠端 refs 要
+`git fetch` 抓得到才新鮮。抓不到的時候 `progress.sh` 會在最上面說，並在
+`--json` 標記 `remote_fresh: false` —— 它不會假裝那個狀態是當下的。
+
+<!-- progress:start 這一段由 `progress.sh --render` 產生，不要手改 -->
+
+### 目前做到哪裡（機器產生）
+
+**沒有列出來的項目就是「未開始」。**「規格審查中」「實作中」不在這裡 —— 那兩個是從遠端分支推的，不是這份 tree 重建得出來的，寫進版控當下就會過期。要看那兩個狀態跑 `bash .github/scripts/progress.sh`。
+
+| 項目 | 狀態 | 依據 |
+|---|---|---|
+| FE-O11 | 已封存 | `fe-o11-coverage` |
+| FE-W01 | 已封存 | `fe-w01-worldcanvas` |
+| FE-W02 | 已封存 | `fe-w02-coords` |
+| FE-W03 | 已封存 | `fe-w03-player` |
+| FE-W04 | 已封存 | `fe-w04-physics` |
+| FE-W05 | 已封存 | `fe-w05-camera` |
+| FE-X01 | 已封存 | `fe-x01-appshell` |
+| FE-O10 | 已完成 | `ae78a12c2af7` |
+| FE-O18 | 常態 | — |
+| BE-G04 | 待裁決 | — |
+| BE-G25 | 待裁決 | — |
+| BE-G01 | 等外部 | — |
+| BE-G02 | 等外部 | — |
+| BE-G03 | 等外部 | — |
+| BE-G05 | 等外部 | — |
+| BE-G06 | 等外部 | — |
+| BE-G09 | 等外部 | — |
+| BE-G10 | 等外部 | — |
+| BE-G11 | 等外部 | — |
+| BE-G12 | 等外部 | — |
+| BE-G13 | 等外部 | — |
+| BE-G14 | 等外部 | — |
+| BE-G16 | 等外部 | — |
+| BE-G20 | 等外部 | — |
+| BE-G21 | 等外部 | — |
+| BE-G22 | 等外部 | — |
+| BE-G23 | 等外部 | — |
+| BE-G24 | 等外部 | — |
+| BE-G26 | 等外部 | — |
+| BE-G27 | 等外部 | — |
+| BE-G07 | 已取消 | — |
+| BE-G08 | 已取消 | — |
+| BE-G15 | 已取消 | — |
+| BE-G17 | 已取消 | — |
+| BE-G18 | 已取消 | — |
+| BE-G19 | 已取消 | — |
+
+共 161 項：未開始 125、等外部 19、已封存 7、已取消 6、待裁決 2、已完成 1、常態 1
+
+來源指紋 `da3d8dadb70fa6d7`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+
+<!-- progress:end -->
 
 ```bash
 bash .github/scripts/progress.sh            # 有動靜的
@@ -342,24 +408,24 @@ bash .github/scripts/wbs-excel.sh
 
 ### 環境、CI 與交付
 
-| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 |
-|---|---|---|---|---|---|---|
-| FE-O09 | 環境設定 | 後端 REST / WS 位址、環境變數規範、local / preview / prod 分離。**預設只連本機自己起的東西** | W1 | 3 | | |
-| | | Cookie 與跨源：身分走 session cookie，`allow_credentials=True`、`CORS_ORIGINS` 預設含 `localhost:3000`。所有 fetch 帶 credentials；**WS 握手也靠同一個 cookie** | W1 | 2 | | |
-| | | 前後端不同網域部署時的 SameSite / Secure | W13–W16 | 2 | | |
-| FE-O10 | CI 補齊 | scaffold 之後**立刻**把 `Lint` / `Typecheck` / `Test` / `Build` 放回 `ci.yml`（檔案裡有註記） | W1 | 3 | | Alarm｜每晚一天，紅的東西就多一天沒人看見 |
-| FE-O11 | 測試策略 | 單元 / component（Testing Library）/ E2E（Playwright）的分工與比重；3D 怎麼測 —— 哪些值得 E2E，哪些只驗 store 與純函式 | W1 | 8 | | |
-| | | **測試環境隔離**：只准打自己 `./run.sh` 起的後端。一次 40 連線的壓測足以把共用實例的人全部踢下線 | W1 | 2 | | |
-| FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`） | W5 | 7 | | |
-| FE-O13 | 視覺回歸 | 3D 畫面怎麼測 —— 截圖比對還是只測 DOM。**先決定，不要做一半** | W5 | 4 | | |
-| FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入 | W5 | 4 | | |
-| FE-O15 | 發表準備 | Demo fake data、固定流程、Demo reset；World 預載、異常 fallback、完整 E2E rehearsal | W5 | 7 | | |
-| | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W5 | 2 | | Alarm｜發表當天最不想踩的地雷 |
-| | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W5 | 5 | | |
-| | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W5 | 3 | | |
-| FE-O16 | 技術可觀測性 | 前端錯誤回報、WS 斷線率、FPS 遙測。**只做技術 telemetry** —— 使用者行為追蹤被後端明文永久排除（BE-G17），兩者不要混在同一個提案裡 | W13–W16 | 6 | | |
-| FE-O17 | 規模化 | `PAGE_SIZE=20` 的 offset 翻頁在資料變多時會慢且會漏；快取與預取策略 | W17–W20 | 6 | BE-G05 待銜接 | Pending｜等真後端提供更好的查詢；本地端先做好快取與預取 |
-| FE-O18 | 文件與交接 | `CONTEXT.md` / ADR / 本表的維護節奏 | 常態 | — | | Regular｜常態維護，沒有完成點 |
+| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 | 涵蓋證據 |
+|---|---|---|---|---|---|---|---|
+| FE-O09 | 環境設定 | 後端 REST / WS 位址、環境變數規範、local / preview / prod 分離。**預設只連本機自己起的東西** | W1 | 3 | | |  |
+| | | Cookie 與跨源：身分走 session cookie，`allow_credentials=True`、`CORS_ORIGINS` 預設含 `localhost:3000`。所有 fetch 帶 credentials；**WS 握手也靠同一個 cookie** | W1 | 2 | | |  |
+| | | 前後端不同網域部署時的 SameSite / Secure | W13–W16 | 2 | | |  |
+| FE-O10 | CI 補齊 | scaffold 之後**立刻**把 `Lint` / `Typecheck` / `Test` / `Build` 放回 `ci.yml`（檔案裡有註記） | W1 | 3 | |  | commit:ae78a12c2af7b4641d2908341192d5cdc6191dd7 |
+| FE-O11 | 測試策略 | 單元 / component（Testing Library）/ E2E（Playwright）的分工與比重；3D 怎麼測 —— 哪些值得 E2E，哪些只驗 store 與純函式 | W1 | 8 | | |  |
+| | | **測試環境隔離**：只准打自己 `./run.sh` 起的後端。一次 40 連線的壓測足以把共用實例的人全部踢下線 | W1 | 2 | | |  |
+| FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`） | W5 | 7 | | |  |
+| FE-O13 | 視覺回歸 | 3D 畫面怎麼測 —— 截圖比對還是只測 DOM。**先決定，不要做一半** | W5 | 4 | | |  |
+| FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入 | W5 | 4 | | |  |
+| FE-O15 | 發表準備 | Demo fake data、固定流程、Demo reset；World 預載、異常 fallback、完整 E2E rehearsal | W5 | 7 | | |  |
+| | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W5 | 2 | | Alarm｜發表當天最不想踩的地雷 |  |
+| | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W5 | 5 | | |  |
+| | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W5 | 3 | | |  |
+| FE-O16 | 技術可觀測性 | 前端錯誤回報、WS 斷線率、FPS 遙測。**只做技術 telemetry** —— 使用者行為追蹤被後端明文永久排除（BE-G17），兩者不要混在同一個提案裡 | W13–W16 | 6 | | |  |
+| FE-O17 | 規模化 | `PAGE_SIZE=20` 的 offset 翻頁在資料變多時會慢且會漏；快取與預取策略 | W17–W20 | 6 | BE-G05 待銜接 | Pending｜等真後端提供更好的查詢；本地端先做好快取與預取 |  |
+| FE-O18 | 文件與交接 | `CONTEXT.md` / ADR / 本表的維護節奏 | 常態 | — | | Regular｜常態維護，沒有完成點 |  |
 
 ---
 

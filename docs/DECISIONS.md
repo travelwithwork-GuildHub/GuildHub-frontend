@@ -29,6 +29,59 @@
 
 ---
 
+## Scenario 覆蓋閘門：先落地、清完缺口才接進 CI（已完成）
+
+**決定**：`check-scenario-coverage.sh` 與它的 19 條負向測試先合併，
+測試接進 CI；**閘門本身等 8 條缺口清掉再接**。
+
+**背景**：閘門第一次跑就抓到 8 條已合併、卻沒有任何通過的測試指著它的
+Scenario：
+
+    FE-W01-S01  進入世界看到 3D 畫面（canvas 像素尺寸不為零）
+    FE-W01-S02  容器尺寸改變（DPR 不超過 2）
+    FE-W01-S03  陰影出現在畫面上
+    FE-W03-S13  角色移動時相機的 target 跟著改變
+    FE-W04-S08  位置由 rigid body 持有，不進 React state
+    FE-W05-S08  target 改變不觸發重新渲染
+    FE-X01-S10  四個工程品質指令都真的跑
+    FE-X01-S11  型別錯誤不被放過
+
+**其中三條是比「缺測試」更嚴重的東西。** `FE-W03-S13`、`FE-W04-S08`、
+`FE-W05-S08` 在各自 change 的 `tasks.md` 裡都寫著「驗證：Scenario `X`」
+而且都打了勾：
+
+    fe-w03-player/tasks.md:33  - [x] 6.1 …；驗證：Scenario `FE-W03-S13`
+    fe-w04-physics/tasks.md:29 - [x] 6.1 …；驗證：Scenario `FE-W04-S08`
+    fe-w05-camera/tasks.md:22  - [x] 4.1 …；驗證：Scenario `FE-W05-S08`
+
+而 `grep -rn "渲染次數\|重新渲染\|rerender" tests/` **零命中** ——
+那三條「不進 React state」的行為，一條測試都沒有。
+**打勾說驗過了，跟真的驗過了，是兩件事。**
+
+**為什麼不現在接**：修那 8 條要動 `openspec/specs/`（加 `VERIFY-BY` 豁免）
+與 `tests/`（補那三條渲染次數測試），兩者都不是 `governance/` 分支能碰的
+路徑。硬接的結果是 CI 立刻紅，然後有人去加 `continue-on-error`。
+
+**接進 CI 的條件**（能機器驗）：
+
+    bash .github/scripts/check-scenario-coverage.sh   rc=0
+
+**已達成。** `fe-o11-coverage`（#55／#57／#58）把八條缺口清掉：四條補了真的
+測試（`FE-W03-S13`、`FE-W04-S08`、`FE-W05-S08`、`FE-X01-S11`），四條在規格上
+標了驗證方式（三條 `manual-browser`、一條 `ci-job`）。
+
+    ✓ Scenario 覆蓋：64 條規格，60 條有通過的測試、4 條豁免    rc=0
+
+閘門已經是 `ci.yml` 的一步，而且被 `test-ci-workflow.sh` 的必跑清單鎖住 ——
+刪掉那一步、或給它加 `if:`／`|| true`，workflow 合約測試會紅。
+
+往後任何一條新的 Scenario 沒有測試也沒有 `VERIFY-BY`，PR 就過不了。
+
+**跟模板的分岔（宣告過的）**：模板 `ai-team-starter` 的必跑清單裡**沒有**
+`check-scenario-coverage.sh`。剛複製的模板沒有任何規格，那支閘門會紅在
+「一份規格檔都沒掃到」—— 而那個判斷是對的。衍生專案有規格之後自己加。
+
+
 ## 每個 PR 不需要走兩輪 review
 
 **拒絕的替代**：取消 `chore/` 通道，要求**每一個** PR（包含改一行 README）
