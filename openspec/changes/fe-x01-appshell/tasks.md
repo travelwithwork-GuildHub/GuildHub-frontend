@@ -19,12 +19,12 @@
 
 ## 4. 路由與外殼（`feat/fe-x01-appshell--layout`）
 
-- [ ] 4.1 在 `next.config` 的 `redirects()` 加入 `/` → `/world`、`permanent: false`；驗證：測試 import 該設定、呼叫 `redirects()`、斷言該筆的 `permanent` 為 `false`（＝307）（Requirement: 根路徑導向世界，Scenario `FE-X01-S01`）
-- [ ] 4.2 建立 not-found 頁面；驗證：測試直接 render 該元件並斷言可辨識的找不到內容；並確認未定義路徑不會被 4.1 的規則吃掉（Scenario `FE-X01-S02`）
-- [ ] 4.3 建立 `/world` 路由、全域 Layout，以及 World 的 client 邊界薄殼（`'use client'` ＋ `next/dynamic` 的 `ssr: false`），殼裡放佔位元件；驗證：測試 render 頁面並斷言 Layout 與佔位內容都在（Requirement: World 區域的 client 邊界，Scenario `FE-X01-S03`）
-- [ ] 4.4 在該邊界加上錯誤呈現（`next/error` 的 `catchError`），fallback 顯示可辨識訊息並提供 `retry()`；驗證：測試讓動態載入失敗，斷言錯誤訊息與重試操作出現、且頁面其餘部分仍在（Scenario `FE-X01-S04`）
-- [ ] 4.5 建立唯一一個 `<Providers>` 組合位置，本次不掛載任何具體 Provider；驗證：測試斷言 children 內容與順序不因經過它而改變（Requirement: 全域 Provider 的單一組合位置，Scenario `FE-X01-S05`）
-- [ ] 4.6 確認組合位置不多包任何元素；驗證：測試比對「經過組合位置」與「未經過」兩次渲染的 DOM 結構完全相同（Scenario `FE-X01-S13`）
+- [x] 4.1 在 `next.config` 的 `redirects()` 加入 `/` → `/world`、`permanent: false`；驗證：測試 import 該設定、呼叫 `redirects()`、斷言該筆的 `permanent` 為 `false`（＝307）（Requirement: 根路徑導向世界，Scenario `FE-X01-S01`）
+- [x] 4.2 建立 not-found 頁面；驗證：測試直接 render 該元件並斷言可辨識的找不到內容；並確認未定義路徑不會被 4.1 的規則吃掉（Scenario `FE-X01-S02`）
+- [x] 4.3 建立 `/world` 路由、全域 Layout，以及 World 的 client 邊界薄殼（`'use client'` ＋ `next/dynamic` 的 `ssr: false`），殼裡放佔位元件；驗證：測試 render 頁面並斷言 Layout 與佔位內容都在（Requirement: World 區域的 client 邊界，Scenario `FE-X01-S03`）
+- [x] 4.4 在該邊界加上錯誤呈現（`next/error` 的 `catchError`），fallback 顯示可辨識訊息並提供 `retry()`；驗證：測試讓動態載入失敗，斷言錯誤訊息與重試操作出現、且頁面其餘部分仍在（Scenario `FE-X01-S04`）
+- [x] 4.5 建立唯一一個 `<Providers>` 組合位置，本次不掛載任何具體 Provider；驗證：測試斷言 children 內容與順序不因經過它而改變（Requirement: 全域 Provider 的單一組合位置，Scenario `FE-X01-S05`）
+- [x] 4.6 確認組合位置不多包任何元素；驗證：測試比對「經過組合位置」與「未經過」兩次渲染的 DOM 結構完全相同（Scenario `FE-X01-S13`）
 
 ## 5. DOM design token（`feat/fe-x01-appshell--layout`｜Requirement: DOM design token 的單一事實來源）
 
@@ -35,11 +35,11 @@
 
 ## 6. 完成前的驗收
 
-- [ ] 6.1 交出一張 Scenario ID ↔ 測試的對照表，`FE-X01-S01` 到 `S14` 每一個都指得出對應的測試；驗證：表格中沒有空格
-- [ ] 6.2 貼出 `npm run lint` / `typecheck` / `test` / `build` 四個指令的**實際輸出**，`test` 要看得到測試數量
-- [ ] 6.3 走完 `design.md`〈驗證方式〉的 **V1–V6**，證據貼在 `feat/fe-x01-appshell--layout` 的 PR 上；驗證：六列都有對應的輸出或截圖，沒有空格。**只連本機 `localhost:3000` 自己起的 dev server**
-- [ ] 6.3.1 V1：`curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:3000/`；驗證：輸出逐字為 `307` 與 `.../world`。這是「斷言設定 ≠ 斷言回應」那個缺口唯一的補法
-- [ ] 6.3.2 V6：`curl` 取 `/world` 的伺服器端 HTML；驗證：其中**不含** World 佔位元件的內容，證明 `ssr: false` 真的生效
-- [ ] 6.3.3 V4／V5：以 DevTools 阻斷 World 的 chunk 請求後重新載入，再解除並按重試；驗證：兩張截圖 —— 錯誤訊息與重試操作都在且頁面其餘部分仍在（`FE-X01-S04`）、重試後內容載入成功
-- [ ] 6.4 `npm run build` 之後確認 `.gitignore` 有涵蓋建置產物，PR 的 diff 裡沒有生成檔；驗證：`git status --short` 乾淨
-- [ ] 6.5 `npx openspec validate fe-x01-appshell --strict` 通過，且本檔案沒有殘留的 `- [ ]`
+- [x] 6.1 交出一張 Scenario ID ↔ 測試的對照表，`FE-X01-S01` 到 `S14` 每一個都指得出對應的測試；驗證：表格中沒有空格
+- [x] 6.2 貼出 `npm run lint` / `typecheck` / `test` / `build` 四個指令的**實際輸出**，`test` 要看得到測試數量
+- [x] 6.3 走完 `design.md`〈驗證方式〉的 **V1–V6**，證據貼在 `feat/fe-x01-appshell--layout` 的 PR 上；驗證：六列都有對應的輸出或截圖，沒有空格。**只連本機 `localhost:3000` 自己起的 dev server**
+- [x] 6.3.1 V1：`curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:3000/`；驗證：輸出逐字為 `307` 與 `.../world`。這是「斷言設定 ≠ 斷言回應」那個缺口唯一的補法
+- [x] 6.3.2 V6：`curl` 取 `/world` 的伺服器端 HTML；驗證：其中**不含** World 佔位元件的內容，證明 `ssr: false` 真的生效
+- [x] 6.3.3 V4／V5：以 DevTools 阻斷 World 的 chunk 請求後重新載入，再解除並按重試；驗證：兩張截圖 —— 錯誤訊息與重試操作都在且頁面其餘部分仍在（`FE-X01-S04`）、重試後內容載入成功
+- [x] 6.4 `npm run build` 之後確認 `.gitignore` 有涵蓋建置產物，PR 的 diff 裡沒有生成檔；驗證：`git status --short` 乾淨
+- [x] 6.5 `npx openspec validate fe-x01-appshell --strict` 通過，且本檔案沒有殘留的 `- [ ]`
