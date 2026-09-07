@@ -1,11 +1,11 @@
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定：`spec/fe-w01-worldcanvas` 合併進 `main`；驗證：`git log --oneline main -- openspec/changes/fe-w01-worldcanvas/proposal.md` 有輸出（`feat/` 的閘門就是去 main 上找這個檔案）
+- [x] 1.1 規格已在 PR 上談定：`spec/fe-w01-worldcanvas` 合併進 `main`；驗證：`git log --oneline main -- openspec/changes/fe-w01-worldcanvas/proposal.md` 有輸出（`feat/` 的閘門就是去 main 上找這個檔案）
 
 ## 2. 相依套件與偵測（Requirement: WebGL2 不可用時不留白畫面）
 
-- [ ] 2.1 安裝 `three`、`@react-three/fiber`、`@types/three`，版本釘死；驗證：`npm run typecheck` 與 `npm run build` 都 rc=0，且 `@react-three/fiber` 的 react peer 上界（`<19.3`）記在 PR 上
-- [ ] 2.2 寫 WebGL2 偵測的純函式（`canvas.getContext('webgl2')`），**在掛 Canvas 之前呼叫**；驗證：mock `getContext` 回 `null` 的測試斷言它回 false，回一個物件時回 true
+- [x] 2.1 安裝 `three`、`@react-three/fiber`、`@types/three`，版本釘死；驗證：`npm run typecheck` 與 `npm run build` 都 rc=0，且 `@react-three/fiber` 的 react peer 上界（`<19.3`）記在 PR 上
+- [x] 2.2 寫 WebGL2 偵測的純函式（`canvas.getContext('webgl2')`），**在掛 Canvas 之前呼叫**；驗證：mock `getContext` 回 `null` 的測試斷言它回 false，回一個物件時回 true
 - [ ] 2.3 WebGL2 不可用時顯示可辨識說明，**且畫面上不得有重試操作**；驗證：測試斷言說明出現、`queryByRole('button')` 找不到重試（Scenario `FE-W01-S06`）
 - [ ] 2.4 WebGL2 可用時不顯示該說明；驗證：測試斷言說明不在（Scenario `FE-W01-S07`）
 - [ ] 2.5 **負向驗證**：把偵測改成永遠回 true，`S06` 那條要從綠變紅；驗證：記錄兩次的退出碼
