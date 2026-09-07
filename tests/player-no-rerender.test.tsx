@@ -3,6 +3,7 @@ import ReactThreeTestRenderer from '@react-three/test-renderer'
 import type { FC } from 'react'
 import { Vector3 } from 'three'
 import { LocalPlayer, type LocalPlayerProps } from '@/world/player/LocalPlayer'
+import { PHYSICS } from '@/world/physics/world'
 
 // `FE-W03-S13`（角色移動時相機的 target 跟著改變，且沒有觸發 React 重新渲染）
 // 與 `FE-W04-S08`（位置由 rigid body 持有，不每幀寫 React state）。
@@ -31,6 +32,14 @@ describe('角色的位置不進 React', () => {
 
     expect(counted, '第一次掛載應該只渲染一次').toHaveBeenCalledTimes(1)
 
+    // **等物理世界真的載進來。** Rapier 是 `await import(...)` ＋ `await init()`，
+    // 不等的話 60 幀全部走「物理還在載入」那一支的純位移 fallback ——
+    // 測試照樣綠，但它證明的**不是** `FE-W04-S08` 說的「位置由 rigid body 持有」。
+    // 實測過：不等的時候 loaded=0 / null=60。
+    await ReactThreeTestRenderer.act(async () => {
+      for (let i = 0; i < 50; i++) await new Promise((r) => setTimeout(r, 0))
+    })
+
     // 按住一個方向鍵，跑很多幀。
     // **是 `code` 不是 `key`** —— LocalPlayer 讀的是實體鍵位。
     await ReactThreeTestRenderer.act(async () => {
@@ -53,6 +62,20 @@ describe('角色的位置不進 React', () => {
     // **沒有下面這一條，上面那條是恆真的** —— 一個什麼都不做的元件當然不會
     // 重新渲染。要證明「它真的動了、而且 target 真的被寫進去」。
     expect(targetRef.current.x, '角色沒有往右移動，或 target 沒有被寫進去').toBeGreaterThan(0)
+
+    // **這一條只有走 rigid body 那條路才會過。** 一直往右走很久：
+    // 物理世界有 ±halfExtent 的靜態邊界牆，角色會停在牆內；
+    // 「物理還在載入」的純位移 fallback 沒有邊界，會一路走出去。
+    // 少了它，「等物理載入」那一段被刪掉照樣綠 —— 而那時候測到的是 fallback，
+    // **不是 `FE-W04-S08` 說的「位置由 rigid body 持有」**（實測：loaded=0 null=60）。
+    await ReactThreeTestRenderer.act(async () => {
+      await renderer.advanceFrames(600, 1 / 60)
+    })
+    expect(
+      targetRef.current.x,
+      '角色走出了遊玩區域 —— 這一幀走的是沒有邊界的 fallback，不是 rigid body',
+    ).toBeLessThan(PHYSICS.halfExtent)
+    expect(counted, '跑了 660 幀之後仍然不該有第二次渲染').toHaveBeenCalledTimes(1)
 
     await ReactThreeTestRenderer.act(async () => {
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowRight' }))
