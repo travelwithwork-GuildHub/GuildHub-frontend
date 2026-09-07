@@ -17,6 +17,9 @@ World 的 3D 渲染面：`/world` 的 client 邊界裡那個真的在跑 WebGL �
 裝置像素比 SHALL 被限制在 **1 到 2 之間** —— 不設上限的話，
 高 DPR 螢幕會用四倍以上的像素去畫同一個畫面。
 
+相機由 `world-camera` 提供。**`FE-W01` 當時設的 perspective 相機是暫時的**，
+已被取代 —— `CONTEXT.md` 訂的是固定的 Orthographic Elevated 相機。
+
 #### Scenario: [FE-W01-S01] 進入世界看到 3D 畫面
 
 - **WHEN** 使用者在支援 WebGL2 的瀏覽器開啟 `/world`
