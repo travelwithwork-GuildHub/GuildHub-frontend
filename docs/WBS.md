@@ -72,7 +72,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 
 | 項目 | 狀態 | 依據 |
 |---|---|---|
-| FE-O11 | 已封存 | `fe-o11-coverage` |
+| FE-O11 | 已封存 | `fe-o11-coverage`、`fe-o11-evidence` |
 | FE-W01 | 已封存 | `fe-w01-worldcanvas` |
 | FE-W02 | 已封存 | `fe-w02-coords` |
 | FE-W03 | 已封存 | `fe-w03-player` |
