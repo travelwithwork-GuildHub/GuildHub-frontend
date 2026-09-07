@@ -3,8 +3,8 @@
 import type {} from '@react-three/fiber'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef, type RefObject } from 'react'
-import { OrthographicCamera, type Vector3Like } from 'three'
-import { CAMERA_DEFAULTS, cameraOffset, damp, orthoFrustum } from './camera'
+import { OrthographicCamera } from 'three'
+import { CAMERA_DEFAULTS, cameraOffset, damp, orthoFrustum, type MutableVector3 } from './camera'
 
 // 固定的 Orthographic Elevated 相機。**不提供任何旋轉或自由移動的操作** ——
 // 沒有 OrbitControls，也沒有任何接受使用者輸入去改變相機的東西。
@@ -19,7 +19,7 @@ export interface WorldCameraProps {
    *
    * **違反這條不會有錯誤訊息，只會變慢**，而且慢的原因在別的地方看不出來。
    */
-  targetRef: RefObject<Vector3Like>
+  targetRef: RefObject<MutableVector3>
 }
 
 export function WorldCamera({ targetRef }: WorldCameraProps) {

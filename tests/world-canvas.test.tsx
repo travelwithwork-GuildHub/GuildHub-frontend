@@ -26,6 +26,14 @@ vi.mock('@react-three/fiber', () => ({
   },
 }))
 
+// LocalPlayer 會操作 three 的 Object3D（getObjectByName、transform）。
+// jsdom 裡沒有真的場景圖，所以這裡把它換成殼 ——
+// **它的邏輯全部是純函式，由 tests/player.test.ts 直接測正式碼**，
+// 不靠這裡的渲染。
+vi.mock('@/world/player/LocalPlayer', () => ({
+  LocalPlayer: () => null,
+}))
+
 const realGetContext = HTMLCanvasElement.prototype.getContext
 
 function stubWebGL2(available: boolean) {
