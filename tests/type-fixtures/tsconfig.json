@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": ["./**/*.ts"],
+  "//": "`exclude` 一定要覆寫成空的。繼承來的那份排除了 tests/type-fixtures ——",
+  "// ": "也就是這個目錄自己。不覆寫的話 tsc 回 TS18003「找不到輸入檔案」，",
+  "//  ": "測試仍然看到非零退出碼而通過，但它驗到的是錯的失敗原因。",
+  "exclude": []
+}

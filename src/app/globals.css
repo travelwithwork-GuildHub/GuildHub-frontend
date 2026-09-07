@@ -1,6 +1,29 @@
 @import 'tailwindcss';
 
-/* DOM design token（色票／字級／間距）在 FE-X01 的第二刀進來。
-   堆疊層級**不放這裡** —— 它在 src/design/layers.ts，理由見
-   openspec/changes/fe-x01-appshell/design.md 的 D5：
-   CSS 自訂屬性取不到只會回空字串，靜默退化成 z-index: 0。 */
+/* DOM design token 的單一事實來源（規格 FE-X01：色票、字級與間距刻度）。
+   實際數值是暫定的 —— FE-W09（WorldDesignSystem，W3）會定統一風格，
+   到時由它收斂。規格只約束「有唯一來源」，不約束值是什麼。
+
+   **堆疊層級刻意不在這裡**（規格 FE-X01-S14）。它在 src/design/layers.ts，
+   理由見 design.md 的 D5：CSS 自訂屬性取不到只會回空字串，靜默退化。 */
+@theme {
+  --color-surface: oklch(0.98 0.004 260);
+  --color-surface-raised: oklch(1 0 0);
+  --color-ink: oklch(0.24 0.02 260);
+  --color-ink-muted: oklch(0.52 0.02 260);
+  --color-accent: oklch(0.58 0.16 258);
+  --color-danger: oklch(0.56 0.19 26);
+  --color-line: oklch(0.9 0.008 260);
+
+  --text-caption: 0.8125rem;
+  --text-body: 1rem;
+  --text-title: 1.5rem;
+
+  --spacing-gutter: 1rem;
+  --spacing-section: 2.5rem;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}

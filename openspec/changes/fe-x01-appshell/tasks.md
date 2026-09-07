@@ -1,6 +1,6 @@
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定：`spec/fe-x01-appshell` 合併進 `main`；驗證：`git log --oneline main -- openspec/changes/fe-x01-appshell/proposal.md` 有輸出（`feat/` 的閘門就是去 main 上找這個檔案）
+- [x] 1.1 規格已在 PR 上談定：`spec/fe-x01-appshell` 合併進 `main`；驗證：`git log --oneline main -- openspec/changes/fe-x01-appshell/proposal.md` 有輸出（`feat/` 的閘門就是去 main 上找這個檔案）
 
 ## 2. 專案骨架與四個品質指令（`feat/fe-x01-appshell--scaffold`｜Requirement: 工程品質指令可執行且誠實）
 
@@ -28,10 +28,10 @@
 
 ## 5. DOM design token（`feat/fe-x01-appshell--layout`｜Requirement: DOM design token 的單一事實來源）
 
-- [ ] 5.1 以 Tailwind 的 `@theme` 定義色票、字級與間距刻度，放在單一檔案；驗證：`npm run build` 產出的樣式包含這些變數
-- [ ] 5.2 以 TypeScript 常數表定義 5 個具名堆疊層（`canvas` / `hud` / `panel` / `modal` / `toast`），並提供型別受限的存取函式；驗證：測試依序取用五層並斷言數值嚴格遞增（Scenario `FE-X01-S06`）
-- [ ] 5.3 未定義的層名必須讓型別檢查失敗；驗證：建立一份取用未定義層名的 fixture，測試斷言對它執行型別檢查會以非零結束（與 3.1 的 lint fixture 同一個模式）（Scenario `FE-X01-S07`）
-- [ ] 5.4 確認堆疊層級沒有被複製到樣式層；驗證：測試斷言 `@theme` 的 token 檔案裡不含任何堆疊層級定義（Scenario `FE-X01-S14`）
+- [x] 5.1 以 Tailwind 的 `@theme` 定義色票、字級與間距刻度，放在單一檔案；驗證：`npm run build` 產出的樣式包含這些變數
+- [x] 5.2 以 TypeScript 常數表定義 5 個具名堆疊層（`canvas` / `hud` / `panel` / `modal` / `toast`），並提供型別受限的存取函式；驗證：測試依序取用五層並斷言數值嚴格遞增（Scenario `FE-X01-S06`）
+- [x] 5.3 未定義的層名必須讓型別檢查失敗；驗證：建立一份取用未定義層名的 fixture，測試斷言對它執行型別檢查會以非零結束（與 3.1 的 lint fixture 同一個模式）（Scenario `FE-X01-S07`）
+- [x] 5.4 確認堆疊層級沒有被複製到樣式層；驗證：測試斷言 `@theme` 的 token 檔案裡不含任何堆疊層級定義（Scenario `FE-X01-S14`）
 
 ## 6. 完成前的驗收
 
