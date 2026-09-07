@@ -29,7 +29,9 @@ export function DebugShadowScene() {
       </mesh>
 
       {/* 投射陰影的方塊。它唯一的工作是證明陰影真的有出現。 */}
-      <mesh position={[0, 0.6, 0]} castShadow>
+      {/* 挪到旁邊：角色的 spawn 點在原點，疊在一起會看不出朝向。
+          FE-W10 會把這個方塊整個移除。 */}
+      <mesh position={[3, 0.6, -2]} castShadow>
         <boxGeometry args={[1.2, 1.2, 1.2]} />
         <meshStandardMaterial color="#6b7fd7" />
       </mesh>

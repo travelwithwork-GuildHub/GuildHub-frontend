@@ -19,6 +19,14 @@ vi.mock('@react-three/fiber', () => ({
   ),
 }))
 
+// LocalPlayer 會操作 three 的 Object3D（getObjectByName、transform）。
+// jsdom 裡沒有真的場景圖，所以這裡把它換成殼 ——
+// **它的邏輯全部是純函式，由 tests/player.test.ts 直接測正式碼**，
+// 不靠這裡的渲染。
+vi.mock('@/world/player/LocalPlayer', () => ({
+  LocalPlayer: () => null,
+}))
+
 describe('World 區域的 client 邊界（成功路徑）', () => {
   it('[FE-X01-S03] 進入世界頁面：Layout 與 World 區域的內容都在', async () => {
     // fe-w01-worldcanvas 之前這裡斷言的是「佔位內容」。佔位被 3D 取代之後

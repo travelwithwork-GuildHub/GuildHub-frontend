@@ -1,4 +1,9 @@
-import type { Vector3Like } from 'three'
+/** 可寫的三維座標。`three` 的 `Vector3Like` 是唯讀的，而 target 要每幀被寫入。 */
+export interface MutableVector3 {
+  x: number
+  y: number
+  z: number
+}
 
 // 相機的平滑與方位。**平滑是純函式** —— 這一項的核心邏輯不需要瀏覽器就測得到。
 
@@ -37,7 +42,7 @@ export const CAMERA_DEFAULTS = {
  * **把 Z 偏移改成負的，`FE-W02` 的整個對映就跟畫面反過來** ——
  * 而兩邊各自的單元測試都會是綠的。
  */
-export function cameraOffset(): Vector3Like {
+export function cameraOffset(): MutableVector3 {
   return { ...CAMERA_DEFAULTS.offset }
 }
 
