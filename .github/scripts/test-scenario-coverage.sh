@@ -162,13 +162,14 @@ add_verify() { printf '%s\n' "$1" >> "$W/repo/openspec/specs/demo/spec.md"; }
 
 # 豁免要真的生效（陽性對照 —— 少了它，「一律報缺」也會讓上面那些全綠）
 setup
-python3 - "$W/repo/openspec/specs/demo/spec.md" <<'PY'
+HEADSHA="$(git -C "$W/repo" rev-parse HEAD)"
+python3 - "$W/repo/openspec/specs/demo/spec.md" "$HEADSHA" <<'PY'
 import io, sys
 p = sys.argv[1]
 t = io.open(p, encoding="utf-8").read()
 t = t.replace("#### Scenario: [DEMO-01-S02] 第二條\n\n- **WHEN** a\n- **THEN** b",
               "#### Scenario: [DEMO-01-S02] 第二條\n\n- **WHEN** a\n- **THEN** b\n"
-              "- **VERIFY-BY** `manual-browser`｜PR #1 的截圖｜這條要真的畫面才驗得到")
+              "- **VERIFY-BY** `manual-browser`｜" + sys.argv[2] + " 的驗證紀錄｜這條要真的畫面才驗得到")
 io.open(p, "w", encoding="utf-8").write(t)
 PY
 FAKE_JSON='{"testResults":[{"assertionResults":[
@@ -208,7 +209,7 @@ FAKE_JSON="$(json_all_pass)"
 run 1 "不認得的豁免種類要紅" "不在列舉裡"
 
 setup
-add_verify '- **VERIFY-BY** `manual-browser`｜PR #1｜TBD'
+add_verify "- **VERIFY-BY** \`manual-browser\`｜$(git -C "$W/repo" rev-parse HEAD)｜TBD"
 FAKE_JSON="$(json_all_pass)"
 run 1 "豁免沒有實質理由要紅" "沒有寫出實質理由"
 
@@ -226,7 +227,7 @@ run 1 "豁免中間欄位是空的要紅" "要三段"
 
 # **過期的豁免要拿掉。** 測試補上了、豁免還留著，那張免死金牌會一直有效。
 setup
-add_verify '- **VERIFY-BY** `manual-browser`｜PR #1｜這條要真的畫面才驗得到'
+add_verify "- **VERIFY-BY** \`manual-browser\`｜$(git -C "$W/repo" rev-parse HEAD)｜這條要真的畫面才驗得到"
 FAKE_JSON="$(json_all_pass)"
 run 1 "同時有通過的測試與豁免要紅（豁免過期）" "豁免過期了"
 
