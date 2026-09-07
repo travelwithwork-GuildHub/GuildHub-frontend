@@ -167,6 +167,24 @@ if files == 0:
 if not scenarios and files:
     die("掃了 %d 份規格檔卻一條 Scenario 都沒有 —— 標題文法變了嗎？" % files)
 
+def _commit_state(sha):
+    """這個 commit 在不在**這份 tree 的歷史**裡。跟 `progress.sh` 同一份語意。
+
+    `missing`（本機沒有這個物件）跟 `not-ancestor`（有物件但還沒合併）
+    **不可以混為一談** —— 前者可能只是淺 clone，後者是證據真的還沒進來。
+    """
+    import subprocess
+    try:
+        if subprocess.run(["git", "cat-file", "-e", sha + "^{commit}"],
+                          capture_output=True).returncode != 0:
+            return "missing"
+        return "ok" if subprocess.run(
+            ["git", "merge-base", "--is-ancestor", sha, "HEAD"],
+            capture_output=True).returncode == 0 else "not-ancestor"
+    except Exception:
+        return "missing"
+
+
 # ── 測試：真的跑過而且通過的葉節點標題 ─────────────────────────────
 try:
     data = json.load(io.open(os.environ["REPORT"], encoding="utf-8"))
