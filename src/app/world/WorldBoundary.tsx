@@ -9,7 +9,7 @@ import { layer } from '@/design/layers'
 // `ssr: false` 的 `next/dynamic` **不能寫在 Server Component 裡**，
 // 所以這一層是薄殼，唯一的工作是把 World 的內容關進瀏覽器端。
 // 內容是誰由 FE-W01 決定，這個檔案不需要因此改動。
-const WorldContent = dynamic(() => import('./WorldPlaceholder'), { ssr: false })
+const WorldContent = dynamic(() => import('@/world/WorldCanvas'), { ssr: false })
 
 // 用 `catchError` 而不是 `error.tsx`：`error.tsx` 是整個路由段的邊界，
 // 會把**整頁**換掉，而規格 S04 明確要求「頁面的其餘部分仍然可用」。
