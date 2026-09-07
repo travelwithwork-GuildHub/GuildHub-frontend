@@ -127,6 +127,9 @@ jobs:
       - name: Prompts contract tests
         run: bash .github/scripts/test-prompts.sh
 
+      - name: Scenario coverage gate tests
+        run: bash .github/scripts/test-scenario-coverage.sh
+
       # ─── 工程品質。2026-09-07 由 FE-O10 放回（governance/ci-quality-steps）───
       #
       # 為什麼曾經被拿掉：這個 repo 建立之初沒有任何程式碼，package.json 那四個
