@@ -34,6 +34,14 @@ describe('工程品質指令', () => {
     expect(script).toContain(binary)
   })
 
+  it('[FE-X01-S12] test 指令不得加 --passWithNoTests', () => {
+    // 「零測試時要非零結束」實測過一次（把 tests/ 移開，rc=1）。
+    // 但那是一次性的證據 —— 之後有人為了讓某個 CI 步驟變綠而加上這個旗標，
+    // 不會有任何東西擋。這一行是那件事的守門員。
+    expect(pkg.scripts.test).not.toContain('--passWithNoTests')
+    expect(pkg.scripts.test).not.toContain('--passWithNoTest')
+  })
+
   it('Node 版本在 .nvmrc 與 engines 之間沒有漂', () => {
     const nvmrc = read('.nvmrc').trim()
     expect(nvmrc).toBe('24')

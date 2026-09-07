@@ -15,6 +15,19 @@ const nextConfig: NextConfig = {
   // Next 自己的說明還寫著「從 diff 移除只會再生，跟你的工作一起 commit
   // 就好」—— 對一般專案合理，對這個 repo 是繞過治理。
   agentRules: false,
+
+  // 規格 FE-X01-S01：`/` 導向 `/world`。
+  //
+  // **`permanent: false` 是 307，不是 308，而且這件事要能被讀出來。**
+  // W2 之後 `/` 會變成登入入口（FE-A01）。永久轉址會被瀏覽器快取，
+  // 而使用者清不掉 —— 屆時他們會一直被送回 `/world`，而且沒有人查得出原因。
+  //
+  // 寫在這裡而不是在 page 裡呼叫 `redirect()`：這樣測試可以在不起 server 的
+  // 情況下斷言 `permanent` 的值。**但那只證明到設定層** ——
+  // 「HTTP 回應真的是 307」由 design.md〈驗證方式〉的 V1 用 curl 補上。
+  async redirects() {
+    return [{ source: '/', destination: '/world', permanent: false }]
+  },
 }
 
 export default nextConfig
