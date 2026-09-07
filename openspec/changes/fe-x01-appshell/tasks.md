@@ -4,18 +4,18 @@
 
 ## 2. 專案骨架與四個品質指令（`feat/fe-x01-appshell--scaffold`｜Requirement: 工程品質指令可執行且誠實）
 
-- [ ] 2.1 建立 Next.js App Router ＋ TypeScript 專案，把 `package.json` 的四個佔位 script 換成真的指令；驗證：`npm run lint && npm run typecheck && npm test && npm run build` 四個都以狀態碼 `0` 結束（Scenario `FE-X01-S10`）
-- [ ] 2.2 四個 script 的**名稱**必須與 `ci.yml` 註記裡那四步（`npm run lint` / `npm run typecheck` / `npm test` / `npm run build`）逐字一致；驗證：對照 `.github/workflows/ci.yml` 檔尾的註解區塊，逐字比對。名稱對不上的話 `FE-O10` 那個 governance PR 接不上去
-- [ ] 2.3 安裝並設定 Vitest ＋ Testing Library ＋ jsdom，**不得加 `--passWithNoTests`**；驗證：`npm test` 的輸出包含大於 `0` 的測試數量（Scenario `FE-X01-S10`）
-- [ ] 2.4 驗證零測試時 `npm test` 以非零結束：暫時把測試檔移開跑一次，確認紅，再放回來；驗證：記錄該次的退出碼（Scenario `FE-X01-S12`）
-- [ ] 2.5 新增 `.nvmrc` 與 `package.json` 的 `engines`，Node 主版本釘在 `24`；驗證：與 `.github/workflows/ci.yml` 的 `node-version` 一致
-- [ ] 2.6 驗證 `typecheck` 真的會擋：暫時放入一個型別錯誤跑一次，確認以非零結束並指出檔案與行，再移除；驗證：記錄該次輸出（Scenario `FE-X01-S11`）
+- [x] 2.1 建立 Next.js App Router ＋ TypeScript 專案，把 `package.json` 的四個佔位 script 換成真的指令；驗證：`npm run lint && npm run typecheck && npm test && npm run build` 四個都以狀態碼 `0` 結束（Scenario `FE-X01-S10`）
+- [x] 2.2 四個 script 的**名稱**必須與 `ci.yml` 註記裡那四步（`npm run lint` / `npm run typecheck` / `npm test` / `npm run build`）逐字一致；驗證：對照 `.github/workflows/ci.yml` 檔尾的註解區塊，逐字比對。名稱對不上的話 `FE-O10` 那個 governance PR 接不上去
+- [x] 2.3 安裝並設定 Vitest ＋ Testing Library ＋ jsdom，**不得加 `--passWithNoTests`**；驗證：`npm test` 的輸出包含大於 `0` 的測試數量（Scenario `FE-X01-S10`）
+- [x] 2.4 驗證零測試時 `npm test` 以非零結束：暫時把測試檔移開跑一次，確認紅，再放回來；驗證：記錄該次的退出碼（Scenario `FE-X01-S12`）
+- [x] 2.5 新增 `.nvmrc` 與 `package.json` 的 `engines`，Node 主版本釘在 `24`；驗證：與 `.github/workflows/ci.yml` 的 `node-version` 一致
+- [x] 2.6 驗證 `typecheck` 真的會擋：暫時放入一個型別錯誤跑一次，確認以非零結束並指出檔案與行，再移除；驗證：記錄該次輸出（Scenario `FE-X01-S11`）
 
 ## 3. 資料存取的靜態約束（`feat/fe-x01-appshell--scaffold`｜Requirement: 資料存取只有一條路）
 
-- [ ] 3.1 在 ESLint 設定中禁止取用全域 `fetch`，並將 `src/api/**` 與 `src/app/api/**` 明確放行；驗證：一個放在元件路徑的 `fetch` fixture 使 `npm run lint` 以非零結束並指出檔案與行（Scenario `FE-X01-S08`）
-- [ ] 3.2 驗證放行路徑確實不被擋：一個放在 `src/api/**` 的 `fetch` fixture 通過 lint（Scenario `FE-X01-S09`）
-- [ ] 3.3 **把防禦拿掉，檢查要變綠**：暫時移除該規則，確認 3.1 的 fixture 從紅變綠，再放回來；驗證：記錄兩次的退出碼。一個從來沒紅過的檢查等於沒有檢查
+- [x] 3.1 在 ESLint 設定中禁止取用全域 `fetch`，並將 `src/api/**` 與 `src/app/api/**` 明確放行；驗證：一個放在元件路徑的 `fetch` fixture 使 `npm run lint` 以非零結束並指出檔案與行（Scenario `FE-X01-S08`）
+- [x] 3.2 驗證放行路徑確實不被擋：一個放在 `src/api/**` 的 `fetch` fixture 通過 lint（Scenario `FE-X01-S09`）
+- [x] 3.3 **把防禦拿掉，檢查要變綠**：暫時移除該規則，確認 3.1 的 fixture 從紅變綠，再放回來；驗證：記錄兩次的退出碼。一個從來沒紅過的檢查等於沒有檢查
 
 ## 4. 路由與外殼（`feat/fe-x01-appshell--layout`）
 

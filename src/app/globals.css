@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+
+/* DOM design token（色票／字級／間距）在 FE-X01 的第二刀進來。
+   堆疊層級**不放這裡** —— 它在 src/design/layers.ts，理由見
+   openspec/changes/fe-x01-appshell/design.md 的 D5：
+   CSS 自訂屬性取不到只會回空字串，靜默退化成 z-index: 0。 */

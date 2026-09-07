@@ -1,16 +1,40 @@
 {
-  "name": "your-project",
+  "name": "guildhub-frontend",
   "private": true,
   "version": "0.0.0",
-  "description": "改成你的專案。name 只能小寫、不能有空白或中文。",
+  "description": "GuildHub 前端 —— 有空間感的自由工作者／專案媒合平台",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
-    "lint": "echo '✗ lint 還沒設定。編輯 package.json 的 scripts，或刪掉 ci.yml 的 Lint 那一步。' && exit 1",
-    "typecheck": "echo '✗ typecheck 還沒設定。編輯 package.json 的 scripts，或刪掉 ci.yml 的 Typecheck 那一步。' && exit 1",
-    "test": "echo '✗ test 還沒設定。編輯 package.json 的 scripts，或刪掉 ci.yml 的 Test 那一步。' && exit 1",
-    "build": "echo '✗ build 還沒設定。編輯 package.json 的 scripts，或刪掉 ci.yml 的 Build 那一步。' && exit 1"
+    "dev": "next dev",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "next build"
+  },
+  "dependencies": {
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.11.0",
-    "lockfile-lint": "5.0.1"
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "26.4.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.4",
+    "jsdom": "30.0.1",
+    "lockfile-lint": "5.0.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vitest": "5.0.0"
   }
 }
