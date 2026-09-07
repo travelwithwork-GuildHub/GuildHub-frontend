@@ -24,16 +24,18 @@
 - [ ] 4.3 建立 `/world` 路由、全域 Layout，以及 World 的 client 邊界薄殼（`'use client'` ＋ `next/dynamic` 的 `ssr: false`），殼裡放佔位元件；驗證：測試 render 頁面並斷言 Layout 與佔位內容都在（Requirement: World 區域的 client 邊界，Scenario `FE-X01-S03`）
 - [ ] 4.4 在該邊界加上錯誤呈現（`next/error` 的 `catchError`），fallback 顯示可辨識訊息並提供 `retry()`；驗證：測試讓動態載入失敗，斷言錯誤訊息與重試操作出現、且頁面其餘部分仍在（Scenario `FE-X01-S04`）
 - [ ] 4.5 建立唯一一個 `<Providers>` 組合位置，本次不掛載任何具體 Provider；驗證：測試斷言 children 內容與順序不因經過它而改變（Requirement: 全域 Provider 的單一組合位置，Scenario `FE-X01-S05`）
+- [ ] 4.6 確認組合位置不多包任何元素；驗證：測試比對「經過組合位置」與「未經過」兩次渲染的 DOM 結構完全相同（Scenario `FE-X01-S13`）
 
-## 5. DOM design token（`feat/fe-x01-appshell--layout`｜Requirement: DOM design token 的單一來源）
+## 5. DOM design token（`feat/fe-x01-appshell--layout`｜Requirement: DOM design token 的單一事實來源）
 
 - [ ] 5.1 以 Tailwind 的 `@theme` 定義色票、字級與間距刻度，放在單一檔案；驗證：`npm run build` 產出的樣式包含這些變數
 - [ ] 5.2 以 TypeScript 常數表定義 5 個具名堆疊層（`canvas` / `hud` / `panel` / `modal` / `toast`），並提供型別受限的存取函式；驗證：測試依序取用五層並斷言數值嚴格遞增（Scenario `FE-X01-S06`）
-- [ ] 5.3 未定義的層名必須讓取用失敗；驗證：測試斷言取用未定義層名不會回傳未定義值或 `0`，且該層名在 `npm run typecheck` 下無法通過（Scenario `FE-X01-S07`）
+- [ ] 5.3 未定義的層名必須讓型別檢查失敗；驗證：建立一份取用未定義層名的 fixture，測試斷言對它執行型別檢查會以非零結束（與 3.1 的 lint fixture 同一個模式）（Scenario `FE-X01-S07`）
+- [ ] 5.4 確認堆疊層級沒有被複製到樣式層；驗證：測試斷言 `@theme` 的 token 檔案裡不含任何堆疊層級定義（Scenario `FE-X01-S14`）
 
 ## 6. 完成前的驗收
 
-- [ ] 6.1 交出一張 Scenario ID ↔ 測試的對照表，`FE-X01-S01` 到 `S12` 每一個都指得出對應的測試；驗證：表格中沒有空格
+- [ ] 6.1 交出一張 Scenario ID ↔ 測試的對照表，`FE-X01-S01` 到 `S14` 每一個都指得出對應的測試；驗證：表格中沒有空格
 - [ ] 6.2 貼出 `npm run lint` / `typecheck` / `test` / `build` 四個指令的**實際輸出**，`test` 要看得到測試數量
 - [ ] 6.3 人工開瀏覽器走一次：`/` 轉址到 `/world`、`/world` 渲染出外殼與佔位內容、一個未定義路徑得到 404，留下截圖；驗證：這是 `design.md` 的 R2 明確記錄的差距（async Server Component 測不到），不是可以省略的一步
 - [ ] 6.4 `npm run build` 之後確認 `.gitignore` 有涵蓋建置產物，PR 的 diff 裡沒有生成檔；驗證：`git status --short` 乾淨
