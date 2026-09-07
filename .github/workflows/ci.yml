@@ -127,26 +127,42 @@ jobs:
       - name: Prompts contract tests
         run: bash .github/scripts/test-prompts.sh
 
-      # ⚠️ Lint / Typecheck / Test / Build 暫時移除。
+      # ─── 工程品質。2026-09-07 由 FE-O10 放回（governance/ci-quality-steps）───
       #
-      # 這個 repo 還沒有任何程式碼，package.json 那四個 script 是刻意會失敗的佔位。
-      # 留著它們，CI 會永遠是紅的 —— 而永遠紅的 CI 等於沒有 CI，
-      # 團隊很快就會開始無視紅燈。
+      # 為什麼曾經被拿掉：這個 repo 建立之初沒有任何程式碼，package.json 那四個
+      # script 是刻意會失敗的佔位。留著它們 CI 會永遠是紅的 ——
+      # 而永遠紅的 CI 等於沒有 CI，團隊很快就會開始無視紅燈。
       #
-      # W1（FE-C01）建立 Next.js 專案並設好四個 script 之後，把下面這段加回來。
-      # **那必須是一個 governance/ 分支的獨立 PR**（它改的是 .github/），
-      # 而且要緊接在 scaffold PR 之後，不要留下一個沒有工程品質閘門的窗口：
+      # 為什麼現在放回來：FE-X01 的 scaffold（#29）已經把四個 script 換成真的指令，
+      # 乾淨 checkout ＋ npm ci 驗過四個都 rc=0。**放回來的那一刻起，
+      # 前一個 PR 的綠燈不再只代表「治理閘門過了」。**
       #
-      #   - name: Lint
-      #     run: npm run lint
+      # 為什麼排在治理閘門之後：分支類別、lockfile、規格結構、工作分解表這幾關
+      # 各自只要幾秒，而且判定的是「這個 PR 在流程上成不成立」。
+      # 分支名不合法的 PR 無論程式碼多好都會被拒 —— 沒有理由先花一分鐘 build 它。
+      # 便宜的、結構性的檢查先跑；貴的、需要編譯的最後跑。
       #
-      #   - name: Typecheck
-      #     run: npm run typecheck
-      #
-      #   - name: Test
-      #     run: npm test
-      #
-      #   - name: Build
-      #     run: npm run build
+      # 上面的 Branch 那一關有 `if: github.event_name == 'pull_request'`，
+      # 所以直接 push 到 main 時它會被跳過，而下面這四關照跑 —— 排在最後是安全的。
       #
       # 每一關獨立列出，不要串成一行 —— 串起來看 log 分不出是哪一關紅的。
+      #
+      # 還沒做、但已知的事：`.next/cache` 沒有被 actions/cache 快取，所以每次
+      # build 都是冷啟動。現在 build 只要幾秒，離 timeout-minutes: 15 很遠，
+      # 所以不在這個 PR 處理 —— 它跟「把四關放回去」是兩件事。
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # NEXT_TELEMETRY_DISABLED：CI 不對外回報建置遙測。
+      # 這不是效能考量，是「CI 不該在沒有人要求的情況下把資料送出去」。
+      - name: Build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
