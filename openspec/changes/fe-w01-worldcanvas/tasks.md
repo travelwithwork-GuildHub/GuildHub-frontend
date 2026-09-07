@@ -6,21 +6,21 @@
 
 - [x] 2.1 安裝 `three`、`@react-three/fiber`、`@types/three`，版本釘死；驗證：`npm run typecheck` 與 `npm run build` 都 rc=0，且 `@react-three/fiber` 的 react peer 上界（`<19.3`）記在 PR 上
 - [x] 2.2 寫 WebGL2 偵測的純函式（`canvas.getContext('webgl2')`），**在掛 Canvas 之前呼叫**；驗證：mock `getContext` 回 `null` 的測試斷言它回 false，回一個物件時回 true
-- [ ] 2.3 WebGL2 不可用時顯示可辨識說明，**且畫面上不得有重試操作**；驗證：測試斷言說明出現、`queryByRole('button')` 找不到重試（Scenario `FE-W01-S06`）
-- [ ] 2.4 WebGL2 可用時不顯示該說明；驗證：測試斷言說明不在（Scenario `FE-W01-S07`）
-- [ ] 2.5 **負向驗證**：把偵測改成永遠回 true，`S06` 那條要從綠變紅；驗證：記錄兩次的退出碼
+- [x] 2.3 WebGL2 不可用時顯示可辨識說明，**且畫面上不得有重試操作**；驗證：測試斷言說明出現、`queryByRole('button')` 找不到重試（Scenario `FE-W01-S06`）
+- [x] 2.4 WebGL2 可用時不顯示該說明；驗證：測試斷言說明不在（Scenario `FE-W01-S07`）
+- [x] 2.5 **負向驗證**：把偵測改成永遠回 true，`S06` 那條要從綠變紅；驗證：記錄兩次的退出碼
 
 ## 3. Canvas 與場景（Requirement: World 以 WebGL Canvas 渲染／燈光與陰影）
 
-- [ ] 3.1 用 R3F `<Canvas>` 取代 `WorldPlaceholder`，畫布填滿容器，DPR 限制在 `[1, 2]`；驗證：`npm run build` rc=0，實際尺寸與 DPR 由 V1／V2 驗
-- [ ] 3.2 設定一個投射陰影的方向性光源與一個環境光；驗證：由 V3 的截圖驗
-- [ ] 3.3 加入除錯用的接收陰影平面與投射陰影方塊，**檔名與註解寫明由 `FE-W10` 移除，不得命名為 `Floor`**；驗證：檔案裡有那句註解，且 `grep -r "Floor" src/` 沒有命中這兩個物件
-- [ ] 3.4 移除 `src/app/world/WorldPlaceholder.tsx`；`WorldBoundary.tsx` **只准改動態 import 指向的路徑**，殼的結構、`catchError` 邊界、fallback 內容與 `retryByReload` 都不得變更；驗證：`git diff src/app/world/WorldBoundary.tsx` 只有 import 那一行（＋必要的註解），其餘為零 —— 那道縫就是為了這件事留的
+- [x] 3.1 用 R3F `<Canvas>` 取代 `WorldPlaceholder`，畫布填滿容器，DPR 限制在 `[1, 2]`；驗證：`npm run build` rc=0，實際尺寸與 DPR 由 V1／V2 驗
+- [x] 3.2 設定一個投射陰影的方向性光源與一個環境光；驗證：由 V3 的截圖驗
+- [x] 3.3 加入除錯用的接收陰影平面與投射陰影方塊，**檔名與註解寫明由 `FE-W10` 移除，不得命名為 `Floor`**；驗證：檔案裡有那句註解，且 `grep -r "Floor" src/` 沒有命中這兩個物件
+- [x] 3.4 移除 `src/app/world/WorldPlaceholder.tsx`；`WorldBoundary.tsx` **只准改動態 import 指向的路徑**，殼的結構、`catchError` 邊界、fallback 內容與 `retryByReload` 都不得變更；驗證：`git diff src/app/world/WorldBoundary.tsx` 只有 import 那一行（＋必要的註解），其餘為零 —— 那道縫就是為了這件事留的
 
 ## 4. 載入中的呈現（Requirement: 3D 內容載入中的呈現）
 
-- [ ] 4.1 用 `<Suspense>` 包住 3D 內容，fallback 是**DOM 疊層**不是 3D 物件；驗證：測試斷言等待狀態可以被 DOM 查詢找到（Scenario `FE-W01-S04`）
-- [ ] 4.2 內容 ready 之後等待狀態消失；驗證：測試斷言它不在畫面上（Scenario `FE-W01-S05`）
+- [x] 4.1 用 `<Suspense>` 包住 3D 內容，fallback 是**DOM 疊層**不是 3D 物件；驗證：測試斷言等待狀態可以被 DOM 查詢找到（Scenario `FE-W01-S04`）
+- [x] 4.2 內容 ready 之後等待狀態消失；驗證：測試斷言它不在畫面上（Scenario `FE-W01-S05`）
 
 ## 5. 卸載（Requirement: 卸載時釋放資源）
 
@@ -30,8 +30,8 @@
 
 ## 6. 更新 app-shell 的既有測試（MODIFIED Requirement）
 
-- [ ] 6.1 `tests/world-boundary.test.tsx` 的 `FE-X01-S03` 原本斷言佔位內容，改成斷言 World 的內容；驗證：`npm test` rc=0，且 **Scenario ID 不變**
-- [ ] 6.2 確認 `FE-X01-S04`（載入失敗的邊界）仍然通過 —— 那個殼沒有被動到；驗證：`tests/world-boundary-failure.test.tsx` 仍然綠
+- [x] 6.1 `tests/world-boundary.test.tsx` 的 `FE-X01-S03` 原本斷言佔位內容，改成斷言 World 的內容；驗證：`npm test` rc=0，且 **Scenario ID 不變**
+- [x] 6.2 確認 `FE-X01-S04`（載入失敗的邊界）仍然通過 —— 那個殼沒有被動到；驗證：`tests/world-boundary-failure.test.tsx` 仍然綠
 
 ## 7. 完成前的驗收
 
