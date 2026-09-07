@@ -1,10 +1,12 @@
 'use client'
 
 import { Canvas } from '@react-three/fiber'
-import { Suspense, useState } from 'react'
+import { Suspense, useRef, useState } from 'react'
+import type { Vector3Like } from 'three'
 import { layer } from '@/design/layers'
 import { isWebGL2Available } from './webgl'
 import { DebugShadowScene } from './DebugShadowScene'
+import { WorldCamera } from './WorldCamera'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -44,6 +46,10 @@ export default function WorldCanvas() {
   const [webgl2] = useState(isWebGL2Available)
   const [ready, setReady] = useState(false)
 
+  // 相機的跟隨目標。**是 ref 不是 state** —— CONTEXT.md：高頻資料不進 React。
+  // FE-W03 接上角色之後，這個 ref 會指向角色的位置；現在它是靜止的原點。
+  const cameraTarget = useRef<Vector3Like>({ x: 0, y: 0, z: 0 })
+
   if (!webgl2) return <WebGLUnavailable />
 
   return (
@@ -54,9 +60,11 @@ export default function WorldCanvas() {
         // 去畫同一個畫面。`2` 不是量出來的最佳值 —— 真正的數字等 FE-O12，
         // 而那時要改的是 Requirement，不是這一行。
         dpr={[1, 2]}
-        camera={{ position: [4, 4, 4], fov: 50 }}
         onCreated={() => setReady(true)}
       >
+        {/* 相機由 FE-W05 提供。FE-W01 當時那個 perspective 相機是暫時的 ——
+            CONTEXT.md 訂的是固定的 Orthographic Elevated 相機。 */}
+        <WorldCamera targetRef={cameraTarget} />
         <ambientLight intensity={0.6} />
         <directionalLight
           position={[5, 8, 3]}
