@@ -28,6 +28,12 @@ class ResizeObserverPolyfill {
   disconnect() {}
 }
 
+// ⚠️ 掛真的 `<Canvas>` 的測試檔要用 `vi.useFakeTimers()`。
+// R3F 的 react-use-measure 會排一個沒有人取消的 `setTimeout(fn, 0)`，
+// 那個孤兒 timer 在 jsdom 被拆掉之後才觸發會炸
+// `ReferenceError: HTMLElement is not defined`，並且算成 unhandled error ——
+// 測試全過、整個 run 卻非零結束。理由與證據見 tests/world-cleanup.test.tsx。
+
 if (!('ResizeObserver' in globalThis)) {
   globalThis.ResizeObserver = ResizeObserverPolyfill as unknown as typeof ResizeObserver
 }
