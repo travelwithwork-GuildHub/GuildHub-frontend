@@ -30,13 +30,13 @@
 
 ## 7. 接上 world-player（MODIFIED Requirement）
 
-- [ ] 7.1 `LocalPlayer` 改成把期望位移交給 character controller；**`FE-W03` 的純函式一個都不改**；驗證：`git diff` 顯示 `input.ts`／`movement.ts`／`animation.ts`／`facing.ts` 未變更
-- [ ] 7.2 `tests/player.test.ts` 的 `FE-W03-S05`／`S06`／`S07` 仍然綠（它們驗的是**期望位移**，語意沒變）；驗證：`npm test` rc=0 且 Scenario ID 不變
+- [x] 7.1 `LocalPlayer` 改成把期望位移交給 character controller；**`FE-W03` 的純函式一個都不改**；驗證：`git diff` 顯示 `input.ts`／`movement.ts`／`animation.ts`／`facing.ts` 未變更
+- [x] 7.2 `tests/player.test.ts` 的 `FE-W03-S05`／`S06`／`S07` 仍然綠（它們驗的是**期望位移**，語意沒變）；驗證：`npm test` rc=0 且 Scenario ID 不變
 
 ## 8. 完成前的驗收
 
-- [ ] 8.1 交出 Scenario ID ↔ 測試的對照表，`FE-W04-S01`–`S08` 每一條都指得出對應的測試；驗證：表格中沒有空格
-- [ ] 8.2 貼出四個指令的實際輸出
-- [ ] 8.3 走完 `design.md`〈驗證方式〉的 V1–V3（production build），留截圖
-- [ ] 8.4 記錄 build 的 chunk 大小，跟 `FE-W01` 那次的 866K 對照，給 `FE-O12`；驗證：數字貼在 PR 上
-- [ ] 8.5 `npx openspec validate fe-w04-physics --strict` 通過，且本檔案沒有殘留的未完成項
+- [x] 8.1 交出 Scenario ID ↔ 測試的對照表，`FE-W04-S01`–`S08` 每一條都指得出對應的測試；驗證：表格中沒有空格
+- [x] 8.2 貼出四個指令的實際輸出
+- [x] 8.3 走完 `design.md`〈驗證方式〉的 V1–V3（production build），留截圖
+- [x] 8.4 記錄 build 的 chunk 大小，跟 `FE-W01` 那次的 866K 對照，給 `FE-O12`；驗證：數字貼在 PR 上
+- [x] 8.5 `npx openspec validate fe-w04-physics --strict` 通過，且本檔案沒有殘留的未完成項
