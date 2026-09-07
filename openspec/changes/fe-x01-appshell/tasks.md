@@ -37,6 +37,9 @@
 
 - [ ] 6.1 交出一張 Scenario ID ↔ 測試的對照表，`FE-X01-S01` 到 `S14` 每一個都指得出對應的測試；驗證：表格中沒有空格
 - [ ] 6.2 貼出 `npm run lint` / `typecheck` / `test` / `build` 四個指令的**實際輸出**，`test` 要看得到測試數量
-- [ ] 6.3 人工開瀏覽器走一次：`/` 轉址到 `/world`、`/world` 渲染出外殼與佔位內容、一個未定義路徑得到 404，留下截圖；驗證：這是 `design.md` 的 R2 明確記錄的差距（async Server Component 測不到），不是可以省略的一步
+- [ ] 6.3 走完 `design.md`〈驗證方式〉的 **V1–V6**，證據貼在 `feat/fe-x01-appshell--layout` 的 PR 上；驗證：六列都有對應的輸出或截圖，沒有空格。**只連本機 `localhost:3000` 自己起的 dev server**
+- [ ] 6.3.1 V1：`curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:3000/`；驗證：輸出逐字為 `307` 與 `.../world`。這是「斷言設定 ≠ 斷言回應」那個缺口唯一的補法
+- [ ] 6.3.2 V6：`curl` 取 `/world` 的伺服器端 HTML；驗證：其中**不含** World 佔位元件的內容，證明 `ssr: false` 真的生效
+- [ ] 6.3.3 V4／V5：以 DevTools 阻斷 World 的 chunk 請求後重新載入，再解除並按重試；驗證：兩張截圖 —— 錯誤訊息與重試操作都在且頁面其餘部分仍在（`FE-X01-S04`）、重試後內容載入成功
 - [ ] 6.4 `npm run build` 之後確認 `.gitignore` 有涵蓋建置產物，PR 的 diff 裡沒有生成檔；驗證：`git status --short` 乾淨
 - [ ] 6.5 `npx openspec validate fe-x01-appshell --strict` 通過，且本檔案沒有殘留的 `- [ ]`
