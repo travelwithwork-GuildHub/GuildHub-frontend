@@ -137,6 +137,7 @@ World 這個只能在瀏覽器端執行的區域掛在哪個邊界上、全域 P
 - **WHEN** 在一份健康的工作區依序執行 `lint`、`typecheck`、`test`、`build`
 - **THEN** 四個指令都以狀態碼 `0` 結束
 - **AND** `test` 的輸出包含大於 `0` 的測試數量
+- **VERIFY-BY** `ci-job`｜ci.yml 的 Lint／Typecheck／Test／Build 四個步驟｜CI 的 job 本身就是這條的執行；在測試裡遞迴跑 npm run build 是沒有意義的
 
 #### Scenario: [FE-X01-S11] 型別錯誤不被放過
 
