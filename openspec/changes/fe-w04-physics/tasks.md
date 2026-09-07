@@ -1,32 +1,32 @@
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定：`spec/fe-w04-physics` 合併進 `main`；驗證：`git log --oneline main -- openspec/changes/fe-w04-physics/proposal.md` 有輸出
+- [x] 1.1 規格已在 PR 上談定：`spec/fe-w04-physics` 合併進 `main`；驗證：`git log --oneline main -- openspec/changes/fe-w04-physics/proposal.md` 有輸出
 
 ## 2. 物理世界與角色 collider（Requirement: 角色會被靜態障礙物擋住）
 
-- [ ] 2.1 導入 Rapier，角色用 **kinematic character controller**（不是 dynamic）；驗證：`npm run build` rc=0
-- [ ] 2.2 走向牆會停下來；驗證：單元測試建世界、step、斷言位置沒有越過牆（Scenario `FE-W04-S01`）
-- [ ] 2.3 沿著牆斜走會滑動，不完全停住；驗證：Scenario `FE-W04-S02`
-- [ ] 2.4 空曠時位移等於期望值；驗證：Scenario `FE-W04-S03`
+- [x] 2.1 導入 Rapier，角色用 **kinematic character controller**（不是 dynamic）；驗證：`npm run build` rc=0
+- [x] 2.2 走向牆會停下來；驗證：單元測試建世界、step、斷言位置沒有越過牆（Scenario `FE-W04-S01`）
+- [x] 2.3 沿著牆斜走會滑動，不完全停住；驗證：Scenario `FE-W04-S02`
+- [x] 2.4 空曠時位移等於期望值；驗證：Scenario `FE-W04-S03`
 
 ## 3. 邊界（Requirement: 遊玩區域有邊界）
 
-- [ ] 3.1 四周用**靜態 collider**，**不得用夾座標**；驗證：朝邊界走很久仍在範圍內（Scenario `FE-W04-S04`）
-- [ ] 3.2 **負向驗證**：把邊界改成夾座標，觀察 `S04` 是否仍過 —— 若仍過，補一條斷言讓它區分得出來；驗證：記錄結論
+- [x] 3.1 四周用**靜態 collider**，**不得用夾座標**；驗證：朝邊界走很久仍在範圍內（Scenario `FE-W04-S04`）
+- [x] 3.2 **負向驗證**：把邊界改成夾座標，觀察 `S04` 是否仍過 —— 若仍過，補一條斷言讓它區分得出來；驗證：記錄結論
 
 ## 4. 穿牆防護（Requirement: 任何速度都不得穿牆）
 
-- [ ] 4.1 單幀位移遠大於牆厚時仍不穿過；驗證：Scenario `FE-W04-S05`
-- [ ] 4.2 **負向驗證**：把移動改成「先移動再檢查重疊」，`S05` 要從綠變紅（`S01` 可能仍綠 —— 那正是低速測不出高速問題的證明）；驗證：記錄兩次的退出碼與哪幾條變紅
+- [x] 4.1 單幀位移遠大於牆厚時仍不穿過；驗證：Scenario `FE-W04-S05`
+- [x] 4.2 **負向驗證**：把移動改成「先移動再檢查重疊」，`S05` 要從綠變紅（`S01` 可能仍綠 —— 那正是低速測不出高速問題的證明）；驗證：記錄兩次的退出碼與哪幾條變紅
 
 ## 5. Sensor（Requirement: Sensor 回報重疊但不擋路）
 
-- [ ] 5.1 sensor 不擋住移動；驗證：Scenario `FE-W04-S06`
-- [ ] 5.2 進入與離開時重疊查詢的結果會變；驗證：Scenario `FE-W04-S07`
+- [x] 5.1 sensor 不擋住移動；驗證：Scenario `FE-W04-S06`
+- [x] 5.2 進入與離開時重疊查詢的結果會變；驗證：Scenario `FE-W04-S07`
 
 ## 6. 不進 React（Requirement: 物理狀態不進 React）
 
-- [ ] 6.1 位置由 rigid body 持有，不每幀寫 React state；驗證：Scenario `FE-W04-S08`
+- [x] 6.1 位置由 rigid body 持有，不每幀寫 React state；驗證：Scenario `FE-W04-S08`
 
 ## 7. 接上 world-player（MODIFIED Requirement）
 
