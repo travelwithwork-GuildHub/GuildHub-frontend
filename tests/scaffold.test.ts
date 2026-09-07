@@ -19,10 +19,19 @@ const pkg = JSON.parse(read('package.json')) as {
 describe('工程品質指令', () => {
   // FE-O10 那個 governance PR 會把 `npm run <name>` 四步加回 ci.yml。
   // 名稱漂掉的話那個 PR 接不上去，而且不會有任何東西報錯。
-  it.each(['lint', 'typecheck', 'test', 'build'])('%s 這個 script 存在且不是佔位', (name) => {
+  //
+  // 只驗「不是佔位」是不夠的：`"lint": "exit 0"` 一樣會通過，
+  // CI 也會綠，但什麼都沒檢查。所以連**該跑哪個執行檔**一起釘住。
+  it.each([
+    ['lint', 'eslint'],
+    ['typecheck', 'tsc'],
+    ['test', 'vitest'],
+    ['build', 'next build'],
+  ])('%s 這個 script 存在，而且真的呼叫 %s', (name, binary) => {
     const script = pkg.scripts[name]
     expect(script, `package.json 少了 ${name}`).toBeDefined()
     expect(script).not.toMatch(/還沒設定|exit 1/)
+    expect(script).toContain(binary)
   })
 
   it('Node 版本在 .nvmrc 與 engines 之間沒有漂', () => {
