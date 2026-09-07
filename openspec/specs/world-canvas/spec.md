@@ -25,12 +25,14 @@ World 的 3D 渲染面：`/world` 的 client 邊界裡那個真的在跑 WebGL �
 - **WHEN** 使用者在支援 WebGL2 的瀏覽器開啟 `/world`
 - **THEN** 頁面渲染出一個 canvas 元素
 - **AND** 該 canvas 的像素尺寸不為零
+- **VERIFY-BY** `manual-browser`｜PR #37 的 V1 驗證紀錄｜jsdom 沒有 WebGL2，canvas 的實際像素尺寸永遠是 0；測得到的只有「有沒有掛上 canvas 元素」，那不是這條在講的事
 
 #### Scenario: [FE-W01-S02] 容器尺寸改變
 
 - **WHEN** 視窗尺寸改變
 - **THEN** canvas 的顯示尺寸跟著容器改變
 - **AND** 有效裝置像素比 MUST NOT 超過 `2`
+- **VERIFY-BY** `manual-browser`｜PR #37 的 V2 驗證紀錄｜有效 DPR 是 renderer 實際套用的值，jsdom 裡 WebGLRenderer 不會真的設定它
 
 ### Requirement: 燈光與陰影
 
@@ -43,6 +45,7 @@ World 的 3D 渲染面：`/world` 的 client 邊界裡那個真的在跑 WebGL �
 
 - **WHEN** 世界渲染完成
 - **THEN** 投射陰影的物件在接收陰影的平面上留下可見的陰影
+- **VERIFY-BY** `manual-browser`｜PR #37 的 V3 驗證紀錄｜陰影是 GPU 算出來的畫面內容；程式能檢查的只有「有沒有設定陰影參數」，而參數設對了畫面上仍然可能沒有陰影
 
 ### Requirement: 3D 內容載入中的呈現
 
