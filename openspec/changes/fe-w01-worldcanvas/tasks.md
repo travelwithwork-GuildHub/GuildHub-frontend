@@ -24,9 +24,9 @@
 
 ## 5. 卸載（Requirement: 卸載時釋放資源）
 
-- [ ] 5.1 確認卸載時沒有殘留的全域事件監聽；驗證：測試包裝 `window.addEventListener`／`removeEventListener` 計數，斷言（a）掛載期間**曾經高於**掛載前、（b）卸載後回到掛載前的水準（Scenario `FE-W01-S08`）
-- [ ] 5.2 **負向驗證**：故意掛一個不移除的 `resize` 監聽，`S08` 要從綠變紅；驗證：記錄兩次的退出碼
-- [ ] 5.3 **確認 `S08` 不是恆真的**：如果 jsdom 裡掛載期間的監聽數量從來沒有高於掛載前，那條測試會失敗 —— 這時 `S08` 只能靠 V4，**要在 PR 上明說**，不得把它算進自動化涵蓋範圍；驗證：貼出測試的實際輸出
+- [x] 5.1 確認卸載時沒有殘留的全域事件監聽；驗證：測試包裝 `window.addEventListener`／`removeEventListener` 計數，斷言（a）掛載期間**曾經高於**掛載前、（b）卸載後回到掛載前的水準（Scenario `FE-W01-S08`）
+- [x] 5.2 **負向驗證**：故意掛一個不移除的 `resize` 監聽，`S08` 要從綠變紅；驗證：記錄兩次的退出碼
+- [x] 5.3 **確認 `S08` 不是恆真的**：如果 jsdom 裡掛載期間的監聽數量從來沒有高於掛載前，那條測試會失敗 —— 這時 `S08` 只能靠 V4，**要在 PR 上明說**，不得把它算進自動化涵蓋範圍；驗證：貼出測試的實際輸出
 
 ## 6. 更新 app-shell 的既有測試（MODIFIED Requirement）
 
@@ -35,8 +35,8 @@
 
 ## 7. 完成前的驗收
 
-- [ ] 7.1 交出 Scenario ID ↔ 證明方式的對照表，`FE-W01-S01`–`S08` 每一條都指得出是 component test 還是哪一條人工驗證；驗證：表格中沒有空格
-- [ ] 7.2 貼出 `npm run lint` / `typecheck` / `test` / `build` 四個指令的實際輸出，`test` 要看得到測試數量
-- [ ] 7.3 走完 `design.md`〈驗證方式〉的 **V1–V4**（production build），證據貼在實作 PR 上；驗證：四列都有輸出或截圖。**V4 要重複進出三次並用 DevTools 的 Event Listeners 確認 `window` 上的數量沒有逐次疊加**
-- [ ] 7.4 記錄 `npm run build` 輸出的 chunk 大小當基準線，讓 `FE-O12` 有東西可比；驗證：數字貼在 PR 上
-- [ ] 7.5 `npx openspec validate fe-w01-worldcanvas --strict` 通過，且本檔案沒有殘留的未完成項
+- [x] 7.1 交出 Scenario ID ↔ 證明方式的對照表，`FE-W01-S01`–`S08` 每一條都指得出是 component test 還是哪一條人工驗證；驗證：表格中沒有空格
+- [x] 7.2 貼出 `npm run lint` / `typecheck` / `test` / `build` 四個指令的實際輸出，`test` 要看得到測試數量
+- [x] 7.3 走完 `design.md`〈驗證方式〉的 **V1–V4**（production build），證據貼在實作 PR 上；驗證：四列都有輸出或截圖。**V4 要重複進出三次並用 DevTools 的 Event Listeners 確認 `window` 上的數量沒有逐次疊加**
+- [x] 7.4 記錄 `npm run build` 輸出的 chunk 大小當基準線，讓 `FE-O12` 有東西可比；驗證：數字貼在 PR 上
+- [x] 7.5 `npx openspec validate fe-w01-worldcanvas --strict` 通過，且本檔案沒有殘留的未完成項
