@@ -24,6 +24,12 @@ async function messagesFor(filePath: string, code = CODE) {
 const blocked = (msgs: Awaited<ReturnType<typeof messagesFor>>) =>
   msgs.filter((m) => m.message.includes('元件裡不准出現 fetch'))
 
+// **這一組每一條都要自己的逾時。** 第一次 `lintText` 會把整份 eslint flat
+// config 載進來（含 next 的 plugin），在忙碌的機器上超過 vitest 預設的 5 秒 ——
+// 於是這一條會隨機紅，而**紅的原因跟被測的規則一點關係也沒有**。
+// 實測：兩位外部審查者各自跑一次都撞到同一條。
+const LINT_TIMEOUT = 60_000
+
 describe('資料存取只有一條路', () => {
   it('[FE-X01-S08] 元件路徑裡的 fetch 會讓 lint 失敗，並指出行號', async () => {
     const hits = blocked(await messagesFor('src/components/Profile.tsx'))
@@ -32,7 +38,7 @@ describe('資料存取只有一條路', () => {
     // 「指出檔案與行」是規格的字面要求
     expect(hits[0]?.line).toBeGreaterThan(0)
     expect(hits[0]?.severity).toBe(2)
-  })
+  }, LINT_TIMEOUT)
 
   it('[FE-X01-S09] 同一段程式碼放在 src/api 底下就通過 —— 差別只在路徑', async () => {
     // 成對比較。只斷言「這裡沒報錯」的話，規則整個沒載入時測試一樣會綠 ——
@@ -42,7 +48,7 @@ describe('資料存取只有一條路', () => {
 
     expect(inComponent.length).toBeGreaterThan(0)
     expect(inApi).toHaveLength(0)
-  })
+  }, LINT_TIMEOUT)
 
   // 下面每一條都是實測撞出來的躲法。沒有這些測試的話，
   // 規則會在某次重構中悄悄退化成只擋得住最天真的那一種寫法。
@@ -54,5 +60,5 @@ describe('資料存取只有一條路', () => {
     ['換一個 HTTP client', 'src/components/D.tsx', 'import axios from "axios"\nexport const go = () => axios.get("/x")\n'],
   ])('[FE-X01-S08] 擋得住：%s', async (_name, filePath, code) => {
     expect(blocked(await messagesFor(filePath, code)).length).toBeGreaterThan(0)
-  })
+  }, LINT_TIMEOUT)
 })
