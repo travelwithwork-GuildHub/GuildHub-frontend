@@ -357,24 +357,24 @@ bash .github/scripts/wbs-excel.sh
 
 ### 環境、CI 與交付
 
-| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 |
-|---|---|---|---|---|---|---|
-| FE-O09 | 環境設定 | 後端 REST / WS 位址、環境變數規範、local / preview / prod 分離。**預設只連本機自己起的東西** | W1 | 3 | | |
-| | | Cookie 與跨源：身分走 session cookie，`allow_credentials=True`、`CORS_ORIGINS` 預設含 `localhost:3000`。所有 fetch 帶 credentials；**WS 握手也靠同一個 cookie** | W1 | 2 | | |
-| | | 前後端不同網域部署時的 SameSite / Secure | W13–W16 | 2 | | |
-| FE-O10 | CI 補齊 | scaffold 之後**立刻**把 `Lint` / `Typecheck` / `Test` / `Build` 放回 `ci.yml`（檔案裡有註記） | W1 | 3 | | Alarm｜每晚一天，紅的東西就多一天沒人看見 |
-| FE-O11 | 測試策略 | 單元 / component（Testing Library）/ E2E（Playwright）的分工與比重；3D 怎麼測 —— 哪些值得 E2E，哪些只驗 store 與純函式 | W1 | 8 | | |
-| | | **測試環境隔離**：只准打自己 `./run.sh` 起的後端。一次 40 連線的壓測足以把共用實例的人全部踢下線 | W1 | 2 | | |
-| FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`） | W5 | 7 | | |
-| FE-O13 | 視覺回歸 | 3D 畫面怎麼測 —— 截圖比對還是只測 DOM。**先決定，不要做一半** | W5 | 4 | | |
-| FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入 | W5 | 4 | | |
-| FE-O15 | 發表準備 | Demo fake data、固定流程、Demo reset；World 預載、異常 fallback、完整 E2E rehearsal | W5 | 7 | | |
-| | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W5 | 2 | | Alarm｜發表當天最不想踩的地雷 |
-| | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W5 | 5 | | |
-| | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W5 | 3 | | |
-| FE-O16 | 技術可觀測性 | 前端錯誤回報、WS 斷線率、FPS 遙測。**只做技術 telemetry** —— 使用者行為追蹤被後端明文永久排除（BE-G17），兩者不要混在同一個提案裡 | W13–W16 | 6 | | |
-| FE-O17 | 規模化 | `PAGE_SIZE=20` 的 offset 翻頁在資料變多時會慢且會漏；快取與預取策略 | W17–W20 | 6 | BE-G05 待銜接 | Pending｜等真後端提供更好的查詢；本地端先做好快取與預取 |
-| FE-O18 | 文件與交接 | `CONTEXT.md` / ADR / 本表的維護節奏 | 常態 | — | | Regular｜常態維護，沒有完成點 |
+| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 | 涵蓋證據 |
+|---|---|---|---|---|---|---|---|
+| FE-O09 | 環境設定 | 後端 REST / WS 位址、環境變數規範、local / preview / prod 分離。**預設只連本機自己起的東西** | W1 | 3 | | |  |
+| | | Cookie 與跨源：身分走 session cookie，`allow_credentials=True`、`CORS_ORIGINS` 預設含 `localhost:3000`。所有 fetch 帶 credentials；**WS 握手也靠同一個 cookie** | W1 | 2 | | |  |
+| | | 前後端不同網域部署時的 SameSite / Secure | W13–W16 | 2 | | |  |
+| FE-O10 | CI 補齊 | scaffold 之後**立刻**把 `Lint` / `Typecheck` / `Test` / `Build` 放回 `ci.yml`（檔案裡有註記） | W1 | 3 | |  | commit:ae78a12c2af7b4641d2908341192d5cdc6191dd7 |
+| FE-O11 | 測試策略 | 單元 / component（Testing Library）/ E2E（Playwright）的分工與比重；3D 怎麼測 —— 哪些值得 E2E，哪些只驗 store 與純函式 | W1 | 8 | | |  |
+| | | **測試環境隔離**：只准打自己 `./run.sh` 起的後端。一次 40 連線的壓測足以把共用實例的人全部踢下線 | W1 | 2 | | |  |
+| FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`） | W5 | 7 | | |  |
+| FE-O13 | 視覺回歸 | 3D 畫面怎麼測 —— 截圖比對還是只測 DOM。**先決定，不要做一半** | W5 | 4 | | |  |
+| FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入 | W5 | 4 | | |  |
+| FE-O15 | 發表準備 | Demo fake data、固定流程、Demo reset；World 預載、異常 fallback、完整 E2E rehearsal | W5 | 7 | | |  |
+| | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W5 | 2 | | Alarm｜發表當天最不想踩的地雷 |  |
+| | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W5 | 5 | | |  |
+| | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W5 | 3 | | |  |
+| FE-O16 | 技術可觀測性 | 前端錯誤回報、WS 斷線率、FPS 遙測。**只做技術 telemetry** —— 使用者行為追蹤被後端明文永久排除（BE-G17），兩者不要混在同一個提案裡 | W13–W16 | 6 | | |  |
+| FE-O17 | 規模化 | `PAGE_SIZE=20` 的 offset 翻頁在資料變多時會慢且會漏；快取與預取策略 | W17–W20 | 6 | BE-G05 待銜接 | Pending｜等真後端提供更好的查詢；本地端先做好快取與預取 |  |
+| FE-O18 | 文件與交接 | `CONTEXT.md` / ADR / 本表的維護節奏 | 常態 | — | | Regular｜常態維護，沒有完成點 |  |
 
 ---
 
