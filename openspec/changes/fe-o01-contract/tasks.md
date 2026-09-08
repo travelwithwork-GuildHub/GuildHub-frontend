@@ -22,12 +22,12 @@
 
 ## 3. REST 契約與哨兵（Requirement：資料形狀只有一份定義／後端形狀改變時 typecheck 要變紅）
 
-- [ ] 3.1 在 `package.json` 加 `contract:generate` script，用 `npx -y openapi-typescript@7.13.0` 從 `http://localhost:8000/openapi.json` 產 `src/api/contract/schema.d.ts`；驗證方式是跑一次它，產出物存在且 `git status` 看得到
-- [ ] 3.2 `schema.d.ts` 進版控，檔頭（或旁邊一個 `.md`）記下產生器版本、產生時間、後端 commit —— D2 說的「哨兵會過期」要有地方查
+- [x] 3.1 在 `package.json` 加 `contract:generate` script，用 `npx -y openapi-typescript@7.13.0` 從 `http://localhost:8000/openapi.json` 產 `src/api/contract/schema.d.ts`；驗證方式是跑一次它，產出物存在且 `git status` 看得到
+- [x] 3.2 `schema.d.ts` 進版控，檔頭（或旁邊一個 `.md`）記下產生器版本、產生時間、後端 commit —— D2 說的「哨兵會過期」要有地方查
 - [x] 3.3 用 Zod 寫出 16 個 `/api/*` 端點涉及的實體與操作輸入輸出，數字全部從 `limits.ts` 讀，不寫死；驗證 `FE-O01-S01`／`S02`／`S03` 通過
-- [ ] 3.4 對每一個 REST 實體寫一條 `Equal` 相等斷言，並建立實體登錄表加一條涵蓋率斷言（`keyof 登錄表` 等於產出型別的實體集合扣掉框架錯誤型別）；驗證 `npm run typecheck` 綠
-- [ ] 3.5 **負向驗證（涵蓋率）**：從登錄表移除一個項目，確認 `npm run typecheck` 紅在涵蓋率那一行；還原後確認回綠（`FE-O01-S10` 的兩個方向）
-- [ ] 3.6 **負向驗證（形狀）**：手改 `schema.d.ts` 讓某個必填欄位變成可為 `null`，確認紅在該實體的斷言那一行；再改成新增一個欄位，確認同樣紅（`FE-O01-S11`）。兩次都還原
+- [x] 3.4 對每一個 REST 實體寫一條 `Equal` 相等斷言，並建立實體登錄表加一條涵蓋率斷言（`keyof 登錄表` 等於產出型別的實體集合扣掉框架錯誤型別）；驗證 `npm run typecheck` 綠
+- [x] 3.5 **負向驗證（涵蓋率）**：從登錄表移除一個項目，確認 `npm run typecheck` 紅在涵蓋率那一行；還原後確認回綠（`FE-O01-S10` 的兩個方向）
+- [x] 3.6 **負向驗證（形狀）**：手改 `schema.d.ts` 讓某個必填欄位變成可為 `null`，確認紅在該實體的斷言那一行；再改成新增一個欄位，確認同樣紅（`FE-O01-S11`）。兩次都還原
 - [x] 3.7 錯誤 envelope：`{detail: string | ValidationError[]}`，且**不列舉 status code**（那是 `FE-X03`）；驗證 `FE-O01-S09` 通過
 - [x] 3.8 500 的純文字回應：確認交給 envelope 驗證會明顯失敗，且契約沒有假設錯誤回應一定是 JSON；驗證 `FE-O01-S12` 通過
 
