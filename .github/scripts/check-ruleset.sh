@@ -44,11 +44,15 @@ ID="$(python3 -c "import json,io;print(json.load(io.open('$FILE',encoding='utf-8
 # 兩個 repo 同時檢查會互相覆蓋，而且固定路徑可以被預先放一個 symlink 進去。
 LIVE_JSON="$(mktemp -t ruleset-live)"
 
-gh api "repos/${REPO}/rulesets/${ID}" > "$LIVE_JSON" 2>/dev/null || {
+# **讀不到 ruleset 不可以讓整支腳本停在這裡** —— 下面的 repo 層級設定
+# 不需要 ruleset，而那一段在「還沒設定完」的時候最有用。
+RULESET_RC=0
+if ! gh api "repos/${REPO}/rulesets/${ID}" > "$LIVE_JSON" 2>/dev/null; then
   echo "✗ 讀不到 ruleset ${ID}。需要對這個 repo 有 admin 權限。" >&2
-  exit 2
-}
+  RULESET_RC=2
+fi
 
+if [ "$RULESET_RC" = 0 ]; then
 python3 - "$FILE" "$LIVE_JSON" <<'PY'
 import json, sys, io
 
@@ -122,7 +126,9 @@ if bad:
 
 print("✓ ruleset 快照與實際設定一致。")
 PY
-RC_RULESET=$?
+RULESET_RC=$?
+fi
+RC_RULESET="$RULESET_RC"
 
 # ── repo 層級的設定 ──────────────────────────────────────────────────
 #
@@ -195,4 +201,9 @@ else
   echo "（沒有 .github/repo-settings.json，跳過 repo 層級設定的比對）"
 fi
 
-[ "$RC_RULESET" = 0 ] && [ "$RC_REPO" = 0 ]
+# **退出碼要分得出「不一致」與「查不到」。** 1 = 快照跟實際對不上（去改一邊）；
+# 2 = 根本沒查到（沒建 ruleset、沒有 admin 權限）——「查不到」不等於「沒問題」，
+# 但它跟「查到了而且不對」的處置完全不同。
+if [ "$RC_RULESET" = 2 ] || [ "$RC_REPO" = 2 ]; then exit 2; fi
+if [ "$RC_RULESET" != 0 ] || [ "$RC_REPO" != 0 ]; then exit 1; fi
+exit 0
