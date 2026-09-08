@@ -45,7 +45,6 @@ bash .github/scripts/progress.sh --all       # 161 項各自在什麼狀態
 bash .github/scripts/progress.sh --blocked   # 不在自己手上的，以及誰依賴它
 bash .github/scripts/progress.sh --check     # 改了 docs/WBS.md 就跑（CI 也在跑）
 bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
-bash .github/scripts/wbs-excel.sh            # 寫進 Excel 管理表
 ```
 
 **前三個是每天用的**（現在做到哪裡、改完有沒有壞），
@@ -127,7 +126,6 @@ bash .github/scripts/test-progress-check.sh   # 每條規則各造一次違規�
 | `.github/scripts/progress.sh` | **現在做到哪裡。** 算出來的，沒有人維護。`--check` 在 CI 裡跑 |
 | `.github/scripts/test-progress-check.sh` | 上面那些規則**自己的負向測試**。改 `progress.sh` 前後都要跑 |
 | `.github/scripts/wbs-page.sh` | 把 `docs/WBS.md` 產成一頁可以點開收合的網頁 |
-| `.github/scripts/wbs-excel.sh` | 把 `docs/WBS.md` 寫進 Excel 管理表的「前端」工作表 |
 | `docs/adr/` | 難逆轉的決策 |
 | `openspec/config.yaml` | 規格要寫到什麼程度 |
 | `openspec/specs/` | 系統現在是什麼樣子（archive 時自動同步） |

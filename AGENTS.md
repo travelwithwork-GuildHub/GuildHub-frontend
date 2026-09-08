@@ -392,7 +392,6 @@ bash .github/scripts/test-progress-check.sh      # 這些規則自己的負向�
 bash .github/scripts/progress.sh --blocked   # 現在做不了的，以及被什麼擋住
 bash .github/scripts/progress.sh --check     # 有規則違規就以非零結束
 bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
-bash .github/scripts/wbs-excel.sh            # 寫進 Excel 管理表
 ```
 
 `--check` 驗的是這張表自己訂的規則：標記要附理由、互斥的處置不得並存、

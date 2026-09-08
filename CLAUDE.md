@@ -16,7 +16,6 @@ Claude Code 進入此 Repository 後：
    **不要在別的地方重算** —— 那樣做過一次，三邊給出三個答案。
 
    ```bash
-   bash .github/scripts/wbs-excel.sh            # 寫進 Excel 管理表
    ```
 
    **那份是算出來的，沒有人維護它**，所以它不會漂。資料來自
