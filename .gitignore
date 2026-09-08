@@ -6,8 +6,12 @@ __pycache__/
 .DS_Store
 dist/
 build/
+# 環境變數。**`.env.example` 是唯一進版控的那一份**（它只有變數名稱與
+# 本機預設值，沒有任何機密）。`.env*.local` 用萬用字元 ——
+# `.env.production.local` 這種名字光靠 `.env.local` 一行是擋不住的。
 .env
 .env.local
+.env*.local
 coverage/
 playwright-report/
 test-results/
