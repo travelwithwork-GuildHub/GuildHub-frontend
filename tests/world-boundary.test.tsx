@@ -38,7 +38,18 @@ describe('World 區域的 client 邊界（成功路徑）', () => {
     render(<WorldPage />)
 
     expect(screen.getByRole('heading', { name: 'GuildHub' })).toBeInTheDocument()
-    // World 內容是動態載入的，所以要等
-    expect(await screen.findByTestId('world-canvas-container')).toBeInTheDocument()
+    // World 內容是動態載入的，所以要等。
+    //
+    // ⚠️ **逾時要放寬，不能用預設的 1 秒。** vitest 平行跑各個檔案，
+    // 別的檔案吃 CPU 時這裡的動態載入實測要 1.6–2.5 秒 ——
+    // 於是這條測試會在「跟某些檔案一起跑」時紅、單獨跑時綠。
+    // **那種失敗指向的是錯的地方**：紅的是這裡，原因在另一個檔案。
+    // （實測：加入 `tests/interpolation.test.ts` 之後三次紅兩次，
+    // 而那個檔案跟 World 的邊界完全無關。）
+    //
+    // 這條 Scenario 要證明的是「動態載入的內容會出現」，不是「一秒內出現」。
+    expect(
+      await screen.findByTestId('world-canvas-container', undefined, { timeout: 10_000 }),
+    ).toBeInTheDocument()
   })
 })
