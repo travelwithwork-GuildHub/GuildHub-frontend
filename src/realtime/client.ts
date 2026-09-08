@@ -186,7 +186,18 @@ export class RealtimeClient {
   #emitClosed(info: CloseInfo): void {
     if (this.#closeEmitted) return
     this.#closeEmitted = true
-    this.#options.onClosed?.({ ...info, opened: this.#opened })
+    // ⚠️ **逐欄取值，不要用 `{ ...info }`。**
+    //
+    // 真的 `CloseEvent` 的 `code` / `reason` / `wasClean` 是**原型上的 getter**，
+    // 不是自有屬性 —— 展開運算子複製不到它們，結果是一個三個欄位都 `undefined`
+    // 的物件。**單元測試看不到這件事**：替身 emit 的是普通物件，展開正常。
+    // 這是整合驗證（V3）抓到的。
+    this.#options.onClosed?.({
+      code: info.code,
+      reason: info.reason,
+      wasClean: info.wasClean,
+      opened: this.#opened,
+    })
   }
 
   #handleOpen(): void {

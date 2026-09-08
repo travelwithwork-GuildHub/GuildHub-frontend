@@ -6,7 +6,7 @@ import {
   type ConnectionClosed,
   type ConnectionState,
 } from '@/realtime/client'
-import type { SocketEventMap, SocketEventName, SocketLike } from '@/realtime/socket'
+import type { CloseInfo, SocketEventMap, SocketEventName, SocketLike } from '@/realtime/socket'
 
 // 規格：openspec/changes/fe-r01-realtime/specs/realtime-client/spec.md
 //   Requirement: 連線狀態機 —— FE-R01-S01 / S02
@@ -24,6 +24,20 @@ import type { SocketEventMap, SocketEventName, SocketLike } from '@/realtime/soc
 const HELLO = (you = 'u-self') => JSON.stringify({ t: 'hello', you, hz: 10 })
 const SNAPSHOT = (id = 'u-self') =>
   JSON.stringify({ t: 'snapshot', players: [{ id, name: '訪客', av: 0, x: 0, y: 0, f: 0, st: '' }] })
+
+/** 把欄位搬到原型上，模仿真的 `CloseEvent`。 */
+function onPrototype(info: CloseInfo): CloseInfo {
+  return Object.create(
+    Object.defineProperties(
+      {},
+      {
+        code: { get: () => info.code, enumerable: false },
+        reason: { get: () => info.reason, enumerable: false },
+        wasClean: { get: () => info.wasClean, enumerable: false },
+      },
+    ),
+  ) as CloseInfo
+}
 
 class FakeSocket implements SocketLike {
   readonly sent: string[] = []
@@ -50,8 +64,18 @@ class FakeSocket implements SocketLike {
     for (const set of this.#listeners.values()) n += set.size
     return n
   }
+  /**
+   * ⚠️ **close 事件的欄位放在原型上，不是自有屬性。**
+   *
+   * 真的 `CloseEvent` 就是這樣 —— `code` / `reason` / `wasClean` 是 getter。
+   * 替身如果用普通物件，`{ ...event }` 這種寫法在測試裡會正常、在瀏覽器裡
+   * 會得到三個 `undefined`。**那個 bug 是整合驗證抓到的，不是這裡** ——
+   * 現在把替身改得忠實一點，讓它下次在這裡就紅。
+   */
   emit<K extends SocketEventName>(type: K, event: SocketEventMap[K]) {
-    for (const l of [...(this.#listeners.get(type) ?? [])]) (l as (e: SocketEventMap[K]) => void)(event)
+    const payload = type === 'close' ? onPrototype(event as CloseInfo) : event
+    for (const l of [...(this.#listeners.get(type) ?? [])])
+      (l as (e: SocketEventMap[K]) => void)(payload as SocketEventMap[K])
   }
 }
 
