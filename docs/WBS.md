@@ -111,7 +111,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 
 共 161 項：未開始 125、等外部 19、已封存 7、已取消 6、待裁決 2、已完成 1、常態 1
 
-來源指紋 `da3d8dadb70fa6d7`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `bfdc65a58f26abac`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -129,19 +129,12 @@ bash .github/scripts/progress.sh --check    # 有規則違規就以非零結束
 bash .github/scripts/wbs-page.sh --open
 ```
 
-要把這份表寫進 Excel 管理表：
-
-```bash
-bash .github/scripts/wbs-excel.sh
-```
-
-三個工具的分工：
+兩個工具的分工：
 
 | | |
 |---|---|
 | `progress.sh` | **每天用的。** 現在做到哪裡、被什麼擋住、有沒有違規 |
 | `wbs-page.sh` | **review 時用的。** 整份計畫長什麼樣、每週負荷、跨項依賴 |
-| `wbs-excel.sh` | **給 Excel 管理表用的。** 覆蓋「前端」工作表，保留你的欄位與下拉 |
 
 ### 三個工具吃同一份
 
