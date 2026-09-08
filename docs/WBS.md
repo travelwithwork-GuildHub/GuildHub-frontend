@@ -79,7 +79,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-W04 | 已封存 | `fe-w04-physics` |
 | FE-W05 | 已封存 | `fe-w05-camera` |
 | FE-X01 | 已封存 | `fe-x01-appshell` |
-| FE-O10 | 已完成 | `ae78a12c2af7` |
+| FE-O10 | 已完成 | 標記 `Done` |
 | FE-O18 | 常態 | — |
 | BE-G04 | 待裁決 | — |
 | BE-G25 | 待裁決 | — |
@@ -111,7 +111,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 
 共 161 項：未開始 125、等外部 19、已封存 7、已取消 6、待裁決 2、已完成 1、常態 1
 
-來源指紋 `bfdc65a58f26abac`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `ddbc5b775e78010b`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -193,7 +193,8 @@ bash .github/scripts/wbs-page.sh --open
 | `待裁決` | **還沒決定要不要做。** 需求本身沒定案 | 沒有週次 ＋ 標記 `TBD` |
 | `已取消` | 決定不做，或被別的項目取代 | 標記 `Cancelled` |
 | `常態` | 沒有完成點的持續性工作 | 標記 `Regular` |
-| `矛盾` | 標了不做、卻有 change 已經封存 | 兩份紀錄打架，**腳本不挑一邊信** |
+| `已完成` | 做完了，但**對不到任何 change**（治理工作） | 標記 `Done`，理由欄要寫出憑什麼 |
+| `矛盾` | 標了不做卻有 change 已封存；或標了 `Done` 卻有 change | 兩份紀錄打架，**腳本不挑一邊信** |
 
 前五個是**事實**（git 與 OpenSpec 證明得了），後五個來自**人寫的標記**。
 分野就在這裡：可以算的不要讓人寫，算不出來的才由人寫。
@@ -215,7 +216,7 @@ bash .github/scripts/wbs-page.sh --open
 寫法固定是 **`標記｜理由`**。沒有理由的標記等於沒有標記 ——
 六個月後沒有人敢刪它，它就永遠留在那裡。
 
-**四個互斥的處置**（一列最多一個）：
+**五個互斥的處置**（一列最多一個）：
 
 | 標記 | 進入條件 | 什麼時候可以拿掉 |
 |---|---|---|
@@ -223,6 +224,16 @@ bash .github/scripts/wbs-page.sh --open
 | `Pending` | 決定要做，但在等一件具體的事 | 那件事發生了 |
 | `Cancelled` | 決定不做 | 重新裁決之後（要在 PR 說明理由） |
 | `Regular` | 常態性工作，**沒有完成點** | 不適用 |
+| `Done` | 做完了，但**對不到任何 change** | 之後真的開了 change 就拿掉（並存會報矛盾） |
+
+`Done` 只給**治理工作**用，而且它是**整張表裡唯一一個人手寫的「事實」**。
+會需要它是因為規則互斥：改 `.github/` 只能走 `governance/` 分支，而
+`governance/` 不准碰 `openspec/` —— 治理工作在結構上不可能有同名的 change，
+`progress.sh` 永遠算不出它的狀態，只好一直顯示「未開始」。
+
+**機器沒有驗過 `Done` 的任何東西**（不像其他狀態是從 git 與 OpenSpec 推的）。
+理由欄要寫出憑什麼（PR 號、commit），由 review 去對。有 change 的項目**不准**
+標 `Done` —— 狀態算得出來，兩個來源就會漂，`progress.sh` 會報「矛盾」。
 
 **一個可並存的風險訊號**：
 
@@ -234,8 +245,9 @@ bash .github/scripts/wbs-page.sh --open
 
 - **`Cancelled` 的列不刪。** 「考慮過並決定不做」跟「沒想到」是完全不同的兩件事，
   刪掉之後沒有人分得出來
-- **`Cancelled` 跟「已封存」打架的時候，`progress.sh` 會報「矛盾」而不是挑一邊信。**
-  一個標成不做的項目卻有 change 封存了，代表兩份紀錄有一份是錯的 —— 去改，不要無視
+- **人寫的標記跟算出來的狀態打架時，`progress.sh` 會報「矛盾」而不是挑一邊信。**
+  標成不做卻有 change 封存了、標了 `Done` 卻有 change，都代表兩份紀錄有一份是錯的
+  —— 去改，不要無視
 ---
 
 ## 舊 ID 去哪了
@@ -401,24 +413,24 @@ bash .github/scripts/wbs-page.sh --open
 
 ### 環境、CI 與交付
 
-| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 | 涵蓋證據 |
-|---|---|---|---|---|---|---|---|
-| FE-O09 | 環境設定 | 後端 REST / WS 位址、環境變數規範、local / preview / prod 分離。**預設只連本機自己起的東西** | W1 | 3 | | |  |
-| | | Cookie 與跨源：身分走 session cookie，`allow_credentials=True`、`CORS_ORIGINS` 預設含 `localhost:3000`。所有 fetch 帶 credentials；**WS 握手也靠同一個 cookie** | W1 | 2 | | |  |
-| | | 前後端不同網域部署時的 SameSite / Secure | W13–W16 | 2 | | |  |
-| FE-O10 | CI 補齊 | scaffold 之後**立刻**把 `Lint` / `Typecheck` / `Test` / `Build` 放回 `ci.yml`（檔案裡有註記） | W1 | 3 | |  | commit:ae78a12c2af7b4641d2908341192d5cdc6191dd7 |
-| FE-O11 | 測試策略 | 單元 / component（Testing Library）/ E2E（Playwright）的分工與比重；3D 怎麼測 —— 哪些值得 E2E，哪些只驗 store 與純函式 | W1 | 8 | | |  |
-| | | **測試環境隔離**：只准打自己 `./run.sh` 起的後端。一次 40 連線的壓測足以把共用實例的人全部踢下線 | W1 | 2 | | |  |
-| FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`） | W5 | 7 | | |  |
-| FE-O13 | 視覺回歸 | 3D 畫面怎麼測 —— 截圖比對還是只測 DOM。**先決定，不要做一半** | W5 | 4 | | |  |
-| FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入 | W5 | 4 | | |  |
-| FE-O15 | 發表準備 | Demo fake data、固定流程、Demo reset；World 預載、異常 fallback、完整 E2E rehearsal | W5 | 7 | | |  |
-| | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W5 | 2 | | Alarm｜發表當天最不想踩的地雷 |  |
-| | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W5 | 5 | | |  |
-| | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W5 | 3 | | |  |
-| FE-O16 | 技術可觀測性 | 前端錯誤回報、WS 斷線率、FPS 遙測。**只做技術 telemetry** —— 使用者行為追蹤被後端明文永久排除（BE-G17），兩者不要混在同一個提案裡 | W13–W16 | 6 | | |  |
-| FE-O17 | 規模化 | `PAGE_SIZE=20` 的 offset 翻頁在資料變多時會慢且會漏；快取與預取策略 | W17–W20 | 6 | BE-G05 待銜接 | Pending｜等真後端提供更好的查詢；本地端先做好快取與預取 |  |
-| FE-O18 | 文件與交接 | `CONTEXT.md` / ADR / 本表的維護節奏 | 常態 | — | | Regular｜常態維護，沒有完成點 |  |
+| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 |
+|---|---|---|---|---|---|---|
+| FE-O09 | 環境設定 | 後端 REST / WS 位址、環境變數規範、local / preview / prod 分離。**預設只連本機自己起的東西** | W1 | 3 | | |
+| | | Cookie 與跨源：身分走 session cookie，`allow_credentials=True`、`CORS_ORIGINS` 預設含 `localhost:3000`。所有 fetch 帶 credentials；**WS 握手也靠同一個 cookie** | W1 | 2 | | |
+| | | 前後端不同網域部署時的 SameSite / Secure | W13–W16 | 2 | | |
+| FE-O10 | CI 補齊 | scaffold 之後**立刻**把 `Lint` / `Typecheck` / `Test` / `Build` 放回 `ci.yml`（檔案裡有註記） | W1 | 3 | | Done｜governance PR #58，commit ae78a12c。治理工作對不到 change，狀態算不出來 |
+| FE-O11 | 測試策略 | 單元 / component（Testing Library）/ E2E（Playwright）的分工與比重；3D 怎麼測 —— 哪些值得 E2E，哪些只驗 store 與純函式 | W1 | 8 | | |
+| | | **測試環境隔離**：只准打自己 `./run.sh` 起的後端。一次 40 連線的壓測足以把共用實例的人全部踢下線 | W1 | 2 | | |
+| FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`） | W5 | 7 | | |
+| FE-O13 | 視覺回歸 | 3D 畫面怎麼測 —— 截圖比對還是只測 DOM。**先決定，不要做一半** | W5 | 4 | | |
+| FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入 | W5 | 4 | | |
+| FE-O15 | 發表準備 | Demo fake data、固定流程、Demo reset；World 預載、異常 fallback、完整 E2E rehearsal | W5 | 7 | | |
+| | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W5 | 2 | | Alarm｜發表當天最不想踩的地雷 |
+| | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W5 | 5 | | |
+| | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W5 | 3 | | |
+| FE-O16 | 技術可觀測性 | 前端錯誤回報、WS 斷線率、FPS 遙測。**只做技術 telemetry** —— 使用者行為追蹤被後端明文永久排除（BE-G17），兩者不要混在同一個提案裡 | W13–W16 | 6 | | |
+| FE-O17 | 規模化 | `PAGE_SIZE=20` 的 offset 翻頁在資料變多時會慢且會漏；快取與預取策略 | W17–W20 | 6 | BE-G05 待銜接 | Pending｜等真後端提供更好的查詢；本地端先做好快取與預取 |
+| FE-O18 | 文件與交接 | `CONTEXT.md` / ADR / 本表的維護節奏 | 常態 | — | | Regular｜常態維護，沒有完成點 |
 
 ---
 
