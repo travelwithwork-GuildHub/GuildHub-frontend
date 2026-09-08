@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { RealtimeClient } from '@/realtime/client'
 import { createMessageValidator, type ProtocolViolation } from '@/realtime/protocol'
 import {
@@ -10,6 +10,7 @@ import {
   type RemoteMotion,
 } from '@/realtime/remotePlayers'
 import { RemotePlayers } from './RemotePlayers'
+import { PositionSync, type LocalPose } from './PositionSync'
 
 // 遠端玩家接上連線的地方。規格 FE-R07。
 //
@@ -21,7 +22,12 @@ import { RemotePlayers } from './RemotePlayers'
 
 const EMPTY_ROSTER: ReadonlyMap<string, RemoteIdentity> = new Map()
 
-export function RemoteWorld() {
+export interface RemoteWorldProps {
+  /** 本地角色的權威狀態，由 `LocalPlayer` 每幀寫入。 */
+  poseRef: RefObject<LocalPose>
+}
+
+export function RemoteWorld({ poseRef }: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
   // **動態不在 React 裡**（每秒 400 次）。這個容器建立一次就不再換掉，
@@ -32,6 +38,9 @@ export function RemoteWorld() {
   // **而那條規則是對的** —— 那樣寫在 concurrent render 下會讀到不該讀的東西。
   // 這裡要的是「建立一次、之後不變」，`useState` 的初始值正好就是那個語意。
   const [state] = useState(createRemotePlayersState)
+  // 目前的連線。**client 物件的身分就是 session generation** ——
+  // 換 scene 時它被換掉，`PositionSync` 靠比對身分決定要不要重置節流。
+  const clientRef = useRef<RealtimeClient | null>(null)
   const motion: ReadonlyMap<string, RemoteMotion> = state.motion
 
   useEffect(() => {
@@ -57,9 +66,11 @@ export function RemoteWorld() {
         }
       },
     })
+    clientRef.current = client
     client.connect()
 
     return () => {
+      clientRef.current = null
       client.close()
       // 卸載時把兩個容器都清乾淨 —— 留著的話，重新掛載會先閃出一批舊角色。
       state.motion.clear()
@@ -70,5 +81,10 @@ export function RemoteWorld() {
     // exhaustive-deps 不必被關掉，不會造成重新連線。
   }, [state])
 
-  return <RemotePlayers roster={roster} motion={motion} />
+  return (
+    <>
+      <RemotePlayers roster={roster} motion={motion} />
+      <PositionSync clientRef={clientRef} poseRef={poseRef} />
+    </>
+  )
 }

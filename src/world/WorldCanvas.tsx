@@ -51,6 +51,10 @@ export default function WorldCanvas() {
   // FE-W03 接上角色之後，這個 ref 會指向角色的位置；現在它是靜止的原點。
   const cameraTarget = useRef({ x: 0, y: 0, z: 0 })
 
+  // 給網路層的權威狀態。**跟相機的 target 分開** —— 兩者今天相同，
+  // 但相機之後可能鎖定別的東西（FE-R03 的 design D1）。
+  const localPose = useRef({ x: 0, z: 0, f: 0 })
+
   if (!webgl2) return <WebGLUnavailable />
 
   return (
@@ -75,10 +79,10 @@ export default function WorldCanvas() {
         />
         <Suspense fallback={null}>
           <DebugShadowScene />
-          <LocalPlayer targetRef={cameraTarget} />
+          <LocalPlayer targetRef={cameraTarget} poseRef={localPose} />
           {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
               WorldCanvas 不知道即時層的存在，也不該知道。 */}
-          <RemoteWorld />
+          <RemoteWorld poseRef={localPose} />
         </Suspense>
       </Canvas>
 
