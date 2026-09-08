@@ -88,3 +88,31 @@ describe('本機開發的 port', () => {
     expect(new Set(ports).size, `${ports.join(' 與 ')} 撞號了`).toBe(ports.length)
   })
 })
+
+// ── 本機開發打得開嗎，第二件事：host ──────────────────────────────
+//
+// **`127.0.0.1` 與 `localhost` 在 Next 16 的 dev server 不是同一件事。**
+//
+// 實測（2026-09-09）：同一個 server，兩個網址，一個能用一個不能。
+//
+//   `localhost:3100/world`  → 正常
+//   `127.0.0.1:3100/world`  → HTTP 200、HTML 完整、**畫面永遠空白**
+//
+// 被擋掉的是 HMR 的 WebSocket（dev server 的 log：`Blocked cross-origin
+// request to Next.js dev resource /_next/hmr from "127.0.0.1"`），
+// 而 Turbopack 的瀏覽器端 runtime 沒有它就**不會 hydrate**。
+//
+// ⚠️ **失敗的方向最糟**：沒有錯誤畫面、沒有 4xx、伺服器渲染的內容還留在
+// 畫面上，錯誤邊界也不會被觸發 —— 看起來就只是「一直在 loading」。
+
+describe('本機開發的 host', () => {
+  it('127.0.0.1 也要能開，不是只有 localhost', async () => {
+    const nextConfig = (await import('../next.config')).default
+    expect(
+      nextConfig.allowedDevOrigins,
+      'next.config 沒有 allowedDevOrigins —— Next 16 會擋掉 127.0.0.1 的 ' +
+        'HMR WebSocket，而那會讓整頁不 hydrate（畫面空白、沒有任何錯誤）。',
+    ).toBeDefined()
+    expect(nextConfig.allowedDevOrigins).toContain('127.0.0.1')
+  })
+})

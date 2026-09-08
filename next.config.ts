@@ -16,6 +16,29 @@ const nextConfig: NextConfig = {
   // 就好」—— 對一般專案合理，對這個 repo 是繞過治理。
   agentRules: false,
 
+  // ⚠️ **`127.0.0.1` 與 `localhost` 在 Next 16 的 dev server 不是同一件事。**
+  //
+  // 實測（2026-09-09，dev server 的 log）：
+  //
+  //     ⚠ Blocked cross-origin request to Next.js dev resource /_next/hmr
+  //       from "127.0.0.1".
+  //
+  // Next 16 預設只信任 `localhost`，其他 host 一律擋掉 dev 資源。
+  // 被擋掉的是 **HMR 的 WebSocket**，而 Turbopack 的瀏覽器端 runtime
+  // 沒有它就**不會 hydrate** —— 症狀是：
+  //
+  //   `localhost:3100/world`  → 正常，canvas 起得來
+  //   `127.0.0.1:3100/world`  → HTTP 200、HTML 完整、**畫面永遠空白**，
+  //                             而且 console 只有一行 WebSocket 握手失敗，
+  //                             看起來完全不像「頁面壞了」
+  //
+  // **沒有任何錯誤畫面**：伺服器端渲染的 `<h1>` 留在畫面上，React 從頭到尾
+  // 沒有接手，所以錯誤邊界也不會被觸發。這個組合非常難查 ——
+  // 兩個網址指向同一個 server，一個能用一個不能。
+  //
+  // 這個設定只影響 `next dev`。
+  allowedDevOrigins: ['127.0.0.1'],
+
   // 規格 FE-X01-S01：`/` 導向 `/world`。
   //
   // **`permanent: false` 是 307，不是 308，而且這件事要能被讀出來。**
