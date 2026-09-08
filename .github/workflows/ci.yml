@@ -56,12 +56,13 @@ jobs:
       # 分支名（`git check-ref-format` rc=0）—— 直接插值的話那段會在閘門拿到
       # 參數之前就被 shell 執行。這是 GitHub 官方點名的 script injection。
       # `.github/scripts/test-ci-workflow.sh` 在驗這件事，改這一步之前先跑它。
+      # **驗證用的暫時步驟**：證明 actionlint 抓得到底下故意種回去的注入洞。
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
+
       - name: Branch
         if: github.event_name == 'pull_request'
-        env:
-          BASE_REF: ${{ github.base_ref }}
-          HEAD_REF: ${{ github.head_ref }}
-        run: bash .github/scripts/check-pr-branch.sh "$BASE_REF" "$HEAD_REF"
+        run: bash .github/scripts/check-pr-branch.sh "${{ github.base_ref }}" "${{ github.head_ref }}"
 
       # lockfile 的來源檢查。
       #
