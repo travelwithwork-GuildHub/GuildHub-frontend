@@ -232,87 +232,70 @@ change id 與 slice 的分界，不需要任何消歧邏輯。
 **阻塞類型的詞彙不是寫死在腳本裡的**，是從 `docs/WBS.md` 自己那張
 `| 阻塞類型 | 意思 | 該做什麼 |` 表讀出來的。要用新的類型，**先去那張表宣告**。
 
-### Scenario 覆蓋：每一條規格都要有一個真的跑過的測試
+### Scenario 缺口報告（**是報告，不是閘門**）
 
 ```bash
 bash .github/scripts/check-scenario-coverage.sh
 ```
 
-〈完成的定義〉第 2 條寫「每個 Scenario 都有對應測試」。**在這支腳本出現以前，
-那句話沒有任何機器在執行** —— 衍生專案實測差集有 8 條。
+列出 `openspec/specs/` 裡「沒有任何通過的測試指著它」的 Scenario。**有缺口
+也回 0，不接在 CI 上，不擋任何 PR。** 它的位置在 `prompts/05-verify.md` 那一
+步：把清單攤開，由人對每一條說出處置。
+
+**為什麼不是閘門。** 它證明得了的事只有「這個 ID 出現在一個通過的測試標題
+裡」，證明不了那個測試真的在驗那條 Scenario 的行為。當它是閘門，唯一保證會
+發生的事是「補一條標題帶 ID 的測試」—— 那比沒有閘門更糟，因為它會產生已經
+驗過的**外觀**。它當閘門的那段期間，副作用是一整套豁免文法（封閉列舉的種類、
+證據要含 40 位 SHA、孤兒／過期／重複豁免各一條規則），那些全部拿掉了。
 
 **它不掃測試原始碼。** 實測踩過：一個 Scenario ID 只出現在測試檔的**一行註解**
 裡，`grep` 會把它算成已覆蓋。所以看的是 `vitest --reporter=json` 的執行結果，
-而且只認 `passed` 的**葉節點**標題 ——「出現這個 ID」跟「這條真的被驗了」中間
-差著：有沒有被 skip、有沒有編譯錯誤、有沒有真的通過。ID 寫在 `describe` 上
-也不算：那個 describe 底下每一條都會沾到它，一條 ID 就能替一整群測試背書。
+而且只認 `passed` 的**葉節點**標題。ID 寫在 `describe` 上也不算：那個 describe
+底下每一條都會沾到它，一條 ID 就能替一整群測試背書。
 
-不用單元測試驗的 Scenario，在它自己底下寫一行豁免：
+**退出碼 0 只代表「量到了」，不代表「沒有缺口」。** 量不到（測試沒綠、報告產
+不出來、一份規格檔都掃不到）回 **2** —— 掃不到不等於沒有缺口。
+
+不用單元測試驗的 Scenario，可以在它底下留一行給人看的註記。**這行沒有機器
+意義**：報告會把它原文印在那條缺口旁邊，讓讀報告的人知道這是刻意的。
 
 ```markdown
 #### Scenario: [FE-W01-S01] 進入世界看到 3D 畫面
 
 - **WHEN** 使用者在支援 WebGL2 的瀏覽器開啟 `/world`
 - **THEN** 頁面渲染出一個 canvas 元素
-- **VERIFY-BY** `manual-browser`｜PR #37 的截圖｜WebGL 像素結果 jsdom 證明不了
+- **VERIFY-BY** 人工瀏覽器｜驗證紀錄在 `2026-09-08-fe-o11-evidence`｜WebGL 像素 jsdom 證不了
 ```
 
-種類是**封閉列舉**，不認得的直接紅 —— 打錯字的豁免等於沒有豁免，而它看起來跟真的一模一樣：
+**只掃 `openspec/specs/`，不掃還沒 archive 的 change。** 一條 Scenario 進入
+現況描述的那一刻才輪到問「誰驗它」—— 那一刻就是 archive。連 active change 的
+delta 一起掃的話會鎖死流程：`spec/` 分支依設計不能加測試，第一個 spec PR 就
+會紅（實測過）。
 
-| 種類 | 用在什麼 | 證據欄要放什麼（**機器在驗**） |
-|---|---|---|
-| `vitest` | 預設，不用寫 | — |
-| `playwright` | E2E 覆蓋的 | — |
-| `command-negative` | 有負向 fixture、而且在 CI 裡會跑的指令 | 指令 |
-| `ci-job` | CI 的 job 本身就是這條的執行 | **`ci.yml` 裡真的存在的步驟名稱** |
-| `manual-browser` | 人在瀏覽器裡看 | **40 位完整 commit SHA，而且在 HEAD 的歷史裡** |
+### CI 的 workflow 檢查
 
-`manual-browser` 為什麼是 SHA 不是 PR 連結：**PR 內文可以編輯、附件可以刪，
-而且要連網才查得到** —— 一份離線的 clone 沒辦法確認它存在。commit 進了 main
-就改不掉、`git show` 就取得回它帶的內容（通常是那個 change 的 `tasks.md`
-裡的驗證紀錄）。
+```yaml
+- name: Workflow lint    # actionlint，版本與 sha256 都固定在 ci.yml 裡
+```
 
-**不要求截圖進 repo。** 一張圖片證明不了它是在什麼版本、什麼環境下拍的，
-只會讓 diff 變大。機器能證明的是「這份紀錄存在、而且從此不會變」，
-剩下的靠 review —— 跟 `commit:` 涵蓋證據同一個強度。
+擋的是**把 `${{ }}` 直接插進 `run:`** 那一類 script injection —— git 收得下
+`chore/$(...)` 這種分支名，直接插值的話那段會在閘門拿到參數之前就被執行。
 
-**只掃 `openspec/specs/`，不掃還沒 archive 的 change。** 判準是
-**「一條 Scenario 進入現況描述的那一刻要有人驗它」** —— 那一刻就是 archive。
+這一步取代了 `test-ci-workflow.sh`（350 行手寫 YAML parser）。實測對照：同一
+份 ci.yml，actionlint 抓到 `"github.head_ref" is potentially untrusted …
+[expression]`，位置正確。**現成的靜態檢查器做得到的事，不要自己寫一份。**
 
-連 active change 的 delta 一起掃的話，流程會鎖死：`spec/` 分支依設計不能加
-測試，所以第一個 spec PR 就會紅、合進 main 之後 main 一直紅，直到 feat PR
-落地（實測過）。代價講清楚：實作階段漏掉的測試要到 archive PR 才會紅，
-**沒有更早的選項** —— 提早驗就得知道「哪一個 feat slice 是最後一個」，
-而一個 change 可以有很多個 feat PR。
-
-**豁免寫在 Scenario 裡面，不另外開一份清單。** 理由是 `feat/` 分支不得回改
-已批准的 specs（分支閘門擋著），所以豁免只能在 spec PR 階段加 ——
-**實作者沒辦法寫到一半才給自己補一張免死金牌。**
-
-機器還會擋：豁免過期（測試補上了但豁免還留著）、孤兒豁免（指到不存在的
-Scenario）、同一條有兩份豁免、Scenario 沒有穩定 ID、ID 重複、
-以及**一份規格檔都沒掃到**（掃不到不等於全部覆蓋）。
-
-### CI 的四個品質步驟被合約鎖住
-
-`Lint`／`Typecheck`／`Test`／`Build` 四步的 `run` 必須**剛好是那一句**，
-不得有 `if:`／`shell:`／`|| true`。`test-ci-workflow.sh` 掃**整份 workflow**
-（放在 `ci:` 或獨立的 `quality:` job 都可以），而且整份檔案都不准出現
-`continue-on-error`。
-
-為什麼要鎖：用 `ci-job` 豁免的那條 Scenario（「四個工程品質指令都真的跑」）
-拿的就是「CI 有跑這四步」當證據 —— **那條證據站不住的話豁免也站不住**。
-（實測：鎖之前把 `Build` 改成 `run: true`，合約測試照樣全過。）
-
-**有規格就一定要接覆蓋閘門**：`openspec/specs/` 裡有 Scenario 的話，
-`ci.yml` 一定要有 `bash .github/scripts/check-scenario-coverage.sh` 那一步。
-還沒有規格的專案（剛複製的模板）不要求 —— 那支閘門會正確地紅在
-「一份規格檔都沒掃到」。
+**換掉之後少了什麼，講清楚**（見 `docs/DECISIONS.md`）：actionlint 不管
+`continue-on-error`、不管 job 層的 `if:`／`defaults:`、也不管「`Lint`／
+`Typecheck`／`Test`／`Build` 四步的 `run` 是不是剛好那一句」。這三類現在靠
+**PR review** —— 它們只可能出現在動 `.github/` 的 `governance/` PR，而那種 PR
+的 diff 上會直接寫著 `continue-on-error: true`。
 
 ### 引用 ID 的寫法
 
-`docs/WBS.md`、`docs/ROADMAP.md`、`AGENTS.md`、`CLAUDE.md`、`README.md`、
-`CONTEXT.md` 這六份裡提到的每一個 ID 都會被驗存在。**寫法只有這幾種**：
+`docs/WBS.md` 與 `docs/ROADMAP.md` 這**兩份**裡提到的每一個 ID 都會被驗存在
+（散文文件 —— `AGENTS.md`、`CLAUDE.md`、`README.md`、`CONTEXT.md` —— 不掃：
+它們是講道理的地方，不是清單）。**寫法只有這幾種**：
 
 ```
 FE-C01                單一個
@@ -335,7 +318,7 @@ FE⎯C01、FE┄C01     中間不是連字號但長得像 —— 認形狀，不
 FE-С99（西里爾 С）    字母也會同形。形狀對、但有字元不是 ASCII 就報
 ```
 
-**在這六份文件的圍籬外，「大寫-大寫＋數字」是保留字。**
+**在這兩份文件的圍籬外，「大寫-大寫＋數字」是保留字。**
 剛好長一樣的東西（例如某些規格代號）會被誤報 —— 這是刻意選的方向：
 漏報是一個懸空 ID 躺六個月沒人發現，誤報只是被擋一次、換個寫法。
 真的要寫，放進圍籬裡。
