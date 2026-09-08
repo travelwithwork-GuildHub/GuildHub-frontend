@@ -33,19 +33,19 @@
 
 ## 4. WebSocket 契約（Requirement：WebSocket 兩個方向是兩個獨立的訊息集合）
 
-- [ ] 4.1 client→server 集合：`move`／`status`／`chat`，每一條標明對應 `protocol.py` 的哪一段；驗證 `FE-O01-S07` 通過（浮點 `x` 被拒、`f=4` 被拒、負座標通過）
-- [ ] 4.2 server→client 集合：`hello`／`snapshot`／`pos`／`presence`／`status`／`chat`／`err`，`pos` 的 `p` 是 `[id,x,y,f]` 陣列不是物件；驗證 `FE-O01-S06` 通過
-- [ ] 4.3 未知的 `t` 明確失敗，不靜默忽略；驗證 `FE-O01-S08` 通過
-- [ ] 4.4 **負向驗證**：把兩個方向合併成單一個以 `t` 為判別鍵的 union，確認 `FE-O01-S06` 變紅（證明「分成兩個」這件事真的有人在看）；改回來
+- [x] 4.1 client→server 集合：`move`／`status`／`chat`，每一條標明對應 `protocol.py` 的哪一段；驗證 `FE-O01-S07` 通過（浮點 `x` 被拒、`f=4` 被拒、負座標通過）
+- [x] 4.2 server→client 集合：`hello`／`snapshot`／`pos`／`presence`／`status`／`chat`／`err`，`pos` 的 `p` 是 `[id,x,y,f]` 陣列不是物件；驗證 `FE-O01-S06` 通過
+- [x] 4.3 未知的 `t` 明確失敗，不靜默忽略；驗證 `FE-O01-S08` 通過
+- [x] 4.4 **負向驗證**：把兩個方向合併成單一個以 `t` 為判別鍵的 union，確認 `FE-O01-S06` 變紅（證明「分成兩個」這件事真的有人在看）；改回來
 
 ## 5. 唯一一份的界線
 
-- [ ] 5.1 確認 `src/api/contract/` 以外沒有任何檔案定義相同形狀或重複那些數字 —— 用 `grep -rn "20\|300\|2000" src/ --include=*.ts --include=*.tsx` 逐條看過，並把結果貼在 PR 上
-- [ ] 5.2 確認這一刀**沒有**引入任何 `fetch`、adapter、Route Handler —— `git diff --stat` 的檔案清單全部在 `src/api/contract/` 底下（加 `package.json` 與測試）
+- [x] 5.1 確認 `src/api/contract/` 以外沒有任何檔案定義相同形狀或重複那些數字 —— 用 `grep -rn "20\|300\|2000" src/ --include=*.ts --include=*.tsx` 逐條看過，並把結果貼在 PR 上
+- [x] 5.2 確認這一刀**沒有**引入任何 `fetch`、adapter、Route Handler —— `git diff --stat` 的檔案清單全部在 `src/api/contract/` 底下（加 `package.json` 與測試）
 
 ## 6. 完成前的驗證
 
-- [ ] 6.1 `openspec validate fe-o01-contract --strict` 通過，貼輸出
-- [ ] 6.2 `npm run lint && npm run typecheck && npm test && npm run build` 全綠，貼輸出（測試數量要看得到）
-- [ ] 6.3 `bash .github/scripts/progress.sh --check` rc=0，貼輸出
+- [x] 6.1 `openspec validate fe-o01-contract --strict` 通過，貼輸出
+- [x] 6.2 `npm run lint && npm run typecheck && npm test && npm run build` 全綠，貼輸出（測試數量要看得到）
+- [x] 6.3 `bash .github/scripts/progress.sh --check` rc=0，貼輸出
 - [ ] 6.4 archive 之後再跑一次 `bash .github/scripts/check-scenario-coverage.sh`，把缺口清單原文貼上並對每一條說出處置
