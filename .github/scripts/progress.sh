@@ -601,8 +601,17 @@ grefs = []     # (被提到的群組 ID, 檔名, 行號)
 #
 # 圍籬程式碼區塊（``` 之間）一律跳過 —— 那裡面是範例，不是引用。
 # `docs/DECISIONS.md` 刻意不驗：它是歷史，會引用當時的 ID 當例子。
-REF_SOURCES = ["docs/WBS.md", "docs/ROADMAP.md",
-               "AGENTS.md", "CLAUDE.md", "README.md", "CONTEXT.md"]
+# **只掃兩份結構化文件。**
+#
+# 2026-09-08 縮回來：原本連 `AGENTS.md`／`CLAUDE.md`／`README.md`／`CONTEXT.md`
+# 一起掃，於是「為了驗幾個工作項目代號」實質限制了四份**散文**能用的
+# Markdown 子集 —— 散文裡出現一個裸的 ID 就會紅，而那不是錯誤。
+# （我自己就被擋過一次：在 AGENTS.md 的說明文字裡寫了一個 Scenario ID。）
+#
+# 外部審查（gpt-5.6-sol）的原話：「這正是『規則互相牽制，然後再加例外解鎖』
+# 的來源。」而「WBS／ROADMAP 指到不存在的 ID」這個真正有價值的檢查，
+# 只需要掃這兩份 —— 它們是機器在讀的結構化文件，不是散文。
+REF_SOURCES = ["docs/WBS.md", "docs/ROADMAP.md"]
 _groups, _milestones, _deps = [], [], []
 
 def parse_mark(mark: str):
@@ -1650,7 +1659,9 @@ def _render_block(stripped):
     return "\n".join(lines)
 
 
-if RENDER or CHECK:
+# **平常跑 `progress.sh` 的人最該看到「區塊過期了」。**
+# 原本只在 --render／--check 算，於是唯一會看到提醒的是 CI。
+if not JSON:
     _wp = pathlib.Path("docs/WBS.md")
     _txt = _wp.read_text(encoding="utf-8") if _wp.is_file() else None
     if _txt is None:
@@ -1679,10 +1690,18 @@ if RENDER or CHECK:
             if RENDER:
                 _wp.write_text(_want, encoding="utf-8")
                 print("✓ 已更新 docs/WBS.md 的進度區塊")
-            elif _want != _txt:
-                violations.append(
-                    "docs/WBS.md 的進度區塊跟現在的狀態對不上 —— "
-                    "跑 `bash .github/scripts/progress.sh --render` 再 commit")
+            elif _want != _txt and not JSON:
+                # **不再是違規，只是提醒。**
+                #
+                # 2026-09-08 降級：那個「必須同步」的要求，讓每個加 change 或
+                # archive 的 PR 都得順手重產一次區塊 —— 而那兩種分支原本不准碰
+                # `docs/WBS.md`，於是逼我放寬了它們的路徑限制。**一條檢查逼出
+                # 一條例外，就是規則互相牽制的開始。**（實測撞到過兩次。）
+                #
+                # 區塊仍然由 `--render` 產生、仍然看得到進度；它過期的時候
+                # 這裡會說，但不擋任何人。
+                print(f"{Y}⚠ docs/WBS.md 的進度區塊跟現在的狀態對不上{X}"
+                      f"{D}（跑 `progress.sh --render` 更新它；這不是違規）{X}")
 
 if violations:
     print()
