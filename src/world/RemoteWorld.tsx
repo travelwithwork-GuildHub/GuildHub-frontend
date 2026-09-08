@@ -25,9 +25,20 @@ const EMPTY_ROSTER: ReadonlyMap<string, RemoteIdentity> = new Map()
 export interface RemoteWorldProps {
   /** 本地角色的權威狀態，由 `LocalPlayer` 每幀寫入。 */
   poseRef: RefObject<LocalPose>
+  /**
+   * 單調時間來源。**注入的，而且寫入樣本與求值畫面位置用的是同一個。**
+   *
+   * ⚠️ 兩邊用不同時鐘的話（例如一邊 `performance.now()`、一邊
+   * `useFrame` 的 `state.clock`），原點與暫停行為都不同，相減得到的數字
+   * 沒有意義 —— 而症狀是「插值瞬間完成」或「永遠不開始」，
+   * **沒有任何錯誤訊息**。測試靠傳一個假的來控制時間。
+   */
+  now?: () => number
 }
 
-export function RemoteWorld({ poseRef }: RemoteWorldProps) {
+const monotonicNow = () => performance.now()
+
+export function RemoteWorld({ poseRef, now = monotonicNow }: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
   // **動態不在 React 裡**（每秒 400 次）。這個容器建立一次就不再換掉，
@@ -60,7 +71,7 @@ export function RemoteWorld({ poseRef }: RemoteWorldProps) {
         const result = validate(raw)
         if (!result.ok) return
         // `selfId` 用來把自己排除在遠端玩家之外 —— `snapshot` 裡包含自己。
-        if (applyMessage(state, result.message, client.selfId)) {
+        if (applyMessage(state, result.message, client.selfId, now())) {
           // 名單真的變了才重繪。**這是唯一會呼叫 setState 的地方。**
           setRoster(state.roster)
         }
@@ -79,11 +90,15 @@ export function RemoteWorld({ poseRef }: RemoteWorldProps) {
     }
     // `state` 是 `useState` 的初始值，身分穩定 —— 列進來只是讓
     // exhaustive-deps 不必被關掉，不會造成重新連線。
-  }, [state])
+    //
+    // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
+    // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
+    // 測試要傳假時鐘的話，也要傳一個身分穩定的。
+  }, [state, now])
 
   return (
     <>
-      <RemotePlayers roster={roster} motion={motion} />
+      <RemotePlayers roster={roster} motion={motion} now={now} />
       <PositionSync clientRef={clientRef} poseRef={poseRef} />
     </>
   )
