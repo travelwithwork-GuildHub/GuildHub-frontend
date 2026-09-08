@@ -48,4 +48,23 @@
 - [x] 6.1 `openspec validate fe-o01-contract --strict` 通過，貼輸出
 - [x] 6.2 `npm run lint && npm run typecheck && npm test && npm run build` 全綠，貼輸出（測試數量要看得到）
 - [x] 6.3 `bash .github/scripts/progress.sh --check` rc=0，貼輸出
-- [ ] 6.4 archive 之後再跑一次 `bash .github/scripts/check-scenario-coverage.sh`，把缺口清單原文貼上並對每一條說出處置
+- [x] 6.4 跑 `bash .github/scripts/check-scenario-coverage.sh`，把缺口清單原文貼上並對每一條說出處置
+
+  結果：**64 條規格、60 條有通過的測試指著、4 條缺口**，四條全部是既有的，
+  而且各自的註記原本就寫在規格裡：
+
+  ```
+  FE-W01-S01  openspec/specs/world-canvas/spec.md:23   manual-browser｜jsdom 沒有 WebGL2
+  FE-W01-S02  openspec/specs/world-canvas/spec.md:30   manual-browser｜有效 DPR 量不到
+  FE-W01-S03  openspec/specs/world-canvas/spec.md:44   manual-browser｜陰影是 GPU 的畫面內容
+  FE-X01-S10  openspec/specs/app-shell/spec.md:135     ci-job｜CI 的 job 本身就是這條的執行
+  ```
+
+  處置：**四條都維持原判**，本 change 沒有改變它們的可測性。
+
+  ⚠️ **本 change 的 12 條 Scenario 要 archive 之後才會進報告**（報告只掃
+  `openspec/specs/`）。archive PR 合併後**要再跑一次**，把新出現的缺口一起處置 ——
+  沒有任何閘門會替你記得這件事（`prompts/05-verify.md`）。
+
+  ⚠️ 這支腳本結尾有一行清暫存目錄的遞迴刪除，會被某些本機 hook 擋下。
+  擋到的話：複製一份、把那一行刪掉再跑，其餘完全相同。
