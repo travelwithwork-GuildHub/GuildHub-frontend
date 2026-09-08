@@ -4,6 +4,7 @@ import type { FC } from 'react'
 import { RemotePlayers } from '@/world/RemotePlayers'
 import { RemotePlayer, type RemotePlayerProps } from '@/world/player/RemotePlayer'
 import type { RemoteIdentity, RemoteMotion } from '@/realtime/remotePlayers'
+import { RENDER_DELAY_MS, appendSample, createTrack } from '@/realtime/interpolation'
 
 // 規格：openspec/changes/fe-r07-remote-players/specs/remote-players/spec.md
 //   Requirement: 名單上的每個人都在畫面上有一個角色 —— FE-R07-S07 / S08
@@ -18,10 +19,22 @@ import type { RemoteIdentity, RemoteMotion } from '@/realtime/remotePlayers'
 
 const identity = (id: string): RemoteIdentity => ({ id, name: '訪客', av: 0 })
 
+/** 測試用的時鐘。**元件不自己取時間**，一律用這個。 */
+let clock = 1000
+const now = () => clock
+
+/** 一條只有一筆樣本的軌跡 —— 那一筆當下就看得到（游標早於它，夾住）。 */
+function trackAt(x: number, z: number, f = 0): RemoteMotion {
+  const track = createTrack()
+  appendSample(track, { x, z, f }, clock)
+  return track
+}
+
 function scene(roster: string[], motion: Map<string, RemoteMotion>) {
   return {
     roster: new Map(roster.map((id) => [id, identity(id)])),
     motion,
+    now,
   }
 }
 
@@ -39,8 +52,8 @@ function remoteCount(renderer: Awaited<ReturnType<typeof ReactThreeTestRenderer.
 describe('遠端角色的渲染', () => {
   it('[FE-R07-S07] 名單改變時，畫面上的角色跟著增減', async () => {
     const motion = new Map<string, RemoteMotion>([
-      ['u1', { x: 1, z: 0, f: 0 }],
-      ['u2', { x: 2, z: 0, f: 0 }],
+      ['u1', trackAt(1, 0)],
+      ['u2', trackAt(2, 0)],
     ])
 
     const renderer = await ReactThreeTestRenderer.create(
@@ -58,7 +71,7 @@ describe('遠端角色的渲染', () => {
   })
 
   it('[FE-R07-S08] 遠端角色的位置來自動態資料，不是 props', async () => {
-    const motion = new Map<string, RemoteMotion>([['u1', { x: 1, z: 2, f: 0 }]])
+    const motion = new Map<string, RemoteMotion>([['u1', trackAt(1, 2)]])
 
     // ⚠️ **數的是 `RemotePlayer`（子元件），不是 `RemotePlayers`（父層）。**
     //
@@ -71,7 +84,9 @@ describe('遠端角色的渲染', () => {
     const counted = vi.fn((props: RemotePlayerProps) => RemotePlayer(props))
     const Counted = counted as unknown as FC<RemotePlayerProps>
 
-    const renderer = await ReactThreeTestRenderer.create(<Counted id="u1" motion={motion} />)
+    const renderer = await ReactThreeTestRenderer.create(
+      <Counted id="u1" motion={motion} now={now} />,
+    )
     await ReactThreeTestRenderer.act(async () => {
       await renderer.advanceFrames(1, 1 / 60)
     })
@@ -84,10 +99,10 @@ describe('遠端角色的渲染', () => {
 
     const rendersBefore = counted.mock.calls.length
 
-    // **就地改寫動態資料** —— 這正是 `applyMessage` 對 `pos` 做的事。
-    const m = motion.get('u1')!
-    m.x = 10
-    m.z = 20
+    // **就地追加一筆樣本** —— 這正是 `applyMessage` 對 `pos` 做的事。
+    appendSample(motion.get('u1')!, { x: 10, z: 20, f: 0 }, clock)
+    // 有 250 毫秒的 render delay，所以要把**注入的時鐘**推過去才會走到。
+    clock += RENDER_DELAY_MS
 
     await ReactThreeTestRenderer.act(async () => {
       await renderer.advanceFrames(2, 1 / 60)

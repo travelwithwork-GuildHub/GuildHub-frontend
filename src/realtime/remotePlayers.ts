@@ -1,5 +1,6 @@
 import type { Player, ServerMessage } from '@/api/contract/ws'
 import { toWorld } from '@/world/coords'
+import { appendSample, createTrack, resetTrack, type Track } from './interpolation'
 
 // 別人在這個世界裡的存在與位置。規格 FE-R07。
 //
@@ -27,15 +28,11 @@ export interface RemoteIdentity {
 /**
  * 一個人的動態。**世界座標，不是協定像素** —— 換算在寫入時就做完了。
  *
- * 叫 `target` 是因為 `FE-R08` 會在它旁邊加 `previous` 做插值。
- * **這一刀直接把 target 套上去，所以角色每 100 毫秒跳一格。**
+ * ⚠️ **這不是「目前位置」，是一段樣本歷史**（`FE-R08`）。畫面位置由
+ * `interpolation.evaluate` 從它求值 —— 直接讀最後一筆的話，
+ * 角色會回到每 100 毫秒跳一格。
  */
-export interface RemoteMotion {
-  x: number
-  z: number
-  /** 協定的離散朝向 0–3。**不是角度。** */
-  f: number
-}
+export type RemoteMotion = Track
 
 export interface RemotePlayersState {
   /** 名單。**這個 Map 只在 join / leave 時被換掉。** */
@@ -52,12 +49,22 @@ function identityOf(p: Player): RemoteIdentity {
   return { id: p.id, name: p.name, av: p.av }
 }
 
-function motionOf(p: Player): RemoteMotion {
+/**
+ * `snapshot` 與 `presence.join` 帶來的座標。
+ *
+ * ⚠️ **它們清空整段歷史，不是追加一筆。** 它們是權威狀態的重建，
+ * 不是一段連續軌跡上的一點 —— 留著舊樣本的話，畫面會把**上一個場景的位置**
+ * 與新位置連成一段插值。**這是唯一的 snap 入口**（`FE-R08` 的 D6：
+ * teleport 是語義的，不是幾何的）。
+ */
+function seedTrack(existing: RemoteMotion | undefined, p: Player, now: number): RemoteMotion {
   // ⚠️ **換算在寫入時做，不在 render loop。**
   // 訊息每秒 400 次；render loop 是每秒 60 次 × 40 個角色 = 2400 次。
   // 放錯邊是六倍的工作量，而且它會每一幀重算一個不會變的值。
   const { x, z } = toWorld({ x: p.x, y: p.y })
-  return { x, z, f: p.f }
+  const track = existing ?? createTrack()
+  resetTrack(track, { x, z, f: p.f }, now)
+  return track
 }
 
 /**
@@ -93,6 +100,7 @@ export function applyMessage(
   state: RemotePlayersState,
   message: ServerMessage,
   selfId: string | null,
+  now: number,
 ): boolean {
   switch (message.t) {
     case 'snapshot': {
@@ -102,7 +110,7 @@ export function applyMessage(
       for (const p of message.players) {
         if (p.id === selfId) continue
         roster.set(p.id, identityOf(p))
-        state.motion.set(p.id, motionOf(p))
+        state.motion.set(p.id, seedTrack(undefined, p, now))
       }
       state.roster = roster
       return true
@@ -114,16 +122,24 @@ export function applyMessage(
       for (const id of message.leave) {
         if (removeRemote(state, id)) changed = true
       }
-      const joining = message.join.filter((p) => p.id !== selfId && !state.roster.has(p.id))
-      if (joining.length > 0) {
+      // ⚠️ **已經在名單裡的人也要重新就位。** 舊寫法整個跳過他們，
+      // 於是「沒有先 `leave` 就 `join`」的情況會留著上一段軌跡 ——
+      // 畫面把舊位置跟新位置連成一段插值。
+      const joining = message.join.filter((p) => p.id !== selfId)
+
+      // **進場就有座標** —— `join` 的元素帶 x/y/f。
+      // 不能等第一則 `pos`：靜止時後端整則不送，
+      // 進來之後沒動過的人**永遠不會出現在 `pos` 裡**。
+      for (const p of joining) {
+        state.motion.set(p.id, seedTrack(state.motion.get(p.id), p, now))
+      }
+
+      // **名單只在真的多了人時才換掉。** 重複的 `join` 不該讓 React 重繪 ——
+      // 換一個新的 Map 就是換身分，而身分改變就是重繪。
+      const fresh = joining.filter((p) => !state.roster.has(p.id))
+      if (fresh.length > 0) {
         const roster = new Map(state.roster)
-        for (const p of joining) {
-          roster.set(p.id, identityOf(p))
-          // **進場就有座標** —— `join` 的元素帶 x/y/f。
-          // 不能等第一則 `pos`：靜止時後端整則不送，
-          // 進來之後沒動過的人**永遠不會出現在 `pos` 裡**。
-          state.motion.set(p.id, motionOf(p))
-        }
+        for (const p of fresh) roster.set(p.id, identityOf(p))
         state.roster = roster
         changed = true
       }
@@ -135,12 +151,12 @@ export function applyMessage(
         // **不在名單裡的一律忽略，不建立新的人。**
         // `pos` 是差量，名單只由 `snapshot` 與 `presence` 決定 ——
         // 這裡放行的話，一個已經離開的人會因為一則延遲的 `pos` 復活。
-        const current = state.motion.get(id)
-        if (current === undefined) continue
-        const { x: wx, z } = toWorld({ x, y })
-        current.x = wx
-        current.z = z
-        current.f = f
+        const track = state.motion.get(id)
+        if (track === undefined) continue
+        const { x: wx, z: wz } = toWorld({ x, y })
+        // **追加一筆，不是覆寫位置。** 覆寫的話畫面沒有前一個點可以插值，
+        // 角色就回到每 100 毫秒跳一格。
+        appendSample(track, { x: wx, z: wz, f }, now)
       }
       // **名單沒有變。** 回傳 true 的話，每秒 400 次的 `pos` 會變成
       // 每秒 400 次的 React 重繪。

@@ -16,15 +16,17 @@ export interface RemotePlayersProps {
   roster: ReadonlyMap<string, RemoteIdentity>
   /** 動態。傳給每個子元件，它們自己在 render loop 裡讀。 */
   motion: ReadonlyMap<string, RemoteMotion>
+  /** 單調時間來源。**與寫入樣本用的是同一個。** */
+  now: () => number
 }
 
-export function RemotePlayers({ roster, motion }: RemotePlayersProps) {
+export function RemotePlayers({ roster, motion, now }: RemotePlayersProps) {
   return (
     <>
       {[...roster.keys()].map((id) => (
         // `key` 用 id：離開的人卸載、進來的人掛載，中間的人不受影響。
         // 用索引的話，一個人離開會讓它後面每一個都被當成「換了人」。
-        <RemotePlayer key={id} id={id} motion={motion} />
+        <RemotePlayer key={id} id={id} motion={motion} now={now} />
       ))}
     </>
   )

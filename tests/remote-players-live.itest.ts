@@ -25,7 +25,7 @@ function observer() {
   const client: RealtimeClient = new RealtimeClient({
     onMessage: (raw) => {
       const result = validate(raw)
-      if (result.ok) applyMessage(state, result.message, client.selfId)
+      if (result.ok) applyMessage(state, result.message, client.selfId, performance.now())
     },
   })
   return { client, state, violations }

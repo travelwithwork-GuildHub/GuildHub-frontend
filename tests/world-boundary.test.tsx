@@ -28,6 +28,11 @@ vi.mock('@/world/player/LocalPlayer', () => ({
 }))
 
 describe('World 區域的 client 邊界（成功路徑）', () => {
+  // ⚠️ **第三個參數（測試自己的逾時）也要放寬，不是只放寬 `findByTestId`。**
+  // vitest 的預設 `testTimeout` 是 5 秒 —— 內層等 10 秒的話它永遠等不到，
+  // 外層會先在 5 秒時把整條測試判定為逾時，
+  // **而那個錯誤訊息不會提到 `world-canvas-container`**。
+  // 實測過：只放寬內層時，重負載下失敗訊息變成一句沒有線索的 timeout。
   it('[FE-X01-S03] 進入世界頁面：Layout 與 World 區域的內容都在', async () => {
     // fe-w01-worldcanvas 之前這裡斷言的是「佔位內容」。佔位被 3D 取代之後
     // 那句話不再成立，所以那條 Scenario 被 MODIFIED —— **ID 沒有變**。
@@ -51,5 +56,5 @@ describe('World 區域的 client 邊界（成功路徑）', () => {
     expect(
       await screen.findByTestId('world-canvas-container', undefined, { timeout: 10_000 }),
     ).toBeInTheDocument()
-  })
+  }, 20_000)
 })

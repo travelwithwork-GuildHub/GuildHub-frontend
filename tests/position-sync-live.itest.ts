@@ -14,13 +14,27 @@ import { createSyncState, markSent, planSend, SEND_INTERVAL_MS } from '@/realtim
 
 const settle = (ms = 600) => new Promise((r) => setTimeout(r, ms))
 
+/**
+ * 某個人**最新收到的那一筆樣本**（不是畫面位置）。
+ *
+ * `FE-R08` 之後 `motion` 存的是一段樣本歷史，畫面位置要經過
+ * 250 毫秒的 render delay 才會走到。這幾條測試驗的是**協定有沒有收到**，
+ * 所以直接看最後一筆。
+ */
+function latest(state: ReturnType<typeof createRemotePlayersState>, id: string) {
+  const samples = state.motion.get(id)?.samples
+  if (samples === undefined || samples.length === 0) return undefined
+  const { x, z, f } = samples[samples.length - 1]!
+  return { x, z, f }
+}
+
 function observer() {
   const state = createRemotePlayersState()
   const validate = createMessageValidator(() => {})
   const client: RealtimeClient = new RealtimeClient({
     onMessage: (raw) => {
       const result = validate(raw)
-      if (result.ok) applyMessage(state, result.message, client.selfId)
+      if (result.ok) applyMessage(state, result.message, client.selfId, performance.now())
     },
   })
   return { client, state }
@@ -57,7 +71,10 @@ describe('位置同步對真後端（不進 CI）', () => {
     }
     await settle()
     expect(sent, '第一個位置送一次之後就該停').toBe(1)
-    expect(a.state.motion.get(bId), 'A 應該收到 B 的第一個位置').toEqual({ x: 2, z: 3, f: 0 })
+    // ⚠️ **這裡問的是「樣本收到了沒有」，不是「畫面上在哪裡」。**
+    // 畫面位置有 250 毫秒的 render delay（`FE-R08`），拿它來斷言
+    // 「收到了」的話，這條測試會變成在驗插值的時間，而不是驗協定。
+    expect(latest(a.state, bId), 'A 應該收到 B 的第一個位置').toEqual({ x: 2, z: 3, f: 0 })
 
     // ── 移動 1 秒：不超過 10 Hz ──
     sent = 0
@@ -74,7 +91,7 @@ describe('位置同步對真後端（不進 CI）', () => {
     expect(sent, `1 秒內送了 ${sent} 則，超過後端的 ${1000 / SEND_INTERVAL_MS} Hz`).toBeLessThanOrEqual(10)
     expect(sent, '一直在動卻幾乎不送').toBeGreaterThan(5)
 
-    const seen = a.state.motion.get(bId)!
+    const seen = latest(a.state, bId)!
     expect(seen.f, 'A 應該看到 B 的新朝向').toBe(2)
     expect(seen.x, 'A 看到的 x 應該跟著往前').toBeGreaterThan(2)
 
