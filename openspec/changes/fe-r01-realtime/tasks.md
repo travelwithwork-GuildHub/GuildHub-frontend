@@ -88,8 +88,25 @@
 
 ## 5. 完成前的驗證
 
-- [ ] 5.1 `openspec validate fe-r01-realtime --strict` 通過，貼輸出
-- [ ] 5.2 `npm run lint && npm run typecheck && npm test && npm run build` 全綠，貼輸出（測試數量要看得到）
-- [ ] 5.3 `bash .github/scripts/progress.sh --check` rc=0，貼輸出
-- [ ] 5.4 跑缺口報告並對每一條缺口說出處置。**Scenario ID 寫在 `it` 標題上，而且那條 `it` 要把該 Scenario 的每一個 WHEN/THEN 子句都跑過**
-- [ ] 5.5 確認這一刀**沒有**建立任何遠端玩家、沒有送任何位置、沒有重連邏輯 —— 用 `git diff --stat` 的檔案清單當證據
+- [x] 5.1 `openspec validate fe-r01-realtime --strict` 通過，貼輸出
+- [x] 5.2 `npm run lint && npm run typecheck && npm test && npm run build` 全綠，貼輸出（25 files / 151 tests）
+- [x] 5.3 `bash .github/scripts/progress.sh --check` rc=0，貼輸出
+- [x] 5.4 跑缺口報告並對每一條缺口說出處置。**Scenario ID 寫在 `it` 標題上，而且那條 `it` 要把該 Scenario 的每一個 WHEN/THEN 子句都跑過**
+
+  archive 前：**83 條規格、79 條有通過的測試指著、4 條缺口**，四條全部是既有的
+  （`FE-W01-S01/S02/S03` 人工瀏覽器驗證、`FE-X01-S10` CI job），維持原判。
+
+  本 change 的 8 條 Scenario 要 archive 之後才會進報告，屆時再跑一次。
+  ID 這次一開始就寫在 `it` 上了。
+- [x] 5.5 確認這一刀**沒有**建立任何遠端玩家、沒有送任何位置、沒有重連邏輯
+
+  整個 change 動到的 `src/` 與 `tests/` 檔案就這四個：
+
+  ```
+  src/realtime/client.ts
+  src/realtime/socket.ts
+  tests/realtime-client.test.ts
+  tests/realtime-live.itest.ts
+  ```
+
+  `api-contract` 與 `runtime-config` 一個字都沒改。
