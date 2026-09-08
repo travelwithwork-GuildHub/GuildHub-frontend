@@ -7,21 +7,21 @@
 
 ## 1. 前置
 
-- [ ] 1.1 規格已在 PR 上談定並合併進 `main` —— 用 `git log --oneline main -- openspec/changes/fe-r07-remote-players/` 確認
-- [ ] 1.2 確認訊息形狀從 `api-contract`、座標換算從 `world-coordinates`、角色從 `world-player` 來，**三份都不改**；`git diff --stat` 的檔案清單當證據
+- [x] 1.1 規格已在 PR 上談定並合併進 `main` —— 用 `git log --oneline main -- openspec/changes/fe-r07-remote-players/` 確認
+- [x] 1.2 確認訊息形狀從 `api-contract`、座標換算從 `world-coordinates`、角色從 `world-player` 來，**三份都不改**；`git diff --stat` 的檔案清單當證據
 
 ## 2. 狀態（Requirement：兩個容器／snapshot／presence／pos）
 
-- [ ] 2.1 建立兩個容器：名單（`id` → 身分）與動態（`id` → 座標與朝向），**動態只存在 ref 裡**（design 的 D1）
-- [ ] 2.2 `snapshot` 重建整份名單與動態，**排除自己**，初始座標取自 `snapshot`；驗證 `FE-R07-S02`／`S03` 通過
-- [ ] 2.3 `presence` 在同一則裡處理 join 與 leave；驗證 `FE-R07-S04` 通過
-- [ ] 2.4 `removeRemote(id)` 做成原子操作，兩個容器一起清，**註解寫明之後新增的狀態都要加進來**（D5）
-- [ ] 2.5 不合常理的 `presence`（leave 不存在的、join 重複的、join 自己）不得造成錯誤；驗證 `FE-R07-S05` 通過
-- [ ] 2.6 `pos` 只更新已知的人，未知 id 忽略且不建立；座標在**寫入時**換算成世界座標（D2）；驗證 `FE-R07-S06` 通過
-- [ ] 2.7 收到位置更新時名單物件**不得被換掉**；驗證 `FE-R07-S01` 通過
-- [ ] 2.8 **負向驗證**：把「排除自己」拿掉，確認 `S02` 變紅；還原
-- [ ] 2.9 **負向驗證**：把 `leave` 改成只清名單不清動態，確認 `S04` 變紅；還原
-- [ ] 2.10 **負向驗證**：把 `pos` 改成「未知 id 就建立一個新的人」，確認 `S06` 變紅；還原
+- [x] 2.1 建立兩個容器：名單（`id` → 身分）與動態（`id` → 座標與朝向），**動態只存在 ref 裡**（design 的 D1）
+- [x] 2.2 `snapshot` 重建整份名單與動態，**排除自己**，初始座標取自 `snapshot`；驗證 `FE-R07-S02`／`S03` 通過
+- [x] 2.3 `presence` 在同一則裡處理 join 與 leave；驗證 `FE-R07-S04` 通過
+- [x] 2.4 `removeRemote(id)` 做成原子操作，兩個容器一起清，**註解寫明之後新增的狀態都要加進來**（D5）
+- [x] 2.5 不合常理的 `presence`（leave 不存在的、join 重複的、join 自己）不得造成錯誤；驗證 `FE-R07-S05` 通過
+- [x] 2.6 `pos` 只更新已知的人，未知 id 忽略且不建立；座標在**寫入時**換算成世界座標（D2）；驗證 `FE-R07-S06` 通過
+- [x] 2.7 收到位置更新時名單物件**不得被換掉**；驗證 `FE-R07-S01` 通過
+- [x] 2.8 **負向驗證**：把「排除自己」拿掉，確認 `S02` 變紅；還原
+- [x] 2.9 **負向驗證**：把 `leave` 改成只清名單不清動態，確認 `S04` 變紅；還原
+- [x] 2.10 **負向驗證**：把 `pos` 改成「未知 id 就建立一個新的人」，確認 `S06` 變紅；還原
 
 ## 3. 渲染（Requirement：名單上的每個人都在畫面上有一個角色）
 
