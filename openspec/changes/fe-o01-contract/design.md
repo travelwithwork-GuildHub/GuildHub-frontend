@@ -69,6 +69,33 @@ openapi-typescript 7.13.0，對真的 FastAPI 後端：
 - **用 `openapi-zod-client` 之類直接產 Zod。** 否決：產出來的 Zod 一樣沒有長度限制
   （量到的事實 #1），而手改產出物就是把產生器變成一次性的模板。
 
+### D1b. 相等斷言本身是空的，要靠一份實體登錄表撐住
+
+**這條是規格 review 抓出來的，原本的設計有洞。**
+
+原本只寫「對每一個 REST 實體斷言相等」。問題是：**把所有斷言整個刪掉，
+typecheck 照樣是綠的** —— 一個沒有斷言的檔案當然不會有型別錯誤。
+而且後端**新增**一個實體時它也不會紅，因為沒有人替新實體寫斷言。
+也就是說，那個哨兵對「漏掉」這件事完全是盲的，而漏掉正是最會發生的那種。
+
+**選的解**：加一份執行期的實體登錄表（名稱 → schema），再斷言它的鍵集合與
+產出型別檔的實體集合**剛好相等**：
+
+```ts
+const ENTITIES = { ProfileOut, LoginIn, /* … */ } as const
+type BackendEntities = Exclude<keyof components['schemas'], 'HTTPValidationError' | 'ValidationError'>
+type _cov = Expect<Equal<keyof typeof ENTITIES, BackendEntities>>
+```
+
+**兩個方向都量過**：登錄表少放實體 → `registry.ts(20,20): error TS2344`
+（紅在涵蓋率那一行）；登錄表剛好等於實體集合 → rc=0 乾淨。
+後者是必要的 —— 只驗「少一個會紅」的話，一條永遠 `false` 的斷言也會通過，
+而它會讓涵蓋率永遠紅、最後被人註解掉。
+
+考慮過用 AST 腳本掃描斷言涵蓋率 —— 否決：那是自己寫一份 parser 去驗另一份程式碼，
+而型別系統本來就答得出這個問題（`AGENTS.md`：現成的靜態檢查器做得到的事，
+不要自己寫一份）。
+
 ### D2. 哨兵保證的是「契約沒偏離上次產出的形狀」，不是「後端現在沒變」
 
 **這是這份設計最容易被高估的地方，所以寫進 spec 的 Requirement 裡。**
@@ -168,6 +195,11 @@ TS 7 會讓 typescript-eslint 拒絕啟動）。實測 `npm install` 直接 ERES
   在那之前這是一個**人工維護的複製**，而且 spec 有寫明。
 - **契約只涵蓋今天存在的 16 個端點** → W6–W9 的能力要各自擴充契約。
   風險是有人在那時候另外開一份定義；緩解只有 review。
+- **500 不是 JSON** → 實測 `POST /api/login`（DB 未連上）回的是
+  `content-type: text/plain` 的 `Internal Server Error`，**不是** `{"detail":...}`。
+  所以「先 `JSON.parse` 再套 envelope」會在 500 時直接拋。契約把 envelope 的
+  適用範圍限定在 JSON 回應（`FE-O01-S12`），**歸一化在哪一層做**留給 `FE-O02`
+  的 adapter 與 `FE-X03` —— 見〈Open Questions〉。
 - **`projects.title`／`body` 現在沒有上限** → 使用者可以貼進任意長度的內容，
   後端會收下。這是後端的現況（沒有 DB 限制），前端上限由 `FE-X05` 決定。
   契約把它記成「未定」而不是省略，讓那件事看得見。
@@ -178,6 +210,7 @@ TS 7 會讓 typescript-eslint 拒絕啟動）。實測 `npm install` 直接 ERES
   要不要在前端給一個語意上合理的範圍（例如 `hours_per_week` 0–168）？
   這不影響本 change 的形狀或任務分解 —— 契約先照後端的型別記錄，
   範圍留給 `FE-X05` 與 `FE-A04` Profile 表單決定。
-- 錯誤 envelope 之外，後端偶爾會回非 JSON 的 500（資料庫錯誤直接冒出來）。
-  那要在哪一層歸一化，是 `FE-O02` 的 adapter 還是 `FE-X03`？
-  這一刀只定義 JSON 的形狀，不影響本 change。
+- 非 JSON 的 500（實測是 `text/plain` 的 `Internal Server Error`）要在哪一層
+  歸一化成一個可顯示的錯誤 —— `FE-O02` 的 adapter 還是 `FE-X03`？
+  這一刀只定義「它不屬於這個 envelope」，不決定誰來接。不影響本 change 的
+  形狀或任務分解。

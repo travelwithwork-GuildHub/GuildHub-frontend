@@ -23,12 +23,15 @@
   來源是 `sql/001_schema.sql` 與 `presence.py`，不是任何散文複述。Zod schema 由這份表建。
 - 新增 `src/api/contract/schema.d.ts`：由 `npx openapi-typescript` 從真後端
   `/openapi.json` 產出，**進版控**。它不是型別來源，是**漂移哨兵** —— 見下一條。
-- 新增型別層的相等斷言：`z.infer<typeof X>` 必須與 `components['schemas']['X']` 完全相同。
-  後端欄位改了、重產之後 **typecheck 會紅**。
+- 新增型別層的相等斷言：`z.infer<typeof X>` 必須與 `components['schemas']['X']` 完全相同，
+  外加一份**實體登錄表**與一條涵蓋率斷言（登錄表的鍵必須剛好等於後端的實體集合）。
+  後端欄位改了、或**新增／刪除一個實體**，重產之後 **typecheck 會紅**。
+  沒有涵蓋率那一條的話，把所有相等斷言刪光 typecheck 照樣是綠的。
 - WS 的 client→server 與 server→client 是**兩個各自獨立的 discriminated union**，
   不是一個。`status` 與 `chat` 在兩個方向都存在但形狀不同，`t` 不是全域唯一的判別鍵。
-- 錯誤 envelope：`{ detail: string | ValidationError[] }`，以及後端實際會回的
-  status code 集合（400/401/403/404/409/422/500）。**只定義線路上的形狀，不定義處置。**
+- 錯誤 envelope：`{ detail: string | ValidationError[] }`，**只涵蓋 JSON 的錯誤回應**。
+  實測 500 回的是 `text/plain` 的 `Internal Server Error`，不是 JSON —— 契約明寫它
+  不屬於這個 envelope。**只定義線路上的形狀，不定義處置、不列舉 status code**（那是 `FE-X03`）。
 
 ### 不做什麼（Non-goals）
 
