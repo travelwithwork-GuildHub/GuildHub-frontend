@@ -7,8 +7,8 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "dev": "next dev",
-    "start": "next start",
+    "dev": "next dev -p 3100",
+    "start": "next start -p 3101",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
