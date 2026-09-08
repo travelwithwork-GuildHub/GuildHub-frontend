@@ -71,6 +71,53 @@ const noFetchRules = {
 // 沒有限制 `WebSocket`：即時層是 FE-R01 的範圍，那一項還沒談過規格，
 //   在這裡先擋會變成替它裁決。
 
+// ─────────────────────────────────────────────────────────────────────────
+// 規格 FE-O09：環境變數只有一處讀取，而且只能用字面存取
+//
+// **刻意用 `no-restricted-syntax`，不是 `no-restricted-properties`。**
+// 上面那個 `DATA_ACCESS_PATHS` 的例外區塊會把 `no-restricted-properties`
+// **整條關掉** —— 放進去的話，`src/api/**` 底下就能自由讀 `process.env`，
+// 而那是一個無聲的洞。`no-restricted-syntax` 不在那個例外裡。
+
+const ENV_ONLY = 'src/config/env.ts'
+
+const ENV_MSG =
+  `環境變數只能在 ${ENV_ONLY} 讀取，別處從那裡 import。` +
+  '散在各處的位址會讓「換一份後端」變成搜尋整個 repo。見 FE-O09 的規格。'
+
+// **這兩條擋的是「在瀏覽器裡靜默變成 undefined」的寫法。**
+//
+// Next.js 是在建置時把 `NEXT_PUBLIC_*` 靜態替換成字面值的。官方文件
+//〈Environment Variables〉明寫 dynamic property lookups 與「先把 process.env
+// 指派給變數再取用」**都不會被替換** —— 在瀏覽器裡得到 `undefined`。
+//
+// ⚠️ **這個 bug 在單元測試裡永遠重現不了**：測試跑在 Node，那裡的
+// `process.env` 是真的物件，兩種寫法都正常。**所以這兩條規則是唯一擋得住
+// 它的東西**，不要因為「測試都綠」就把它們拿掉。
+const INLINE_MSG =
+  'Next.js 只替換完整的字面存取 `process.env.NEXT_PUBLIC_X`。' +
+  '計算屬性與「先指派再取用」不會被替換，在瀏覽器裡是 undefined，而且沒有任何錯誤訊息。' +
+  '這個 bug 在單元測試裡重現不了（測試跑在 Node）—— 這條規則是唯一擋得住它的東西。'
+
+/** 任何形式的 `process.env`。 */
+const ANY_PROCESS_ENV = {
+  selector: "MemberExpression[object.name='process'][property.name='env']",
+  message: ENV_MSG,
+}
+
+/** `process.env[name]` —— 計算屬性，不會被替換。 */
+const COMPUTED_PROCESS_ENV = {
+  selector:
+    "MemberExpression[computed=true][object.object.name='process'][object.property.name='env']",
+  message: INLINE_MSG,
+}
+
+/** `const e = process.env` —— 先指派再取用，同樣不會被替換。 */
+const ALIASED_PROCESS_ENV = {
+  selector: "VariableDeclarator[init.object.name='process'][init.property.name='env']",
+  message: INLINE_MSG,
+}
+
 const config = [
   { ignores: ['.next/**', 'node_modules/**'] },
 
@@ -84,6 +131,33 @@ const config = [
       'no-restricted-globals': 'off',
       'no-restricted-properties': 'off',
       'no-restricted-imports': 'off',
+    },
+  },
+
+  // `src/**` 底下不准讀 `process.env`。
+  //
+  // **範圍是 `src/**`，不是全部** —— 規格的字面就是「`src/` 底下該模組以外」。
+  // 測試檔本來就要設環境變數才能驗「缺變數會怎樣」；把它們一起擋住的話，
+  // 這條規則第一天就會被關掉。`next.config.ts` 同理，它是建置期的檔案。
+  {
+    files: ['src/**'],
+    rules: {
+      'no-restricted-syntax': ['error', ANY_PROCESS_ENV, COMPUTED_PROCESS_ENV, ALIASED_PROCESS_ENV],
+    },
+  },
+
+  // 唯一的例外，而且是**完整路徑**不是萬用字元。
+  //
+  // 既有的 no-fetch 規則踩過那個洞：寬鬆的 glob 會讓
+  // `src/components/src/api/sneaky.ts` 被當成例外。這裡不重蹈覆轍 ——
+  // `**/env.ts` 會讓任何人多開一個 `src/world/env.ts` 就繞過去。
+  //
+  // 注意這裡**只放行「讀 process.env」，計算屬性與先指派再取用仍然擋著** ——
+  // 那兩條在這個檔案裡才最需要，因為它就是唯一會讀的地方。
+  {
+    files: [ENV_ONLY],
+    rules: {
+      'no-restricted-syntax': ['error', COMPUTED_PROCESS_ENV, ALIASED_PROCESS_ENV],
     },
   },
 ]
