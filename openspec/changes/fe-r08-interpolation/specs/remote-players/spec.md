@@ -123,8 +123,17 @@ per-player 的容器**移除。只清一邊的話，沒清到的那一份會隨�
 
 角色 SHALL 重複使用既有的程式化 Chibi 角色，MUST NOT 另做一套。
 
-render loop 在寫入 transform 之前 SHALL 確認角色物件還在 ——
-`leave` 造成的卸載與 render loop 之間有競態。
+render loop 在讀取一個人的樣本之前 SHALL 確認那份樣本還在 ——
+`leave` **同步**清掉 `motion` 的 entry，而角色要等 React 依新名單重繪
+才會卸載，中間有一段「元件還在、樣本已經沒了」的空窗。
+
+> ⚠️ **原本這裡寫的是「確認角色物件還在 —— 卸載與 render loop 之間有競態」，
+> 那是錯的。** 量過：元件卸載之後它的 `useFrame` **完全不再被呼叫**，
+> 而且 ref 從來沒有是 `null` 過（連第一幀都不是）。React 的 commit 是同步的，
+> rAF 不會插進它中間，所以「元件還掛著但 ref 是 null」在這個結構下不可達。
+> 那個 null 檢查是 **TypeScript 的型別收斂**（`useRef<Group>(null)` 是 `Group | null`），
+> 不是執行期防禦 —— 拿掉它不會變紅，只會編譯不過。
+> **真正可達、而且需要被釘住的是上面那個空窗。**
 
 **位置與朝向 MUST NOT 成為 React 的 props 或 state**：
 它們每秒改變 60 次 × 名單人數。這條限制在插值之後**更嚴格了**，
@@ -169,8 +178,14 @@ render loop 在寫入 transform 之前 SHALL 確認角色物件還在 ——
 > 兩個時鐘剛好都在走，所以看起來像是對的。**沒有這一條，那個 bug 只會在
 > 真實網路的某些時序下才現形。**
 
-#### Scenario: [FE-R08-S20] leave 造成的卸載與 render loop 的競態
+#### Scenario: [FE-R08-S20] 樣本已經被清掉，但角色還沒卸載
 
-- **WHEN** 一個角色在 render loop 即將寫入 transform 之前被卸載
-- **THEN** 不拋錯
-- **AND** 不寫入任何 transform
+- **WHEN** 一個遠端角色已經在畫面上、而且 transform 已經被寫過
+- **AND** 他的樣本被就地刪掉（`leave` 做的事），**但名單還沒重繪**
+- **THEN** 下一幀不拋錯
+- **AND** 角色的 transform 停在原地，**不寫入任何新值、也不跳回原點**
+
+> ⚠️ **不可以用「把角色卸載掉再推進幾幀」來測這一條。**
+> 卸載之後那個元件的 `useFrame` 根本不會再被呼叫，所以那樣的測試
+> **就算把守衛整條拿掉也是綠的** —— 它驗的是 R3F 的訂閱管理，不是我們的程式碼。
+> 要製造的是**資料突變與 React 重繪之間的時序差**：只改 Map，不動名單。
