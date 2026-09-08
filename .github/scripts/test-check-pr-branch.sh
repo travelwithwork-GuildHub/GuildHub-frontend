@@ -38,7 +38,12 @@ bump_fail() { FAIL=$((FAIL + 1)); }
 mkdir -p "$BASELINE"
 # 用 HEAD 而不是某個寫死的分支名 —— 這樣在任何分支上都能跑。
 git -C "$REPO" archive HEAD | tar -x -C "$BASELINE"
-cd "$BASELINE"
+# **這個 `cd` 失敗一定要停。** 2026-09-08 實際發生：`$BASELINE` 指到不存在的
+# 路徑，`cd` 失敗、腳本照樣往下走，於是下面那串 `git init` / `git add -A` /
+# `git commit -qm base` / `git branch -M main` **跑在真的工作目錄上** ——
+# 在我的分支上多出一個叫 `base` 的 commit，還把 git 身分改成 `t@t`。
+# 檯子搭不起來的代價不可以是「動到被測的東西」。
+cd "$BASELINE" || { echo "進不去測試檯目錄 $BASELINE" >&2; exit 2; }
 git init -q && git config user.email t@t && git config user.name t
 
 # main 上先放一個「已經談定並合併」的 change，模擬實作階段的前提。
@@ -70,11 +75,26 @@ cat > openspec/changes/demo-change/specs/demo/spec.md <<'EOF'
 EOF
 git add -A && git commit -qm base && git branch -M main
 
+# **clone 失敗不可以靜靜往下走。** 2026-09-08：CI 上偶發地 clone 不出東西，
+# 而 `2>/dev/null` 把原因吞掉了 —— 看到的只有後面那串「cd: 沒有這個目錄」，
+# 然後測試以「期望=0 實際=1」收場，看起來像閘門判錯，其實是檯子沒搭起來。
+# **檯子壞掉要說是檯子壞掉**，不可以冒充成被測物的失敗。
+mkclone() { # mkclone <目錄> <說明>
+  local w="$1" desc="$2"
+  if git clone -q "$BASELINE" "$w" 2>"$w.clone" && [ -d "$w/.git" ]; then
+    return 0
+  fi
+  printf '  \033[31m\xe2\x9c\x97\033[0m %-46s 測試檯沒搭起來（git clone 失敗）\n' "$desc"
+  bump_fail
+  sed 's/^/      /' "$w.clone" 2>/dev/null | head -5
+  return 1
+}
+
 run() { # run <期望exit> <base> <分支> <說明> <造檔案的指令...>
   local want="$1" base="$2" br="$3" desc="$4"; shift 4
   N=$((N+1))
   local W="$ROOT/c$N"
-  git clone -q "$BASELINE" "$W" 2>/dev/null
+  mkclone "$W" "$desc" || return
   echo node_modules >> "$W/.git/info/exclude"
   ln -s "$REPO/node_modules" "$W/node_modules" 2>/dev/null
   ( cd "$W" && git config user.email t@t && git config user.name t \
@@ -100,7 +120,7 @@ run_msg() { # run_msg <期望exit> <base> <分支> <說明> <訊息片段> <造�
   local want="$1" base="$2" br="$3" desc="$4" needle="$5"; shift 5
   N=$((N+1))
   local W="$ROOT/c$N"
-  git clone -q "$BASELINE" "$W" 2>/dev/null
+  mkclone "$W" "$desc" || return
   echo node_modules >> "$W/.git/info/exclude"
   ln -s "$REPO/node_modules" "$W/node_modules" 2>/dev/null
   ( cd "$W" && git config user.email t@t && git config user.name t \
@@ -220,7 +240,7 @@ run_status() { # run_status <期望exit> <STATUS_MODE> <說明> <訊息片段>
   local want="$1" mode="$2" desc="$3" needle="$4"
   N=$((N+1))
   local W="$ROOT/c$N"
-  git clone -q "$BASELINE" "$W" 2>/dev/null
+  mkclone "$W" "$desc" || return
   echo node_modules >> "$W/.git/info/exclude"
   ln -s "$REPO/node_modules" "$W/node_modules" 2>/dev/null
   # 造一份**完全正常**的新規格：這樣被擋下來的唯一理由就是 status 那一關。

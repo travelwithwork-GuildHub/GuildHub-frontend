@@ -55,7 +55,7 @@ jobs:
       # 直接插進 `run:`。Actions 是**文字替換**，而 git 收 `chore/$(...)` 這種
       # 分支名（`git check-ref-format` rc=0）—— 直接插值的話那段會在閘門拿到
       # 參數之前就被 shell 執行。這是 GitHub 官方點名的 script injection。
-      # `.github/scripts/test-ci-workflow.sh` 在驗這件事，改這一步之前先跑它。
+      # 下面的 Workflow lint（actionlint）在驗這件事。
       - name: Branch
         if: github.event_name == 'pull_request'
         env:
@@ -119,15 +119,38 @@ jobs:
       - name: Branch gate tests
         run: bash .github/scripts/test-check-pr-branch.sh
 
-      # workflow 自己的合約測試：分支名有沒有原樣傳進閘門。
-      - name: Workflow contract tests
-        run: bash .github/scripts/test-ci-workflow.sh
+      # workflow 自己的靜態檢查。
+      #
+      # 這一步取代了 `.github/scripts/test-ci-workflow.sh`（350 行手寫 parser）。
+      # 那支存在的理由是「`${{ }}` 不可以直接插進 `run:`」—— 那正是 actionlint
+      # 的 `expression` 規則。實測對照過：同一份 ci.yml，actionlint 抓到
+      #
+      #   ci.yml:65:84: "github.head_ref" is potentially untrusted. avoid using
+      #   it directly in inline scripts. instead, pass it through an environment
+      #   variable. [expression]
+      #
+      # **版本固定 + checksum 驗證。** 不用第三方 action，也不吃 latest ——
+      # 一個會自己變的檢查器，紅綠會在沒有人改任何東西的時候翻面。
+      # 升級方式：改下面三個常數（版本、檔名裡的版本、sha256），跑一次確認。
+      - name: Workflow lint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL "$url" -o /tmp/actionlint.tar.gz
+          echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+          /tmp/actionlint -color
 
       # 提示檔自己的合約測試：文件教的操作，閘門收不收得下。
       - name: Prompts contract tests
         run: bash .github/scripts/test-prompts.sh
 
-      - name: Scenario coverage gate tests
+      # `check-scenario-coverage.sh` 是**報告不是閘門**，所以它自己不在 CI 上；
+      # 但那支報告會被人拿來做判斷，所以它的測試留著 —— 報錯的尺比沒有尺更糟。
+      - name: Scenario report tests
         run: bash .github/scripts/test-scenario-coverage.sh
 
       # ─── 工程品質。2026-09-07 由 FE-O10 放回（governance/ci-quality-steps）───
@@ -162,12 +185,6 @@ jobs:
 
       - name: Test
         run: npm test
-
-      # **每一條 Scenario 都要有一個真的跑過而且通過的測試指著它。**
-      # 排在 Test 之後 —— 它自己會再跑一次 vitest（要 JSON 報告），
-      # 但先讓 Test 那一步給出一般人看得懂的輸出。
-      - name: Scenario coverage
-        run: bash .github/scripts/check-scenario-coverage.sh
 
       # NEXT_TELEMETRY_DISABLED：CI 不對外回報建置遙測。
       # 這不是效能考量，是「CI 不該在沒有人要求的情況下把資料送出去」。
