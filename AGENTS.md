@@ -117,18 +117,17 @@ PR 標題和內文都不是（它們隨時可以改，而且不影響 CI 看到�
 
 | 分支 | 能改什麼 | 機器上界 |
 |---|---|---|
-| `spec/<id>` | `openspec/changes/<id>/**` + `docs/adr/**` + **`docs/WBS.md` 的進度區塊** | 目錄，加 `openspec validate <id> --strict`，加 **Scenario ID 格式與唯一性** |
+| `spec/<id>` | `openspec/changes/<id>/**` + `docs/adr/**` | 目錄，加 `openspec validate <id> --strict`，加 **Scenario ID 格式與唯一性** |
 | `feat/<id>--<slice>` | 不限，但**不得回改**任何 change 的 proposal/design/specs | `<id>` 必須已經在 main 上 |
 | `fix/<id>--<slice>` | 同上 | 同上 |
 | `chore/<描述>` | 不得碰 `openspec/`、`.github/` 與 `.gitattributes` | diff ≤ **20000 bytes**（lockfile 另計 ≤ 1000000），拒絕 binary / symlink / submodule / LFS pointer |
-| `archive/<id>` | 那三種 openspec 路徑 + **`docs/WBS.md` 的進度區塊** | `validate --archived --strict` **與** `validate --all --strict` 都要過 |
+| `archive/<id>` | 那三種 openspec 路徑 | `validate --archived --strict` **與** `validate --all --strict` 都要過 |
 | `governance/<描述>` | 規則本身（CI、CODEOWNERS、AGENTS.md、config.yaml） | 只允許列舉的治理路徑；**機器不判斷那些檔案的內容是不是真的治理變更** |
 
-`spec/` 與 `archive/` 為什麼能碰 `docs/WBS.md`：**那個區塊是機器產生的，
-而它的內容由 change 的狀態決定** —— 加一個 change、archive 一個 change，
-都會讓它過期。不准碰的話流程會鎖死（實測過）。邊界是精確的：
-**把區塊拿掉之後的內容必須逐字不變**，週次、點數、標記、阻塞仍然只有
-`governance/` 能動。
+`docs/WBS.md` **只有 `governance/` 能動**，進度區塊也一樣。
+2026-09-08 收回了 `spec/` 與 `archive/` 的例外：那個例外是被「區塊必須跟狀態
+同步」逼出來的，而那條檢查已經降級成提醒 —— **一條檢查逼出一條例外，就是
+規則互相牽制的開始**。區塊過期不擋任何人，想更新就開一個 `governance/` PR。
 
 ### archive 之前先把 tasks 打勾
 
@@ -220,9 +219,12 @@ change id 與 slice 的分界，不需要任何消歧邏輯。
 <!-- progress:end -->
 ```
 
-然後 `bash .github/scripts/progress.sh --render`。**`--check` 會驗它跟現在的
-狀態一致** —— 對不上就紅，所以它不會偷偷過期。沒有那兩行就是沒開這個功能，
-`--check` 不會因此紅。
+然後 `bash .github/scripts/progress.sh --render`。**區塊過期只會被提醒，不會
+擋 PR**（跑 `progress.sh` 就看得到那行警告，不是只有 CI）。沒有那兩行就是沒開
+這個功能，什麼都不會說。
+
+它曾經是硬性要求 —— 那逼得每個加 change 或 archive 的 PR 都要順手重產一次區塊，
+於是又逼出「讓那兩種分支能碰 `docs/WBS.md`」的路徑例外。兩條一起收掉了。
 
 三件事刻意這樣定：
 
@@ -235,7 +237,8 @@ change id 與 slice 的分界，不需要任何消歧邏輯。
 
 > **「重產之後沒有 diff」這種檢查是不夠的。** 把 renderer 改成「把現有內容
 > 原樣吐回去」，那種檢查永遠是綠的 —— 它只驗了產出有沒有存檔，沒驗產出有
-> 沒有反映真實狀態。這裡的測試是**改來源、不重產，然後要求 `--check` 紅**。
+> 沒有反映真實狀態。這裡的測試是**改來源、不重產，然後要求那句提醒真的出現**
+> （而且重產之後它要消失 —— 少了後面這半，「永遠提醒」也會讓前半通過）。
 
 **阻塞類型的詞彙不是寫死在腳本裡的**，是從 `docs/WBS.md` 自己那張
 `| 阻塞類型 | 意思 | 該做什麼 |` 表讀出來的。要用新的類型，**先去那張表宣告**。
@@ -473,7 +476,7 @@ approve 的簽章永遠是真的，橡皮圖章偵測不出來。
 | `check-pr-branch.sh` 的 `archive/` 那條 | 封存的內容跟 main 上那份**逐檔 blob 相同**（不是只看檔案有沒有被刪） | `openspec/specs/` 有沒有被另一個 change 覆蓋掉 |
 | `chore/` 的 bytes 上界 | review 面積小到人讀得完（lockfile 另有上界，不是無限） | 「這不是功能」。80 行的功能可以冒充 chore |
 | `openspec validate --strict` | 規格的**結構**：有沒有 Scenario、Purpose 夠不夠長 | 規格的**內容**對不對 |
-| `progress.sh --check` | 工作分解表的**形式**：標記附了理由、互斥的處置沒有並存、缺口有決策期限與 fallback、工作沒有排在它依賴的裁決之前、依賴不懸空；**引用不懸空** —— `docs/WBS.md`、`docs/ROADMAP.md`、`AGENTS.md`、`CLAUDE.md`、`README.md`、`CONTEXT.md` 裡提到的每一個工作項目 ID **與群組 ID** 都要真的存在（圍籬程式碼區塊與〈舊 ID 去哪了〉除外）；以及**解析本身 fail-closed**（表頭畸形、表格被截斷、欄數對不上、ID 重複或漏掉都會紅，不會安靜跳過） | **那些理由與 fallback 寫得對不對**。「`Pending｜等後端`」格式完全合法，內容等於沒說。**也不驗前端項目彼此的先後** —— 跨項依賴那張表靠人維護 |
+| `progress.sh --check` | 工作分解表的**形式**：標記附了理由、互斥的處置沒有並存、缺口有決策期限與 fallback、工作沒有排在它依賴的裁決之前、依賴不懸空；**引用不懸空** —— `docs/WBS.md` 與 `docs/ROADMAP.md` 這兩份裡提到的每一個工作項目 ID **與群組 ID** 都要真的存在（散文文件不掃）（圍籬程式碼區塊與〈舊 ID 去哪了〉除外）；以及**解析本身 fail-closed**（表頭畸形、表格被截斷、欄數對不上、ID 重複或漏掉都會紅，不會安靜跳過） | **那些理由與 fallback 寫得對不對**。「`Pending｜等後端`」格式完全合法，內容等於沒說。**也不驗前端項目彼此的先後** —— 跨項依賴那張表靠人維護 |
 | `archive/` 的雙重 validate | tasks 全部完成、archive 後 main spec 不會紅 | `openspec/specs/` 有沒有被另一個 change 覆蓋掉 |
 
 **最重要的那一格是空的：沒有任何機制能證明 diff 對應規格。**
