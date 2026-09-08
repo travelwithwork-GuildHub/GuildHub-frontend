@@ -18,5 +18,16 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.itest.ts'],
     testTimeout: 60_000,
+    // ⚠️ **一定要關掉並行。**
+    //
+    // 這些測試共用**同一份後端的同一個 scene**（`lobby` 是唯一不需要 token
+    // 的）。並行跑的話，一個檔案建立的連線會讓另一個檔案收到 `presence`，
+    // 於是「靜止時應該零則訊息」那條會紅 —— 而**紅的原因跟被測的東西無關**。
+    // 實測踩過：`realtime-live` 的握手訊息數從 2 變成 3。
+    //
+    // 這是 `AGENTS.md`〈測試環境隔離〉那件事的縮影：共用的服務不能同時被用。
+    // 這裡沒辦法用「一人一份 scene」隔離 —— 後端的 scene 只有 `lobby`
+    // 與需要 token 的 `room:{id}`。
+    fileParallelism: false,
   },
 })

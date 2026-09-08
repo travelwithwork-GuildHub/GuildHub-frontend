@@ -61,8 +61,12 @@
 
 ## 5. 完成前的驗證
 
-- [ ] 5.1 `openspec validate fe-r07-remote-players --strict` 通過，貼輸出
-- [ ] 5.2 `npm run lint && npm run typecheck && npm test && npm run build` 全綠，貼輸出（測試數量要看得到）
-- [ ] 5.3 `bash .github/scripts/progress.sh --check` rc=0，貼輸出
-- [ ] 5.4 跑缺口報告並對每一條缺口說出處置。**Scenario ID 寫在 `it` 標題上**
-- [ ] 5.5 確認這一刀**沒有做插值、沒有做朝向轉場、沒有送任何位置** —— `git diff --stat` 的檔案清單當證據
+- [x] 5.1 `openspec validate fe-r07-remote-players --strict` 通過，貼輸出
+- [x] 5.2 `npm run lint && npm run typecheck && npm test && npm run build` 全綠，貼輸出（測試數量要看得到）
+- [x] 5.3 `bash .github/scripts/progress.sh --check` rc=0，貼輸出
+- [x] 5.4 跑缺口報告並對每一條缺口說出處置。**Scenario ID 寫在 `it` 標題上**
+
+  archive 前：**96 條規格、92 條有通過的測試指著、4 條缺口**，
+  四條全部是既有的（`FE-W01-S01/S02/S03` 人工瀏覽器驗證、`FE-X01-S10` CI job），
+  維持原判。本 change 的 8 條要 archive 之後才會進報告。
+- [x] 5.5 確認這一刀**沒有做插值、沒有做朝向轉場、沒有送任何位置** —— `git diff --stat` 的檔案清單當證據

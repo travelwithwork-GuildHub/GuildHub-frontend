@@ -7,6 +7,7 @@ import { isWebGL2Available } from './webgl'
 import { DebugShadowScene } from './DebugShadowScene'
 import { WorldCamera } from './WorldCamera'
 import { LocalPlayer } from './player/LocalPlayer'
+import { RemoteWorld } from './RemoteWorld'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -75,6 +76,9 @@ export default function WorldCanvas() {
         <Suspense fallback={null}>
           <DebugShadowScene />
           <LocalPlayer targetRef={cameraTarget} />
+          {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
+              WorldCanvas 不知道即時層的存在，也不該知道。 */}
+          <RemoteWorld />
         </Suspense>
       </Canvas>
 
