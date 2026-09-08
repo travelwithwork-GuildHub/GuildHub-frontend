@@ -1,4 +1,4 @@
-import { facingFromDirection, type Facing } from '@/world/coords'
+import { FACING, facingFromDirection, type Facing } from '@/world/coords'
 import type { Direction } from './input'
 
 // 朝向。**import `world-coordinates`，不在這裡重寫判斷。**
@@ -15,4 +15,19 @@ import type { Direction } from './input'
  */
 export function nextFacing(dir: Direction, previous: Facing): Facing {
   return facingFromDirection(dir.x, dir.z) ?? previous
+}
+
+/**
+ * 朝向 → 繞 Y 軸的角度。0 下、1 左、2 右、3 上（協定的編碼）。
+ *
+ * ⚠️ **本地與遠端角色共用這一份。** 原本它是 `LocalPlayer` 裡的私有常數，
+ * `FE-R07` 要用同一個對映時搬到這裡 —— 複製一份的話，兩邊會在
+ * 「左是 +90° 還是 −90°」上悄悄分岔，而畫面上那看起來只是「有人轉錯邊」。
+ * 檔頭那句「任何一個自己再寫一次，兩邊就開始漂」講的就是這件事。
+ */
+export const FACING_ROTATION: Record<Facing, number> = {
+  [FACING.down]: 0,
+  [FACING.left]: Math.PI / 2,
+  [FACING.right]: -Math.PI / 2,
+  [FACING.up]: Math.PI,
 }
