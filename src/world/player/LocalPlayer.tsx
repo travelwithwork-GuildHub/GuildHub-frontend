@@ -9,7 +9,7 @@ import type { MutableVector3 } from '@/world/camera'
 import { CHIBI_PARTS, ChibiPlayer, type ChibiPart } from './ChibiPlayer'
 import { advancePhase, animationStateFor, poseAt, type AnimationState } from './animation'
 import { MOVEMENT_KEYS, directionFromKeys } from './input'
-import { nextFacing } from './facing'
+import { FACING_ROTATION, nextFacing } from './facing'
 import { displacement, speedOf } from './movement'
 import { planSteps } from '@/world/physics/accumulator'
 import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/world/physics/world'
@@ -19,14 +19,6 @@ import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/wo
 // ⚠️ **位置、朝向、動畫相位、手腳角度全部不進 React state**
 // （CONTEXT.md：高頻資料不進 React）。它們放在 ref，每幀直接寫進
 // Three 的 transform。這個元件在整個生命週期裡**一次都不會重新渲染**。
-
-/** 朝向 → 繞 Y 軸的角度。0 下、1 左、2 右、3 上（協定的編碼）。 */
-const FACING_ROTATION: Record<Facing, number> = {
-  [FACING.down]: 0,
-  [FACING.left]: Math.PI / 2,
-  [FACING.right]: -Math.PI / 2,
-  [FACING.up]: Math.PI,
-}
 
 export interface LocalPlayerProps {
   /** 相機要跟隨的目標。**由這裡每幀寫入，不經過 React。** */
