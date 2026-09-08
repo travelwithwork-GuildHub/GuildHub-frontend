@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "next build",
-    "contract:generate": "npx -y openapi-typescript@7.13.0 http://localhost:8000/openapi.json -o src/api/contract/schema.d.ts"
+    "contract:generate": "npx -y openapi-typescript@7.13.0 http://localhost:8000/openapi.json -o src/api/contract/schema.d.ts",
+    "test:integration": "vitest run --config vitest.integration.mts"
   },
   "dependencies": {
     "@react-three/fiber": "9.7.0",

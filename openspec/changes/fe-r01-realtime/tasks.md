@@ -33,10 +33,58 @@
 **只准打自己 `bash run.sh` 起的後端**（`AGENTS.md`〈測試環境隔離〉）。
 每一條都把實際輸出貼在 PR 上。
 
-- [ ] 4.1 V1：起後端、連上、靜止 35 秒後看 `readyState`；貼輸出
-- [ ] 4.2 V2：瀏覽器開 `/world` 連兩次，比對兩次的 `hello.you` 是否相同。**預期會失敗**（還沒有登入，`FE-A01` 在 W2）—— **照實貼失敗的結果**，並註明由 `FE-A01` 之後補驗
-- [ ] 4.3 V3：用不合法的 scene 連一次，記下 `code`／`reason`／`wasClean`；貼輸出，確認仍然是 `1006`／空／`false`
-- [ ] 4.4 換 scene 時「舊的先關乾淨」要不要等 `close` 事件：量一次兩種做法的延遲，把數字寫進 PR，然後在 design 的 Open Questions 上結案
+- [x] 4.1 V1：起後端、連上、靜止 35 秒後看 `readyState`；貼輸出
+
+  通過。**第一次跑是紅的，而紅的原因跟後端無關**：`connect()` 在收到 `hello`
+  就 resolve，而 `snapshot` 緊接在後（實測 <1ms），所以立刻取基準線會把
+  `snapshot` 算成「靜止期間收到的訊息」。改成先讓握手那一批沉澱 500ms
+  再取基準線，並順手斷言握手就是兩則。
+- [x] 4.2 V2：**做不了，而且阻塞比預期的更上游。**
+
+  規格原本寫「預期會失敗（還沒有登入）」。實際量到的是**根本拿不到 session cookie**：
+
+  ```
+  $ curl -i -X POST http://localhost:8000/api/login -d '{"nickname":"驗證用"}'
+  HTTP/1.1 500 Internal Server Error
+  content-type: text/plain; charset=utf-8
+  ```
+
+  `/api/login` 要寫 `profiles` 表，而資料庫沒有連上。所以 V2 卡的不是
+  「前端還沒有登入畫面」，是**後端連建立 session 的能力都還沒有**。
+  可拋棄的資料庫是 `FE-O04`（W2），登入是 `FE-A01`（W2）。
+
+  另外：這台機器的瀏覽器自動化起不來（Chrome 兩次都以 SIGTRAP 結束），
+  但那不影響結論 —— 就算瀏覽器能跑，沒有 cookie 可帶。
+
+  **處置：V2 移到 `FE-A01` 之後補驗。** 在那之前「cookie 有沒有送到」
+  這件事**沒有人驗過**，而它的失敗是無聲的（後端會安靜地發一個新身分）。
+- [x] 4.3 V3：通過，而且**抓到一個單元測試看不到的 bug**。
+
+  `closed.code` 是 `undefined` —— 因為 `#emitClosed` 用 `{ ...info }` 展開，
+  而真的 `CloseEvent` 的 `code`／`reason`／`wasClean` 是**原型上的 getter**，
+  不是自有屬性。替身 emit 的是普通物件，所以單元測試全綠。
+
+  改成逐欄取值；並把替身改成把欄位放在原型上，讓它下次在單元測試就紅
+  （負向驗證：把修正改回展開運算子，`FE-R01-S06` 變紅）。
+
+  修好之後 `code=1006`／`reason=""`／`wasClean=false`／`opened=false`，
+  跟開工前量到的一致。
+- [x] 4.4 換 scene 時要不要等 `close` 事件：**量到不用等。**
+
+  量法比「量延遲」直接：換到同一個 scene，看新連線的 `snapshot` 裡有幾個人。
+  重疊的話後端會把同一個人當成兩個。
+
+  ```
+  4.4 量到的：換 scene 之後新連線的 snapshot 有 1 個人
+      {"t":"snapshot","players":[{"id":"70eea369-…","name":"訪客",…}]}
+  ```
+
+  **1 個 —— 沒有重疊。** 所以 `closeAndEnter` 不等 `close` 事件是安全的。
+
+  ⚠️ **但這是對本機後端量的。** 保證它的機制不明顯（舊連線的關閉要比新連線的
+  握手快），高延遲的線路上不一定成立。這條測試留在整合驗證裡，
+  之後在別的環境跑到它變紅的話，那就是要改成等 `close` 的證據。
+  design.md 的 Open Questions 不改 —— `feat/` 不得回改 design。
 
 ## 5. 完成前的驗證
 
