@@ -31,8 +31,16 @@ const PROBE = path.join(
   `__typecheck_probe_${process.pid}_${Math.random().toString(36).slice(2, 8)}__.ts`,
 )
 
+// **只刪這次執行真的建立的那個檔案。**
+//
+// 原本是無條件 `rmSync(PROBE, { force: true })` —— 那是**資料所有權錯誤**：
+// 「這個路徑上有東西」不等於「這個東西是我建的」。檔名帶了 PID 與亂數之後
+// 撞名機率極低，但**低機率的資料遺失仍然是資料遺失**，而修法只有一個布林。
+let created = false
+
 afterEach(() => {
-  rmSync(PROBE, { force: true })
+  if (created) rmSync(PROBE, { force: true })
+  created = false
 })
 
 describe('typecheck 真的會擋', () => {
@@ -44,6 +52,7 @@ describe('typecheck 真的會擋', () => {
         'export const probe: number = "這不是數字"\n',
       { encoding: 'utf8', flag: 'wx' },
     )
+    created = true
 
     let code = 0
     let output = ''
@@ -68,7 +77,6 @@ describe('typecheck 真的會擋', () => {
   it('[FE-X01-S11] 沒有那個檔案的時候 typecheck 是綠的（陽性對照）', () => {
     // **沒有這一條，上一條是恆真的** —— 一個永遠失敗的 typecheck
     // 也會讓上面那條通過。
-    rmSync(PROBE, { force: true })
     const out = execFileSync('npm', ['run', 'typecheck'], {
       cwd: ROOT,
       encoding: 'utf8',
