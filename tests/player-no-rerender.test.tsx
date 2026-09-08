@@ -25,10 +25,13 @@ import { PHYSICS } from '@/world/physics/world'
 describe('角色的位置不進 React', () => {
   it('[FE-W03-S13][FE-W04-S08] 連續移動多幀，角色元件的渲染次數不增加，而 target 有跟上', async () => {
     const targetRef = { current: new Vector3(0, 0, 0) }
+    // FE-R03 之後 LocalPlayer 多一個給網路層的 pose ref。這條測試驗的是
+    // 「位置不進 React」，跟它無關 —— 但它是必填的 prop。
+    const poseRef = { current: { x: 0, z: 0, f: 0 } }
     const counted = vi.fn((props: LocalPlayerProps) => LocalPlayer(props))
     const Counted = counted as unknown as FC<LocalPlayerProps>
 
-    const renderer = await ReactThreeTestRenderer.create(<Counted targetRef={targetRef} />)
+    const renderer = await ReactThreeTestRenderer.create(<Counted targetRef={targetRef} poseRef={poseRef} />)
 
     expect(counted, '第一次掛載應該只渲染一次').toHaveBeenCalledTimes(1)
 

@@ -6,6 +6,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import type { Group, Object3D } from 'three'
 import { FACING, type Facing } from '@/world/coords'
 import type { MutableVector3 } from '@/world/camera'
+import type { LocalPose } from '@/world/PositionSync'
 import { CHIBI_PARTS, ChibiPlayer, type ChibiPart } from './ChibiPlayer'
 import { advancePhase, animationStateFor, poseAt, type AnimationState } from './animation'
 import { MOVEMENT_KEYS, directionFromKeys } from './input'
@@ -23,9 +24,17 @@ import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/wo
 export interface LocalPlayerProps {
   /** 相機要跟隨的目標。**由這裡每幀寫入，不經過 React。** */
   targetRef: RefObject<MutableVector3>
+  /**
+   * 給網路層讀的權威狀態。**專用的，不重用上面那個。**
+   *
+   * `targetRef` 的語意是「相機要看哪裡」—— 之後相機可能鎖定別的東西
+   *（觀戰、過場、鎖定目標），兩者一分岔，送出去的就變成相機在看的位置，
+   * 而不是角色在的位置。規格 FE-R03。
+   */
+  poseRef: RefObject<LocalPose>
 }
 
-export function LocalPlayer({ targetRef }: LocalPlayerProps) {
+export function LocalPlayer({ targetRef, poseRef }: LocalPlayerProps) {
   const rootRef = useRef<Group>(null)
   const bodyRef = useRef<Group>(null)
   /** 子部位查一次就快取。查不到的話動畫會靜默停止 —— 見 partsRef 的初始化。 */
@@ -136,6 +145,11 @@ export function LocalPlayer({ targetRef }: LocalPlayerProps) {
     targetRef.current.x = root.position.x
     targetRef.current.y = root.position.y
     targetRef.current.z = root.position.z
+
+    // 給網路層的權威狀態。**另一個 ref** —— 見 `poseRef` 的說明。
+    poseRef.current.x = root.position.x
+    poseRef.current.z = root.position.z
+    poseRef.current.f = facing.current
   })
 
   return (
