@@ -49,6 +49,16 @@ done <<< "$NUMSTAT"
 
 total=$((product + tests + other))
 
+# ⚠️ **空的 diff 不是「通過」。**
+# 它幾乎一定代表「還沒 commit」—— 而這支腳本量的是 commit 過的東西。
+# 印一個綠勾出去的話，它會變成一個**在最需要它的時候恆真**的閘門。
+# （實測踩過：在同一個複合指令裡把 `pr-size.sh` 排在 `git commit` 前面，
+#  它回報 0 行並印了「可以寫 PR 說明了」。）
+if [ "$total" -eq 0 ] && [ "$generated" -eq 0 ]; then
+  echo "相對 $BASE 沒有任何差異 —— 你 commit 了嗎？（這支腳本量的是 commit 過的東西）" >&2
+  exit 2
+fi
+
 printf '基準 %s\n\n' "$BASE"
 printf '  產品程式碼  %5d  （上限 %d）\n' "$product" "$PRODUCT_MAX"
 printf '  判準        %5d\n' "$tests"
