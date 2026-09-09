@@ -5,6 +5,7 @@
 // 型別就找不到（TS2339: Property 'mesh' does not exist）。
 // 這個 type-only import 沒有 runtime 成本，只是把擴充拉進 TS 的程式集。
 import type {} from '@react-three/fiber'
+import { worldColor } from '@/design/world'
 
 // ⚠️⚠️ **這整個檔案由 FE-W10 移除。** ⚠️⚠️
 //
@@ -25,7 +26,7 @@ export function DebugShadowScene() {
       {/* 接收陰影的平面。**不是** Floor —— 見檔案開頭。 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow>
         <planeGeometry args={[20, 20]} />
-        <meshStandardMaterial color="#cfd4e4" />
+        <meshStandardMaterial color={worldColor('ground')} />
       </mesh>
 
       {/* 投射陰影的方塊。它唯一的工作是證明陰影真的有出現。 */}
@@ -33,7 +34,7 @@ export function DebugShadowScene() {
           FE-W10 會把這個方塊整個移除。 */}
       <mesh position={[3, 0.6, -2]} castShadow>
         <boxGeometry args={[1.2, 1.2, 1.2]} />
-        <meshStandardMaterial color="#6b7fd7" />
+        <meshStandardMaterial color={worldColor('accent')} />
       </mesh>
     </>
   )

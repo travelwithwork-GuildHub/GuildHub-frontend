@@ -3,6 +3,7 @@
 import type {} from '@react-three/fiber'
 import { forwardRef } from 'react'
 import type { Group } from 'three'
+import { worldColor } from '@/design/world'
 
 // 程式化的 Chibi 角色。**沒有載入任何外部模型** ——
 // CONTEXT.md 的詞彙表：Procedural Avatar 是「由 primitive 組出來的 Chibi 角色，
@@ -19,9 +20,12 @@ import type { Group } from 'three'
 // 那條規則是對的（傳 ref 等於在 render 期間碰它），而 three.js 本來就有
 // 用名字查子物件的慣例。呼叫端查一次、快取起來，之後每幀直接寫 transform。
 
-const SKIN = '#f2c9a0'
-const BODY = '#4d5bb0'
-const LIMB = '#3b4794'
+// 規格 FE-W09-S02：**MUST NOT 寫死顏色。** 這些值搬到 `src/design/world.ts`，
+// 改顏色去那裡改一次，不是在十幾個場景元件裡逐一改。
+const SKIN = worldColor('skin')
+const BODY = worldColor('avatarBody')
+const LIMB = worldColor('avatarLimb')
+const INK = worldColor('ink')
 
 /** 呼叫端用這些名字查子部位。改名字會讓動畫靜默停止 —— 所以它們是契約。 */
 export const CHIBI_PARTS = ['leftArm', 'rightArm', 'leftLeg', 'rightLeg'] as const
@@ -63,11 +67,11 @@ export const ChibiPlayer = forwardRef<Group>(function ChibiPlayer(_props, ref) {
           眼睛在 +Z 面，所以朝向 0（下）時它正對相機。 */}
       <mesh position={[-0.14, 1.18, 0.3]}>
         <boxGeometry args={[0.1, 0.13, 0.02]} />
-        <meshStandardMaterial color="#20232e" />
+        <meshStandardMaterial color={INK} />
       </mesh>
       <mesh position={[0.14, 1.18, 0.3]}>
         <boxGeometry args={[0.1, 0.13, 0.02]} />
-        <meshStandardMaterial color="#20232e" />
+        <meshStandardMaterial color={INK} />
       </mesh>
 
       <mesh position={[0, 0.66, 0]} castShadow>
