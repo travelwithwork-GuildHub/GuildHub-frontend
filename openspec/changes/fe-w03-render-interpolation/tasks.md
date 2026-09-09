@@ -27,15 +27,15 @@
 
 ## 5. 接進 LocalPlayer
 
-- [ ] 5.1 render loop 改成呼叫 2.1 那個模組，回呼裡做
+- [x] 5.1 render loop 改成呼叫 2.1 那個模組，回呼裡做
       `movePlayer(pw, delta)` 再讀 `translation()`
-- [ ] 5.2 `FE-W03-S17`：`targetRef`（相機）寫**畫面位置**，
+- [x] 5.2 `FE-W03-S17`：`targetRef`（相機）寫**畫面位置**，
       `poseRef`（網路）寫**物理位置**，而且在非整數倍的那一幀**兩者不相等**
-- [ ] 5.3 走路動畫的相位**維持用 raw dt**（design 的 D3）——
+- [x] 5.3 走路動畫的相位**維持用 raw dt**（design 的 D3）——
       改成固定步會把剛修好的問題搬到腳上
 
 ## 6. 在真瀏覽器上量一次
 
-- [ ] 6.1 用 `tests/e2e/` 既有的做法（`addInitScript` ＋ `__THREE_DEVTOOLS__`）
+- [x] 6.1 用 `tests/e2e/` 既有的做法（`addInitScript` ＋ `__THREE_DEVTOOLS__`）
       重跑一次逐幀位移，把修好之後的分布貼進 PR。
       **這是證據不是閘門** —— 判準是 3.1，理由見 design 的 D5

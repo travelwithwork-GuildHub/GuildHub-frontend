@@ -12,7 +12,7 @@ import { advancePhase, animationStateFor, poseAt, type AnimationState } from './
 import { MOVEMENT_KEYS, directionFromKeys } from './input'
 import { FACING_ROTATION, nextFacing } from './facing'
 import { displacement, speedOf } from './movement'
-import { planSteps } from '@/world/physics/accumulator'
+import { advanceRenderMotion, createRenderMotion } from './renderMotion'
 import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/world/physics/world'
 
 // 本地玩家。
@@ -47,7 +47,9 @@ export function LocalPlayer({ targetRef, poseRef }: LocalPlayerProps) {
   // 物理世界。**位置的權威來源是 rigid body，不是這個元件的 state**
   // （CONTEXT.md 第 214 行明列 Rapier rigid body 是允許放高頻資料的地方）。
   const physics = useRef<PhysicsWorld | null>(null)
-  const accumulator = useRef(0)
+  // 累加器 ＋ 前後兩個物理位置。**畫面位置是從這裡插值出來的**，
+  // 不是直接讀 rigid body（規格 `FE-W03-S14`）。
+  const motion = useRef(createRenderMotion({ x: 0, z: 0 }))
 
   useEffect(() => {
     let cancelled = false
@@ -129,19 +131,32 @@ export function LocalPlayer({ targetRef, poseRef }: LocalPlayerProps) {
     // 中間可能被障礙物擋掉一部分（規格的 MODIFIED Requirement）。
     const pw = physics.current
     if (pw) {
-      // 固定時間步：不跟著 render 的 dt 變，否則影格率不穩時解算會抖
-      const plan = planSteps(accumulator.current, dt)
-      accumulator.current = plan.remainder
+      // 固定時間步：不跟著 render 的 dt 變，否則影格率不穩時解算會抖。
+      //
+      // ⚠️ **畫面位置不是物理位置**（規格 `FE-W03-S14`）。
+      // render 的節拍跟 1/60 永遠對不齊，直接把 rigid body 的位置畫出去的話
+      // 每一幀走 0、1 或 2 步 —— 實測 120 幀裡有 44% 走錯距離，畫面在抖。
+      // `advanceRenderMotion` 把它插值到「真實位置延後一個固定步」。
       const delta = displacement(dir, PHYSICS.fixedStep)
-      for (let i = 0; i < plan.steps; i++) movePlayer(pw, delta)
-      const t = pw.player.translation()
-      root.position.x = t.x
-      root.position.z = t.z
+      const rendered = advanceRenderMotion(motion.current, dt, () => {
+        movePlayer(pw, delta)
+        const t = pw.player.translation()
+        return { x: t.x, z: t.z }
+      })
+      root.position.x = rendered.x
+      root.position.z = rendered.z
     } else {
-      // 物理還在載入（WASM 是非同步的）——先用純位移，載完就接手
+      // 物理還在載入（WASM 是非同步的）——先用純位移，載完就接手。
+      // 這一支不需要插值：它本來就是跟著 render 的 dt 連續走的。
       const delta = displacement(dir, dt)
       root.position.x += delta.x
       root.position.z += delta.z
+      // 載入完成之後 `advanceRenderMotion` 要從**現在的位置**接手，
+      // 否則角色會瞬移回原點。
+      motion.current.prev.x = root.position.x
+      motion.current.prev.z = root.position.z
+      motion.current.cur.x = root.position.x
+      motion.current.cur.z = root.position.z
     }
 
     // 朝向用 world-coordinates 的那一份，站著不動時保留前一個
@@ -163,14 +178,23 @@ export function LocalPlayer({ targetRef, poseRef }: LocalPlayerProps) {
     if (parts.leftLeg) parts.leftLeg.rotation.x = -pose.swing
     if (parts.rightLeg) parts.rightLeg.rotation.x = pose.swing
 
-    // 相機的 target：**直接寫 ref，不經過 React**
+    // 相機的 target：**直接寫 ref，不經過 React**。
+    //
+    // ⚠️ **是畫面位置，不是物理位置**（規格 `FE-W03-S17`）。
+    // 相機跟著會跳的物理位置的話，它的輸出會帶著同一個 0／1／2 步的節拍
+    //（damp 只把它變低頻，不會消掉），而角色本身是平滑的 ——
+    // 於是**角色相對於相機在抖**，而使用者的眼睛鎖的正是角色。
     targetRef.current.x = root.position.x
     targetRef.current.y = root.position.y
     targetRef.current.z = root.position.z
 
     // 給網路層的權威狀態。**另一個 ref** —— 見 `poseRef` 的說明。
-    poseRef.current.x = root.position.x
-    poseRef.current.z = root.position.z
+    //
+    // ⚠️ **是物理位置，不是畫面位置**（規格 `FE-W03-S17`）。
+    // 畫面位置刻意延後一個固定步；把那個延遲也送出去，等於讓每個遠端玩家
+    // 額外多看到 16.7 ms 的落後，而遠端本來就有自己的插值（`FE-R08`）。
+    poseRef.current.x = motion.current.cur.x
+    poseRef.current.z = motion.current.cur.z
     poseRef.current.f = facing.current
   })
 

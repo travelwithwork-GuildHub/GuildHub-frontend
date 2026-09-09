@@ -3,6 +3,8 @@ import ReactThreeTestRenderer from '@react-three/test-renderer'
 import type { FC } from 'react'
 import { Vector3 } from 'three'
 import { LocalPlayer, type LocalPlayerProps } from '@/world/player/LocalPlayer'
+import { MOVE_SPEED } from '@/world/player/movement'
+import { PHYSICS } from '@/world/physics/world'
 
 // 規格：openspec/specs/position-sync/spec.md
 //   Requirement: 位置從專用的 ref 來，不是相機的跟隨目標 —— Scenario FE-R03-S01
@@ -45,8 +47,15 @@ describe('本地角色的位置給網路層讀', () => {
     expect(poseRef.current.x, '角色往右走了，pose ref 的 x 沒有跟上').toBeGreaterThan(0)
     // 朝向也要寫進去 —— `move` 訊息需要它
     expect(poseRef.current.f, '向右的朝向是協定的 2').toBe(2)
-    // 這個 ref 拿到的就是角色現在的位置
-    expect(poseRef.current.x).toBeCloseTo(targetRef.current.x, 5)
+    // 這個 ref 拿到的是角色**物理上**現在的位置。
+    //
+    // ⚠️ **它跟相機的 target 刻意不相等**（規格 `FE-W03-S17`）：
+    // 相機拿的是畫面位置，而畫面位置刻意落後物理位置一個固定步 ——
+    // 那是 `FE-W03` 的 render interpolation。這裡只驗兩者在同一個地方附近，
+    // 「不相等」那一半由 `tests/render-target-split.test.tsx` 驗。
+    const lag = MOVE_SPEED * PHYSICS.fixedStep
+    expect(poseRef.current.x - targetRef.current.x).toBeGreaterThanOrEqual(0)
+    expect(poseRef.current.x - targetRef.current.x).toBeLessThanOrEqual(lag + 1e-6)
     expect(poseRef.current.z).toBeCloseTo(targetRef.current.z, 5)
 
     expect(
