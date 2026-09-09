@@ -12,6 +12,9 @@ import { InteractionProvider } from './interaction/InteractionProvider'
 import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
 import { BoardTargets } from './rooms/BoardTargets'
+import { labelAnchorsFor } from './rooms/anchors'
+import { DoorLabelProjector } from './rooms/DoorLabelProjector'
+import { DoorLabels, useLabelNodes } from './rooms/DoorLabels'
 import { ProjectDoors } from './rooms/ProjectDoors'
 import { RoomsNotice } from './rooms/RoomsNotice'
 import { CORRIDOR_SLOTS } from './rooms/slots'
@@ -66,8 +69,13 @@ export default function WorldCanvas() {
   // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
   // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
   const rooms = useRooms(CORRIDOR_SLOTS.length)
+  // 標籤的 DOM 節點。**身分穩定，不進 React** —— 位置每幀由投影元件直接寫進 style。
+  const labelNodesRef = useLabelNodes()
 
   if (!webgl2) return <WebGLUnavailable />
+
+  // 標籤掛在門頂上。**錨點與門的幾何從同一份推導** —— 門變高標籤跟著上去。
+  const anchors = labelAnchorsFor(rooms.doors, CORRIDOR_SLOTS)
 
   return (
     // ⚠️ **`InteractionProvider` 要包住 Canvas 與它外面的提示。**
@@ -106,6 +114,9 @@ export default function WorldCanvas() {
             <ProjectDoors rooms={rooms.doors} slots={CORRIDOR_SLOTS} />
             {/* 兩塊看板接上互動系統（`FE-W12-S14`）。**它們不接任何 API。** */}
             <BoardTargets />
+            {/* 把標籤釘在門上（`FE-W12-S10`）。**它渲染 null** ——
+                標籤本身是 Canvas 外面的 DOM。 */}
+            <DoorLabelProjector anchors={anchors} nodesRef={labelNodesRef} />
             <SpatialInteraction poseRef={localPose} />
           </Suspense>
         </Canvas>
@@ -116,6 +127,10 @@ export default function WorldCanvas() {
         <InteractionPrompt />
         {/* 規格 FE-W12-S02／S03／S04／S05：走廊的門「為什麼不在那裡」。
             **一切正常時它什麼都不顯示** —— 見下面那條禁令。 */}
+        {/* 規格 `FE-W12-S09`：名稱與在線數**常態可見**。
+            `CONTEXT.md` 那條鏈的第一環是「看見」—— 只在走到門前才顯示的話，
+            那已經是第二環「靠近」了。 */}
+        <DoorLabels anchors={anchors} nodesRef={labelNodesRef} />
         <RoomsNotice view={rooms} />
         {/* ⚠️ 規格 FE-O14-S11／S12：這裡刻意什麼都沒有。
             以前這裡有一段「目前是單人預覽，看不到其他人」——
