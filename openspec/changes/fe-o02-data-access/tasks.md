@@ -42,9 +42,10 @@
 
 ## 6. 位址與憑證只有一個來源（`FE-O02-S08`）
 
-- [ ] 6.1 掃 `src/api/`：除了 `src/config/env.ts` 之外不得出現後端位址字面值。
-      **負向**：在某個操作裡寫死一個 `http://` 位址 → 必須紅
-      （還沒做 —— 實作（四））
+- [x] 6.1 掃 `src/api/`：除了 `src/config/env.ts` 之外不得出現後端位址字面值。
+      **負向**：在 transport 裡寫死 `http://localhost:8000` →
+      `expected [ src/api/transport.ts ] to deeply equal []`。
+      偵測器本身也有成對比較（註解裡的網址不算、路徑不算）
 
 ## 7. 沒有契約的 domain（`FE-O02-S09`、`S10`）
 
