@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LAYOUT, SPAWN, STANCES, ZONES } from '@/world/layout/guildHallLayout'
-import { staticBoxesFor, WORLD_HALF_EXTENT } from '@/world/layout/geometry'
+import { staticBoxesFor, visualBoxFor, WORLD_HALF_EXTENT } from '@/world/layout/geometry'
 import { isReachable, reachableFrom } from '@/world/layout/reachability'
 import { boxOnScreen, groundOverscan, isOnScreen, occluders, screenHalfExtents } from '@/world/layout/framing'
 import { PHYSICS, type StaticBox } from '@/world/physics/world'
@@ -51,6 +51,29 @@ describe('每一個分區都走得到', () => {
     expect(isReachable(stance!, reached), '開口被封住了，走廊卻還是走得到').toBe(false)
   })
 
+  it('[FE-W11-S10] 比角色還窄的縫走不過去', () => {
+    // ⚠️ **這條在驗「障礙物有沒有依角色半徑膨脹」。**
+    // 實測：把膨脹拿掉，上面每一條都照樣綠 —— 因為真的配置裡最窄的通道是 1.8，
+    // 角色縮成一個點也過得去。**那時膨脹這件事是沒有人驗過的。**
+    const gap = 0.3 // 角色直徑是 0.5
+    const wall: StaticBox[] = [
+      { x: 0, z: -5, halfWidth: 0.25, halfDepth: 5 - gap / 2 },
+      { x: 0, z: 5, halfWidth: 0.25, halfDepth: 5 - gap / 2 },
+    ]
+    const half = 8
+    const west = { x: -3, z: 0 }
+    const east = { x: 3, z: 0 }
+    const radius = PHYSICS.playerRadius
+
+    expect(isReachable(east, reachableFrom(west, wall, { half, radius })), '0.3 的縫比角色還窄，不該過得去').toBe(false)
+    // 對照：把縫拉寬到角色直徑的兩倍就過得去 —— 證明這把尺不是「永遠說不通」。
+    const wide: StaticBox[] = [
+      { x: 0, z: -5, halfWidth: 0.25, halfDepth: 5 - 1 },
+      { x: 0, z: 5, halfWidth: 0.25, halfDepth: 5 - 1 },
+    ]
+    expect(isReachable(east, reachableFrom(west, wide, { half, radius })), '2.0 的縫應該過得去').toBe(true)
+  })
+
   it('[FE-W11-S11] 通道明顯寬於角色直徑', () => {
     // 走廊隔牆的開口是配置裡最窄的通道。**不去證明「剛好過得去」** ——
     // 那種通道真的走起來會一直卡住。
@@ -69,8 +92,13 @@ describe('固定相機下的構圖', () => {
     const boards = LAYOUT.filter((i) => i.kind === 'projectBoard' || i.kind === 'talentBoard')
     expect(boards.length, '兩個看板').toBe(2)
     for (const board of boards) {
-      const box = staticBoxesFor([board])[0]
-      expect(box, `${board.id} 沒有碰撞盒 —— 這條會恆真`).toBeDefined()
+      // ⚠️ **量的是視覺包圍盒，不是碰撞盒。** 看板的板面不擋路，
+      // 所以它的碰撞盒只有兩根 0.9 高的柱子；看板真正是 2.3 高。
+      // 用碰撞盒算的話，「頭被切掉」在畫面上看得到，而測試是綠的（實測）。
+      const box = visualBoxFor(board)
+      expect(box, `${board.id} 沒有包圍盒 —— 這條會恆真`).toBeDefined()
+      expect((box?.halfHeight ?? 0) * 2, `${board.id} 的視覺高度看起來像只有柱子`)
+        .toBeGreaterThan(1.5)
       expect(boxOnScreen(box!, SPAWN), `${board.id} 有一部分在畫面外`).toBe(true)
     }
     // 防恆真：畫面外的東西要判成 false。

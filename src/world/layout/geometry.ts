@@ -1,5 +1,5 @@
 import type { BoxFootprint, PropDefinition } from '../environment/definition'
-import { footprintOf, rotateFootprint } from '../environment/definition'
+import { footprintOf, rotateFootprint, visualBoundsOf } from '../environment/definition'
 import { furnitureDefinition, FURNITURE_KINDS, type FurnitureKind } from '../environment/furnitureProps'
 import { carpetDefinition, platformDefinition, wallDefinition } from '../environment/structural'
 import {
@@ -58,6 +58,25 @@ export function definitionFor(item: LayoutItem): PropDefinition {
  */
 export function staticBoxFor(item: LayoutItem): StaticBox | undefined {
   const local: BoxFootprint | undefined = footprintOf(definitionFor(item))
+  if (local === undefined) return undefined
+  const turned = rotateFootprint(local, item.turns ?? 0)
+  return {
+    x: item.x + turned.offsetX,
+    z: item.z + turned.offsetZ,
+    halfWidth: turned.halfWidth,
+    halfDepth: turned.halfDepth,
+    halfHeight: turned.halfHeight,
+  }
+}
+
+/**
+ * 一個配置項在世界座標下**看得見的**包圍盒。
+ *
+ * ⚠️ **不要拿碰撞盒去問構圖。** 看板的板面不擋路，所以它的碰撞盒只有兩根
+ * 0.9 高的柱子；看板真正是 2.3 高。用碰撞盒算「在不在畫面內」會漏掉頭。
+ */
+export function visualBoxFor(item: LayoutItem): StaticBox | undefined {
+  const local = visualBoundsOf(definitionFor(item))
   if (local === undefined) return undefined
   const turned = rotateFootprint(local, item.turns ?? 0)
   return {

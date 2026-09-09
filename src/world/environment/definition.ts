@@ -89,13 +89,33 @@ export function quarterTurnsOf(rotationY: number): number {
  * **那是單盒碰撞模型的限制，不是這個函式算錯。**
  */
 export function footprintOf(def: PropDefinition): BoxFootprint | undefined {
+  return boundsOf(def, (part) => part.blocks === true)
+}
+
+/**
+ * 一個元件**看得見的**包圍盒（所有部件，不只擋路的那些）。
+ *
+ * ⚠️⚠️ **這跟碰撞盒是兩件事，混用會量錯東西。**
+ * 看板的板面沒有標 `blocks`（它在頭上，不擋路），所以它的碰撞盒只有兩根
+ * 0.9 高的柱子 —— 拿碰撞盒去問「這個看板在不在畫面內」，
+ * 量到的是柱子而不是看板（實測：看板真正的高度是 2.3，頭被切掉了畫面上看得到，
+ * 而用碰撞盒算出來是「完整在畫面內」）。
+ */
+export function visualBoundsOf(def: PropDefinition): BoxFootprint | undefined {
+  return boundsOf(def, () => true)
+}
+
+function boundsOf(
+  def: PropDefinition,
+  include: (part: PartDefinition) => boolean,
+): BoxFootprint | undefined {
   let minX = Infinity, maxX = -Infinity
   let minY = Infinity, maxY = -Infinity
   let minZ = Infinity, maxZ = -Infinity
   let found = false
 
   for (const part of def.parts) {
-    if (part.blocks !== true) continue
+    if (!include(part)) continue
     found = true
     const [hx, hy, hz] = halfExtentsOf(part.geometry)
     const turns = quarterTurnsOf(part.rotationY ?? 0)
