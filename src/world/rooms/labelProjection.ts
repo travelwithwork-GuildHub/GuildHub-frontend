@@ -18,7 +18,7 @@ import { screenHalfExtents, toScreen } from '../layout/framing'
  *
  * ⚠️ **測試從這裡讀，不得抄一份數字。**
  */
-export const LABEL_SIZE = { width: 168, height: 34 } as const
+export const LABEL_SIZE = { width: 200, height: 34 } as const
 
 /**
  * 最小支援的畫面尺寸。
@@ -40,11 +40,17 @@ export interface LabelRect {
 }
 
 /**
- * 一個世界座標點的標籤該放在哪。**`null` 代表它在畫面外。**
+ * 一個世界座標點的標籤該放在哪。**`null` 代表它不該出現。**
  *
  * ⚠️ **畫面外要回 `null`，不能靠「它自己會跑出去」。**
  * 絕對定位的元素跑到容器外面仍然在 DOM 與無障礙樹裡 ——
  * 螢幕閱讀器會念出一個看不到的東西（規格 `FE-W12-S13`）。
+ *
+ * ⚠️⚠️ **判準是「整個矩形都在畫面裡」，不是「有一部分在畫面裡」。**
+ * 第一版寫的是後者，人工截圖抓到的症狀是：**走廊在畫面外的時候，
+ * 六個標籤仍然貼在畫面左緣，各被切掉一半** ——
+ * 名字讀不出來，而且它會被讀成「那個方向有東西」。
+ * 那正是規格 `S13` 的理由那一段講的事，而我第一版的實作沒有做到它。
  */
 export function labelRectFor(
   point: { x: number; y: number; z: number },
@@ -60,12 +66,12 @@ export function labelRectFor(
 
   const left = centerX - LABEL_SIZE.width / 2
   const top = centerY - LABEL_SIZE.height
-  const outside =
-    left + LABEL_SIZE.width < 0 ||
-    left > viewport.width ||
-    top + LABEL_SIZE.height < 0 ||
-    top > viewport.height
-  return outside ? null : { left, top }
+  const fits =
+    left >= 0 &&
+    top >= 0 &&
+    left + LABEL_SIZE.width <= viewport.width &&
+    top + LABEL_SIZE.height <= viewport.height
+  return fits ? { left, top } : null
 }
 
 /**

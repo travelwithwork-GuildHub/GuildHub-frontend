@@ -29,8 +29,16 @@ const FULL = CORRIDOR_SLOTS.map((_, i) =>
   room(String.fromCharCode(97 + i), `專案 ${i}`, i),
 )
 
-/** 站在走廊裡看門。 */
-const IN_CORRIDOR = { x: -9, z: 3 }
+/**
+ * 站在門這一排的正前方。
+ *
+ * ⚠️ **不能用走廊的中心 `x = -9`。** 標籤 200px 寬，而最小支援畫面只有 320px ——
+ * 門在畫面中央偏西 2.7 個單位時，標籤的左緣會落到畫面外，於是**整組被隱藏**
+ *（那是對的行為，見 `S13`），而這一組判準會變成空集合。
+ *
+ * 站在門線上（`x = -11.6`，那是離門最近的可站立格）才是這條判準要問的情況。
+ */
+const IN_CORRIDOR = { x: -11.6, z: 3 }
 
 describe('標籤的位置', () => {
   it('[FE-W12-S10] 標籤掛在門**頂上**，不是門身上', () => {
@@ -52,11 +60,15 @@ describe('標籤的位置', () => {
     const anchors = labelAnchorsFor(FULL, CORRIDOR_SLOTS)
     expect(anchors.length).toBeGreaterThan(1)
 
+    // ⚠️ **拿相鄰的兩個「看得見的」**。最北那一扇在最小畫面上本來就在畫面外
+    // （走廊深 12＝可見高度 12），拿 `rects[0]` 會 null。
     const rects = anchors.map((a) => labelRectFor(a, IN_CORRIDOR, MIN_VIEWPORT))
-    const first = rects[0]
-    const second = rects[1]
-    if (first === null || second === null || first === undefined || second === undefined) {
-      throw new Error('走廊中間看不到前兩扇門的標籤 —— 投影或槽位算錯了')
+    const visible = rects.map((r, i) => ({ r, i })).filter((e) => e.r !== null)
+    expect(visible.length).toBeGreaterThan(1)
+    const first = visible[0]?.r
+    const second = visible[1]?.r
+    if (first === undefined || second === undefined || first === null || second === null) {
+      throw new Error('走廊裡看不到相鄰兩扇門的標籤 —— 投影或槽位算錯了')
     }
     // 兩扇門只差在 z，而螢幕縱向座標是 `(py - pz + tz) × √2/2` ——
     // 所以差距是**算得出來的**，不是「有差就好」。
@@ -70,26 +82,30 @@ describe('標籤的位置', () => {
 
   it('[FE-W12-S13] 門在畫面外時沒有位置', () => {
     const anchors = labelAnchorsFor(FULL, CORRIDOR_SLOTS)
-    const anchor = anchors[0]
-    if (anchor === undefined) throw new Error('沒有錨點')
+    // 取一個站在走廊裡**確實看得到**的（最北那一扇在最小畫面上本來就看不到）。
+    const anchor = anchors.find((a) => labelRectFor(a, IN_CORRIDOR, MIN_VIEWPORT) !== null)
+    if (anchor === undefined) throw new Error('站在走廊裡一個標籤都看不到')
 
     // 相機跟著角色 —— 走到世界的另一頭，走廊就離開畫面了。
     expect(labelRectFor(anchor, { x: 60, z: 3 }, MIN_VIEWPORT)).toBe(null)
+    // ⚠️ **只差一點點也要藏起來。** 人工截圖抓到的症狀是：走廊在畫面外時，
+    // 標籤仍然貼在畫面左緣、各被切掉一半 —— 那時候「有一部分在畫面裡」是真的。
+    expect(labelRectFor(anchor, { x: IN_CORRIDOR.x + 4, z: 3 }, MIN_VIEWPORT)).toBe(null)
     // 反向控制：站在走廊裡看得到。
     expect(labelRectFor(anchor, IN_CORRIDOR, MIN_VIEWPORT)).not.toBe(null)
   })
 })
 
 describe('排滿時的版面', () => {
-  it('[FE-W12-S11] 最小支援尺寸下，標籤兩兩不相交', () => {
+  it('[FE-W12-S11] 最小支援尺寸下，看得見的標籤兩兩不相交', () => {
     const anchors = labelAnchorsFor(FULL, CORRIDOR_SLOTS)
     const rects = anchors
       .map((a) => labelRectFor(a, IN_CORRIDOR, MIN_VIEWPORT))
       .filter((r) => r !== null)
 
-    // ⚠️ **「大於一」擋的是空泛為真**：只有 0 或 1 個標籤時，
-    // 「任意兩個」是空集合，下面的迴圈一次都不會跑。
-    expect(rects.length).toBe(CORRIDOR_SLOTS.length)
+    // ⚠️ **不是「等於容量」。** 走廊深 12，而相機的垂直可見範圍也是 12 ——
+    // 站在走廊裡本來就看不到最北那一扇（實測 5/6）。那是空間本來的樣子。
+    // 「至少兩個」擋的是空泛為真：0 或 1 個時「任意兩個」是空集合。
     expect(rects.length).toBeGreaterThan(1)
 
     for (let i = 0; i < rects.length; i += 1) {
