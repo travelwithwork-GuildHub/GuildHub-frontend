@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { LAYOUT, SPAWN, STANCES, ZONES } from '@/world/layout/guildHallLayout'
 import { staticBoxesFor, visualBoxFor, WORLD_HALF_EXTENT } from '@/world/layout/geometry'
-import { isReachable, reachableFrom } from '@/world/layout/reachability'
+import { cellsOf, isReachable, reachableFrom, standableIn } from '@/world/layout/reachability'
 import { boxOnScreen, groundOverscan, isOnScreen, occluders, screenHalfExtents } from '@/world/layout/framing'
 import { PHYSICS, type StaticBox } from '@/world/physics/world'
 
@@ -140,5 +140,73 @@ describe('固定相機下的構圖', () => {
     // 防恆真：沒有 overscan（地板只有遊玩區域那麼大）時要不成立。
     expect(reachable + halfWidth, '沒有 overscan 的話畫面角落會超出地板')
       .toBeGreaterThan(WORLD_HALF_EXTENT)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// 封存前由外部審查逼出來的三條。它們共同的形狀是
+// **把「只驗幾個代表點」換成「把整個可走區域掃一遍」** ——
+// 代表點會漏掉分區裡的死角，而 BFS 的格子本來就已經算好了。
+
+describe('封存前補上的覆蓋', () => {
+  const reached = reachableFrom(SPAWN, BOXES, REACH)
+
+  it('[FE-W11-S10] 分區裡沒有走不進去的死角', () => {
+    // 只驗代表點的話，分區裡包著一塊到不了的地方是看不出來的。
+    for (const zone of ZONES) {
+      const standable = standableIn(zone, BOXES, PHYSICS.playerRadius)
+      expect(standable.length, `分區 ${zone.id} 裡一個站得下的格子都沒有`).toBeGreaterThan(100)
+      const unreachable = standable.filter((c) => !isReachable(c, reached))
+      expect(unreachable.length, `分區 ${zone.id} 裡有 ${unreachable.length} 格站得下卻走不到`).toBe(0)
+    }
+  })
+
+  it('[FE-W11-S13] 整個可走區域裡，角色都不會被家具擋住', () => {
+    // ⚠️ **牆不算。** 任何一面牆都會遮住站在它北側緊鄰處的角色 ——
+    // 那是牆的本質，不是缺陷（design D5）。這條掃的是**家具與擺設**。
+    const notWalls = LAYOUT.filter((i) => i.kind !== 'wall')
+      .flatMap((i) => {
+        const box = staticBoxesFor([i])
+        return box.length > 0 ? box : []
+      })
+    expect(notWalls.length, '一個非牆的碰撞盒都沒有 —— 這條是空的').toBeGreaterThan(5)
+
+    const sample = cellsOf(reached, 10) // 每 1 個世界單位取一點
+    expect(sample.length, '取樣點太少').toBeGreaterThan(50)
+    // ⚠️ **忽略比角色還窄的東西。** 實測掃出來的三個「遮擋」全部是細桿：
+    // 旗桿 0.08 寬、招牌柱 0.1、側放的書架 0.4 —— 角色是 0.5。
+    // 一根比角色還細的柱子只蓋掉一條縫，不是「被擋住」；
+    // 硬要求連細桿都不能在視線上，判準會逼人把所有立柱貼到牆上。
+    const width = PHYSICS.playerRadius * 2
+    const blockedViews = sample.filter((cell) => occluders(cell, notWalls, 1, width).length > 0)
+    expect(blockedViews.length, `有 ${blockedViews.length} 個站得到的位置被家具擋住視線`).toBe(0)
+
+    // 防恆真：一個跟角色一樣寬、夠高的東西放在取樣點的 +Z 側要被抓到。
+    const blocker: StaticBox = { x: sample[0]!.x, z: sample[0]!.z + 2, halfWidth: 0.6, halfDepth: 0.4, halfHeight: 1.5 }
+    expect(occluders(sample[0]!, [blocker], 1, width).length, '寬的障礙物沒有被抓到').toBe(1)
+  })
+
+  it('配置裡沒有兩個東西的碰撞盒疊在一起', () => {
+    // 「椅子塞進桌子裡」這種資料錯誤在畫面上看得出來，但沒有機器在看。
+    // ⚠️ **邊界牆的四個角本來就互相重疊** —— 那是把角封起來的方式。
+    const solid = LAYOUT.map((item) => ({ item, box: staticBoxesFor([item])[0] })).filter(
+      (e) => e.box !== undefined,
+    )
+    expect(solid.length, '一個碰撞盒都沒有').toBeGreaterThan(10)
+
+    const isBoundary = (i: (typeof LAYOUT)[number]) => i.kind === 'wall' && i.role === 'boundary'
+    const clashes: string[] = []
+    for (let i = 0; i < solid.length; i += 1) {
+      for (let j = i + 1; j < solid.length; j += 1) {
+        const a = solid[i]!
+        const b = solid[j]!
+        if (isBoundary(a.item) && isBoundary(b.item)) continue
+        const overlapX = a.box!.halfWidth + b.box!.halfWidth - Math.abs(a.box!.x - b.box!.x)
+        const overlapZ = a.box!.halfDepth + b.box!.halfDepth - Math.abs(a.box!.z - b.box!.z)
+        // 邊緣相接（重疊 0）不算 —— 兩張桌子並排是合法的。
+        if (overlapX > 1e-6 && overlapZ > 1e-6) clashes.push(`${a.item.id} × ${b.item.id}`)
+      }
+    }
+    expect(clashes, '這些東西疊在一起了').toEqual([])
   })
 })

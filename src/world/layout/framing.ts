@@ -19,7 +19,13 @@ import type { StaticBox } from '../physics/world'
 // **高度與 -Z 對螢幕縱向的貢獻一樣大** —— 一個 2 單位高的看板，
 // 在畫面上等於往北多站 2 個單位。這就是為什麼看板容易「頭超出畫面」。
 
-/** 驗證用的長寬比。**固定值** —— 見檔頭。 */
+/**
+ * **驗證用**的長寬比。固定值 —— 見檔頭。
+ *
+ * ⚠️ **只有測試用它。** 產品那一邊（地板要鋪多大）**必須用執行期真正的長寬比** ——
+ * 網頁的視窗比例完全不可控（超寬螢幕、直向、分割視窗），
+ * 寫死 16:9 的話那些情況一定會看到世界的盡頭。
+ */
 export const FRAMING_ASPECT = 16 / 9
 
 export interface ScreenPoint {
@@ -94,6 +100,17 @@ export function occluders(
   stance: { x: number; z: number },
   boxes: readonly StaticBox[],
   chestHeight = 1,
+  /**
+   * 忽略比這個窄的東西（水平、垂直於視線方向的寬度）。
+   *
+   * ⚠️ **相機看的方向是 -Z，所以「垂直於視線」的水平軸是 X。**
+   *
+   * 省略＝一律不忽略（代表站位用這個，那幾個點是設計上保證看得清楚的地方）。
+   * 掃整個可走區域時傳角色的直徑：**一根 0.08 寬的旗桿不構成「遮住角色」**
+   * —— 它只蓋掉一條縫。硬要求「連細桿都不能在視線上」的話，
+   * 判準會逼人把所有立柱貼到牆上，而那不是產品問題。
+   */
+  minWidth = 0,
 ): number[] {
   const camera = {
     x: stance.x + CAMERA_DEFAULTS.offset.x,
@@ -111,6 +128,7 @@ export function occluders(
       z: camera.z + (chest.z - camera.z) * t,
     }
     for (const [index, box] of boxes.entries()) {
+      if (box.halfWidth * 2 < minWidth) continue
       const h = (box.halfHeight ?? 0) * 2
       if (p.y < 0 || p.y > h) continue
       if (Math.abs(p.x - box.x) > box.halfWidth) continue
@@ -132,5 +150,9 @@ export function occluders(
  */
 export function groundOverscan(reachableHalf: number, aspect = FRAMING_ASPECT): number {
   const { halfWidth, halfHeight } = screenHalfExtents(aspect)
-  return reachableHalf + Math.max(halfWidth, halfHeight * Math.SQRT2)
+  const exact = reachableHalf + Math.max(halfWidth, halfHeight * Math.SQRT2)
+  // ⚠️ **量化到整數單位。** 這個值會變成 `geometryFor` 的快取鍵，
+  // 而視窗每拉一個像素長寬比就變一次 —— 不量化的話，
+  // 拉一次視窗就在快取裡留下一份新的地板幾何（`FE-W07` 在看的正是這種成長）。
+  return Math.ceil(exact)
 }
