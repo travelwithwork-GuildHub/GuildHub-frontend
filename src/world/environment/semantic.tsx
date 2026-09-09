@@ -120,20 +120,30 @@ export function talentBoardDefinition(items = 3): PropDefinition {
  * 門：**門框（兩根立柱＋門楣）＋ 門板 ＋ 把手**。
  *
  * `open` 今天就有作用：門板轉 90°（**是 90° 的整數倍**，所以碰撞的規則吃得下 ——
- * 見 `quarterTurnsOf`）。門板本身不擋路，擋路的是門框。
+ * 見 `quarterTurnsOf`）。
+ *
+ * ⚠️⚠️ **門的每一個部件都不擋路 —— 規格 `FE-W10-S14`。**
+ *
+ * 碰撞盒是「所有擋路部件的 **AABB 聯集**」。兩根分開的門柱取聯集之後，
+ * **中間的門洞會被實心堵死** —— 實測門寬 1.4、碰撞盒寬 1.58，那扇門走不過去。
+ * 對桌子與看板來說「填滿空隙」正是要的（它們是實心障礙物），
+ * **但門是牆上的一個洞**。
+ *
+ * 門洞兩側的阻擋由**周圍的牆**提供，而牆的擺放是 `FE-W11` 的配置。
+ * **MUST NOT 把門柱標回 `blocks: true`** —— 那會再次封死門洞，
+ * 而症狀是「這扇門推不開」，看起來像 bug 不像設計。
  */
 export function doorDefinition(open = false): PropDefinition {
   const width = 1.4
   const height = 2.2
   return {
     parts: [
-      post(-width / 2, height, 0.09),
-      post(width / 2, height, 0.09),
+      { ...post(-width / 2, height, 0.09), blocks: false },
+      { ...post(width / 2, height, 0.09), blocks: false },
       {
         geometry: { shape: 'RoundedBox', width: width + 0.18, height: 0.18, depth: 0.18, radius: 0.04 },
         material: POST,
         position: [0, height - 0.09, 0],
-        blocks: true,
       },
       {
         geometry: { shape: 'RoundedBox', width: width - 0.12, height: height - 0.2, depth: 0.07, radius: 0.03 },
