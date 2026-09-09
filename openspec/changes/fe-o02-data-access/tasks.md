@@ -66,4 +66,5 @@
 
 ## 9. 文件
 
-- [ ] 9.1 `docs/WBS.md` 的 `FE-O02` 那一列把 `local` 改成 `internal`（另開 `chore/`）
+- [x] 9.1 `docs/WBS.md` 的 `FE-O02` 那一列把 `local` 改成 `internal`（#154），
+      並把理由寫進那一格，免得下一個人再改回去
