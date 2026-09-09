@@ -163,6 +163,16 @@ export async function sendMessage(input: contract.MessageCreate) {
 // ---------------------------------------------------------------- 走廊門位
 
 /** ⚠️ `online_count` **不會自己更新** —— 要自行輪詢。 */
-export async function listRooms() {
-  return send('listRooms', { method: 'GET', path: '/api/rooms' }, z.array(contract.RoomDoorOut))
+/**
+ * ⚠️ **這是整份 operations 裡唯一收 `signal` 的**，因為它是唯一被**輪詢**的。
+ * `FE-W12` 的契約要求「頁籤不可見時**中止**進行中的請求」——
+ * 只把結果標成「不採用」的話那個請求仍然在飛，
+ * 而「同時最多一個進行中」會被違反。
+ */
+export async function listRooms(options: { signal?: AbortSignal } = {}) {
+  return send(
+    'listRooms',
+    { method: 'GET', path: '/api/rooms', signal: options.signal },
+    z.array(contract.RoomDoorOut),
+  )
 }
