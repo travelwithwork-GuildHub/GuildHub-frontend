@@ -1,14 +1,14 @@
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-w07-resource-ownership` 合併進 `main`）。
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-w07-resource-ownership` 合併進 `main`）。
       驗證：`npx --no-install openspec validate fe-w07-resource-ownership --strict` 通過且 PR 已合併
 
 ## 2. 量測台（`FE-W07-S04`、`S05`）
 
-- [ ] 2.1 `vite` 升成直接 `devDependency`；`tests/e2e/leak-harness/` 放
+- [x] 2.1 `vite` 升成直接 `devDependency`；`tests/e2e/leak-harness/` 放
       `index.html` ＋ vite config，root 限制在 `tests/` 底下。
       驗證：`npx vite --config tests/e2e/leak-harness/vite.config.mts` 起得來
-- [ ] 2.2 量測台 entry：`createRoot` 反覆 render / unmount，
+- [x] 2.2 量測台 entry：`createRoot` 反覆 render / unmount，
       讀 `renderer.info.memory` 與 patch 過的 `dispose` 計數，結果放 `window.__LEAK_RESULT__`。
       每輪之間的等待寫成具名常數，**值由 Q1 量出來**
 - [ ] 2.3 driver：`playwright-core` 起 Chromium、起 vite server、讀結果、關掉兩者。
@@ -19,7 +19,7 @@
 
 ## 3. 尺要先證明自己量得到（`FE-W07-S03`）
 
-- [ ] 3.1 故意洩漏的 fixture（`useMemo(() => new BufferGeometry())`，卸載不 dispose），
+- [x] 3.1 故意洩漏的 fixture（`useMemo(() => new BufferGeometry())`，卸載不 dispose），
       放在量測台裡當**第一個**受測對象
 - [ ] 3.2 它沒有被判定為洩漏時，整個測試以「這把尺量不到東西」失敗，
       且訊息與「有洩漏」明顯不同。
