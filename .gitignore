@@ -26,3 +26,8 @@ docs/wbs.html
 next-env.d.ts
 .turbo/
 *.tsbuildinfo
+
+# Vercel CLI 連結專案時建立的（含 projectId / orgId）。
+# **不進版控** —— 它綁定一個特定的 Vercel 帳號與專案，
+# 而別人 clone 之後會拿到一個指向別人專案的連結。
+.vercel
