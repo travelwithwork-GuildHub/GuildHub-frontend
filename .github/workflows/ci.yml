@@ -188,7 +188,20 @@ jobs:
 
       # NEXT_TELEMETRY_DISABLED：CI 不對外回報建置遙測。
       # 這不是效能考量，是「CI 不該在沒有人要求的情況下把資料送出去」。
+      #
+      # NEXT_PUBLIC_APP_ENV：**這一步建出來的東西不是要部署的**，所以它明說自己是
+      # `local`。`FE-O14` 之後 `next.config.ts` 會在建置時驗證部署設定，
+      # 而 `appEnv()` 用建置模式當守門員 —— `next build` 是 `NODE_ENV=production`，
+      # 代號缺席就拋錯（那是 `FE-O09-S07`，刻意的：漏設代號的正式站
+      # 會合法地退回 localhost）。
+      #
+      # ⚠️ **不要把它改成 `production` 讓 CI「更像正式環境」。**
+      # 那樣就得在 CI 裡填一組後端位址，而 `AGENTS.md`〈測試環境隔離〉
+      # 禁止任何共用位址進到這裡；填假的則會讓這一步變成在驗一組假設定。
+      # 真正的部署設定在部署平台上，**repo 裡沒有它的對應物**
+      # （`FE-O14` design 的〈這把尺量不到什麼〉）。
       - name: Build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_APP_ENV: local
         run: npm run build
