@@ -2,6 +2,7 @@
 
 import type {} from '@react-three/fiber'
 import { PHYSICS } from '../physics/world'
+import { groundOverscan } from '../layout/framing'
 import { GuildHall } from '../layout/GuildHall'
 import { Floor } from './structural'
 
@@ -23,9 +24,19 @@ import { Floor } from './structural'
 
 export function WorldShell() {
   const span = PHYSICS.halfExtent * 2
+  // ⚠️ **視覺地板要比碰撞邊界大**（`FE-W11-S14`）：牆只有 2 單位高，
+  // 相機從 12 個單位的高處往下看 —— 玩家走到邊緣時看得到牆外面。
+  // 大小**由相機投影到地面的範圍推導**，不是隨手挑一個常數：
+  // 相機參數改的那天，隨手挑的常數會靜默失效。
+  const outside = groundOverscan(PHYSICS.halfExtent - PHYSICS.playerRadius) * 2
 
   return (
     <>
+      {/* 世界外面的地。比地面暗一階，看起來不像可以走過去的地方。
+          壓在正式地板下面一點，避免兩個共面的多邊形互相閃爍（z-fighting）。 */}
+      <group position={[0, -0.05, 0]}>
+        <Floor width={outside} depth={outside} color="outside" />
+      </group>
       <Floor width={span} depth={span} />
       {/* ⚠️ **四面邊界牆已經搬進 `LAYOUT`**（`FE-W11`）——
           它們現在跟內牆走同一條路，視覺與碰撞吃同一份資料。

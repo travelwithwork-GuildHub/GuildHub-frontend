@@ -1,6 +1,7 @@
 'use client'
 
 import type {} from '@react-three/fiber'
+import type { WorldColorName } from '@/design/world'
 import type { PropDefinition } from './definition'
 import { PropParts } from './PropParts'
 
@@ -17,12 +18,17 @@ import { PropParts } from './PropParts'
 /** 圓角半徑。薄板的半徑會被 `geometryFor` 夾到最短邊的 0.49 倍，這裡給的是上界。 */
 const RADIUS = 0.06
 
-export function floorDefinition(width: number, depth: number, thickness = 0.2): PropDefinition {
+export function floorDefinition(
+  width: number,
+  depth: number,
+  thickness = 0.2,
+  color: WorldColorName = 'ground',
+): PropDefinition {
   return {
     parts: [
       {
         geometry: { shape: 'RoundedBox', width, height: thickness, depth, radius: RADIUS },
-        material: { kind: 'standard', color: 'ground', roughness: 0.95 },
+        material: { kind: 'standard', color, roughness: 0.95 },
         // 上表面切齊 y = 0 —— 角色的腳在 y ≈ -0.02，所以它站在地面上。
         position: [0, -thickness / 2, 0],
         // 平貼的地面**不投射陰影**：它沒有東西可以投上去，而每個 caster
@@ -73,8 +79,19 @@ export function platformDefinition(width: number, depth: number, height: number)
   }
 }
 
-export function Floor({ width, depth, thickness }: { width: number; depth: number; thickness?: number }) {
-  return <PropParts definition={floorDefinition(width, depth, thickness)} />
+export function Floor({
+  width,
+  depth,
+  thickness,
+  color,
+}: {
+  width: number
+  depth: number
+  thickness?: number
+  /** 省略＝地面色。世界外面的地用 `outside`（見 `FE-W11-S14`）。 */
+  color?: WorldColorName
+}) {
+  return <PropParts definition={floorDefinition(width, depth, thickness, color)} />
 }
 
 export function Wall({ length, height, thickness }: { length: number; height: number; thickness: number }) {
