@@ -138,6 +138,30 @@ describe('RealtimeClient', () => {
     expect(states).toEqual(['connecting', 'open', 'ready'])
   })
 
+  it('[FE-R04-S01] 生命週期事件不得關閉連線，也不得換身分', () => {
+    // 規格：openspec/changes/fe-r04-background-tab/specs/realtime-client/spec.md
+    //   Requirement: 分頁隱藏時不主動關閉連線
+    //
+    // 匿名連線的身分是**每條連線一個新的 uuid4**（後端 `_identify()`）。
+    // 切到背景就斷線的話，回來時你是另一個人 —— 別人看到你離開又進來。
+    const { client, sockets } = setup()
+    client.connect()
+    sockets[0]!.emit('open', null)
+    sockets[0]!.emit('message', { data: HELLO('u-abc') })
+    expect(client.state, '前置條件：要先 ready').toBe('ready')
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('blur'))
+    window.dispatchEvent(new Event('pagehide'))
+
+    expect(client.state, '生命週期事件把連線關掉了').toBe('ready')
+    expect(sockets[0]!.closeCalls, 'close 被呼叫了').toBe(0)
+    // ⚠️ **這一條才是重點。** 只驗前兩個的話，一個「關掉再立刻開一條」的實作
+    // 照樣是綠的 —— 而斷線重連的真正代價就是**換身分**。
+    expect(sockets.length, '建立了第二條連線 —— 那等於換成另一個人').toBe(1)
+    expect(client.selfId, '身分變了').toBe('u-abc')
+  })
+
   it('[FE-R01-S02] 還沒 ready 就送訊息會明確失敗', () => {
     const { client, sockets } = setup()
     client.connect()
