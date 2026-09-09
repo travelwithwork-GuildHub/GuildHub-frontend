@@ -8,7 +8,9 @@ import type { RefObject } from 'react'
 
 // 規格：openspec/changes/fe-o14-preview-deploy/specs/runtime-config/spec.md
 //   Requirement: 沒有即時後端時 MUST NOT 建立連線 —— FE-O14-S07 / S08
-//   Requirement: 沒有即時後端時訪客看得到說明 —— FE-O14-S09 / S10
+// 規格：openspec/changes/fe-o14-drop-preview-notice/specs/runtime-config/spec.md
+//   Requirement: 世界不解釋「為什麼看不到別人」 —— FE-O14-S11 / S12
+//   （退場的 FE-O14-S09 / S10 是它的前身，那兩個 ID MUST NOT 被重新使用）
 //
 // ⚠️ **被換掉的是全域的 `WebSocket`，不是我們自己的任何一層。**
 // `RemoteWorld` → `RealtimeClient` → `browserSocket` → `new WebSocket(url)`，
@@ -89,9 +91,7 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-const NOTICE = { name: '單人預覽' } as const
-
-describe('單人預覽（沒有即時後端的部署）', () => {
+describe('沒有即時後端的部署', () => {
   it('[FE-O14-S07] none 時完全不碰 socket，而且不吵', () => {
     // ⚠️ **這一條直接掛 `RemoteWorld`，不透過 `WorldCanvas`。**
     // 後者會渲染 `<ambientLight>`／`<directionalLight>` 這些 R3F 內建標籤，
@@ -130,36 +130,52 @@ describe('單人預覽（沒有即時後端的部署）', () => {
     expect(screen.getByTestId('world-canvas-container')).toBeTruthy()
   })
 
-  it('[FE-O14-S09] 單人預覽的說明出現、讀得到、而且沒有重試', () => {
+  // 規格 `FE-O14-S11`／`S12` 的判準：**只下在訪客真的會讀到的措辭上**。
+  //
+  // ⚠️ **MUST NOT 改成 `queryByRole('status')`。** 那看起來更嚴，實際是錯的：
+  // `status` 在這個世界已經有兩個合法使用者（`world-loading` 與
+  // `interaction-prompt`），而 `FE-R12`（連不上的呈現）大機率是第三個。
+  // 規格裡有一則明文的 MUST NOT 講這件事。
+  const FORBIDDEN = ['單人預覽', '看不到其他人', '即時伺服器'] as const
+
+  /** 世界渲染完成，而且畫面上沒有那些措辭。 */
+  function expectNoRealtimeStatusProse() {
+    // **正向控制。** 只斷言容器存在不夠 —— 一個內部出錯只剩空殼容器的世界
+    // 也有容器，而在空白畫面上「沒有那段文字」恆真。
+    // `ready` 只有在 `Canvas` 的 `onCreated` 真的跑過之後才是 true。
+    expect(
+      screen.queryByTestId('world-loading'),
+      '世界還停在載入中 —— 下面那些「沒有那段文字」的斷言在空畫面上恆真',
+    ).toBeNull()
+
+    const text = screen.getByTestId('world-canvas-container').textContent ?? ''
+    for (const phrase of FORBIDDEN) {
+      expect(text, `畫面上出現了「${phrase}」`).not.toContain(phrase)
+    }
+  }
+
+  it('[FE-O14-S11] 資料來源是 none 時世界渲染完成，但沒有任何說明', () => {
     vi.stubEnv('NEXT_PUBLIC_REALTIME_ADAPTER', 'none')
     render(<WorldCanvas />)
 
-    const notice = screen.getByRole('status', NOTICE)
-    expect(notice.textContent).toContain('單人預覽')
-    expect(notice.textContent).toContain('看不到其他人')
-    // 「永遠不會成功的按鈕比沒有按鈕更糟」——
-    // 範圍內不得有任何按鈕或可點擊元素。
-    expect(notice.querySelectorAll('button, a, [role="button"], input')).toHaveLength(0)
+    expectNoRealtimeStatusProse()
   })
 
-  it('[FE-O14-S10] 連線失敗之後單人預覽的說明仍然不出現', () => {
+  it('[FE-O14-S12] 連線失敗之後也不出現「一切正常」的措辭', () => {
     vi.stubEnv('NEXT_PUBLIC_REALTIME_ADAPTER', 'guildhub')
     vi.stubEnv('NEXT_PUBLIC_GUILDHUB_WS', 'ws://localhost:8000/ws')
     render(<WorldCanvas />)
 
-    expect(screen.queryByRole('status', NOTICE)).toBeNull()
+    expectNoRealtimeStatusProse()
 
     // ⚠️ **這一行不能省。** 少了它，一個根本沒走到連線路徑的測試也會綠 ——
-    // 而那正是這條要防的情況。
+    // 而那正是這條要防的情況。（從退場的 `FE-O14-S10` 原封搬過來）
     expect(FakeSocket.last, '根本沒有嘗試連線，下面那條斷言等於沒驗').not.toBeNull()
 
     // 握手從來沒成功就被關掉 —— 實測時客戶端看到的就是這個
     // （`close code=1006`、空 reason、`wasClean=false`）。
     FakeSocket.last?.emit('close', { code: 1006, reason: '', wasClean: false })
 
-    expect(
-      screen.queryByRole('status', NOTICE),
-      '後端連不上時竟然顯示了「單人預覽」—— 那會在真的壞掉的那天告訴使用者一切正常',
-    ).toBeNull()
+    expectNoRealtimeStatusProse()
   })
 })
