@@ -41,6 +41,10 @@ export const WORLD_COLORS = {
   carpet: '#d8bda6',
   /** 平台／台階。介於地面與牆之間。 */
   platform: '#bfc6da',
+  /** 木頭（桌面、層板）。 */
+  wood: '#b08968',
+  /** 深一階的木頭（桌腳、側板）。 */
+  woodDark: '#8c6a4f',
 } as const
 
 export type WorldColorName = keyof typeof WORLD_COLORS
