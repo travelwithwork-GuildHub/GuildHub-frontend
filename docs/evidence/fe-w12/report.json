@@ -1,0 +1,42 @@
+[
+  {
+    "case": "success-6",
+    "note": "剛好排滿走廊",
+    "intercepted": 2,
+    "labels": 6,
+    "visible": 6,
+    "notice": null,
+    "sample": "星際導航 · 3 人",
+    "screenshot": "docs/evidence/fe-w12/success-6.png"
+  },
+  {
+    "case": "overflow-9",
+    "note": "超過容量 —— 要說出「另有 3 個沒有顯示」",
+    "intercepted": 2,
+    "labels": 6,
+    "visible": 6,
+    "notice": "另有 3 個專案沒有顯示。",
+    "sample": "星際導航 · 3 人",
+    "screenshot": "docs/evidence/fe-w12/overflow-9.png"
+  },
+  {
+    "case": "empty",
+    "note": "目前沒有公開的專案",
+    "intercepted": 2,
+    "labels": 0,
+    "visible": 0,
+    "notice": "目前沒有公開的專案。",
+    "sample": null,
+    "screenshot": "docs/evidence/fe-w12/empty.png"
+  },
+  {
+    "case": "failed",
+    "note": "拿不到資料 —— MUST NOT 跟 empty 長得一樣",
+    "intercepted": 2,
+    "labels": 0,
+    "visible": 0,
+    "notice": "暫時拿不到專案清單 —— 走廊的門稍後會出現。",
+    "sample": null,
+    "screenshot": "docs/evidence/fe-w12/failed.png"
+  }
+]

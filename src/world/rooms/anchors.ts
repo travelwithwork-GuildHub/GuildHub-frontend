@@ -1,7 +1,7 @@
 import type { RoomDoorOut } from '@/api/contract/rest'
 import { visualBoundsOf } from '../environment/definition'
 import { doorDefinition } from '../environment/semantic'
-import { doorLabel, doorTargetId } from './labels'
+import { doorTag, doorTargetId } from './labels'
 import type { DoorSlot } from './slots'
 
 // 每一扇門的標籤要掛在哪個世界座標上。規格 `FE-W12-S09`／`S10`。
@@ -35,7 +35,7 @@ export function labelAnchorsFor(
     return [
       {
         id: doorTargetId(room.project_id),
-        text: doorLabel(room),
+        text: doorTag(room),
         x: slot.x,
         y: DOOR_TOP + CLEARANCE,
         z: slot.z,
