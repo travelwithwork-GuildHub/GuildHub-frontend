@@ -9,6 +9,8 @@ import {
   type PhysicsWorld,
 } from '@/world/physics/world'
 import { planSteps } from '@/world/physics/accumulator'
+import { staticBoxesFor } from '@/world/layout/geometry'
+import { LAYOUT } from '@/world/layout/guildHallLayout'
 
 // ⚠️ import 的是**正式碼**。而且這裡跑的是**真的 Rapier** ——
 // 不是 mock。開工前實測過它在 jsdom 裡跑得起來，所以碰撞、邊界、
@@ -67,21 +69,39 @@ describe('遊玩區域有邊界', () => {
     ['+Z', { x: 0, z: 1 }],
     ['−Z', { x: 0, z: -1 }],
   ])('[FE-W04-S04] 朝 %s 邊界走很久仍在範圍內', (_label, dir) => {
-    const pw = createPhysicsWorld(RAPIER)
-    const end = walk(pw, dir, 600, 0.1) // 想走 60 個單位，區域只有 ±10
+    // ⚠️ **邊界現在來自配置**（`FE-W11`），不再由 `createPhysicsWorld` 自己生。
+    // 這條 Scenario 的 ID 與 WHEN／THEN 都沒有改 —— 產品義務沒變，
+    // 換的是誰提供那四個 collider。**它照樣要綠。**
+    const pw = createPhysicsWorld(RAPIER, { staticBoxes: staticBoxesFor(LAYOUT) })
+    const end = walk(pw, dir, 900, 0.1) // 想走 90 個單位，區域只有 ±12
 
     expect(Math.abs(end.x)).toBeLessThanOrEqual(PHYSICS.halfExtent)
     expect(Math.abs(end.z)).toBeLessThanOrEqual(PHYSICS.halfExtent)
+  })
+
+  it('[FE-W11-S08] 物理世界裡沒有多出來的邊界', () => {
+    // 不傳任何盒子時，世界裡一個靜態碰撞體都沒有 ——
+    // 「邊界藏在建構流程裡」那條路已經拔掉了。
+    const empty = createPhysicsWorld(RAPIER)
+    expect(empty.world.colliders.len(), '角色自己的 collider 之外不該有別的').toBe(1)
+
+    const boxes = staticBoxesFor(LAYOUT)
+    expect(boxes.length, '配置一個碰撞盒都沒推導出來 —— 下面那條恆真').toBeGreaterThan(4)
+    const full = createPhysicsWorld(RAPIER, { staticBoxes: boxes })
+    expect(full.world.colliders.len(), '碰撞體數量跟傳進去的對不上').toBe(boxes.length + 1)
   })
 })
 
 describe('任何速度都不得穿牆', () => {
   it('[FE-W04-S05] 世界剛建好、第一次移動就衝向邊界', () => {
-    // ⚠️ 這條是負向驗證逼出來的：原本只有「addStaticBox 加的牆」被涵蓋，
-    // 而那個函式自己會更新查詢管線。**邊界是在 createPhysicsWorld 裡加的** ——
+    // ⚠️ 這條是負向驗證逼出來的：原本只有「事後用 addStaticBox 加的牆」被涵蓋，
+    // 而那個函式自己會更新查詢管線。**邊界是在 createPhysicsWorld 裡面加的** ——
     // 那裡少一次 updateSceneQueries 的話，開場第一幀衝出去就穿牆，
     // 而且之後每一步都正常（因為 step 更新了管線），所以幾乎查不出來。
-    const pw = createPhysicsWorld(RAPIER)
+    //
+    // `FE-W11` 把邊界的來源換成配置，**但它們仍然是在建構流程裡加的**，
+    // 所以這條要防的事情一模一樣。
+    const pw = createPhysicsWorld(RAPIER, { staticBoxes: staticBoxesFor(LAYOUT) })
 
     movePlayer(pw, { x: 50, z: 0 })
     const end = pw.player.translation()

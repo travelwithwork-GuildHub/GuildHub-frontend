@@ -56,13 +56,33 @@ export interface StaticBox {
   sensor?: boolean
 }
 
+export interface PhysicsWorldOptions {
+  /** 角色的起始位置。省略＝原點。 */
+  readonly spawn?: { readonly x: number; readonly z: number }
+  /**
+   * 這個世界裡所有的靜態障礙物，**包含遊玩區域的邊界**。
+   *
+   * ⚠️⚠️ **邊界不再由這裡自己生**（`FE-W11`）。以前有一個 `addBounds()`
+   * 藏在裡面，於是「邊界在哪裡」有兩份真相：`PHYSICS.halfExtent`、
+   * 那個函式、以及配置。移一面牆或改世界尺寸時它們會不同步。
+   *
+   * 現在邊界與內牆走**同一條路** —— 都是配置推導出來的 `StaticBox`。
+   * 不傳的話這個世界**沒有邊界**，那是刻意的：測試要一個空世界時就不傳。
+   */
+  readonly staticBoxes?: readonly StaticBox[]
+}
+
 /**
  * 建立物理世界。
  *
  * 重力是零：**這是俯視角的平面移動**（`CONTEXT.md`：移動是 2D gameplay logic）。
  * 留一個用不到的重力設定，只會讓之後的人猜它為什麼在那裡。
  */
-export function createPhysicsWorld(rapier: typeof RAPIER, spawn = { x: 0, z: 0 }): PhysicsWorld {
+export function createPhysicsWorld(
+  rapier: typeof RAPIER,
+  options: PhysicsWorldOptions = {},
+): PhysicsWorld {
+  const spawn = options.spawn ?? { x: 0, z: 0 }
   const world = new rapier.World({ x: 0, y: 0, z: 0 })
   world.timestep = PHYSICS.fixedStep
 
@@ -80,37 +100,15 @@ export function createPhysicsWorld(rapier: typeof RAPIER, spawn = { x: 0, z: 0 }
   // 沿著表面滑動，而不是撞到就完全停住 —— 規格 FE-W04-S02。
   controller.setSlideEnabled(true)
 
-  addBounds(rapier, world)
+  const built: PhysicsWorld = { rapier, world, controller, player, playerCollider }
+  for (const box of options.staticBoxes ?? []) addStaticBox(built, box)
 
   // ⚠️ 查詢管線要先更新，否則**第一次移動看不到剛加的 collider** ——
   // 症狀是「開場第一步就穿牆」，而之後每一步都正常（因為 step 更新了它）。
   // 實測抓到的：S05 只推一次，結果直接穿到 x=5。
   world.updateSceneQueries()
 
-  return { rapier, world, controller, player, playerCollider }
-}
-
-/**
- * 遊玩區域的邊界。
- *
- * **用靜態 collider，不是夾座標**（規格明文的 MUST NOT）。
- * 夾座標會讓角色在邊界上抖動，而且跟 sensor 的重疊判定對不起來 ——
- * 一個在物理裡算、一個在物理外算。
- */
-function addBounds(rapier: typeof RAPIER, world: RAPIER.World): void {
-  const e = PHYSICS.halfExtent
-  const t = PHYSICS.wallThickness
-  const h = PHYSICS.wallHeight
-  const walls: Array<[number, number, number, number]> = [
-    [0, -e - t, e + t, t], // 上（−Z）
-    [0, e + t, e + t, t], // 下（+Z）
-    [-e - t, 0, t, e + t], // 左（−X）
-    [e + t, 0, t, e + t], // 右（+X）
-  ]
-  for (const [x, z, hw, hd] of walls) {
-    const body = world.createRigidBody(rapier.RigidBodyDesc.fixed().setTranslation(x, 0, z))
-    world.createCollider(rapier.ColliderDesc.cuboid(hw, h, hd), body)
-  }
+  return built
 }
 
 /** 加一個靜態方塊。`sensor: true` 的不擋路，只回報重疊。 */

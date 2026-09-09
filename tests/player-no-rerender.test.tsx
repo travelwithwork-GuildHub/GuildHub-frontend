@@ -4,6 +4,7 @@ import type { FC } from 'react'
 import { Vector3 } from 'three'
 import { LocalPlayer, type LocalPlayerProps } from '@/world/player/LocalPlayer'
 import { PHYSICS } from '@/world/physics/world'
+import { SPAWN } from '@/world/layout/guildHallLayout'
 
 // `FE-W03-S13`（角色移動時相機的 target 跟著改變，且沒有觸發 React 重新渲染）
 // 與 `FE-W04-S08`（位置由 rigid body 持有，不每幀寫 React state）。
@@ -67,9 +68,11 @@ describe('角色的位置不進 React', () => {
     // **三個軸都要驗。** 只斷言 x 的話，把 `targetRef.current.z = 999` 寫死
     // 進正式碼照樣綠 —— 規格說的是「相機讀到的 target 是角色的**新位置**」，
     // 不是「x 有變」。（外部審查實測的存活突變。）
-    expect(targetRef.current.x, '角色沒有往右移動，或 target 沒有被寫進去').toBeGreaterThan(0)
+    expect(targetRef.current.x, '角色沒有往右移動，或 target 沒有被寫進去').toBeGreaterThan(SPAWN.x)
     expect(targetRef.current.y, 'target 的 y 不等於角色的 y').toBe(0)
-    expect(targetRef.current.z, '只按了右，z 不該動').toBeCloseTo(0, 6)
+    // ⚠️ 比的是**出生點的 z**，不是 0 —— `FE-W11` 之後出生點不在原點。
+    // 寫死 0 的話，這條斷言驗的是「出生點在哪裡」而不是「z 有沒有動」。
+    expect(targetRef.current.z, '只按了右，z 不該動').toBeCloseTo(SPAWN.z, 6)
 
     // **這一條只有走 rigid body 那條路才會過。** 一直往右走很久：
     // 物理世界有 ±halfExtent 的靜態邊界牆，角色會停在牆內；
