@@ -13,7 +13,7 @@ import {
   type FurnitureKind,
 } from '@/world/environment/furnitureProps'
 import { PropParts } from '@/world/environment/PropParts'
-import { carpetDefinition } from '@/world/environment/structural'
+import * as structural from '@/world/environment/structural'
 
 // 規格：openspec/changes/fe-w10-environment-components/specs/world-environment/spec.md
 //   Requirement: 場景元件分成三類 —— FE-W10-S02
@@ -141,9 +141,52 @@ describe('家具', () => {
     }
   })
 
+  it('[FE-W10-S05] 視覺可以比碰撞大 —— 葉子與燈罩伸出碰撞盒外面', async () => {
+    // 這一條把「為什麼不能要求整個 Box3 等於碰撞盒」釘住。
+    // 拿掉的話，有人把葉子標成擋路仍然會全綠，而那是一堵隱形牆。
+    for (const kind of ['plant', 'lamp'] as const) {
+      const whole = await measure(furnitureDefinition(kind))
+      const box = furnitureFootprint(kind)
+      expect(whole).not.toBeNull()
+      const visual = whole?.getSize(new Vector3()) ?? new Vector3()
+      expect((box?.halfWidth ?? 0) * 2, `${kind} 的碰撞盒跟整個視覺一樣寬 —— 裝飾被算進碰撞了`)
+        .toBeLessThan(visual.x - 0.05)
+    }
+  })
+
   it('[FE-W10-S06] 沒有擋路的部件就沒有碰撞盒', () => {
-    expect(footprintOf(carpetDefinition(3, 2)), '地毯不擋路，不該有碰撞盒').toBeUndefined()
+    expect(footprintOf(structural.carpetDefinition(3, 2)), '地毯不擋路，不該有碰撞盒').toBeUndefined()
     expect(footprintOf({ parts: [] })).toBeUndefined()
+  })
+
+  it('[FE-W10-S13] 每一個阻擋物都落地', async () => {
+    // ⚠️ **走的是「所有 definition」，不是「目前這幾種家具」。**
+    // 具名清單會過期 —— 新增一種家具而忘記加進清單的話，這條就漏掉它了。
+    // 結構元件用**匯出的名字**收集（`*Definition`），家具用 `FURNITURE_KINDS`。
+    const builders = Object.entries(structural).filter(([name]) => name.endsWith('Definition'))
+    expect(builders.length, '一個結構元件的 definition 都沒收集到 —— 命名慣例改了？').toBeGreaterThan(3)
+
+    const all: [string, PropDefinition][] = [
+      ...FURNITURE_KINDS.map((k) => [k, furnitureDefinition(k)] as [string, PropDefinition]),
+      ...builders.map(([name, build]) => [
+        name,
+        (build as (a: number, b: number, c: number) => PropDefinition)(2, 2, 0.4),
+      ] as [string, PropDefinition]),
+    ]
+
+    let blocking = 0
+    for (const [name, definition] of all) {
+      const parts = definition.parts.filter((p) => p.blocks === true)
+      if (parts.length === 0) continue
+      blocking += parts.length
+      // ⚠️ 量的是**整組**擋路部件，不是逐一部件。
+      // 桌面是擋路的部件而它站在桌腳上 —— 逐一部件的話桌子永遠不合格
+      //（實測第一版就是這樣紅的，而紅的是規格不是實作）。
+      const box = await measure({ parts })
+      expect(box?.min.y, `${name} 的整組阻擋物懸在空中（碰撞是貼地的 2.5D 模型）`)
+        .toBeCloseTo(0, 3)
+    }
+    expect(blocking, '一個擋路的部件都沒走到 —— 這條驗證是空的').toBeGreaterThan(0)
   })
 
   it('[FE-W10-S07] 旋轉 90° 之後碰撞盒跟著轉', () => {

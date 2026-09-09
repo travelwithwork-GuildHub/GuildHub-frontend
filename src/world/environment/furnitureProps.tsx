@@ -18,7 +18,7 @@ import { PropParts } from './PropParts'
 // 盆栽只有花盆擋路、燈只有底座與燈桿擋路 —— 葉子跟燈罩合法地伸出碰撞盒外面。
 // 標錯的話玩家會在離樹幹還有一段距離的空氣中被擋住。
 
-export const FURNITURE_KINDS = ['desk', 'chair', 'shelf'] as const
+export const FURNITURE_KINDS = ['desk', 'chair', 'shelf', 'plant', 'lamp'] as const
 
 export type FurnitureKind = (typeof FURNITURE_KINDS)[number]
 
@@ -79,15 +79,61 @@ const SHELF: PropDefinition = {
   ],
 }
 
+// ⚠️ **葉子刻意不擋路。** 這一種是「視覺比碰撞大」的例子 ——
+// 標成擋路的話，玩家會在離花盆 0.3 個單位的地方撞到空氣。
+const PLANT: PropDefinition = {
+  parts: [
+    {
+      geometry: { shape: 'Cylinder', radius: 0.22, height: 0.3 },
+      material: { kind: 'standard', color: 'terracotta', roughness: 0.9 },
+      position: [0, 0.15, 0],
+      blocks: true,
+    },
+    {
+      geometry: { shape: 'Sphere', radius: 0.34 },
+      material: { kind: 'standard', color: 'leaf', roughness: 0.85 },
+      position: [0, 0.62, 0],
+    },
+    {
+      geometry: { shape: 'Sphere', radius: 0.22 },
+      material: { kind: 'standard', color: 'leaf', roughness: 0.85 },
+      position: [0.2, 0.86, 0.08],
+    },
+  ],
+}
+
+// ⚠️ **燈罩不擋路**，理由同 `PLANT` 的葉子。
+const LAMP: PropDefinition = {
+  parts: [
+    {
+      geometry: { shape: 'Cylinder', radius: 0.18, height: 0.06 },
+      material: { kind: 'standard', color: 'metal', roughness: 0.4, metalness: 0.6 },
+      position: [0, 0.03, 0],
+      blocks: true,
+    },
+    {
+      geometry: { shape: 'Cylinder', radius: 0.035, height: 1.3 },
+      material: { kind: 'standard', color: 'metal', roughness: 0.4, metalness: 0.6 },
+      position: [0, 0.71, 0],
+      blocks: true,
+    },
+    {
+      // `basic` 不吃光 —— 燈罩是「自己在發亮」的外觀，被打光會看起來像塑膠。
+      geometry: { shape: 'Cylinder', radius: 0.28, height: 0.26 },
+      material: { kind: 'basic', color: 'glow' },
+      position: [0, 1.44, 0],
+      castShadow: false,
+    },
+  ],
+}
+
 export const FURNITURE: Readonly<Record<FurnitureKind, PropDefinition>> = {
   desk: DESK,
   chair: CHAIR,
   shelf: SHELF,
+  plant: PLANT,
+  lamp: LAMP,
 }
-
-// ⚠️ **`plant` 與 `lamp` 在下一刀。** 它們是「視覺比碰撞大」的那一種
-//（葉子伸出花盆、燈罩懸出底座），而那條判準值得跟這三個**主要阻擋物**分開驗 ——
-// 混在一起的話，很容易為了讓共用的測試通過，錯誤地把碰撞盒膨脹到包住葉片。
 
 /** 取一種家具的 definition。未列舉的名字拋錯 —— 型別擋得住打字錯誤，擋不住 `as any`。 */
 export function furnitureDefinition(kind: FurnitureKind): PropDefinition {
