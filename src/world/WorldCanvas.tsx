@@ -8,7 +8,6 @@ import { DebugShadowScene } from './DebugShadowScene'
 import { WorldCamera } from './WorldCamera'
 import { LocalPlayer } from './player/LocalPlayer'
 import { RemoteWorld } from './RemoteWorld'
-import { SinglePlayerNotice } from './SinglePlayerNotice'
 import { InteractionProvider } from './interaction/InteractionProvider'
 import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
@@ -102,9 +101,13 @@ export default function WorldCanvas() {
         {!ready && <LoadingOverlay />}
         {/* 規格 FE-W06-S13：提示在 Canvas **外面** */}
         <InteractionPrompt />
-        {/* 規格 FE-O14-S09：沒有即時後端時告訴訪客這是單人預覽。
-            它自己判斷要不要出現 —— WorldCanvas 不需要知道即時層的設定。 */}
-        <SinglePlayerNotice />
+        {/* ⚠️ 規格 FE-O14-S11／S12：這裡刻意什麼都沒有。
+            以前這裡有一段「目前是單人預覽，看不到其他人」——
+            拿掉是產品決定（這個網址對外的用途是展示世界，而那段字是
+            畫面上唯一的文字，會先於世界本身被讀到）。
+            **MUST NOT 加回任何描述即時層狀態的常駐說明。**
+            「有位址但連不上」怎麼呈現是 FE-R12（W5），那個可以做 ——
+            唯一的限制是不得借用「單人預覽」這種「一切正常」的措辭。 */}
       </div>
     </InteractionProvider>
   )
