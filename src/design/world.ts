@@ -53,6 +53,12 @@ export const WORLD_COLORS = {
   metal: '#9aa3b5',
   /** 燈罩。**用 `basic` 材質**，不吃光 —— 它自己是光源的外觀。 */
   glow: '#ffe9b0',
+  /** 布料（旗幟、垂墜）。 */
+  cloth: '#8f5f7a',
+  /** 公佈欄的板面。 */
+  board: '#e6dcc8',
+  /** 釘在板面上的卡片。 */
+  card: '#f7f2e6',
 } as const
 
 export type WorldColorName = keyof typeof WORLD_COLORS
