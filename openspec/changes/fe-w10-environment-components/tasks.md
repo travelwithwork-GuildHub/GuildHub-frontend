@@ -15,7 +15,7 @@
 - [ ] 1.7 測試 `FE-W10-S08`／`S09`（資源限制的兩個方向）
 - [ ] 1.8 **突變**：把 `Wall` 的尺寸改成寫死的 `20` → `S11` 要紅
 - [ ] 1.9 **突變**：在 `Floor` 裡塞一個 `<boxGeometry>` → `S08` 要紅
-- [ ] 1.10 **突變**：讓 `WorldShell` 的牆也建一組 collider → `S12` 要紅
+- [ ] 1.10 **突變**：在 `WorldShell` 裡呼叫一次 `createCollider` → `S12` 要紅
 
 ## 2. 家具與碰撞判準（`feat/…--furniture`）
 
