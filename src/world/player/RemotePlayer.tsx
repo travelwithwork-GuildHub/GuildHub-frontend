@@ -46,13 +46,22 @@ export function RemotePlayer({ id, motion, now }: RemotePlayerProps) {
 
   useFrame(() => {
     const root = rootRef.current
-    // ⚠️ **卸載與 render loop 有競態。** `leave` 造成的卸載可能發生在
-    // 這一幀之前，那時 ref 已經是 null —— 不擋的話使用者離開就噴紅字。
+    // ⚠️ **這一行是 TypeScript 的型別收斂，不是執行期防禦。**
+    // `useRef<Group>(null)` 的型別是 `Group | null`，不寫它編譯不過 ——
+    // 但它**到不了**：量過，元件卸載之後它的 `useFrame` 完全不再被呼叫，
+    // 而且 ref 從來沒有是 null 過（連第一幀都不是）。React 的 commit 是同步的，
+    // rAF 不會插進它中間。**所以不要在這裡寫「防卸載競態」** ——
+    // 那句話會讓下一個人照著錯的心智模型寫出一條永遠不會紅的測試（`FE-R08-S20` 的前一版）。
     if (!root) return
 
     const track = motion.get(id)
-    // 名單上有、但動態還沒到（理論上不會發生：`snapshot` 與 `join` 都帶座標）。
-    // 真的發生的話**保持上一個位置**，不要跳回原點。
+    // ⚠️ **這一行才是真正在擋競態的那一個**（`FE-R08-S20`）。
+    // `leave` **同步**刪掉 `motion` 的 entry，而角色要等 React 依新名單重繪
+    // 才卸載 —— 中間有一段「元件還在、樣本已經沒了」的空窗。
+    // 拿掉它，下一幀就在 `evaluate(undefined, …)` 拋 `TypeError`。
+    //
+    // 同一行也涵蓋「名單上有、但動態還沒到」（理論上不會發生：`snapshot`
+    // 與 `join` 都帶座標）。兩種情況都**保持上一個位置**，不要跳回原點。
     if (track === undefined) return
 
     const pose = evaluate(track, now())
