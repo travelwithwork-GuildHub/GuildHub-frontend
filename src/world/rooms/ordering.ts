@@ -29,13 +29,47 @@ export interface RoomDoors {
  * 後者需要伺服器端的槽位指派，那是 `FE-V01` 的事。
  */
 export function doorsFor(rooms: readonly RoomDoorOut[], capacity: number): RoomDoors {
-  const sorted = [...rooms].sort((a, b) => {
+  const unique = dedupe(rooms)
+  const sorted = [...unique].sort((a, b) => {
     if (a.project_id < b.project_id) return -1
     if (a.project_id > b.project_id) return 1
     return 0
   })
   return {
     doors: sorted.slice(0, Math.max(0, capacity)),
-    hidden: Math.max(0, rooms.length - Math.max(0, capacity)),
+    hidden: Math.max(0, unique.length - Math.max(0, capacity)),
   }
+}
+
+/**
+ * 去掉重複的 `project_id`，**保留第一筆**。
+ *
+ * ⚠️⚠️ **這是這個 repo 少數「不明顯失敗」的地方，而它有理由。**
+ *
+ * 互動系統對重複的 id **拋錯**（`FE-W06-S16` 刻意的設計：兩個物件共用一個 id
+ * 會讓「提示指著誰、按 E 觸發誰」變成不確定）。而門的 id 是 `door:${project_id}` ——
+ * 所以後端多回一筆重複的房間，兩個 `<Interactable>` 會撞在一起、
+ * error boundary 接手，**整個 3D 世界變成白畫面**。
+ *
+ * **一筆髒資料不該讓世界消失。** 走廊少一扇門是可以承受的降級。
+ *
+ * ⚠️ **但不靜默** —— `console.error` 帶著那個 `project_id`，讓它定位得到。
+ * 也**不拋 `ContractDriftError`**：後端從來沒有承諾 `project_id` 唯一，
+ * 所以重複不算違反契約，而那條路一樣是白畫面。
+ */
+function dedupe(rooms: readonly RoomDoorOut[]): RoomDoorOut[] {
+  const seen = new Set<string>()
+  const out: RoomDoorOut[] = []
+  for (const room of rooms) {
+    if (seen.has(room.project_id)) {
+      console.error(
+        `GET /api/rooms 回了重複的 project_id「${room.project_id}」，已略過第二筆。` +
+          '兩個門共用一個互動識別字會讓整個世界拋錯 —— 這是後端的資料問題。',
+      )
+      continue
+    }
+    seen.add(room.project_id)
+    out.push(room)
+  }
+  return out
 }
