@@ -690,7 +690,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-R07 | RemotePlayers | `snapshot` 建立；`presence` 的 join / leave lifecycle；`pos` 更新 target state | W1 | 7 | | |
 | FE-R08 | Interpolation | previous / target；10 Hz → 60 FPS，遠端角色**無明顯跳格**；jitter / 缺包 / teleport threshold | W1 | 10 | | |
 | | | **朝向 `f` 是離散的，做 facing transition，不是角度插值** | W1 | 3 | | |
-| FE-R09 | BrowserLoadTest | 40 個真實 Chromium / R3F Browser E2E（**不是 WebSocket fake client**）；單 Browser 渲染 39 個 Remote，記錄 FPS / CPU / GPU / Memory | W1 | 10 | | |
+| FE-R09 | BrowserLoadTest | **1 個真實瀏覽器 ＋ N 個 WebSocket client**，量被測瀏覽器渲染 N 個 Remote 時的 FPS。**40 個真實 Chromium 做不到** —— 量出來一個空白 WebGL 頁面就要 225 MB，40 × 225 = 9 GB 超過這台機器的實體記憶體（判定見 `docs/adr/0004`） | W1 | 10 | | Alarm｜這個綠燈**不涵蓋**「40 個完整前端在同一台機器上」 |
 | | | 另跑 40 WebSocket client network baseline，區分 Server／Protocol 與 Browser Rendering 問題 | W1 | 2 | | |
 | | | **只准打自己本機起的後端。** 後端已有 `tools/run_swarm.py --n 40 --seconds 300` 可直接調插值，`--n 5 --idle` 驗證靜止時封包數為 0 | W1 | 1 | | |
 | FE-R10 | Presence | Online snapshot / player status / offline cleanup / online count | W3 | 6 | | |
