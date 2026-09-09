@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { realtimeAdapter } from '@/config/env'
 import { RealtimeClient } from '@/realtime/client'
 import { createMessageValidator, type ProtocolViolation } from '@/realtime/protocol'
 import {
@@ -55,6 +56,14 @@ export function RemoteWorld({ poseRef, now = monotonicNow }: RemoteWorldProps) {
   const motion: ReadonlyMap<string, RemoteMotion> = state.motion
 
   useEffect(() => {
+    // 規格 `FE-O14-S07`：即時層的資料來源是 `none` 時
+    // **MUST NOT 建立任何 WebSocket 連線**。
+    //
+    // ⚠️ **早退在最前面，而且不留任何痕跡** —— `none` 是一個正常狀態，
+    // 不是錯誤。在這裡 `console.warn` 一行會讓每一個單人預覽的訪客
+    // 在 console 看到一則警告，而那會教人忽略警告。
+    if (realtimeAdapter() === 'none') return
+
     // 違規通報。**必填** —— `FE-R02` 的契約明文寫著它保證不了呼叫端有沒有在看，
     // 所以這裡要真的接上一個東西，而不是傳一個空函式。
     //

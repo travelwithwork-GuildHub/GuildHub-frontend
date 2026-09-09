@@ -8,6 +8,7 @@ import { DebugShadowScene } from './DebugShadowScene'
 import { WorldCamera } from './WorldCamera'
 import { LocalPlayer } from './player/LocalPlayer'
 import { RemoteWorld } from './RemoteWorld'
+import { SinglePlayerNotice } from './SinglePlayerNotice'
 import { InteractionProvider } from './interaction/InteractionProvider'
 import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
@@ -101,6 +102,9 @@ export default function WorldCanvas() {
         {!ready && <LoadingOverlay />}
         {/* 規格 FE-W06-S13：提示在 Canvas **外面** */}
         <InteractionPrompt />
+        {/* 規格 FE-O14-S09：沒有即時後端時告訴訪客這是單人預覽。
+            它自己判斷要不要出現 —— WorldCanvas 不需要知道即時層的設定。 */}
+        <SinglePlayerNotice />
       </div>
     </InteractionProvider>
   )
