@@ -97,6 +97,50 @@ describe('家具', () => {
     }
   })
 
+  it('[FE-W10-S05] 四種 primitive 的半尺寸都跟真的幾何對得上', async () => {
+    // ⚠️ 這一條**不是**多餘的：上面五種家具的擋路部件全是 `RoundedBox`，
+    // 所以 `Capsule`／`Sphere`／`Cylinder` 那三個分支一條都沒被走過。
+    // 實測：把 `Cylinder` 的半高寫成全高，上面那條**照樣全綠**。
+    const shapes: PropDefinition['parts'] = [
+      {
+        geometry: { shape: 'RoundedBox', width: 1.2, height: 0.4, depth: 0.6, radius: 0.05 },
+        material: { kind: 'standard', color: 'wood' },
+        position: [-2, 0.2, 0],
+        blocks: true,
+      },
+      {
+        geometry: { shape: 'Capsule', radius: 0.3, length: 0.8 },
+        material: { kind: 'standard', color: 'wood' },
+        position: [0, 0.7, 0],
+        blocks: true,
+      },
+      {
+        geometry: { shape: 'Sphere', radius: 0.45 },
+        material: { kind: 'standard', color: 'wood' },
+        position: [2, 0.45, 0.5],
+        blocks: true,
+      },
+      {
+        geometry: { shape: 'Cylinder', radius: 0.25, height: 1.1 },
+        material: { kind: 'standard', color: 'wood' },
+        position: [3.5, 0.55, -0.4],
+        blocks: true,
+      },
+    ]
+    for (const part of shapes) {
+      const one = { parts: [part] }
+      const measured = await measure(one)
+      const declared = footprintOf(one)
+      const size = measured?.getSize(new Vector3()) ?? new Vector3()
+      const center = measured?.getCenter(new Vector3()) ?? new Vector3()
+      const what = part.geometry.shape
+      expect(declared?.halfWidth, `${what} 的半寬`).toBeCloseTo(size.x / 2, 3)
+      expect(declared?.halfHeight, `${what} 的半高`).toBeCloseTo(size.y / 2, 3)
+      expect(declared?.halfDepth, `${what} 的半深`).toBeCloseTo(size.z / 2, 3)
+      expect(declared?.offsetX, `${what} 的位置`).toBeCloseTo(center.x, 3)
+    }
+  })
+
   it('[FE-W10-S06] 沒有擋路的部件就沒有碰撞盒', () => {
     expect(footprintOf(carpetDefinition(3, 2)), '地毯不擋路，不該有碰撞盒').toBeUndefined()
     expect(footprintOf({ parts: [] })).toBeUndefined()
