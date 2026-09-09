@@ -1,26 +1,26 @@
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-r05-self-echo` 合併進 `main`）。
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-r05-self-echo` 合併進 `main`）。
       驗證：`npx --no-install openspec validate fe-r05-self-echo --strict` 通過且 PR 已合併
 
 ## 2. 指名的測試
 
 **正式碼不改。** 這一節的產出全部在 `tests/`。
 
-- [ ] 2.1 `FE-R05-S01`：一則 `pos` 同時含自己與別人 —— 自己不進名單、
+- [x] 2.1 `FE-R05-S01`：一則 `pos` 同時含自己與別人 —— 自己不進名單、
       樣本容器裡沒有自己、**而且別人照常更新**（第三條是防「整則被丟掉」）
-- [ ] 2.2 `FE-R05-S02`：`snapshot` 的第一個元素就是自己（實測後端如此）
-- [ ] 2.3 `FE-R05-S03`：`selfId` 是 `null` 時自己會被當成遠端玩家 ——
+- [x] 2.2 `FE-R05-S02`：`snapshot` 的第一個元素就是自己（實測後端如此）
+- [x] 2.3 `FE-R05-S03`：`selfId` 是 `null` 時自己會被當成遠端玩家 ——
       **這一條斷言的是這一層的邊界**，用來釘住「`hello` 先到且同步設定」這個前提
 
 ## 3. 負向驗證
 
 **驗收條件不是「測試全綠」，是「把防禦拿掉，測試要變紅」。**
 
-- [ ] 3.1 把 `snapshot` 的 `if (p.id === selfId) continue` 拿掉 →
+- [x] 3.1 把 `snapshot` 的 `if (p.id === selfId) continue` 拿掉 →
       **FE-R05-S02** 要紅（**FE-R05-S01** 也會紅，因為名單裡有了自己，`pos` 就會更新它）
-- [ ] 3.2 把 `presence.join` 的 `p.id !== selfId` 拿掉 → 既有的 `FE-R07-S05` 要紅
-- [ ] 3.3 把 `pos` 的「不在名單裡就跳過」拿掉 → **FE-R05-S01** 要紅
+- [x] 3.2 把 `presence.join` 的 `p.id !== selfId` 拿掉 → 既有的 `FE-R07-S05` 要紅
+- [x] 3.3 把 `pos` 的「不在名單裡就跳過」拿掉 → **FE-R05-S01** 要紅
       （自己會憑空被建出來）
-- [ ] 3.4 把 `selfId` 改成非同步設定（模擬「放進 React state」）→
+- [x] 3.4 把 `selfId` 改成非同步設定（模擬「放進 React state」）→
       **FE-R05-S03** 要紅
