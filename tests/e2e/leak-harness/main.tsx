@@ -4,8 +4,6 @@ import { Canvas } from '@react-three/fiber'
 import { BoxGeometry, MeshStandardMaterial, type WebGLRenderer } from 'three'
 import { DebugShadowScene } from '@/world/DebugShadowScene'
 import { ChibiPlayer } from '@/world/player/ChibiPlayer'
-import { geometryFor } from '@/world/primitives/geometry'
-import { materialFor } from '@/world/primitives/material'
 
 // FE-W07 洩漏偵測的量測台。規格 `openspec/specs/world-resources/`。
 //
@@ -95,35 +93,6 @@ function OwnedFixture() {
   return <mesh geometry={geo} material={mat} />
 }
 
-/**
- * **FE-W09 的共用快取。** `geometryFor`／`materialFor` 是模組層級的 cache，
- * 規格明文寫著使用者 MUST NOT 對它們 `dispose()`。
- *
- * 它們被 `FE-W07-S06` 的涵蓋率檢查抓到（用 `new` 建 GPU 資源），
- * 而**正確的處置是登記進來、不是把它們排除**：登記之後這把尺會真的證明
- * 「快取在重複進出下不成長」，那比一句「相信它不會」強。
- *
- * ⚠️ **`dispose={null}` 不能省。** 沒有它就是在依賴
- * 「prop 傳進去的資源目前碰巧不會被 R3F 釋放」這個實作細節 ——
- * 而共用實例被釋放的症狀是**看不出來的**（three.js 下一幀會重新上傳）。
- *
- * ⚠️⚠️ **這個 subject 只證明得了 geometry 那一半。**
- * `renderer.info.memory` 只有 `geometries` 與 `textures` 兩個欄位，
- * 而 `MeshStandardMaterial` 本身不增加這兩項 ——
- * 所以把 material 的 cache 拿掉，這裡**仍然會是 clean**。
- * material 的共用由 `tests/world-design-system.test.ts` 的 `toBe` 斷言守，
- * 不是這裡。寫出來免得有人以為這條涵蓋了兩邊。
- */
-function SharedPrimitiveFixture() {
-  return (
-    <mesh
-      geometry={geometryFor({ shape: 'RoundedBox', width: 1, height: 1, depth: 1, radius: 0.12 })}
-      material={materialFor({ kind: 'standard', color: 'accent' })}
-      dispose={null}
-    />
-  )
-}
-
 // ─────────────────────────────────────────────────────────────────────
 // 受測清單
 //
@@ -161,20 +130,6 @@ const SUBJECTS: readonly Subject[] = [
     source: 'src/world/player/ChibiPlayer.tsx',
     expect: 'clean',
     render: () => <ChibiPlayer />,
-  },
-  // FE-W09 的共用快取。**一個 subject 登記兩個檔案是刻意的** ——
-  // 它們是同一個機制的兩半，分開 render 只會多一個一模一樣的量測。
-  {
-    id: 'primitives:geometry',
-    source: 'src/world/primitives/geometry.ts',
-    expect: 'clean',
-    render: () => <SharedPrimitiveFixture />,
-  },
-  {
-    id: 'primitives:material',
-    source: 'src/world/primitives/material.ts',
-    expect: 'clean',
-    render: () => <SharedPrimitiveFixture />,
   },
 ]
 

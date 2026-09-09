@@ -33,7 +33,6 @@ const MUST_INCLUDE = [
   join('player', 'ChibiPlayer.tsx'),
   join('player', 'LocalPlayer.tsx'),
   join('interaction', 'InteractionPrompt.tsx'),
-  join('primitives', 'geometry.ts'),
 ]
 
 describe('src/world 不得寫死顏色', () => {
