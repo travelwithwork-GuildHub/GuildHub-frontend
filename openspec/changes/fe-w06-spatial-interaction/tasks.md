@@ -20,23 +20,23 @@
 
 - [x] 3.1 `src/world/interaction/registry.ts`：建立一次就不換掉的 Map，
       register／unregister。**不進 React state**
-- [ ] 3.2 `FE-W06-S15`：卸載後不得再被選為目標，而且如果它原本是目標，React 要收到更新
+- [x] 3.2 `FE-W06-S15`：卸載後不得再被選為目標，而且如果它原本是目標，React 要收到更新
 - [x] 3.3 `FE-W06-S16`：id 重複要明顯失敗。
       **負向**：拿掉那個檢查 → 這條必須紅
 
 ## 4. 接上 render loop 與 React（`FE-W06-S08`、`S09`）
 
-- [ ] 4.1 `src/world/interaction/SpatialInteraction.tsx`：每幀算，比對前一個 id，
+- [x] 4.1 `src/world/interaction/SpatialInteraction.tsx`：每幀算，比對前一個 id，
       只有改變才 `setState`
-- [ ] 4.2 `FE-W06-S08`：連續移動很多幀、目標改變 N 次 → React 更新次數與 N 同階。
+- [x] 4.2 `FE-W06-S08`：連續移動很多幀、目標改變 N 次 → React 更新次數與 N 同階。
       **負向**：拿掉比對 → 更新次數變成跟幀數同階
-- [ ] 4.3 `FE-W06-S09`：走出所有範圍時 React 收到「沒有目標」
+- [x] 4.3 `FE-W06-S09`：走出所有範圍時 React 收到「沒有目標」
 
 ## 5. 按鍵與提示（`FE-W06-S10`～`S14`）
 
-- [ ] 5.1 `E` 只觸發 active target，且只觸發一次
-- [ ] 5.2 `FE-W06-S11`：沒有目標時按 `E` 不得拋錯
-- [ ] 5.3 `FE-W06-S12`：目標在按鍵被處理之前註銷 → 不得觸發已消失的物件、不得拋錯
+- [x] 5.1 `E` 只觸發 active target，且只觸發一次
+- [x] 5.2 `FE-W06-S11`：沒有目標時按 `E` 不得拋錯
+- [x] 5.3 `FE-W06-S12`：目標在按鍵被處理之前註銷 → 不得觸發已消失的物件、不得拋錯
 - [ ] 5.4 `FE-W06-S13`／`S14`：DOM 提示出現、**含物件的顯示名稱**、換人時跟著換
 
 ## 6. 修訂已封存的 world-physics（`FE-W04-S09`）
