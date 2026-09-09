@@ -61,9 +61,26 @@ export class RealtimeError extends Error {
   override name = 'RealtimeError'
 }
 
-/** `scene` 與 `token` 進查詢參數，base 來自設定模組 —— 不寫死。 */
+/**
+ * `scene` 與 `token` 進查詢參數，base 來自設定模組 —— 不寫死。
+ *
+ * ⚠️ **即時層資料來源是 `none` 時拋錯**（`wsUrl()` 那時回 `null`）。
+ * 走到這裡代表有人在 `none` 的部署下建立了連線 —— 而規格 `FE-O14`
+ * 明文要求那時 **MUST NOT 建立任何 WebSocket 連線**。
+ *
+ * 這不是死碼：`RemoteWorld` 是唯一的呼叫端，而「它有沒有真的擋住」
+ * 是 `FE-O14-S07` 在驗的事。這一層是那條防線漏掉時的第二道 ——
+ * 它會讓錯誤指出**原因**，而不是變成一次連往 `null` 的連線嘗試。
+ */
 export function connectionUrl(scene: string, token?: string): string {
-  const url = new URL(wsUrl())
+  const base = wsUrl()
+  if (base === null) {
+    throw new RealtimeError(
+      '即時層的資料來源是 none，不該建立連線。' +
+        'NEXT_PUBLIC_REALTIME_ADAPTER=none 代表這個部署刻意沒有即時後端。',
+    )
+  }
+  const url = new URL(base)
   url.searchParams.set('scene', scene)
   if (token) url.searchParams.set('token', token)
   return url.toString()
