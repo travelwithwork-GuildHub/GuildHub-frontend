@@ -18,10 +18,10 @@
 
 ## 3. 註冊表與 contract（`FE-W06-S15`、`S16`）
 
-- [ ] 3.1 `src/world/interaction/registry.ts`：建立一次就不換掉的 Map，
+- [x] 3.1 `src/world/interaction/registry.ts`：建立一次就不換掉的 Map，
       register／unregister。**不進 React state**
 - [ ] 3.2 `FE-W06-S15`：卸載後不得再被選為目標，而且如果它原本是目標，React 要收到更新
-- [ ] 3.3 `FE-W06-S16`：id 重複要明顯失敗。
+- [x] 3.3 `FE-W06-S16`：id 重複要明顯失敗。
       **負向**：拿掉那個檢查 → 這條必須紅
 
 ## 4. 接上 render loop 與 React（`FE-W06-S08`、`S09`）
