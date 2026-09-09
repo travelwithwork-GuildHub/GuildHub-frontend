@@ -1,4 +1,31 @@
 import type { NextConfig } from 'next'
+import { validateDeployConfig } from './src/config/env'
+
+// 規格 FE-O14「部署設定的錯誤 SHALL 在建置時失敗」。
+//
+// ⚠️ **這一行拿掉之後，測試必須變紅。** 那是這條 Requirement 的驗收條件，
+// 不是「測試全綠」（`tests/deploy-build-gate.itest.ts` 的 V2）。
+//
+// 為什麼要有它：`wsUrl()` 第一次被呼叫是在 `RemoteWorld` 的 `useEffect` 裡，
+// 所以設定錯誤是在**訪客的瀏覽器**裡爆炸的。實測過那個組合 ——
+// `next build` 綠燈、CI 綠燈、部署成功，線上只剩下「GuildHub」四個字。
+// `fe-o09-env` 的那些守衛全部是對的，錯的是**時機**。
+//
+// ⚠️⚠️ **MUST NOT 在這裡重寫一份檢查，也 MUST NOT 逐一列舉變數。**
+// `validateDeployConfig()` 迭代 `DEPLOY_CONFIG_ITEMS` —— 那是唯一一份清單。
+// 兩份清單會漂，而漂掉的方向必然是建置時比執行時鬆，
+// 於是閘門看起來還在、實際上已經漏了。
+//
+// ⚠️ **MUST NOT 用 try/catch 把它包起來只 log。** 那樣建置會綠燈，
+// 而這整條 Requirement 存在的理由就是「不要產出一個綠燈但壞掉的 bundle」。
+//
+// 本機不受影響：`appEnv()` 用 `NODE_ENV` 當守門員。實測（design 的 M4）：
+//
+//     next dev    → NODE_ENV=development   載入 1 次 → 走本機預設值
+//     next build  → NODE_ENV=production    載入 2 次
+//
+// 載入兩次是無害的（只讀不寫），寫在這裡免得有人看到兩次輸出以為是 bug。
+validateDeployConfig()
 
 const nextConfig: NextConfig = {
   // ⚠️ **必須是 false。實測後加的，不是預防性設定。**
