@@ -64,6 +64,14 @@ export interface RequestSpec {
   params?: Record<string, string>
   /** 已經通過契約驗證的 body。`undefined` 代表不送 body。 */
   body?: unknown
+  /**
+   * 中止訊號。
+   *
+   * ⚠️ **這是「取消」，不是「不採用結果」。** 兩者差在請求還在不在飛 ——
+   * 一個只被標成「結果不要」的請求仍然佔著「同時最多一個」的名額
+   *（`FE-W12` 的輪詢契約踩過這個矛盾）。
+   */
+  signal?: AbortSignal
 }
 
 /**
@@ -84,6 +92,7 @@ export function buildRequest(spec: RequestSpec): Request {
     method: spec.method,
     credentials: REST_CREDENTIALS,
   }
+  if (spec.signal !== undefined) init.signal = spec.signal
   if (spec.body !== undefined) {
     init.body = JSON.stringify(spec.body)
     init.headers = { 'content-type': 'application/json' }
