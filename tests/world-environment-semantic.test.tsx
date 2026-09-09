@@ -52,17 +52,22 @@ describe('語意元件', () => {
     }
   })
 
-  it('[FE-W10-S13] 五種語意元件的阻擋物都落地', async () => {
+  it('[FE-W10-S13] 語意元件的阻擋物都落地', async () => {
     let checked = 0
     for (const [name, build] of BUILDERS) {
       const parts = build().parts.filter((p) => p.blocks === true)
+      // `Door` 是明文的例外（`FE-W10-S14`）—— 門是牆上的一個洞。
+      if (name === 'doorDefinition') {
+        expect(parts.length, '門的部件不該擋路 —— 見 FE-W10-S14').toBe(0)
+        continue
+      }
       expect(parts.length, `${name} 一個擋路的部件都沒有 —— 它會變成穿得過去的裝飾`)
         .toBeGreaterThan(0)
       checked += 1
       const box = await boundsOf({ parts })
       expect(box.min.y, `${name} 的整組阻擋物懸在空中`).toBeCloseTo(0, 3)
     }
-    expect(checked, '一個都沒走到 —— 這條驗證是空的').toBe(5)
+    expect(checked, '一個都沒走到 —— 這條驗證是空的').toBe(4)
   })
 
   it('公開的 props 今天就有作用', async () => {
@@ -89,15 +94,19 @@ describe('語意元件', () => {
     expect(open.z, 'Door 的 open 沒有作用').toBeGreaterThan(shut.z + 0.5)
   })
 
-  it('門板不擋路，門框才擋路', () => {
-    // 門是給人走過去的。門板算進碰撞的話，關著的門會是一堵永遠推不開的牆 ——
-    // 而「門開了沒有」是 `FE-W12` 的資料，不是這裡的幾何。
-    const shut = footprintOf(semantic.doorDefinition(false))
-    const open = footprintOf(semantic.doorDefinition(true))
-    expect(shut, '門沒有任何碰撞盒 —— 門框應該要擋人').toBeDefined()
-    expect(open?.halfWidth, '門的碰撞盒隨著開關改變 —— 門板被算進碰撞了')
-      .toBeCloseTo(shut?.halfWidth ?? 0, 4)
-    expect(open?.halfDepth).toBeCloseTo(shut?.halfDepth ?? 0, 4)
+  it('[FE-W10-S14] 門走得過去', () => {
+    // ⚠️ 碰撞盒是「所有擋路部件的 AABB 聯集」，所以**兩根分開的門柱**
+    // 會把中間的門洞實心堵死（實測門寬 1.4、碰撞盒寬 1.58）。
+    // 門是牆上的一個洞 —— 阻擋由周圍的牆提供，那是 `FE-W11` 的配置。
+    for (const open of [false, true]) {
+      const definition = semantic.doorDefinition(open)
+      expect(footprintOf(definition), `門有碰撞盒（open=${open}）—— 門洞會被堵死`)
+        .toBeUndefined()
+      expect(
+        definition.parts.filter((p) => p.blocks === true).length,
+        `門有擋路的部件（open=${open}）`,
+      ).toBe(0)
+    }
   })
 })
 
@@ -109,6 +118,31 @@ function meshes(root: Object3D): Mesh[] {
   })
   return found
 }
+
+describe('props 的邊界值', () => {
+  // codex 在封存前的驗證裡指出的：`items = 0 / 1 / 很多`、極小的尺寸，
+  // 至少要確認不會產生 NaN、負尺寸，或讓碰撞與視覺脫鉤。
+  it('極端的 items 不會做出壞掉的幾何', async () => {
+    for (const items of [0, 1, 12]) {
+      for (const build of [semantic.projectBoardDefinition, semantic.talentBoardDefinition]) {
+        const definition = build(items)
+        const box = await boundsOf(definition)
+        const size = box.getSize(new Vector3())
+        expect(Number.isFinite(size.x) && Number.isFinite(size.y) && Number.isFinite(size.z)).toBe(true)
+        expect(size.x, `items=${items} 做出了零寬度的看板`).toBeGreaterThan(0)
+        // 板面本身還在 —— `items = 0` 不該讓整個看板消失。
+        expect(size.y).toBeGreaterThan(1)
+      }
+    }
+  })
+
+  it('極小的尺寸不會做出退化的幾何', async () => {
+    // `geometryFor` 會把圓角夾到最短邊的 0.49 倍；夾錯的話 bbox 會塌成 0
+    // （`FE-W09` 實測過 `(4, 0.2, 4)` r=0.1 的高度是 0）。
+    const tiny = await boundsOf(semantic.signDefinition(0.05))
+    expect(tiny.getSize(new Vector3()).y, '招牌塌成零高度').toBeGreaterThan(1)
+  })
+})
 
 describe('語意元件的渲染', () => {
   it('每一個元件都渲染出它 definition 裡的每一個部件', async () => {

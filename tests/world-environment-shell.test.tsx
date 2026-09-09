@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
 import type {} from '@react-three/fiber'
 import { Box3, Vector3, type Mesh, type Object3D } from 'three'
-import { Floor, Platform, Wall } from '@/world/environment/structural'
+import { Carpet, Floor, Platform, Wall } from '@/world/environment/structural'
 import { WorldShell } from '@/world/environment/WorldShell'
 import { PHYSICS } from '@/world/physics/world'
 
@@ -73,6 +73,13 @@ describe('結構元件', () => {
     const platform = await boundsOf(<Platform width={3} depth={2} height={0.4} />)
     expect(platform.size.y).toBeCloseTo(0.4, 4)
     expect(platform.center.y).toBeCloseTo(0.2, 4)
+
+    // ⚠️ `Carpet` 原本一次都沒有真的 render 過（只被 `footprintOf` 讀過）——
+    // 那樣的話「它做得出合法的幾何」是沒有人驗過的。
+    const carpet = await boundsOf(<Carpet width={2.5} depth={1.5} />)
+    expect(carpet.size.x).toBeCloseTo(2.5, 4)
+    expect(carpet.size.z).toBeCloseTo(1.5, 4)
+    expect(carpet.size.y, '地毯塌成零厚度').toBeGreaterThan(0)
   })
 })
 
