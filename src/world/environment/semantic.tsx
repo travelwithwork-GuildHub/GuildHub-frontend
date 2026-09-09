@@ -58,15 +58,17 @@ export function guildBannerDefinition(height = 2.6): PropDefinition {
   return {
     parts: [
       post(0, height, 0.04),
+      // 頂桿與旗面**掛在旗桿的一側**。置中的話旗桿會從旗面正中間穿過去
+      // —— 目視才看得出來，而那看起來像穿模不像旗子。
       {
-        geometry: { shape: 'RoundedBox', width: 1, height: 0.06, depth: 0.06, radius: 0.02 },
+        geometry: { shape: 'RoundedBox', width: 0.94, height: 0.06, depth: 0.06, radius: 0.02 },
         material: METAL,
-        position: [0, height - 0.1, 0],
+        position: [0.45, height - 0.1, 0],
       },
       {
         geometry: { shape: 'RoundedBox', width: 0.8, height: height * 0.62, depth: 0.03, radius: 0.02 },
         material: { kind: 'standard', color: 'cloth', roughness: 1 },
-        position: [0, height - 0.13 - (height * 0.62) / 2, 0],
+        position: [0.45, height - 0.13 - (height * 0.62) / 2, 0],
       },
     ],
   }
@@ -101,12 +103,15 @@ export function projectBoardDefinition(items = 4): PropDefinition {
 export function talentBoardDefinition(items = 3): PropDefinition {
   const width = 1
   const height = 1.5
+  // ⚠️ 徽章是**球**不是圓盤。第一版用了平躺的 `Cylinder`，目視才發現它是
+  // 「躺在板子上的碟子」而不是「貼在板面上的徽章」——
+  // `PartDefinition` 只有 `rotationY`（繞 Y 軸），立不起來。
+  // 加 `rotationX` 會讓碰撞的 90° 規則變成兩個軸的問題，**代價遠大於這個造型**。
+  // 球從每個角度看都是圓的，而「圓 vs 方」正是它跟 `ProjectBoard` 的差異所在。
   const badges: PartDefinition[] = Array.from({ length: items }, (_, i) => ({
-    geometry: { shape: 'Cylinder', radius: 0.16, height: 0.03 },
+    geometry: { shape: 'Sphere', radius: 0.15 },
     material: { kind: 'standard', color: 'card', roughness: 0.9 },
-    // 圓盤要面向板面，所以繞 X 轉 90°；`rotationY` 只管 Y 軸，這裡直接用部件的姿態。
-    position: [0, 1.75 - i * 0.42, 0.05],
-    rotationY: 0,
+    position: [0, 1.75 - i * 0.42, 0.09],
   }))
   return { parts: [...boardFrame(width, height), ...badges] }
 }
