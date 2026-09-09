@@ -1,6 +1,6 @@
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-o02-data-access` 合併進 `main`）。
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-o02-data-access` 合併進 `main`）。
       驗證：`npx --no-install openspec validate fe-o02-data-access --strict` 通過且 PR 已合併
 
 ## 2. 測試的載具先做（否則後面每一條都沒有辦法驗）
@@ -8,16 +8,19 @@
 - [ ] 2.1 微型 HTTP server：`127.0.0.1`，當次建立當次銷毀。
       **handler 拿 `src/api/contract/` 的 schema 去 `safeParse` 收到的 request**，
       不合就回 400。回應也用同一份 response schema 產生
-- [ ] 2.2 回答 Q2（port 怎麼選）與 Q3（`credentials` 驗不驗得到）。
-      驗證：貼實際量到的結果；Q3 量不到的話，改用哪一種驗法要寫進 design
+- [x] 2.2 Q2：port 取 0，`server.address().port` 拿得回實際 port。
+      Q3：**驗不到** —— `document.cookie` 設得進去，但 server 收到的
+      `req.headers.cookie` 是 `null`（jsdom 的 cookie jar 跟 Node 的 fetch 沒連通）。
+      改驗 `Request.credentials`，預設是 `same-origin` 所以拿掉那一行會紅。
+      `FE-O02-S01` 的措辭已經回去更正（#149）
 
 ## 3. adapter 切換（`FE-O02-S01`～`S03`）
 
-- [ ] 3.1 `NEXT_PUBLIC_DATA_ADAPTER` 進 `src/config/env.ts`（唯一准許讀 env 的檔案）
+- [x] 3.1 `NEXT_PUBLIC_DATA_ADAPTER` 進 `src/config/env.ts`（唯一准許讀 env 的檔案）
 - [ ] 3.2 `FE-O02-S01`：選 `guildhub` 時打到 `restBase()`，並帶 session cookie
-- [ ] 3.3 `FE-O02-S02`：選 `internal` 時每個操作拋錯，**而且不送出任何請求**。
+- [x] 3.3 `FE-O02-S02`：選 `internal` 時每個操作拋錯，**而且不送出任何請求**。
       驗證：測試 server 記錄收到的請求數，必須是 0
-- [ ] 3.4 `FE-O02-S03`：值無法辨識時拋錯並列出合法值。
+- [x] 3.4 `FE-O02-S03`：值無法辨識時拋錯並列出合法值。
       **負向**：改成「無法辨識就退回 guildhub」→ 這條必須紅
 
 ## 4. 送出去之前對照契約（`FE-O02-S04`）

@@ -28,6 +28,21 @@ export type AppEnv = (typeof APP_ENVS)[number]
 export const REST_CREDENTIALS: RequestCredentials = 'include'
 
 /**
+ * 資料來源。規格 `FE-O02`。
+ *
+ * ⚠️⚠️ **這跟 `APP_ENVS` 的 `local` 是兩個不同的軸，而且刻意不共用「local」這個字。**
+ *
+ *     NEXT_PUBLIC_APP_ENV=local        跑在開發者的機器上 → 連 localhost:8000 的**真後端**
+ *     NEXT_PUBLIC_DATA_ADAPTER=internal 連**我們自己的** Route Handlers ＋ 可拋棄資料庫
+ *
+ * 兩個都叫 `local` 的話，「你 local 壞了」會變成一句沒有意義的話 ——
+ * 那兩個 local 指向的是**相反的資料來源**。
+ * （`docs/WBS.md` 寫的是 `local`，那一列要跟著改。）
+ */
+export const DATA_ADAPTERS = ['guildhub', 'internal'] as const
+export type DataAdapter = (typeof DATA_ADAPTERS)[number]
+
+/**
  * 本機預設值。**指向開發者自己起的那一份後端** ——
  * 後端 `bash run.sh` 起來就是這兩個位址（實測：`/openapi.json` 回 200、
  * `/ws` 連得上並收到 `hello`）。
@@ -112,6 +127,28 @@ function resolve(
       '部署出去的版本沒有預設位址 —— 安靜退回 localhost 會讓症狀變成' +
       '「所有資料都不見了」，而不是「設定錯了」。',
   )
+}
+
+/**
+ * 目前的資料來源。
+ *
+ * 缺席時預設 `guildhub` —— 今天只有它是可用的（`internal` 的後端是 `FE-O03`，W2）。
+ *
+ * ⚠️ **值無法辨識時拋錯，MUST NOT 退回預設。** 退回去的話，
+ * 一個把 `internal` 打成 `intenral` 的環境會安靜地連到真後端 ——
+ * 而症狀是「我的本地資料改了沒有反應」，不是「設定錯了」。
+ */
+export function dataAdapter(): DataAdapter {
+  const raw = read(process.env.NEXT_PUBLIC_DATA_ADAPTER)
+  if (raw === null) return 'guildhub'
+  if (!(DATA_ADAPTERS as readonly string[]).includes(raw)) {
+    throw new ConfigError(
+      `NEXT_PUBLIC_DATA_ADAPTER 的值 ${JSON.stringify(raw)} 無法辨識。` +
+        `只能是 ${DATA_ADAPTERS.join(' / ')}。**打錯字不會退回預設** —— ` +
+        '退回去的話，一個打錯字的環境會安靜地連到另一個資料來源。',
+    )
+  }
+  return raw as DataAdapter
 }
 
 /** 後端 REST 的 base URL。 */
