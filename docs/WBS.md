@@ -73,24 +73,29 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | 項目 | 狀態 | 依據 |
 |---|---|---|
 | FE-O01 | 已封存 | `fe-o01-contract` |
+| FE-O02 | 已封存 | `fe-o02-data-access` |
 | FE-O09 | 已封存 | `fe-o09-env` |
 | FE-O11 | 已封存 | `fe-o11-coverage`、`fe-o11-evidence` |
+| FE-O14 | 已封存 | `fe-o14-drop-preview-notice`、`fe-o14-preview-deploy` |
 | FE-R01 | 已封存 | `fe-r01-realtime` |
 | FE-R02 | 已封存 | `fe-r02-protocol` |
 | FE-R03 | 已封存 | `fe-r03-position-sync` |
 | FE-R05 | 已封存 | `fe-r05-self-echo` |
 | FE-R07 | 已封存 | `fe-r07-remote-players` |
 | FE-R08 | 已封存 | `fe-r08-interpolation` |
+| FE-R09 | 已封存 | `fe-r09-browser-load` |
 | FE-W01 | 已封存 | `fe-w01-worldcanvas` |
 | FE-W02 | 已封存 | `fe-w02-coords` |
-| FE-W03 | 已封存 | `fe-w03-player` |
+| FE-W03 | 已封存 | `fe-w03-player`、`fe-w03-render-interpolation` |
 | FE-W04 | 已封存 | `fe-w04-physics` |
 | FE-W05 | 已封存 | `fe-w05-camera` |
 | FE-W06 | 已封存 | `fe-w06-spatial-interaction` |
 | FE-W07 | 已封存 | `fe-w07-resource-ownership` |
+| FE-W09 | 已封存 | `fe-w09-world-design-system` |
+| FE-W10 | 已封存 | `fe-w10-environment-components` |
+| FE-W11 | 已封存 | `fe-w11-guild-hall` |
 | FE-X01 | 已封存 | `fe-x01-appshell` |
 | FE-O10 | 已完成 | 標記 `Done` |
-| FE-O02 | 規格已合併 | `fe-o02-data-access` |
 | FE-R04 | 規格已合併 | `fe-r04-background-tab` |
 | FE-R06 | 規格已合併 | `fe-r06-multi-tab` |
 | FE-O18 | 常態 | — |
@@ -122,9 +127,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G18 | 已取消 | — |
 | BE-G19 | 已取消 | — |
 
-共 161 項：未開始 112、等外部 19、已封存 17、已取消 6、規格已合併 3、待裁決 2、已完成 1、常態 1
+共 161 項：未開始 107、已封存 23、等外部 19、已取消 6、待裁決 2、規格已合併 2、已完成 1、常態 1
 
-來源指紋 `cce7978682f76501`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `1053f52bb4dae486`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -663,8 +668,9 @@ bash .github/scripts/wbs-page.sh --open
 | FE-W10 | EnvironmentComponents | Floor / Wall / Carpet / Platform；Desk / Chair / Shelf / Plant / Lamp / Sign；GuildBanner / ProjectBoard / TalentBoard / Door | W3 | 15 | | |
 | FE-W11 | Guild Hall | spawn、Board、社交區、Corridor 配置；簡化 Collider 與固定 Camera 構圖驗證 | W3 | 14 | | |
 | FE-W16 | Project Room | spawn / collision / desk layout | W4 | 9 | | |
+| | | Seat（available / occupied，與 API 結果同步）。**從 `FE-W12` 移過來** —— 座位的 API 是 `GET /api/projects/{id}/seats`，**綁專案**，而 `FE-W12` 做的 Guild Hall 不屬於任何專案。留在那裡的話只能交一個沒有地方 mount 的狀態機 | W4 | 4 | | |
 | FE-W17 | 視覺分區 | Marketplace 與 Office 的配置 | W4 | 11 | BE-G09 待銜接 | Alarm｜先裁決「視覺分區」還是「伺服器 scene」，否則做出來名不符實 |
-| FE-W12 | 互動物件 | Project Board、Talent Board、Project Door（依 `GET /api/rooms` 生成，顯示名稱與在線數）、Seat（available / occupied，與 API 結果同步） | W3 | 12 | | |
+| FE-W12 | 互動物件 | Project Board、Talent Board、Project Door（依 `GET /api/rooms` 生成，顯示名稱與在線數）。**Seat 移到 `FE-W16`** —— 座位綁專案，Guild Hall 不是專案 | W3 | 12 | | |
 | FE-W13 | 渲染預算 | 遠端角色的 instancing / LOD / 簡化。**40 人同畫面是架構決定，不是收尾優化**。量測與數字目標一起在這裡 | W5 | 10 | | |
 | FE-W14 | VisualPolish | 統一 Chibi / Toy-like 的色彩、圓角、Outline、Shadow；固定 Camera 下的構圖與可讀性；Avatar 組合檢查避免穿模 | W5 | 10 | | |
 | FE-W15 | 資產管線 | 紋理尺寸、壓縮、授權、快取、版本與 fallback | W5 | 4 | | |
