@@ -98,6 +98,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-O10 | 已完成 | 標記 `Done` |
 | FE-R04 | 規格已合併 | `fe-r04-background-tab` |
 | FE-R06 | 規格已合併 | `fe-r06-multi-tab` |
+| FE-W12 | 規格已合併 | `fe-w12-interactive-objects` |
 | FE-O18 | 常態 | — |
 | BE-G04 | 待裁決 | — |
 | BE-G25 | 待裁決 | — |
@@ -127,9 +128,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G18 | 已取消 | — |
 | BE-G19 | 已取消 | — |
 
-共 161 項：未開始 107、已封存 23、等外部 19、已取消 6、待裁決 2、規格已合併 2、已完成 1、常態 1
+共 162 項：未開始 107、已封存 23、等外部 19、已取消 6、規格已合併 3、待裁決 2、已完成 1、常態 1
 
-來源指紋 `1053f52bb4dae486`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `3c7484756940c829`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -673,6 +674,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-W12 | 互動物件 | Project Board、Talent Board、Project Door（依 `GET /api/rooms` 生成，顯示名稱與在線數）。**Seat 移到 `FE-W16`** —— 座位綁專案，Guild Hall 不是專案 | W3 | 12 | | |
 | FE-W13 | 渲染預算 | 遠端角色的 instancing / LOD / 簡化。**40 人同畫面是架構決定，不是收尾優化**。量測與數字目標一起在這裡 | W5 | 10 | | |
 | FE-W14 | VisualPolish | 統一 Chibi / Toy-like 的色彩、圓角、Outline、Shadow；固定 Camera 下的構圖與可讀性；Avatar 組合檢查避免穿模 | W5 | 10 | | |
+| FE-W18 | 牆面語意物件的可讀性 | **固定的 45° 俯視相機只看得見朝南或朝上的面** —— 貼在南北向牆上、面朝東西的東西在畫面上是一條細縫。量出來：`door-corridor` 螢幕橫向輪廓 0.22、`shelf-social` 0.40，而角色直徑是 0.5。做三件事：① 鋸齒狀西牆（每個槽位凹折出一個朝南的小牆面，門搬回牆上，全部維持 90° 整數倍）② 全域掃描判準（**必須區分結構牆與語意物件** —— 牆本來就該是細的）③ 修 `door-corridor` 與 `shelf-social` | W4 | 8 | | Alarm｜視角讓核心語意物件讀不出來，`CONTEXT.md`：分不出來的話 3D 就是一條很貴的導覽列 |
 | FE-W15 | 資產管線 | 紋理尺寸、壓縮、授權、快取、版本與 fallback | W5 | 4 | | |
 | | | 外部 GLB 使用規則：僅特殊物件、需符合色票與風格；必要時 Blender 簡化後導入 | W5 | 1 | | Pending｜預設不排入 MVP 工時 |
 
