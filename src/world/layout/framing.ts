@@ -156,3 +156,18 @@ export function groundOverscan(reachableHalf: number, aspect = FRAMING_ASPECT): 
   // 拉一次視窗就在快取裡留下一份新的地板幾何（`FE-W07` 在看的正是這種成長）。
   return Math.ceil(exact)
 }
+
+/**
+ * 一個包圍盒投影到畫面上的**橫向輪廓**寬度（相機空間單位）。規格 `FE-W12-S25`。
+ *
+ * ⚠️⚠️ **量的是橫向輪廓，不是投影面積。**
+ * 面積會被高度灌大 —— 一條又高又深的細線面積不小，而它正是要擋掉的那個東西。
+ *
+ * 這把尺的由來：固定相機**只看得見朝南或朝上的面**，
+ * 所以一個面朝東西的薄物件在畫面上是一條細縫（實測：面朝東的門是 0.22，
+ * 面朝南是 1.58，而角色的直徑是 0.5）。
+ */
+export function screenWidthOf(box: StaticBox): number {
+  const xs = corners(box).map((point) => toScreen(point, { x: 0, z: 0 }).sx)
+  return Math.max(...xs) - Math.min(...xs)
+}

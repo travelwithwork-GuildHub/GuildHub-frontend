@@ -16,8 +16,21 @@ import type { LayoutItem, QuarterTurn, Zone } from '../layout/types'
 // **座標系**：+X 在畫面右方、+Z 在畫面下方。走廊在西側（x 為負），
 // 門沿著它的長邊（z）排開，貼著西緣。
 
-/** 門轉四分之一圈，讓門面朝東（走廊裡的人正對著它）。 */
-export const DOOR_TURNS: QuarterTurn = 1
+/**
+ * 門的朝向：**面朝南（+Z），也就是朝著相機**。
+ *
+ * ⚠️⚠️ **不是「面朝走廊裡的人」。** 第一版是 `turns: 1`（面朝東，貼著西牆），
+ * 那在語意上比較對 —— 但這個世界的相機是**固定的** 45° 俯視，
+ * **它只看得見朝南或朝上的面**。量出來：面朝東的門在畫面上的橫向輪廓是 **0.22**，
+ * 而角色的直徑是 **0.5**。六扇門是六條約 10 像素的細縫（人工截圖）。
+ *
+ * `turns: 0` 之後是 1.58。代價是門**不再貼在牆上**，
+ * 而是立在走廊裡的一排門框 —— 那是一個**已知的、有票追蹤的**折衷（`FE-W18`
+ * 的鋸齒牆會把它們搬回牆上，而且仍然朝南）。
+ *
+ * 規格 `FE-W12-S25`／`S26` 守著這件事：改回 `1` 會紅。
+ */
+export const DOOR_TURNS: QuarterTurn = 0
 
 /**
  * 兩扇門之間的最小淨距。
@@ -28,15 +41,26 @@ export const DOOR_TURNS: QuarterTurn = 1
  */
 export const MIN_GAP = 0.4
 
-/** 門在世界座標下的包圍盒（已經轉過），**從造型推導**。 */
-const DOOR_BOX = rotateFootprint(
-  // 門一定有看得見的部件，所以這裡不會是 undefined。
-  visualBoundsOf(doorDefinition()) ?? { offsetX: 0, offsetZ: 0, halfWidth: 0, halfDepth: 0, halfHeight: 0 },
-  DOOR_TURNS,
-)
+/** 門在自己的局部座標下的包圍盒，**從造型推導**。門一定有看得見的部件。 */
+const DOOR_LOCAL = visualBoundsOf(doorDefinition()) ?? {
+  offsetX: 0,
+  offsetZ: 0,
+  halfWidth: 0,
+  halfDepth: 0,
+  halfHeight: 0,
+}
 
-/** 門沿走廊長邊佔掉的寬度。 */
-export const DOOR_SPAN = DOOR_BOX.halfDepth * 2
+/** 門在世界座標下的包圍盒（已經轉過）。 */
+const DOOR_BOX = rotateFootprint(DOOR_LOCAL, DOOR_TURNS)
+
+/**
+ * 一個槽位**保留**的寬度：門**最寬的那一個方向**。
+ *
+ * ⚠️⚠️ **與門的朝向無關，這是刻意的。**
+ * 用「門沿走廊軸的跨度」算的話，門一旦轉成面朝南，那個跨度只剩厚度 0.22 ——
+ * 走廊會被算成放得下 **19 扇**。**純視覺的轉向不得改變生成的數量。**
+ */
+export const DOOR_SPAN = Math.max(DOOR_LOCAL.halfWidth, DOOR_LOCAL.halfDepth) * 2
 
 export interface DoorSlot {
   /** 槽位在走廊上的序號，由北往南。 */

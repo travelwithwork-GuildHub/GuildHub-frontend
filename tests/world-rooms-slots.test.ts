@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { screenWidthOf } from '@/world/layout/framing'
 import { staticBoxesFor, visualBoxFor } from '@/world/layout/geometry'
 import { LAYOUT, ZONES } from '@/world/layout/guildHallLayout'
 import type { Zone } from '@/world/layout/types'
+import { PHYSICS } from '@/world/physics/world'
 import { DOOR_SPAN, MIN_GAP, doorItemAt, doorSlots, slotCapacity } from '@/world/rooms/slots'
 import type { StaticBox } from '@/world/physics/world'
 
@@ -147,6 +149,36 @@ describe('槽位從走廊的矩形推導', () => {
     expect(inside, `走廊裡有寫死的門：${inside.join('、')}`).toEqual([])
     // 反向控制：走廊外面的門（隔牆那個開口）不該被誤判進來。
     expect(LAYOUT.some((item) => item.kind === 'door')).toBe(true)
+  })
+
+  it('[FE-W12-S25] 每一扇門都有可辨識的橫向輪廓', () => {
+    const zone = corridor()
+    const boxes = boxesOf(zone)
+
+    // 門檻是**角色的直徑**，不是挑的數字 —— `world-layout` 的遮擋判準
+    // 已經用同一個尺度當「比角色還窄的東西不算遮擋」的界線。
+    const minimum = PHYSICS.playerRadius * 2
+
+    expect(boxes.length).toBe(slotCapacity(zone))
+    expect(boxes.length).toBeGreaterThan(0)
+    for (const box of boxes) {
+      expect(
+        screenWidthOf(box),
+        `這扇門在畫面上比角色還窄 —— 那不是門，是一根柱子`,
+      ).toBeGreaterThanOrEqual(minimum)
+    }
+  })
+
+  it('[FE-W12-S26] 反向控制：把門轉成面朝東西就不合格', () => {
+    const zone = corridor()
+    const slot = doorSlots(zone)[0]
+    if (slot === undefined) throw new Error('沒有槽位')
+
+    // ⚠️ 少了這一條，上面那條可能只是「門本來就夠寬」的複述。
+    // 這裡要證明**這把尺真的量得到那個退化**。
+    const sideways = visualBoxFor({ ...doorItemAt(slot, 'sideways'), turns: 1 })
+    if (sideways === undefined) throw new Error('沒有包圍盒')
+    expect(screenWidthOf(sideways)).toBeLessThan(PHYSICS.playerRadius * 2)
   })
 
   it('[FE-W12-S08] 兩扇門彼此不相交', () => {
