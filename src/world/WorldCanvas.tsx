@@ -13,6 +13,7 @@ import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
 import { BoardTargets } from './rooms/BoardTargets'
 import { ProjectDoors } from './rooms/ProjectDoors'
+import { RoomsNotice } from './rooms/RoomsNotice'
 import { CORRIDOR_SLOTS } from './rooms/slots'
 import { useRooms } from './rooms/useRooms'
 
@@ -65,7 +66,6 @@ export default function WorldCanvas() {
   // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
   // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
   const rooms = useRooms(CORRIDOR_SLOTS.length)
-  // 狀態說明（載入中／失敗／沒有專案／排不下）在下一刀。
 
   if (!webgl2) return <WebGLUnavailable />
 
@@ -114,6 +114,9 @@ export default function WorldCanvas() {
         {!ready && <LoadingOverlay />}
         {/* 規格 FE-W06-S13：提示在 Canvas **外面** */}
         <InteractionPrompt />
+        {/* 規格 FE-W12-S02／S03／S04／S05：走廊的門「為什麼不在那裡」。
+            **一切正常時它什麼都不顯示** —— 見下面那條禁令。 */}
+        <RoomsNotice view={rooms} />
         {/* ⚠️ 規格 FE-O14-S11／S12：這裡刻意什麼都沒有。
             以前這裡有一段「目前是單人預覽，看不到其他人」——
             拿掉是產品決定（這個網址對外的用途是展示世界，而那段字是
