@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { act } from 'react'
+import { act, useEffect, type RefObject } from 'react'
 import { InteractionPrompt } from '@/world/interaction/InteractionPrompt'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
 
@@ -12,28 +12,42 @@ import { InteractionProvider, useInteraction } from '@/world/interaction/Interac
 // 正常路徑上呼叫它的是 `SpatialInteraction`（在 Canvas 裡，用 `useFrame`），
 // 而那條路徑由 `tests/interaction-loop.test.tsx` 驗。
 
-let setTarget: ReturnType<typeof useInteraction>['setTarget']
+type SetTarget = ReturnType<typeof useInteraction>['setTarget']
 
-function Handle() {
-  setTarget = useInteraction().setTarget
+/**
+ * 把 `setTarget` 交到測試手上。
+ *
+ * ⚠️ **用 ref 當 prop、只在 effect 裡寫。** 在 render 期間指派給外部變數會被
+ * `react-hooks/globals` 擋，直接改 prop 物件會被 `react-hooks/immutability` 擋 ——
+ * **兩條規則都是對的**。傳 ref 是這個 repo 既有的模式（`targetRef`、`poseRef`）。
+ */
+function Handle({ handleRef }: { handleRef: RefObject<{ setTarget?: SetTarget }> }) {
+  const { setTarget } = useInteraction()
+  useEffect(() => {
+    handleRef.current.setTarget = setTarget
+  }, [handleRef, setTarget])
   return null
 }
 
 function mount() {
-  return render(
+  const handleRef: RefObject<{ setTarget?: SetTarget }> = { current: {} }
+  render(
     <InteractionProvider>
-      <Handle />
+      <Handle handleRef={handleRef} />
       <InteractionPrompt />
     </InteractionProvider>,
   )
+  return (target: Parameters<SetTarget>[0]) => {
+    act(() => handleRef.current.setTarget?.(target))
+  }
 }
 
 describe('互動提示', () => {
   it('[FE-W06-S13] 有目標時提示出現，而且指名是哪一個物件', () => {
-    mount()
+    const setTarget = mount()
     expect(screen.queryByTestId('interaction-prompt')).toBeNull()
 
-    act(() => setTarget({ id: 'board:main', label: '專案看板', distance: 1.2 }))
+    setTarget({ id: 'board:main', label: '專案看板', distance: 1.2 })
 
     const prompt = screen.getByTestId('interaction-prompt')
     // 規格的字面要求：**不能只寫「按 E」** ——
@@ -43,11 +57,11 @@ describe('互動提示', () => {
   })
 
   it('[FE-W06-S14] 目標換人時，提示的內容跟著換', () => {
-    mount()
-    act(() => setTarget({ id: 'a', label: '專案看板', distance: 1 }))
+    const setTarget = mount()
+    setTarget({ id: 'a', label: '專案看板', distance: 1 })
     expect(screen.getByTestId('interaction-prompt').textContent).toContain('專案看板')
 
-    act(() => setTarget({ id: 'b', label: '人才看板', distance: 1 }))
+    setTarget({ id: 'b', label: '人才看板', distance: 1 })
 
     const prompt = screen.getByTestId('interaction-prompt')
     expect(prompt.textContent).toContain('人才看板')
@@ -55,11 +69,11 @@ describe('互動提示', () => {
   })
 
   it('[FE-W06-S09] 沒有目標時提示消失', () => {
-    mount()
-    act(() => setTarget({ id: 'a', label: '專案看板', distance: 1 }))
+    const setTarget = mount()
+    setTarget({ id: 'a', label: '專案看板', distance: 1 })
     expect(screen.queryByTestId('interaction-prompt')).not.toBeNull()
 
-    act(() => setTarget({ id: null, label: null, distance: null }))
+    setTarget({ id: null, label: null, distance: null })
 
     expect(screen.queryByTestId('interaction-prompt')).toBeNull()
   })
