@@ -1,6 +1,6 @@
 'use client'
 
-import type {} from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
 import { PHYSICS } from '../physics/world'
 import { groundOverscan } from '../layout/framing'
 import { GuildHall } from '../layout/GuildHall'
@@ -28,7 +28,14 @@ export function WorldShell() {
   // 相機從 12 個單位的高處往下看 —— 玩家走到邊緣時看得到牆外面。
   // 大小**由相機投影到地面的範圍推導**，不是隨手挑一個常數：
   // 相機參數改的那天，隨手挑的常數會靜默失效。
-  const outside = groundOverscan(PHYSICS.halfExtent - PHYSICS.playerRadius) * 2
+  //
+  // ⚠️⚠️ **用執行期真正的長寬比，不是寫死的 16:9。**
+  // 網頁的視窗比例完全不可控 —— 超寬螢幕、直向、分割視窗都會讓
+  // 寫死的值不夠大，而症狀是「畫面邊緣有一塊空白」。
+  // （`groundOverscan` 內部會把結果量化到整數單位，所以拉視窗不會
+  // 在幾何快取裡一直留下新的地板。）
+  const { width, height } = useThree((state) => state.size)
+  const outside = groundOverscan(PHYSICS.halfExtent - PHYSICS.playerRadius, width / height) * 2
 
   return (
     <>

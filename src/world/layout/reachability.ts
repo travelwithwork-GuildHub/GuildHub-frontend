@@ -90,3 +90,42 @@ export function isReachable(
 ): boolean {
   return reached.has(key(Math.round(point.x / CELL), Math.round(point.z / CELL)))
 }
+
+/**
+ * 一個矩形範圍裡「角色站得下」的每一個格子。
+ *
+ * 拿來問「這個分區有沒有走不進去的死角」—— 只驗一個代表點的話，
+ * 分區裡包著一塊到不了的地方是看不出來的。
+ */
+export function standableIn(
+  area: { x: number; z: number; halfWidth: number; halfDepth: number },
+  boxes: readonly StaticBox[],
+  radius: number,
+): { x: number; z: number }[] {
+  const out: { x: number; z: number }[] = []
+  const fromX = Math.ceil((area.x - area.halfWidth) / CELL)
+  const toX = Math.floor((area.x + area.halfWidth) / CELL)
+  const fromZ = Math.ceil((area.z - area.halfDepth) / CELL)
+  const toZ = Math.floor((area.z + area.halfDepth) / CELL)
+  for (let ix = fromX; ix <= toX; ix += 1) {
+    for (let iz = fromZ; iz <= toZ; iz += 1) {
+      const x = ix * CELL
+      const z = iz * CELL
+      if (!blocked(x, z, boxes, radius)) out.push({ x, z })
+    }
+  }
+  return out
+}
+
+/** 可走集合裡的格子座標（給遮擋掃描降採樣用）。 */
+export function cellsOf(reached: ReadonlySet<string>, step = 10): { x: number; z: number }[] {
+  const out: { x: number; z: number }[] = []
+  for (const id of reached) {
+    const [a, b] = id.split(',')
+    const ix = Number(a)
+    const iz = Number(b)
+    if (ix % step !== 0 || iz % step !== 0) continue
+    out.push({ x: ix * CELL, z: iz * CELL })
+  }
+  return out
+}
