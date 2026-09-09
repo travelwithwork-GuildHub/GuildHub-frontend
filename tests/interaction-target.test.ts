@@ -68,7 +68,7 @@ describe('互動目標的選擇', () => {
     let switches = 0
     for (let frame = 0; frame < 120; frame++) {
       const x = (frame % 2 === 0 ? 1 : -1) * amplitude
-      const next = chooseTarget({ x, z: -1.5, f: FACING.down }, both, current, TUNING).id
+      const next: string | null = chooseTarget({ x, z: -1.5, f: FACING.down }, both, current, TUNING).id
       if (next !== current) {
         switches++
         current = next
@@ -88,7 +88,7 @@ describe('互動目標的選擇', () => {
     let switches = 0
     for (let frame = 0; frame < 120; frame++) {
       const x = (frame % 2 === 0 ? 1 : -1) * amplitude
-      const next = chooseTarget({ x, z: -1.5, f: FACING.down }, both, current, noHysteresis).id
+      const next: string | null = chooseTarget({ x, z: -1.5, f: FACING.down }, both, current, noHysteresis).id
       if (next !== current) {
         switches++
         current = next
