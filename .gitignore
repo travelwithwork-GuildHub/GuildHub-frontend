@@ -31,3 +31,4 @@ next-env.d.ts
 # **不進版控** —— 它綁定一個特定的 Vercel 帳號與專案，
 # 而別人 clone 之後會拿到一個指向別人專案的連結。
 .vercel
+.env*

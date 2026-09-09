@@ -436,7 +436,8 @@ bash .github/scripts/wbs-page.sh --open
 | | | **測試環境隔離**：只准打自己 `./run.sh` 起的後端。一次 40 連線的壓測足以把共用實例的人全部踢下線 | W1 | 2 | | |
 | FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`） | W5 | 7 | | |
 | FE-O13 | 視覺回歸 | 3D 畫面怎麼測 —— 截圖比對還是只測 DOM。**先決定，不要做一半** | W5 | 4 | | |
-| FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入 | W5 | 4 | | |
+| FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入。**設定錯誤在建置時就紅** —— 以前是建置綠燈、部署成功、線上白畫面 | W1 | 4 | | |
+| | | 即時後端要部署在**常駐容器**（Railway／Render／Fly），不是 Vercel：Vercel 的 WebSocket 連線被釘在個別 function instance，跨實例要 Redis，不接就會形成兩個互不相見的房間。現有的 FastAPI 已經是那個形狀，一行都不用改 | — | — | | Pending｜需要帳號與帳單決策，不是程式碼 |
 | FE-O15 | 發表準備 | Demo fake data、固定流程、Demo reset；World 預載、異常 fallback、完整 E2E rehearsal | W5 | 7 | | |
 | | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W5 | 2 | | Alarm｜發表當天最不想踩的地雷 |
 | | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W5 | 5 | | |
