@@ -91,9 +91,11 @@ export const LAYOUT: readonly LayoutItem[] = [
   { id: 'wall-corridor-south', kind: 'wall', x: CORRIDOR_WALL.x, z: southSeg.center, turns: 1, length: southSeg.length },
   { id: 'door-corridor', kind: 'door', x: CORRIDOR_WALL.x, z: GAP.center, turns: 1 },
   { id: 'carpet-corridor', kind: 'carpet', x: -9, z: 3, width: 5, depth: 11 },
-  // 靠著西邊界牆的兩扇門。**它們今天通不到任何地方** —— `FE-W12` 才依 API 生成。
-  { id: 'door-room-1', kind: 'door', x: -11.4, z: 0, turns: 1 },
-  { id: 'door-room-2', kind: 'door', x: -11.4, z: 6, turns: 1 },
+  // ⚠️ **走廊上的門不在這裡。** 它們依 `GET /api/rooms` 生成，
+  // 槽位由 `src/world/rooms/slots.ts` 從下面那個 `corridor` 分區推導
+  //（規格 `FE-W12-S06`）。`FE-W11` 曾經在 x=-11.4 擺過兩扇寫死的示意門，
+  // **`FE-W12` 把它們拿掉了** —— 留著的話世界上會同時有寫死的門與生成的門，
+  // 而它們的座標不一樣，看起來是兩排。
   { id: 'banner-corridor', kind: 'guildBanner', x: -8, z: -1.5 },
   { id: 'lamp-corridor', kind: 'lamp', x: -7, z: 8 },
 ] as const
