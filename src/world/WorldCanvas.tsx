@@ -8,6 +8,9 @@ import { DebugShadowScene } from './DebugShadowScene'
 import { WorldCamera } from './WorldCamera'
 import { LocalPlayer } from './player/LocalPlayer'
 import { RemoteWorld } from './RemoteWorld'
+import { InteractionProvider } from './interaction/InteractionProvider'
+import { InteractionPrompt } from './interaction/InteractionPrompt'
+import { SpatialInteraction } from './interaction/SpatialInteraction'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -58,36 +61,47 @@ export default function WorldCanvas() {
   if (!webgl2) return <WebGLUnavailable />
 
   return (
-    <div data-testid="world-canvas-container" className="relative h-full w-full">
-      <Canvas
-        shadows
-        // 規格 FE-W01-S02：DPR 上限 2。不設限的話 3x 螢幕會用九倍的像素
-        // 去畫同一個畫面。`2` 不是量出來的最佳值 —— 真正的數字等 FE-O12，
-        // 而那時要改的是 Requirement，不是這一行。
-        dpr={[1, 2]}
-        onCreated={() => setReady(true)}
-      >
-        {/* 相機由 FE-W05 提供。FE-W01 當時那個 perspective 相機是暫時的 ——
-            CONTEXT.md 訂的是固定的 Orthographic Elevated 相機。 */}
-        <WorldCamera targetRef={cameraTarget} />
-        <ambientLight intensity={0.6} />
-        <directionalLight
-          position={[5, 8, 3]}
-          intensity={1.6}
-          castShadow
-          shadow-mapSize={[1024, 1024]}
-        />
-        <Suspense fallback={null}>
-          <DebugShadowScene />
-          <LocalPlayer targetRef={cameraTarget} poseRef={localPose} />
-          {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
-              WorldCanvas 不知道即時層的存在，也不該知道。 */}
-          <RemoteWorld poseRef={localPose} />
-        </Suspense>
-      </Canvas>
+    // ⚠️ **`InteractionProvider` 要包住 Canvas 與它外面的提示。**
+    // 提示是 DOM（`CONTEXT.md`：3D 負責空間，DOM 負責產品操作），
+    // 而算出目標的那一半在 Canvas 裡面 —— 兩邊要看到同一份狀態。
+    <InteractionProvider>
+      <div data-testid="world-canvas-container" className="relative h-full w-full">
+        <Canvas
+          shadows
+          // 規格 FE-W01-S02：DPR 上限 2。不設限的話 3x 螢幕會用九倍的像素
+          // 去畫同一個畫面。`2` 不是量出來的最佳值 —— 真正的數字等 FE-O12，
+          // 而那時要改的是 Requirement，不是這一行。
+          dpr={[1, 2]}
+          onCreated={() => setReady(true)}
+        >
+          {/* 相機由 FE-W05 提供。FE-W01 當時那個 perspective 相機是暫時的 ——
+              CONTEXT.md 訂的是固定的 Orthographic Elevated 相機。 */}
+          <WorldCamera targetRef={cameraTarget} />
+          <ambientLight intensity={0.6} />
+          <directionalLight
+            position={[5, 8, 3]}
+            intensity={1.6}
+            castShadow
+            shadow-mapSize={[1024, 1024]}
+          />
+          <Suspense fallback={null}>
+            <DebugShadowScene />
+            <LocalPlayer targetRef={cameraTarget} poseRef={localPose} />
+            {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
+                WorldCanvas 不知道即時層的存在，也不該知道。 */}
+            <RemoteWorld poseRef={localPose} />
+            {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
+                提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
+                那是 FE-W12（W3）。 */}
+            <SpatialInteraction poseRef={localPose} />
+          </Suspense>
+        </Canvas>
 
-      {/* 規格 FE-W01-S05：ready 之後等待狀態消失 */}
-      {!ready && <LoadingOverlay />}
-    </div>
+        {/* 規格 FE-W01-S05：ready 之後等待狀態消失 */}
+        {!ready && <LoadingOverlay />}
+        {/* 規格 FE-W06-S13：提示在 Canvas **外面** */}
+        <InteractionPrompt />
+      </div>
+    </InteractionProvider>
   )
 }

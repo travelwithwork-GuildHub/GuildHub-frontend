@@ -116,6 +116,9 @@ describe('Sensor 回報重疊但不擋路', () => {
     const pw = createPhysicsWorld(RAPIER)
     const sensor = addStaticBox(pw, { x: 2, z: 0, halfWidth: 0.5, halfDepth: 0.5, sensor: true })
 
+    // ⚠️ **前提是物理世界已經步進過。** 沒步進過的查詢一律回「沒有重疊」，
+    // 而且**不會報錯** —— 那是無聲的（規格 FE-W04 的 MODIFIED Requirement）。
+    // 這一行同時是「一開始不該重疊」與那個前提的對照組。
     expect(isOverlapping(pw, sensor), '一開始不該重疊').toBe(false)
 
     walk(pw, { x: 1, z: 0 }, 40, 0.05) // 走到 x≈2
@@ -123,6 +126,41 @@ describe('Sensor 回報重疊但不擋路', () => {
 
     walk(pw, { x: 1, z: 0 }, 40, 0.05) // 走過去
     expect(isOverlapping(pw, sensor), '離開了卻還在回報重疊').toBe(false)
+  })
+
+  // ⚠️⚠️ **這一條是把一個推翻掉的假設釘住。** ⚠️⚠️
+  //
+  // FE-W04 原本寫著「sensor 是 Interaction Range 的原語」。FE-W06 開工時實測
+  // 發現它不管遮蔽 —— 角色與 sensor 中間隔一道實心牆，重疊照樣成立。
+  // 所以互動範圍改用距離判定，而 sensor 的定位被修訂成「物理的觸發原語」。
+  //
+  // 沒有這條測試的話，之後 FE-V03（可旁觀）／FE-V04（漸進式接近）
+  // 很可能會假設 sensor 幫他們處理了視線 —— 而那個假設是錯的。
+  it('[FE-W04-S09] Sensor 的重疊不代表可互動 —— 牆擋不住它', () => {
+    const pw = createPhysicsWorld(RAPIER)
+    // 一道實心牆擋在 x=1；sensor 在牆的另一邊，但範圍蓋回角色身上
+    addStaticBox(pw, { x: 1, z: 0, halfWidth: 0.2, halfDepth: 3 })
+    const sensor = addStaticBox(pw, {
+      x: 2,
+      z: 0,
+      halfWidth: 2.5,
+      halfDepth: 2.5,
+      halfHeight: 2,
+      sensor: true,
+    })
+
+    // 原地踏步，只為了讓世界步進 —— 見上一條的前提
+    walk(pw, { x: 0, z: 0 }, 3, 0.05)
+
+    expect(
+      isOverlapping(pw, sensor),
+      'sensor 開始擋牆了嗎？如果這條變紅，FE-W06 用距離判定的理由要重新評估',
+    ).toBe(true)
+
+    // 對照：那道牆是實心的，角色真的過不去 ——
+    // 沒有這一段的話，上面那個 true 可能只是因為牆根本不存在
+    const end = walk(pw, { x: 1, z: 0 }, 200, 0.05)
+    expect(end.x, '牆沒有擋住角色 —— 上面那條驗證是空的').toBeLessThan(0.8)
   })
 })
 
