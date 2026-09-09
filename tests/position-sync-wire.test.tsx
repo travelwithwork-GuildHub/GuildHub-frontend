@@ -77,6 +77,35 @@ describe('位置同步接上連線', () => {
     expect(parsed(notReady.sent)[0]).toEqual({ t: 'move', x: 32, y: 64, f: 3 })
   })
 
+  it('[FE-R04-S02] 一個超長的幀不會送出一串位置', async () => {
+    // 規格：openspec/changes/fe-r04-background-tab/specs/position-sync/spec.md
+    //   Requirement: 超長的一幀最多只送一則
+    //
+    // 分頁從背景回到前景時，render loop 的第一幀可能是好幾分鐘。
+    // 補送是錯的：背景期間 rAF 停了、角色**根本沒有移動**，
+    // 所謂「漏掉的位置」並不存在；而補送出去的會是一段已經過去的移動。
+    const ready = fakeClient('ready')
+    const clientRef: RefObject<RealtimeClient | null> = { current: ready.client }
+    const poseRef = pose(5, 7, 1)
+
+    const renderer = await ReactThreeTestRenderer.create(
+      <PositionSync clientRef={clientRef} poseRef={poseRef} />,
+    )
+
+    // **只推進一幀，而那一幀是 300 秒。**
+    await ReactThreeTestRenderer.act(async () => {
+      await renderer.advanceFrames(1, 300)
+    })
+
+    expect(
+      ready.sent,
+      `一幀 300 秒送出了 ${ready.sent.length} 則 —— 節流計時器累積了多久` +
+        '都不該讓同一幀送出第二則',
+    ).toHaveLength(1)
+    // 送的是**當下**的位置（5 × 32 = 160、7 × 32 = 224），不是中間任何一個
+    expect(parsed(ready.sent)[0]).toEqual({ t: 'move', x: 160, y: 224, f: 1 })
+  })
+
   it('[FE-R03-S06] 換連線之後，同一個位置要重新送一次', async () => {
     const first = fakeClient('ready')
     const clientRef: RefObject<RealtimeClient | null> = { current: first.client }

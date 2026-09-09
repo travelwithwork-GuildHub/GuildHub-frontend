@@ -84,16 +84,38 @@ export function LocalPlayer({ targetRef, poseRef }: LocalPlayerProps) {
       }
     }
     const up = (e: KeyboardEvent) => pressed.current.delete(e.code)
-    // 視窗失焦時清掉按鍵狀態 —— 不清的話切走再切回來角色會一直走
-    const blur = () => pressed.current.clear()
+
+    // ⚠️ **按著方向鍵切走時，`keyup` 不會回到這一頁。**
+    // 不清的話 `pressed` 裡那個鍵會一直在，切回來角色自己一直走、
+    // 而且一直把位置送出去 —— 使用者要再按一次同一個鍵才停得下來。
+    //
+    // **三個事件都要掛，不是挑一個**（規格 FE-R04，design 的 D3）：
+    //
+    //   blur                        切到別的應用程式、點到 devtools
+    //   visibilitychange → hidden   **切到同一個視窗的別的分頁**、視窗最小化
+    //   pagehide                    頁面進 bfcache、導航離開
+    //
+    // 它們的涵蓋範圍互有缺口：切到同一個視窗的別的分頁時 `blur` **不一定**觸發；
+    // 整個視窗失焦但這個分頁仍是可見的那一個時 `visibilitychange` **不觸發**。
+    // 清空是冪等的，所以三個都掛的成本是零，漏掉任何一個的成本是「角色自己一直走」。
+    const release = () => pressed.current.clear()
+    // **只在隱藏時清。** 不看 `visibilityState` 的話，切回前景那一次也會清 ——
+    // 那在「切回來的瞬間剛好按著鍵」時會吃掉一次輸入。
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') release()
+    }
 
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
-    window.addEventListener('blur', blur)
+    window.addEventListener('blur', release)
+    window.addEventListener('pagehide', release)
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
-      window.removeEventListener('blur', blur)
+      window.removeEventListener('blur', release)
+      window.removeEventListener('pagehide', release)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [])
 
