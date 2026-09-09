@@ -45,6 +45,14 @@ export const WORLD_COLORS = {
   wood: '#b08968',
   /** 深一階的木頭（桌腳、側板）。 */
   woodDark: '#8c6a4f',
+  /** 葉子。 */
+  leaf: '#6f9e6a',
+  /** 陶盆。 */
+  terracotta: '#c17f59',
+  /** 金屬（燈桿、把手）。 */
+  metal: '#9aa3b5',
+  /** 燈罩。**用 `basic` 材質**，不吃光 —— 它自己是光源的外觀。 */
+  glow: '#ffe9b0',
 } as const
 
 export type WorldColorName = keyof typeof WORLD_COLORS
