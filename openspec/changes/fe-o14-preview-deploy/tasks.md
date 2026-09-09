@@ -53,9 +53,9 @@
 
 ## 7. 文件
 
-- [ ] 7.1 `.env.example` 補上 `NEXT_PUBLIC_REALTIME_ADAPTER`，
+- [x] 7.1 `.env.example` 補上 `NEXT_PUBLIC_REALTIME_ADAPTER`，
       附兩種部署情境的完整範例（有後端／沒有後端）
-- [ ] 7.2 `docs/DEPLOY.md`：Vercel 上要設哪些變數、兩種情境各自設什麼。
+- [x] 7.2 `docs/DEPLOY.md`：Vercel 上要設哪些變數、兩種情境各自設什麼。
       **明寫這份文件證明不了 Vercel 主控台上的設定**
 
 ## 8. 不在這個 change 裡（不要順手做）
