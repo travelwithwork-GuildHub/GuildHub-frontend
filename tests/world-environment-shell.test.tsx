@@ -99,32 +99,30 @@ describe('世界的外殼', () => {
   it('[FE-W10-S11] 可見的邊界與物理的邊界對齊', async () => {
     const scene = await sceneOf(<WorldShell />)
     const meshes = meshesOf(scene)
-    // 牆是站在地面上的那些（底面在 y = 0）。
-    const walls = meshes.filter((m) => {
-      const b = boxOf(scene, m as Object3D)
-      return Math.abs(b.min.y) < EPS && b.max.y > 0.5
-    })
-    expect(walls.length, '四面邊界牆').toBe(4)
 
-    // ⚠️ **期望值一律從 `PHYSICS` 推導。** 寫死 20 的話，改了物理範圍之後
-    // 玩家會走到牆外面 —— 而畫面上看起來只是「牆的位置怪怪的」。
+    // ⚠️ **邊界牆由 `FE-W11` 的配置提供**（它們跟內牆走同一條路），
+    // 所以外殼裡現在也有內牆 —— 不能用「站在地上的牆」去數四面。
+    // 認邊界的方式是**內側面貼齊 `halfExtent`**，那正是這條 Scenario 在講的事。
     const half = PHYSICS.halfExtent
-    for (const wall of walls) {
+    const boundaries = meshes.filter((m) => {
+      const b = boxOf(scene, m as Object3D)
+      if (Math.abs(b.min.y) > EPS || b.max.y < 0.5) return false
+      const size = b.getSize(new Vector3())
+      const center = b.getCenter(new Vector3())
+      const thinX = size.x < size.z
+      const inner = Math.abs(thinX ? center.x : center.z) - (thinX ? size.x : size.z) / 2
+      return Math.abs(inner - half) < EPS
+    })
+    expect(boundaries.length, '四面邊界牆的內側面應該貼齊遊玩區域').toBe(4)
+
+    // ⚠️ 期望值一律從 `PHYSICS` 推導。寫死 24 的話，改了物理範圍之後
+    // 玩家會走到牆外面 —— 而畫面上看起來只是「牆的位置怪怪的」。
+    for (const wall of boundaries) {
       const b = boxOf(scene, wall as Object3D)
       expect(b.max.y, '牆的高度不是物理的 wallHeight').toBeCloseTo(PHYSICS.wallHeight, 4)
       const size = b.getSize(new Vector3())
-      const thin = Math.min(size.x, size.z)
-      expect(thin, '牆的厚度不是物理的 wallThickness').toBeCloseTo(PHYSICS.wallThickness, 4)
-      // 牆面貼著 ±halfExtent：薄的那一軸的中心落在邊界上。
-      const center = b.getCenter(new Vector3())
-      const axis = size.x < size.z ? center.x : center.z
-      expect(Math.abs(axis), '牆沒有貼在物理邊界上').toBeCloseTo(half, 4)
+      expect(Math.min(size.x, size.z), '牆的厚度不是物理的 wallThickness')
+        .toBeCloseTo(PHYSICS.wallThickness, 4)
     }
-
-    // 整個外殼的水平範圍等於場地加上牆的厚度（牆的中心在邊界上，各外露一半）。
-    const all = boxOf(scene)
-    const span = all.getSize(new Vector3())
-    expect(span.x).toBeCloseTo(half * 2 + PHYSICS.wallThickness, 4)
-    expect(span.z).toBeCloseTo(half * 2 + PHYSICS.wallThickness, 4)
   })
 })
