@@ -141,22 +141,26 @@ describe('家具', () => {
     }
   })
 
-  it('[FE-W10-S05] 視覺可以比碰撞大 —— 葉子與燈罩伸出碰撞盒外面', async () => {
-    // 這一條把「為什麼不能要求整個 Box3 等於碰撞盒」釘住。
-    // 拿掉的話，有人把葉子標成擋路仍然會全綠，而那是一堵隱形牆。
+  it('[FE-W10-S05] 裝飾不得被整組算進碰撞', async () => {
+    // 這一條把「為什麼不能要求整個 Box3 等於碰撞盒」釘住：
+    // 盆栽的葉子、燈的燈罩本來就該伸出碰撞盒 —— 標成擋路的話，
+    // 玩家會在離花盆還有一段距離的空氣中被擋住。
+    //
+    // ⚠️⚠️ **它擋不到「只標錯其中一個裝飾部件」。** 實測：把盆栽最大的那片葉子
+    // 標成擋路，佔地從 0.44 長到 0.68，而視覺是 0.76 —— 用「碰撞明顯小於視覺」
+    // 的判準仍然是綠的。**那是刻意的**：碰撞盒那時真的就長那樣，
+    // 是設計錯誤不是漂移，規格明文寫了 MUST NOT 假裝這條判準判斷得出來。
+    // 它守的是**整組塌陷**（有人把所有部件都標成擋路，碰撞退化成整個 Box3）。
+    const RATIO = 0.75
     for (const kind of ['plant', 'lamp'] as const) {
       const whole = await measure(furnitureDefinition(kind))
       const box = furnitureFootprint(kind)
-      expect(whole).not.toBeNull()
       const visual = whole?.getSize(new Vector3()) ?? new Vector3()
-      expect((box?.halfWidth ?? 0) * 2, `${kind} 的碰撞盒跟整個視覺一樣寬 —— 裝飾被算進碰撞了`)
-        .toBeLessThan(visual.x - 0.05)
+      const widest = Math.max(visual.x, visual.z)
+      const footprint = Math.max((box?.halfWidth ?? 0) * 2, (box?.halfDepth ?? 0) * 2)
+      expect(footprint / widest, `${kind} 的碰撞盒幾乎跟整個視覺一樣大 —— 裝飾被算進碰撞了`)
+        .toBeLessThan(RATIO)
     }
-  })
-
-  it('[FE-W10-S06] 沒有擋路的部件就沒有碰撞盒', () => {
-    expect(footprintOf(structural.carpetDefinition(3, 2)), '地毯不擋路，不該有碰撞盒').toBeUndefined()
-    expect(footprintOf({ parts: [] })).toBeUndefined()
   })
 
   it('[FE-W10-S13] 每一個阻擋物都落地', async () => {
@@ -187,6 +191,11 @@ describe('家具', () => {
         .toBeCloseTo(0, 3)
     }
     expect(blocking, '一個擋路的部件都沒走到 —— 這條驗證是空的').toBeGreaterThan(0)
+  })
+
+  it('[FE-W10-S06] 沒有擋路的部件就沒有碰撞盒', () => {
+    expect(footprintOf(structural.carpetDefinition(3, 2)), '地毯不擋路，不該有碰撞盒').toBeUndefined()
+    expect(footprintOf({ parts: [] })).toBeUndefined()
   })
 
   it('[FE-W10-S07] 旋轉 90° 之後碰撞盒跟著轉', () => {
