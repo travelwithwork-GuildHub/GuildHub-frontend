@@ -60,6 +60,8 @@
 
 ## 8. 不在這個 change 裡（不要順手做）
 
-- [ ] 8.1 開一張後續工作：把現有的 FastAPI 部署到常駐容器，
+- [x] 8.1 開一張後續工作：把現有的 FastAPI 部署到常駐容器，
       讓 `NEXT_PUBLIC_REALTIME_ADAPTER=guildhub` 真的有東西可連。
-      **需要帳號與帳單決策，不是程式碼**
+      **需要帳號與帳單決策，不是程式碼**。
+      落點：`docs/WBS.md` 的 `FE-O14` 續行（governance PR #175），
+      標記 `Pending`。這個 repo 的後續工作清單就是那張表，不另造第二份
