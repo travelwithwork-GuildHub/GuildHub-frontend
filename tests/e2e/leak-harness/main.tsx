@@ -31,8 +31,15 @@ const ROUNDS = 10
  *
  * 量出來的（design 的 Q1）：
  *
- *     0 ms   乾淨的三個受測對象**全部**被判成洩漏（釋放還沒輪到），
- *            而且校正砝碼的成長也變成每輪 0.375 份 —— 連尺本身都不穩
+ *     0 ms   乾淨的三個受測對象**全部**被判成洩漏，
+ *            而且校正砝碼的成長變成每輪 0.375 份 —— 連尺本身都不穩
+ *
+ *            ⚠️ 0 毫秒時**同時壞了兩件事**，不要只記其中一件：
+ *            （a）R3F 的釋放還沒輪到 → 乾淨的被判成洩漏；
+ *            （b）React 來不及完成每一輪的掛載卸載，多數輪次被合併掉
+ *                 → 每輪必漏一份的砝碼只長了 0.375 份。
+ *            只寫（a）的話，下一個人會拿 0.375 這個數字去推錯的結論
+ *            （這是外部審查抓到的）。
  *     30 ms  全部正確
  *     100 ms 全部正確
  *
@@ -68,7 +75,8 @@ function LeakingFixture() {
 }
 
 /**
- * **乾淨的那一個。** 跟上面完全相同，只多了 cleanup —— 這就是規格要求的所有權。
+ * **乾淨的那一個。** 資源的所有權行為跟上面只差一段 cleanup
+ *（顏色不同只是為了在有頭模式下看得出來，跟量測無關）—— 這就是規格要求的所有權。
  *
  * ⚠️ 把 `useEffect` 那一段拿掉，`FE-W07-S02` 必須變紅。
  * 那是這個 change 唯一一個「拿掉防禦就變紅」的地方（design 的 D4）。
@@ -95,7 +103,13 @@ function OwnedFixture() {
 /** 受測對象。`expect` 是**這個 fixture 應該被判成什麼** —— 尺的自我校正靠它。 */
 interface Subject {
   id: string
-  /** 這個 subject 對應的正式碼檔案；fixture 是 `null`。給涵蓋率檢查對照。 */
+  /**
+   * 這個 subject 對應的正式碼檔案；fixture 是 `null`。給涵蓋率檢查對照。
+   *
+   * ⚠️ **這個欄位是宣告，不是保證。** 涵蓋率檢查只驗到「這個路徑存在」
+   * 與「量測台真的 import 了它」；`render()` 有沒有真的 render 它，
+   * 沒有任何機制擋得住。要擋住需要型別資訊，成本遠高於它防的東西。
+   */
   source: string | null
   expect: 'leaks' | 'clean'
   render: () => ReactNode
@@ -171,8 +185,15 @@ function Harness() {
 async function run(): Promise<SubjectResult[]> {
   const host = document.getElementById('root')
   if (host === null) throw new Error('量測台找不到 #root')
-  // **刻意不包 `<StrictMode>`**：它會把每次掛載變成 掛載→卸載→掛載，
-  // 而這裡要數的就是掛載與卸載的次數。包了的話每輪的基準都不一樣。
+  // **刻意不包 `<StrictMode>`。**
+  //
+  // ⚠️ 理由不是「包了就量不到」—— 判準看的是同一個 subject 十輪之間的**增量**，
+  // 而 StrictMode 只會讓洩漏的斜率變成兩倍、乾淨的照樣平坦，兩種都還是判得出來
+  //（這一點原本的註解寫錯了，是外部審查指出的）。
+  //
+  // 真正的理由是**輪次與掛載次數的對應**：包了之後「第 3 輪」代表的是
+  // 第 5 與第 6 次掛載，而失敗訊息裡的「每輪多 1 份」就不再等於
+  // 「每次進出多 1 份」。這支的輸出是要拿去查產品的，對應關係要是一比一。
   createRoot(host).render(<Harness />)
   // **等 renderer 真的建好，不是睡固定時間** —— 見 `RENDERER_TIMEOUT_MS` 的說明
   const controls = await Promise.race([
@@ -180,7 +201,11 @@ async function run(): Promise<SubjectResult[]> {
     sleep(RENDERER_TIMEOUT_MS).then(() => null),
   ])
   if (controls === null) {
-    throw new Error(`${RENDERER_TIMEOUT_MS}ms 內拿不到 WebGLRenderer —— WebGL2 起不來？`)
+    throw new Error(
+      `${RENDERER_TIMEOUT_MS}ms 內拿不到 WebGLRenderer。` +
+        `可能是 WebGL2 起不來、React render 失敗、import 錯誤，或 onCreated 沒被呼叫 ——` +
+        `打開 LEAK_HEADED=1 看 console 才分得出是哪一個`,
+    )
   }
   const { setCell, renderer } = controls
 
@@ -198,7 +223,15 @@ async function run(): Promise<SubjectResult[]> {
       const mem = renderer.info.memory
       rounds.push({ round, geometries: mem.geometries, textures: mem.textures })
     }
-    // 收尾：把子樹拿掉，下一個 subject 從乾淨的狀態開始
+    // 收尾：把子樹拿掉。
+    //
+    // ⚠️ **這不會讓下一個 subject 從「乾淨」的狀態開始**（原本的註解是錯的，
+    // 外部審查指出）—— 校正砝碼故意不釋放，它漏掉的東西會一直留在
+    // 這個 renderer 的計數裡。下一個 subject 的基準線因此是墊高的。
+    //
+    // 那不影響判定：`verdict` 看的是**同一個 subject 十輪之間的增量**，
+    // 不是絕對值。這一行的作用只是讓每個 subject 的第一輪都從
+    // 「子樹剛掛上去」開始，而不是從「上一個 subject 還掛著」開始。
     await swap(null)
     results.push({ id: subject.id, source: subject.source, expect: subject.expect, rounds })
   }

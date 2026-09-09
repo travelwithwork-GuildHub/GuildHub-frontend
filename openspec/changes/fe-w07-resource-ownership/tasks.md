@@ -15,7 +15,9 @@
       逾時值寫成具名常數。
       驗證：故意把 port 佔住 → 測試紅，且訊息指出是 server 那一環（`FE-W07-S04`）
 - [x] 2.4 `FE-W07-S05`：攔 `page.on('request')`，非 `127.0.0.1` 的位址一律讓測試失敗。
-      驗證：暫時在量測台 import 一個會連線的模組，確認它紅
+      **負向驗證**（外部審查指出這一條原本沒做）：在 `index.html` 加一行
+      `<link href="https://fonts.googleapis.com/…">` →
+      `❌ 量測台對外連線了（FE-W07-S05）／GET https://fonts.googleapis.com/css2?family=Inter`
 
 ## 3. 尺要先證明自己量得到（`FE-W07-S03`）
 
@@ -59,8 +61,25 @@
       過程中發現初次等 renderer 與每輪沉澱共用同一個常數會報「WebGL2 起不來」（假的原因），
       已拆成兩個常數
 
+## 6.5 外部審查之後補的（codex gpt-5.6-terra ＋ Gemini 3.1 Pro 各一輪）
+
+- [x] 6.5.1 `FE-W07-S05` 的負向驗證（見 2.4）—— 原本有防線但沒有驗過
+- [x] 6.5.2 涵蓋率多擋一種：登記的路徑**存在**、卻沒有被量測台 `import`。
+      原本只擋「檔案不存在」，所以一個 subject 可以宣告 `source: X` 卻 render 別的東西
+- [x] 6.5.3 掃描器補上 `useLoader`／`useTexture`／`useGLTF`／`useFBO`、
+      `new TextureLoader()`、`<primitive>`、`new (THREE.BoxGeometry)()`。
+      **擋不住的形狀（改名 import、動態拼接、跨檔 helper、`extend()`）寫進註解**，
+      不假裝擋得住
+- [x] 6.5.4 修掉五處講錯或過度宣稱的註解：
+      `SETTLE_MS = 0` 的成因（同時壞了兩件事，不只釋放延後）、
+      `<StrictMode>` 的排除理由（原本寫「量不到」是錯的，真正理由是輪次對應）、
+      `swap(null)` 的「乾淨狀態」（校正砝碼的殘留一直在）、
+      renderer 逾時訊息只寫 WebGL2、`source` 欄位被說成保證
+- [x] 6.5.5 把這把尺**量不到什麼**寫進 driver 的檔頭（只漏一次、
+      `info.memory` 以外的資源、一漏一放抵銷、要靠 props 才建立的、非同步建立的）
+
 ## 7. 文件
 
-- [ ] 7.1 `docs/adr/0003-gpu-resource-ownership.md`：所有權規則，
+- [x] 7.1 `docs/adr/0003-gpu-resource-ownership.md`：所有權規則，
       以及**量過之後決定不寫的那兩條禁令**。
       change 會被 archive，ADR 不會 —— `FE-W08`～`FE-W15` 要看得到它
