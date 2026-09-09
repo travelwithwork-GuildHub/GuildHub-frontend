@@ -2,7 +2,8 @@
 
 import type {} from '@react-three/fiber'
 import { PHYSICS } from '../physics/world'
-import { Floor, Wall } from './structural'
+import { GuildHall } from '../layout/GuildHall'
+import { Floor } from './structural'
 
 // 世界的外殼。規格 `FE-W10-S10`／`S11`／`S12`。
 //
@@ -21,27 +22,15 @@ import { Floor, Wall } from './structural'
 // 玩家會走到牆外面 —— 而畫面上看起來只是「牆的位置怪怪的」。
 
 export function WorldShell() {
-  const half = PHYSICS.halfExtent
-  const span = half * 2
-  const { wallThickness: thickness, wallHeight: height } = PHYSICS
-
-  // 四面牆的中心落在物理邊界上。牆比場地長 `thickness`，讓四個角接起來。
-  const length = span + thickness
-  const walls: { key: string; position: [number, number, number]; rotationY: number }[] = [
-    { key: 'north', position: [0, 0, -half], rotationY: 0 },
-    { key: 'south', position: [0, 0, half], rotationY: 0 },
-    { key: 'west', position: [-half, 0, 0], rotationY: Math.PI / 2 },
-    { key: 'east', position: [half, 0, 0], rotationY: Math.PI / 2 },
-  ]
+  const span = PHYSICS.halfExtent * 2
 
   return (
     <>
       <Floor width={span} depth={span} />
-      {walls.map((w) => (
-        <group key={w.key} position={w.position} rotation={[0, w.rotationY, 0]}>
-          <Wall length={length} height={height} thickness={thickness} />
-        </group>
-      ))}
+      {/* ⚠️ **四面邊界牆已經搬進 `LAYOUT`**（`FE-W11`）——
+          它們現在跟內牆走同一條路，視覺與碰撞吃同一份資料。
+          在這裡再畫一次的話就是第二份真相。 */}
+      <GuildHall />
     </>
   )
 }

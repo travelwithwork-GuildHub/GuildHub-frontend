@@ -91,14 +91,25 @@ export function duplicateIds(items: readonly LayoutItem[]): string[] {
 /** 遊玩區域的半徑。**唯一的尺寸來源** —— 地板、邊界、配置的合法範圍都從它推導。 */
 export const WORLD_HALF_EXTENT = PHYSICS.halfExtent
 
-/** 碰撞盒超出遊玩區域的配置項。回空陣列代表全部都在裡面。 */
+/**
+ * 碰撞盒超出遊玩區域的配置項。回空陣列代表全部都在裡面。
+ *
+ * **兩層判準**：
+ * 1. 邊界牆本來就跨在區域的邊上（內側面貼齊 `half`、外側面在外面），
+ *    所以它只要不超出「世界連牆在內」的範圍就好
+ * 2. 其餘每一個會擋路的東西都要**完整**落在 `±half` 之內
+ *
+ * ⚠️ 判斷「是不是邊界」看的是 `role`，**不是 `id` 的開頭** ——
+ * 字串比對改個名字就靜默失效。
+ */
 export function outOfBounds(items: readonly LayoutItem[], half = WORLD_HALF_EXTENT): string[] {
   const bad: string[] = []
   for (const item of items) {
     const box = staticBoxFor(item)
     if (box === undefined) continue
-    const overX = Math.abs(box.x) + box.halfWidth > half
-    const overZ = Math.abs(box.z) + box.halfDepth > half
+    const limit = item.kind === 'wall' && item.role === 'boundary' ? half + PHYSICS.wallThickness : half
+    const overX = Math.abs(box.x) + box.halfWidth > limit
+    const overZ = Math.abs(box.z) + box.halfDepth > limit
     if (overX || overZ) bad.push(item.id)
   }
   return bad.sort()

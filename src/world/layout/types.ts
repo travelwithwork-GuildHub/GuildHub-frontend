@@ -38,7 +38,18 @@ export type SemanticKind = (typeof SEMANTIC_KINDS)[number]
  * `width`／`depth`、家具什麼都不要。硬塞一組共用參數只會讓呼叫端猜哪幾個有效。
  */
 export type LayoutItem =
-  | (Placement & { readonly kind: 'wall'; readonly length: number })
+  | (Placement & {
+      readonly kind: 'wall'
+      readonly length: number
+      /**
+       * 這面牆是**遊玩區域的邊界**。
+       *
+       * ⚠️ 有讀取者：邊界牆本來就跨在區域的邊上（內側面貼齊邊界、外側面在外面），
+       * 所以「東西不得擺到區域外面」那條檢查對它不成立 —— 它**定義**了那條邊。
+       * 用 `id` 開頭去猜是字串比對，改個名字就靜默失效。
+       */
+      readonly role?: 'boundary'
+    })
   | (Placement & { readonly kind: 'carpet'; readonly width: number; readonly depth: number })
   | (Placement & {
       readonly kind: 'platform'
