@@ -14,6 +14,8 @@ import { FACING_ROTATION, nextFacing } from './facing'
 import { displacement, speedOf } from './movement'
 import { advanceRenderMotion, createRenderMotion } from './renderMotion'
 import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/world/physics/world'
+import { staticBoxesFor } from '@/world/layout/geometry'
+import { LAYOUT, SPAWN } from '@/world/layout/guildHallLayout'
 
 // 本地玩家。
 //
@@ -57,7 +59,12 @@ export function LocalPlayer({ targetRef, poseRef }: LocalPlayerProps) {
       const rapier = await import('@dimforge/rapier3d-compat')
       await rapier.init()
       if (cancelled) return
-      physics.current = createPhysicsWorld(rapier)
+      // ⚠️ **靜態障礙物全部來自配置** —— 邊界也是（`FE-W11`）。
+      // 這裡是世界裡唯一一個把 `StaticBox` 交給物理引擎的地方。
+      physics.current = createPhysicsWorld(rapier, {
+        spawn: SPAWN,
+        staticBoxes: staticBoxesFor(LAYOUT),
+      })
     })()
     return () => {
       cancelled = true
