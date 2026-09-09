@@ -227,6 +227,69 @@ describe('遠端玩家的狀態', () => {
     })
   })
 
+  // ── FE-R05 自我回聲 ───────────────────────────────────────────────
+  //
+  // 規格：openspec/changes/fe-r05-self-echo/specs/remote-players/spec.md
+  //   Requirement: 自己永遠不會出現在遠端玩家裡
+  //
+  // 後端不做逐人過濾（實測：送 move 之後自己收到自己的 pos）。
+  // 目前不會長出分身是**結構性**的：自己從來沒有進過名單。
+  // 這三條把那件事釘住 —— 沒有它們，重構名單時踩掉的症狀是
+  // 「畫面上多一個跟你重疊、跟著你走的分身」，而單人測試看不出來。
+
+  it('[FE-R05-S01] 自己的位置原路廣播回來時不產生分身', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player(SELF, 0, 0), player('u1', 32, 0, 0)))
+
+    // **同一則 pos 裡同時有自己與別人** —— 這正是後端廣播回來的樣子。
+    clock += 100
+    apply(state, pos([SELF, 3200, 3200, 1], ['u1', 320, 0, 2]))
+
+    expect(state.roster.has(SELF), '自己被加進遠端玩家了 —— 那就是分身').toBe(false)
+    expect(state.motion.has(SELF), '自己的樣本被建出來了 —— 那就是分身').toBe(false)
+    // **第三條是防「整則被丟掉」** —— 只驗前兩條的話，
+    // 一個「看到自己就 return」的錯誤實作照樣是綠的，而那會讓
+    // 同一則訊息裡其他人的位置全部遺失。
+    expect(
+      shown(state, 'u1', clock + RENDER_DELAY_MS),
+      '自我回聲不該讓同一則裡其他人的更新消失',
+    ).toEqual({ x: 10, z: 0, f: 2 })
+  })
+
+  it('[FE-R05-S02] snapshot 裡的自己不會變成遠端角色', () => {
+    const state = createRemotePlayersState()
+
+    // 實測後端：snapshot 的第一個元素就是自己。
+    apply(state, snapshot(player(SELF, 64, 64, 3), player('u1', 32, 0)))
+
+    expect([...state.roster.keys()], '名單裡不該有自己').toEqual(['u1'])
+    expect(state.motion.has(SELF), '自己不該有樣本').toBe(false)
+  })
+
+  it('[FE-R05-S03] selfId 還沒設定時自己會被當成別人 —— 釘住 hello 先到這個前提', () => {
+    const state = createRemotePlayersState()
+
+    // `selfId` 是 null：`hello` 還沒被處理。
+    applyMessage(state, snapshot(player(SELF, 64, 64, 3), player('u1', 32, 0)), null, clock)
+
+    // ⚠️ **這裡斷言的是「壞掉的行為」，而且是刻意的。**
+    // 這一層沒有任何別的資訊可以認出自己 —— 寫成「就算是 null 也不會有分身」
+    // 是做不到的。真正的防線是「`hello` 在同一條連線上早於 `snapshot`，
+    // 而且 `selfId` 是同步設定的」，所以要釘住的是那個前提：
+    // 一旦有人把 `selfId` 改成非同步（例如放進 React state），
+    // 正式路徑就會落進這個分支，而這條測試會紅。
+    expect(
+      state.roster.has(SELF),
+      'selfId 是 null 時自己會進名單 —— 這是這一層的邊界，' +
+        '防線在「hello 先到且同步設定」。這條紅了代表那個前提被破壞了',
+    ).toBe(true)
+
+    // 對照組：`selfId` 有值時同一則訊息不會有自己。
+    const ok = createRemotePlayersState()
+    applyMessage(ok, snapshot(player(SELF, 64, 64, 3), player('u1', 32, 0)), SELF, clock)
+    expect(ok.roster.has(SELF), 'selfId 有值時自己不該進名單').toBe(false)
+  })
+
   it('不屬於這一層的訊息不會造成任何改變', () => {
     const state = createRemotePlayersState()
     apply(state, snapshot(player('u1')))
