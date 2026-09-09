@@ -72,14 +72,27 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 
 | 項目 | 狀態 | 依據 |
 |---|---|---|
+| FE-O01 | 已封存 | `fe-o01-contract` |
+| FE-O09 | 已封存 | `fe-o09-env` |
 | FE-O11 | 已封存 | `fe-o11-coverage`、`fe-o11-evidence` |
+| FE-R01 | 已封存 | `fe-r01-realtime` |
+| FE-R02 | 已封存 | `fe-r02-protocol` |
+| FE-R03 | 已封存 | `fe-r03-position-sync` |
+| FE-R05 | 已封存 | `fe-r05-self-echo` |
+| FE-R07 | 已封存 | `fe-r07-remote-players` |
+| FE-R08 | 已封存 | `fe-r08-interpolation` |
 | FE-W01 | 已封存 | `fe-w01-worldcanvas` |
 | FE-W02 | 已封存 | `fe-w02-coords` |
 | FE-W03 | 已封存 | `fe-w03-player` |
 | FE-W04 | 已封存 | `fe-w04-physics` |
 | FE-W05 | 已封存 | `fe-w05-camera` |
+| FE-W06 | 已封存 | `fe-w06-spatial-interaction` |
+| FE-W07 | 已封存 | `fe-w07-resource-ownership` |
 | FE-X01 | 已封存 | `fe-x01-appshell` |
 | FE-O10 | 已完成 | 標記 `Done` |
+| FE-O02 | 規格已合併 | `fe-o02-data-access` |
+| FE-R04 | 規格已合併 | `fe-r04-background-tab` |
+| FE-R06 | 規格已合併 | `fe-r06-multi-tab` |
 | FE-O18 | 常態 | — |
 | BE-G04 | 待裁決 | — |
 | BE-G25 | 待裁決 | — |
@@ -109,9 +122,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G18 | 已取消 | — |
 | BE-G19 | 已取消 | — |
 
-共 161 項：未開始 125、等外部 19、已封存 7、已取消 6、待裁決 2、已完成 1、常態 1
+共 161 項：未開始 112、等外部 19、已封存 17、已取消 6、規格已合併 3、待裁決 2、已完成 1、常態 1
 
-來源指紋 `ddbc5b775e78010b`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `cce7978682f76501`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -391,7 +404,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-O01 | 資料層契約 | **唯一一份。** 用 Zod 定義每一個操作的輸入與輸出，放在 `src/api/contract/`。REST entity、operation、WS 訊息集合全部在這裡，**別處不得再定義一次** | W1 | 8 | | Alarm｜這份被複製到第二個地方的那天，整套就開始漂 |
 | | | 已存在的那一半用產的：`npx openapi-typescript` 從真後端的 `/openapi.json`；WS 依 `protocol.py` 手寫並標明對應段落 | W1 | 5 | | |
 | FE-O02 | 資料存取介面 | domain operations（Profile / Project / Role / Application / Invitation / Offer / Message / Room / Seat）。**元件裡不准出現 `fetch`** | W1 | 6 | | Alarm｜這條破了，之後銜接是重寫不是切換 |
-| | | Adapter 切換：`local`（自己的 Route Handlers）或 `guildhub`（真後端），環境變數決定。**元件不知道自己連的是誰** | W1 | 5 | | |
+| | | Adapter 切換：`internal`（自己的 Route Handlers）或 `guildhub`（真後端），環境變數決定。**元件不知道自己連的是誰**。**刻意不叫 `local`** —— `NEXT_PUBLIC_APP_ENV=local` 的 `local` 是「跑在開發者機器上、連 localhost 的真後端」，兩個是相反的資料來源（`FE-O02` design 的 D1） | W1 | 5 | | |
 | | | 兩個 adapter 的錯誤都對映到 `FE-X03` 的那一份語彙 | W2 | 4 | | |
 | FE-O04 | 可拋棄的資料庫 | Docker Postgres（或 SQLite），schema 對齊真後端的 `sql/001_schema.sql`，新增的表另外標明；`seed` 與 `reset` 一個指令回到乾淨狀態 | W2 | 9 | | |
 | | | **測試用另一個資料庫，不動開發資料。** L3 的教訓：測試會污染 DB、洗掉紀錄，跑越多次越亂 | W2 | 4 | | Alarm｜不做這條，開發資料遲早被測試洗掉 |
