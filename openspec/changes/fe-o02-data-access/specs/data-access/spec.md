@@ -33,7 +33,18 @@ adapter 由 `NEXT_PUBLIC_DATA_ADAPTER` 決定，值是 `guildhub`（真後端）
 - **WHEN** `NEXT_PUBLIC_DATA_ADAPTER` 是 `guildhub`
 - **AND** 呼叫任何一個 domain operation
 - **THEN** 請求送到 `restBase()` 給的位址
-- **AND** 請求帶上 session cookie（`credentials: 'include'`）
+- **AND** 送出的請求 MUST 以 `credentials: 'include'` 建構
+
+> ⚠️ **這一條刻意不寫成「請求帶上 session cookie」。** 那件事在
+> 單元測試的環境裡**驗不了**：實測 `document.cookie` 設得進去，
+> 但 `fetch(url, { credentials: 'include' })` 之後測試 server 收到的
+> `req.headers.cookie` 是 `null` —— jsdom 的 cookie jar 跟 Node 的 fetch
+> 沒有連通。
+>
+> 驗得到的是 `Request` 物件上的 `credentials`，而它的**預設值是
+> `same-origin` 不是 `include`** —— 所以「有沒有寫那一行」是量得出來的。
+>
+> **端到端的 cookie 只有瀏覽器驗得到**（`FE-O08` 切換演練，W5）。
 
 #### Scenario: [FE-O02-S02] 設定選 internal 時，每個操作明顯失敗
 
