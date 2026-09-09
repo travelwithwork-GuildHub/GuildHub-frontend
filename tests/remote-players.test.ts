@@ -177,6 +177,56 @@ describe('遠端玩家的狀態', () => {
     expect(state.motion.get('u2')!.samples.length, '別人的樣本被連累了').toBe(u2Before)
   })
 
+  it('[FE-R08-S17] join 一個已經在名單裡的人，樣本要重來', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player('u1', 0, 0)))
+    for (let i = 1; i <= 5; i++) {
+      clock += 100
+      apply(state, pos(['u1', i * 32, 0, 0]))
+    }
+    expect(state.motion.get('u1')!.samples.length, '前置條件：他要真的有一段歷史').toBeGreaterThan(1)
+
+    // **沒有先 `leave`** —— 這正是「重複 join」的情況，
+    // 而舊寫法會整個跳過已經在名單裡的人，於是舊軌跡被留了下來。
+    apply(state, presence([player('u1', 3200, 0)], []))
+
+    expect(
+      state.motion.get('u1')!.samples.length,
+      'join 是權威狀態的重建，要清空整段歷史，只留它自己帶來的那一筆',
+    ).toBe(1)
+    expect(shown(state, 'u1'), '畫面上應該直接在新位置，不是從舊位置滑過去').toEqual({
+      x: 100,
+      z: 0,
+      f: 0,
+    })
+  })
+
+  it('[FE-R08-S18] snapshot 也清掉「仍然在名單裡」那個人的樣本', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player('u1', 0, 0)))
+    for (let i = 1; i <= 5; i++) {
+      clock += 100
+      apply(state, pos(['u1', i * 32, 0, 0]))
+    }
+    expect(state.motion.get('u1')!.samples.length, '前置條件：他要真的有一段歷史').toBeGreaterThan(1)
+
+    // ⚠️ **這一則 snapshot 仍然包含他。**
+    // `FE-R07-S03` 只證明了「被移除的人消失」，證明不了「留下來的人被重設」——
+    // 而後者才是換場景之後把**上一個場景的位置**跟新位置連成一段插值的來源。
+    apply(state, snapshot(player('u1', 3200, 0)))
+
+    expect([...state.roster.keys()], '他仍然在名單裡').toEqual(['u1'])
+    expect(
+      state.motion.get('u1')!.samples.length,
+      'snapshot 是權威狀態的重建，不是一段連續軌跡上的一點',
+    ).toBe(1)
+    expect(shown(state, 'u1'), '畫面上應該直接在新位置，不是從舊位置滑過去').toEqual({
+      x: 100,
+      z: 0,
+      f: 0,
+    })
+  })
+
   it('不屬於這一層的訊息不會造成任何改變', () => {
     const state = createRemotePlayersState()
     apply(state, snapshot(player('u1')))
