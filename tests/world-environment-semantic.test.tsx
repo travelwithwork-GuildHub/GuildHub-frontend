@@ -119,6 +119,31 @@ function meshes(root: Object3D): Mesh[] {
   return found
 }
 
+describe('props 的邊界值', () => {
+  // codex 在封存前的驗證裡指出的：`items = 0 / 1 / 很多`、極小的尺寸，
+  // 至少要確認不會產生 NaN、負尺寸，或讓碰撞與視覺脫鉤。
+  it('極端的 items 不會做出壞掉的幾何', async () => {
+    for (const items of [0, 1, 12]) {
+      for (const build of [semantic.projectBoardDefinition, semantic.talentBoardDefinition]) {
+        const definition = build(items)
+        const box = await boundsOf(definition)
+        const size = box.getSize(new Vector3())
+        expect(Number.isFinite(size.x) && Number.isFinite(size.y) && Number.isFinite(size.z)).toBe(true)
+        expect(size.x, `items=${items} 做出了零寬度的看板`).toBeGreaterThan(0)
+        // 板面本身還在 —— `items = 0` 不該讓整個看板消失。
+        expect(size.y).toBeGreaterThan(1)
+      }
+    }
+  })
+
+  it('極小的尺寸不會做出退化的幾何', async () => {
+    // `geometryFor` 會把圓角夾到最短邊的 0.49 倍；夾錯的話 bbox 會塌成 0
+    // （`FE-W09` 實測過 `(4, 0.2, 4)` r=0.1 的高度是 0）。
+    const tiny = await boundsOf(semantic.signDefinition(0.05))
+    expect(tiny.getSize(new Vector3()).y, '招牌塌成零高度').toBeGreaterThan(1)
+  })
+})
+
 describe('語意元件的渲染', () => {
   it('每一個元件都渲染出它 definition 裡的每一個部件', async () => {
     for (const [name, build] of BUILDERS) {
