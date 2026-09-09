@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense, useRef, useState } from 'react'
 import { layer } from '@/design/layers'
 import { isWebGL2Available } from './webgl'
-import { DebugShadowScene } from './DebugShadowScene'
+import { WorldShell } from './environment/WorldShell'
 import { WorldCamera } from './WorldCamera'
 import { LocalPlayer } from './player/LocalPlayer'
 import { RemoteWorld } from './RemoteWorld'
@@ -85,7 +85,7 @@ export default function WorldCanvas() {
             shadow-mapSize={[1024, 1024]}
           />
           <Suspense fallback={null}>
-            <DebugShadowScene />
+            <WorldShell />
             <LocalPlayer targetRef={cameraTarget} poseRef={localPose} />
             {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
                 WorldCanvas 不知道即時層的存在，也不該知道。 */}

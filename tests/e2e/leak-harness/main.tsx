@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Canvas } from '@react-three/fiber'
 import { BoxGeometry, MeshStandardMaterial, type WebGLRenderer } from 'three'
-import { DebugShadowScene } from '@/world/DebugShadowScene'
 import { ChibiPlayer } from '@/world/player/ChibiPlayer'
 import { geometryFor } from '@/world/primitives/geometry'
 import { materialFor } from '@/world/primitives/material'
@@ -150,12 +149,6 @@ const SUBJECTS: readonly Subject[] = [
   // 校正砝碼永遠排第一：尺量不到它的話，後面的結果全部沒有意義
   { id: 'fixture:leaking', source: null, expect: 'leaks', render: () => <LeakingFixture /> },
   { id: 'fixture:owned', source: null, expect: 'clean', render: () => <OwnedFixture /> },
-  {
-    id: 'DebugShadowScene',
-    source: 'src/world/DebugShadowScene.tsx',
-    expect: 'clean',
-    render: () => <DebugShadowScene />,
-  },
   {
     id: 'ChibiPlayer',
     source: 'src/world/player/ChibiPlayer.tsx',

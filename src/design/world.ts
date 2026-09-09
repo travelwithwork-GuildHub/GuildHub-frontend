@@ -35,6 +35,12 @@ export const WORLD_COLORS = {
   ground: '#cfd4e4',
   /** 強調色，用在要被看見的物件上。原本是 `DebugShadowScene` 的方塊。 */
   accent: '#6b7fd7',
+  /** 牆面。比地面深一階，讓邊界在俯視角下看得出來。 */
+  wall: '#aeb6cf',
+  /** 地毯。分區用的暖色，跟地面的冷灰藍拉開。 */
+  carpet: '#d8bda6',
+  /** 平台／台階。介於地面與牆之間。 */
+  platform: '#bfc6da',
 } as const
 
 export type WorldColorName = keyof typeof WORLD_COLORS

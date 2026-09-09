@@ -28,7 +28,9 @@ function sourceFiles(dir: string): string[] {
 /** 這幾個檔案一定要在掃描範圍裡。**名單縮水或路徑打錯都會紅。** */
 const MUST_INCLUDE = [
   'WorldCanvas.tsx',
-  'DebugShadowScene.tsx',
+  // `DebugShadowScene.tsx` 由 `FE-W10` 移除，接手的是 `environment/WorldShell.tsx`。
+  join('environment', 'WorldShell.tsx'),
+  join('environment', 'structural.tsx'),
   'RemoteWorld.tsx',
   join('player', 'ChibiPlayer.tsx'),
   join('player', 'LocalPlayer.tsx'),
