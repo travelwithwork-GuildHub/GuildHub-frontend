@@ -92,6 +92,30 @@ Zod 的 `z.object()` 預設就是 strip（未知的鍵被丟掉，不報錯）�
   「tree-shaking 拿不拿得掉沒用到的」——**要量 bundle 才知道**
 - **Q2：測試 server 的 port 怎麼選？** 固定 port 會在 CI 上撞；
   取 0 讓作業系統給的話要把實際 port 傳回設定。先量會不會撞
-- **Q3：`credentials: 'include'` 在測試 server 上驗得到嗎？**
-  jsdom 的 fetch 會不會真的帶 cookie 是要量的 —— 量不到的話，
-  這條防禦要換一種驗法（例如驗傳給 `fetch` 的 init），並在規格上記明白
+- ~~**Q3：`credentials: 'include'` 在測試 server 上驗得到嗎？**~~ **量完了，答案是不行。**
+
+  實測（vitest 的 jsdom 環境，Node 的 fetch，測試自己起的 server）：
+
+  ```
+  document.cookie = 'session=abc123'   ← 設得進去
+  fetch(url, { credentials: 'include' })
+  server 收到的 req.headers.cookie      → null      ← **沒有帶**
+  ```
+
+  jsdom 的 `document.cookie` 跟 Node 的 fetch 之間沒有連通 ——
+  **這個環境端到端驗不了 cookie**。
+
+  替代驗法量過了，可行：
+
+  ```
+  new Request(url, { credentials: 'include' }).credentials  → 'include'
+  new Request(url, {}).credentials                          → 'same-origin'   ← 預設值
+  fetch(new Request(...))                                   → server 收得到
+  ```
+
+  預設是 `same-origin` 而不是 `include`，所以**「有沒有寫那一行」是量得出來的**
+  —— 拿掉它，`Request.credentials` 會變成 `same-origin`，測試會紅。
+
+  **所以 `FE-O02-S01` 的措辭要改**：從「請求帶上 session cookie」改成
+  「請求以 `credentials: 'include'` 建構」，並明寫端到端的 cookie
+  只有瀏覽器驗得到。已另開 spec 更正 PR —— **不就地改**。
