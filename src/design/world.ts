@@ -59,6 +59,8 @@ export const WORLD_COLORS = {
   board: '#e6dcc8',
   /** 釘在板面上的卡片。 */
   card: '#f7f2e6',
+  /** 世界外面的地。**比地面暗一階** —— 它不是可以走過去的地方。 */
+  outside: '#9ba3b8',
 } as const
 
 export type WorldColorName = keyof typeof WORLD_COLORS

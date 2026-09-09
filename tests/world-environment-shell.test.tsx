@@ -89,11 +89,15 @@ describe('世界的外殼', () => {
     const meshes = meshesOf(scene)
     expect(meshes.length, '外殼什麼都沒渲染出來 —— 下面的斷言在空場景上恆真').toBeGreaterThan(0)
 
-    // 接收陰影的地面：上表面切齊 y = 0（角色的腳在 y ≈ -0.02，所以它站在地面上）。
+    // 接收陰影的地面。**`FE-W11` 之後有兩片**：遊玩區域的地板，
+    // 以及一片更大、更暗的「世界外面的地」（overscan，`FE-W11-S14`）。
     const ground = meshes.filter((m) => m.receiveShadow && m.position.y < 0)
-    expect(ground.length, '沒有任何接收陰影的地面').toBe(1)
-    const box = boxOf(scene, ground[0] as Object3D)
-    expect(box.max.y, '地面的上表面沒有切齊 y = 0，角色會浮在空中或陷進去').toBeCloseTo(0, 4)
+    expect(ground.length, '沒有任何接收陰影的地面').toBeGreaterThan(0)
+
+    // 角色站的那一片：上表面切齊 y = 0（角色的腳在 y ≈ -0.02）。
+    const tops = ground.map((m) => boxOf(scene, m as Object3D).max.y)
+    expect(Math.max(...tops), '沒有任何一片地面的上表面切齊 y = 0 —— 角色會浮在空中或陷進去')
+      .toBeCloseTo(0, 4)
   })
 
   it('[FE-W10-S11] 可見的邊界與物理的邊界對齊', async () => {
