@@ -1,5 +1,6 @@
 import { rotateFootprint, visualBoundsOf } from '../environment/definition'
 import { doorDefinition } from '../environment/semantic'
+import { ZONES } from '../layout/guildHallLayout'
 import type { LayoutItem, QuarterTurn, Zone } from '../layout/types'
 
 // 走廊上門的槽位。規格 `FE-W12-S06`／`S07`／`S08`。
@@ -83,3 +84,15 @@ export function doorSlots(zone: Zone): readonly DoorSlot[] {
 export function doorItemAt(slot: DoorSlot, id: string): LayoutItem {
   return { id, kind: 'door', x: slot.x, z: slot.z, turns: slot.turns }
 }
+
+/** Guild Hall 的走廊。**取不到就拋錯** —— 回一個假的矩形會讓門靜靜跑到原點。 */
+function corridorZone(): Zone {
+  const zone = ZONES.find((candidate) => candidate.id === 'corridor')
+  if (zone === undefined) {
+    throw new Error('配置裡沒有走廊分區 —— 走廊的門沒有地方可以排。')
+  }
+  return zone
+}
+
+/** Guild Hall 走廊上的槽位。**這是產品用的那一份**（測試用 `doorSlots(zone)` 餵別的矩形）。 */
+export const CORRIDOR_SLOTS: readonly DoorSlot[] = doorSlots(corridorZone())

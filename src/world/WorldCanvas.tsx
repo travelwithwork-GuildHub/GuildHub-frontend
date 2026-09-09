@@ -11,6 +11,10 @@ import { RemoteWorld } from './RemoteWorld'
 import { InteractionProvider } from './interaction/InteractionProvider'
 import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
+import { BoardTargets } from './rooms/BoardTargets'
+import { ProjectDoors } from './rooms/ProjectDoors'
+import { CORRIDOR_SLOTS } from './rooms/slots'
+import { useRooms } from './rooms/useRooms'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -58,6 +62,11 @@ export default function WorldCanvas() {
   // 但相機之後可能鎖定別的東西（FE-R03 的 design D1）。
   const localPose = useRef({ x: 0, z: 0, f: 0 })
 
+  // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
+  // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
+  const rooms = useRooms(CORRIDOR_SLOTS.length)
+  // 狀態說明（載入中／失敗／沒有專案／排不下）在下一刀。
+
   if (!webgl2) return <WebGLUnavailable />
 
   return (
@@ -93,6 +102,10 @@ export default function WorldCanvas() {
             {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
                 提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
                 那是 FE-W12（W3）。 */}
+            {/* 走廊上依 `GET /api/rooms` 生成的門（`FE-W12-S01`）。 */}
+            <ProjectDoors rooms={rooms.doors} slots={CORRIDOR_SLOTS} />
+            {/* 兩塊看板接上互動系統（`FE-W12-S14`）。**它們不接任何 API。** */}
+            <BoardTargets />
             <SpatialInteraction poseRef={localPose} />
           </Suspense>
         </Canvas>
