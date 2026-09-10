@@ -156,9 +156,31 @@ try {
     )
   }
 
-  // ── `S04`：A 換了角色，B 看到的 A 跟著變 ────────────────────
+  // ── `S02`：**還沒儲存的選擇，別人不該看到** ──────────────────
+  //
+  // ⚠️ **這一條要在儲存之前量，而它比看起來重要。**
+  // 預覽跟已儲存值混成一個值的話，A 按了取消之後，B 看到的會是
+  // 一個 A 根本沒有選的角色 —— 而那個 bug 在單人測試時完全看不出來。
   await pageA.click('button:has-text("更換角色")')
   await pageA.click('button:has-text("角色 2")')
+  await pageA.waitForTimeout(1500)
+  await pageB.waitForTimeout(1500)
+  const previewOnly = await burst(pageB, 3)
+
+  const leaked = stableDiff(withA0, previewOnly)
+  // 門檻用「A 佔的像素的十分之一」——換色會動到 A 身上一大片，
+  // 而動畫雜訊只有幾十個像素。
+  const leakCeiling = Math.round(presence / 10)
+  if (leaked <= leakCeiling)
+    ok(`A 還沒儲存時，B 看到的沒有變（差 ${leaked}，上限 ${leakCeiling}）`)
+  else
+    bad(
+      `A 還沒儲存，B 就已經看到變化了（差 ${leaked} 個像素）`,
+      '**未提交的選擇不是事實**（規格 S02）—— 預覽的值漏進了送給別人的狀態。' +
+        'A 按取消之後，B 會停在一個 A 根本沒有選的角色',
+    )
+
+  // ── `S04`：A 儲存之後，B 看到的 A 跟著變 ────────────────────
   await pageA.click('button:has-text("就用這個")')
   // 儲存 → 重連 → 後端重讀 session → 新的 snapshot 傳到 B。
   // ⚠️ 這中間 B 會看到 A 離開又進來（規格 `S05` 明寫的代價），所以要等久一點。
@@ -166,7 +188,7 @@ try {
   await pageB.waitForTimeout(2000)
   const withA1 = await burst(pageB, 3)
 
-  const changed = stableDiff(withA0, withA1)
+  const changed = stableDiff(previewOnly, withA1)
   if (changed >= SIGNAL_FLOOR)
     ok(`A 換了角色之後，B 看到的畫面差了 ${changed} 個像素（下限 ${SIGNAL_FLOOR}）`)
   else
