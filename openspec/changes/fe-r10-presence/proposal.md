@@ -10,7 +10,8 @@
 - 讓遠端玩家狀態從 `snapshot`／`presence.join` 建立，並由後續 `status` 訊息更新。
 - `presence.leave` 與整份 `snapshot` 重建時，同步清除不再在線玩家的狀態，避免同一
   `id` 再出現時讀到舊值。
-- 提供目前 WebSocket scene 的在線人數；名單包含自己時，人數也包含自己。
+- 提供目前 WebSocket scene 的在線人數：以不同 player／user id 去重，
+  包含自己；同一 id 的多條 WebSocket 連線仍只算一人。
 - 補上兩個獨立瀏覽器各登入不同身分、互相看見對方姓名的整合驗收；姓名的實際
   渲染能力仍由 `FE-W08` 提供，本 change 不重做角色標籤。
 - 不改後端 schema、REST API 或 WebSocket 協定，沿用既有的 `Player.st`、`status`、
@@ -23,6 +24,8 @@
   資料與負責跨瀏覽器驗收。
 - 不做聊天、重連、斷線提示、跨 scene 導覽或歷史在線紀錄；分別屬於 `FE-R11`、
   `FE-R12`、`FE-V`，而歷史活動追蹤不在產品範圍。
+- 不顯示 WebSocket connection 數量；現有 `snapshot`／`presence` 不攜帶
+  connection 身分或計數，要支援必須另改後端協定。
 - 不把 Presence 寫入資料庫，也不增加新的 REST 端點或 WebSocket 訊息。
 
 ## Capabilities

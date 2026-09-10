@@ -59,6 +59,9 @@ MUST NOT 改變名單成員、位置樣本或其他玩家的狀態。收到自�
 `presence.leave` SHALL 同步移除該玩家的狀態；後來同一個 id 再加入時，只能讀到
 新 join payload 的 `st`。收到新的 `snapshot` 時，系統 SHALL 以該 snapshot
 取代整份目前狀態，MUST NOT 保留前一份 snapshot 裡任何玩家的舊狀態。
+收到同一個已在名單裡的 id 的 `presence.join`（沒有先收到該 id 的 `leave`）時，
+系統 SHALL 以該 join payload 的 `st` 更新這個人的狀態，MUST NOT 因此新增
+第二筆名單項目或改變在線人數。
 
 #### Scenario: [FE-R10-S05] leave 後同 id 再加入不會讀到舊狀態
 
@@ -72,15 +75,23 @@ MUST NOT 改變名單成員、位置樣本或其他玩家的狀態。收到自�
 - **THEN** 他的目前狀態變成空白
 - **AND** 舊狀態沒有被合併或保留
 
+#### Scenario: [FE-R10-S11] 重複 join 不建立第二筆，但刷新該 id 的狀態
+
+- **WHEN** 名單裡已有一個帶非空白狀態的玩家，收到同一個 id 的 `presence.join`，
+  其中的 `st` 是空白
+- **THEN** 該玩家的狀態變成空白
+- **AND** 名單裡仍然只有這一筆，在線人數不變
+
 ### Requirement: 使用者看得到目前 scene 的在線人數
 
 WebSocket 完成初始 `snapshot` 後，系統 SHALL 顯示目前伺服器 scene 的在線人數。
 人數 SHALL 等於權威 Presence 名單裡不同玩家 id 的數量，**包含目前使用者自己**；
-MUST NOT 直接採用已排除自己的遠端角色數量。
+MUST NOT 直接採用已排除自己的遠端角色數量。同一 user id 同時有多條
+WebSocket 連線時 SHALL 只計一人；匿名連線因各自取得不同 id，所以各自計一人。
 
 後續 `presence.join`／`presence.leave` SHALL 更新人數；重複 join、未知 id 的 leave、
 `status` 與 `pos` MUST NOT 改變人數。在初始 snapshot 尚未到達或連線已卸載時，
-系統 MUST NOT 把前一條連線的人數當成目前值顯示。
+系統 SHALL 把在線人數視為尚未就緒，MUST NOT 顯示任何數字作為目前在線人數。
 
 #### Scenario: [FE-R10-S07] 初始在線人數包含自己
 
@@ -90,14 +101,15 @@ MUST NOT 直接採用已排除自己的遠端角色數量。
 
 #### Scenario: [FE-R10-S08] join 與 leave 更新在線人數
 
-- **WHEN** 初始在線人數是 3，之後一個新 id 加入、再有一個現有 id 離開
-- **THEN** 顯示的人數依序變成 4、3
-- **AND** status、pos、重複 join 與未知 id 的 leave 都不改變人數
+- **WHEN** 初始在線人數是 3，之後一個新 id 加入、同一 id 因另一條連線重複
+  join，再有一個現有 id 離開
+- **THEN** 顯示的人數依序變成 4、維持 4、再變成 3
+- **AND** status、pos 與未知 id 的 leave 都不改變人數
 
 #### Scenario: [FE-R10-S09] 新連線取得 snapshot 前不顯示舊人數
 
 - **WHEN** 前一條連線曾顯示非零人數，之後該連線卸載並建立新的連線
-- **THEN** 新連線取得自己的 snapshot 前不顯示前一條連線的人數
+- **THEN** 新連線取得自己的 snapshot 前，畫面不顯示任何在線人數數字
 - **AND** 新 snapshot 到達後才顯示它所代表的人數
 
 ### Requirement: 兩個獨立登入身分互相看得到姓名
