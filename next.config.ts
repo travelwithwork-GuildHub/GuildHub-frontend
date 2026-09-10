@@ -75,9 +75,6 @@ const nextConfig: NextConfig = {
   // 寫在這裡而不是在 page 裡呼叫 `redirect()`：這樣測試可以在不起 server 的
   // 情況下斷言 `permanent` 的值。**但那只證明到設定層** ——
   // 「HTTP 回應真的是 307」由 design.md〈驗證方式〉的 V1 用 curl 補上。
-  async redirects() {
-    return [{ source: '/', destination: '/world', permanent: false }]
-  },
 }
 
 export default nextConfig
