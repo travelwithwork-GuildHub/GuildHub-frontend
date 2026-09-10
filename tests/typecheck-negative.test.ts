@@ -88,6 +88,18 @@ describe('typecheck 真的會擋', () => {
     // 全錯（tsbuildinfo 陳舊快取、`next build` 與 typecheck 爭用 `.next/types/`、
     // dev server 重編譯的賽跑），另外跑了 23 次都沒能重現。
     // **查不出來的原因就是這裡沒有留下證據。** 與其繼續猜，不如讓下一次紅燈可診斷。
+    //
+    // ⚠️ **後續：加上診斷的當天下午就抓到了，根因跟那三個假設都無關。**
+    //
+    //     tests/my-avatar.test.ts(22,3): error TS2353: 'created_at' does not exist in type
+    //
+    // **是工作區裡有型別錯誤。** 這條陽性對照會抓到 repo 裡**任何一個**型別錯誤，
+    // 而它「偶爾紅」正是因為那些時候手上有還沒跑過 `typecheck` 的檔案。
+    // 三個假設全繞著競爭條件轉，是因為原本的判準把 tsc 的輸出吞掉了。
+    //
+    // **所以這條紅燈的第一嫌疑不是環境，是「你剛才寫的東西型別不對」。**
+    // 上面那句「有東西在跟 tsc 搶 `.next/types/`」留著，因為那仍然是可能的第二嫌疑
+    // —— 但**先看訊息指的是哪個檔案**，那一行會直接告訴你。
     let code = 0
     let output = ''
     try {
@@ -106,7 +118,9 @@ describe('typecheck 真的會擋', () => {
       code,
       [
         '陽性對照紅了 —— 乾淨的 src/ 底下 typecheck 竟然不是綠的。',
-        '這通常不是產品壞了，而是有東西在跟 tsc 搶 .next/types/ 或 tsconfig.tsbuildinfo。',
+        '第一嫌疑：**你剛才寫的檔案型別不對**（實測過一次，是測試 fixture 少了一欄）。',
+        '第二嫌疑：有東西在跟 tsc 搶 .next/types/ 或 tsconfig.tsbuildinfo。',
+        '底下那一行會直接告訴你是哪一個檔案、哪一行。',
         'tsc 的完整輸出：',
         output,
       ].join('\n'),
