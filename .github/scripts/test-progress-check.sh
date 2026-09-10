@@ -569,6 +569,63 @@ baseline
 edit "Pending｜後端沒有" "Pending＋Cancelled｜兩個都標"
 run 1 "互斥的處置並存：紅" "互斥"
 
+# ── 負責人（第八欄）────────────────────────────────────────────────
+#
+# **這一欄不參與任何狀態計算。** 一項工作做完了沒有，跟誰負責無關 ——
+# 所以下面沒有任何一條在斷言狀態。它們驗的全是**解析器認不認得這一欄**，
+# 因為認錯的症狀是安靜的：多打一個 `|` 會讓那一欄的內容被當成負責人印出來。
+
+# 把〈工作項目〉那張表改成八欄。**每一列都要改**，欄數對不上會先被別條擋掉。
+owner_table() {
+  python3 - "$W/docs/WBS.md" <<'PY_OWNER'
+import io, sys
+path = sys.argv[1]
+lines = io.open(path, encoding="utf-8").read().split("\n")
+out, in_t = [], False
+for ln in lines:
+    if ln.startswith("| ID | 項目 |"):
+        in_t = True
+        out.append(ln.rstrip() + " 負責人 |")
+    elif in_t and ln.startswith("|---"):
+        out.append(ln.rstrip() + "---|")
+    elif in_t and ln.startswith("|"):
+        out.append(ln.rstrip() + " |")
+    else:
+        in_t = False
+        out.append(ln)
+io.open(path, "w", encoding="utf-8").write("\n".join(out))
+PY_OWNER
+}
+
+baseline
+owner_table
+edit "| FE-C01 | AppShell | 專案骨架 | W1 | 3 | | | |" \
+     "| FE-C01 | AppShell | 專案骨架 | W1 | 3 | | | 小明 |"
+run 0 "八欄的負責人表：綠燈" ""
+run_all_has "負責人印在 --all 上" "小明"
+run_field_has "負責人進得了 --json" FE-C01 owner 小明
+
+# 只驗欄數不驗表頭的話，任何人多打一個 `|` 都會變成「有負責人欄」的表，
+# 而那一欄裡的東西會被當成負責人印出來。
+baseline
+owner_table
+edit "| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 | 負責人 |" \
+     "| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 | 擁有者 |"
+run 1 "第八欄的表頭不是「負責人」：紅" "第八欄的表頭"
+
+baseline
+owner_table
+edit "| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 | 負責人 |" \
+     "| ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 | 負責人 | 備註 |"
+run 1 "九欄：紅" "最多 8 欄"
+
+# 續行上的負責人**不會被讀到**，而畫面上它看起來已經指派好了。
+baseline
+owner_table
+edit "| | | 全域 Layout | W1 | 2 | | | |" \
+     "| | | 全域 Layout | W1 | 2 | | | 小明 |"
+run 1 "負責人寫在續行：紅" "只能寫在 ID 那一列"
+
 # ── 缺口的決策期限與 fallback ─────────────────────────────────────
 baseline
 edit "| 決策≤W1 |" "| — |"
