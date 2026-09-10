@@ -23,10 +23,15 @@ export interface RemotePlayersProps {
 export function RemotePlayers({ roster, motion, now }: RemotePlayersProps) {
   return (
     <>
-      {[...roster.keys()].map((id) => (
+      {[...roster.entries()].map(([id, identity]) => (
         // `key` 用 id：離開的人卸載、進來的人掛載，中間的人不受影響。
         // 用索引的話，一個人離開會讓它後面每一個都被當成「換了人」。
-        <RemotePlayer key={id} id={id} motion={motion} now={now} />
+        //
+        // ⚠️ **`av` 從名單拿，不是從動態拿**（`FE-W19-S02`）。
+        // 協定早就送得到它（snapshot 的每個人都是
+        // `{"id","name","av","x","y","f","st"}`，而 `RemoteIdentity` 也存了），
+        // **但在這一行之前沒有任何地方讀它** —— 那正是這一項存在的理由。
+        <RemotePlayer key={id} id={id} motion={motion} now={now} av={identity.av} />
       ))}
     </>
   )
