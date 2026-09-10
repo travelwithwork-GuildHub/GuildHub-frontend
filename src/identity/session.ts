@@ -1,7 +1,8 @@
 import { LIMITS } from '@/api/contract/limits'
-import { login } from '@/api/operations'
+import { getMyProfile, login } from '@/api/operations'
+import { HttpError } from '@/api/transport'
 import { browserRecoveryKeyStore, type RecoveryKeyStore } from './recoveryKey'
-import { NicknameLengthError, type Identity } from './types'
+import { NicknameLengthError, RecoveryKeyRejectedError, type Identity } from './types'
 
 // 身分的取得與恢復。規格 `FE-A01`（identity-session）。
 //
@@ -11,10 +12,17 @@ import { NicknameLengthError, type Identity } from './types'
 // 在這裡快取一份名字的話，那條判準會紅 —— 那是刻意的設計，不是效能疏忽。
 //
 // 唯一落地的東西是**恢復金鑰**，而它只在使用者明確選擇之後才寫（`recoveryKey.ts`）。
-//
-// ⚠️ **這一刀只做「取得身分」那一半**（`S01`／`S02`／`S03`／`S07`）。
-// 「問後端我是誰」與「用金鑰恢復」（`S04`–`S06`、`S08`、`S10`、`S17`）是下一刀 ——
-// 拆點在 Scenario 上，不是在行數上（`AGENTS.md`：實作與證明它的判準不得分開）。
+
+
+/** 401 是「你是訪客」，不是錯誤。分辨它是這一層最重要的一件事。 */
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof HttpError && error.status === 401
+}
+
+/** 404 在登入這條路徑上只有一個意思：那把金鑰指向的名片不存在。 */
+function isNotFound(error: unknown): boolean {
+  return error instanceof HttpError && error.status === 404
+}
 
 /**
  * 暱稱的長度檢查。**在送出之前**（`S02`）。
@@ -70,4 +78,65 @@ export async function signInWithNickname(
   const profile = await login({ nickname })
   persist(store, profile.id, remember)
   return { state: 'signed-in', profile }
+}
+
+/**
+ * 用一把手上的恢復金鑰取回身分。`S17`（換裝置）／`S10`（金鑰無效）。
+ *
+ * ⚠️ **404 轉成 `RecoveryKeyRejectedError`，不是回一張新名片。**
+ * 後端在那條路徑上也拒絕靜默建新的（`auth.py` 的註解逐字寫著理由），
+ * 兩邊是同一個決定 —— 靜默改建新的話，「我回來了」與「我是新來的」
+ * 在畫面上完全一樣，而使用者會以為自己的專案與訊息不見了。
+ */
+export async function signInWithRecoveryKey(
+  key: string,
+  { remember = false, store = browserRecoveryKeyStore() }: SignInOptions = {},
+): Promise<Identity> {
+  let profile
+  try {
+    profile = await login({ resume_token: key })
+  } catch (error) {
+    if (isNotFound(error)) throw new RecoveryKeyRejectedError()
+    throw error
+  }
+  persist(store, profile.id, remember)
+  return { state: 'signed-in', profile }
+}
+
+/**
+ * 問後端「我是誰」。`S04`／`S05`／`S06`／`S08`。
+ *
+ * ⚠️ **401 之後還有一步。** cookie 不在的時候 `GET /api/me` 必然回 401，
+ * 而那正是要拿金鑰去恢復的時刻（`S08`）。
+ * `S05` 的條件因此是「401 **且手上沒有可用的金鑰**」才是訪客 ——
+ * 規格裡那個但書不是修辭，少了它這條會跟 `S08` 直接矛盾，
+ * 而矛盾的方向是**讓正確的實作變紅**。
+ *
+ * ⚠️ **401 不重試。** 它不是暫時性的失敗，重試只會多打一次同樣的 401。
+ *
+ * ⚠️ **回傳值裡沒有「上次問到的名字」。** 這一層不快取任何身分 ——
+ * `S04` 的後兩行要求「後端上的名字改了，重新載入要顯示新的」，
+ * 而那條判準存在的理由就是擋掉快取。
+ */
+export async function resolveIdentity(
+  store: RecoveryKeyStore = browserRecoveryKeyStore(),
+): Promise<Identity> {
+  try {
+    return { state: 'signed-in', profile: await getMyProfile() }
+  } catch (error) {
+    // 5xx、網路中斷、回應不符合契約 —— 全部是「現在問不到」，**不是訪客**（`S06`）。
+    if (!isUnauthorized(error)) return { state: 'unavailable', cause: error }
+
+    const key = store.read()
+    if (key === null) return { state: 'guest', reason: 'no-session' }
+
+    try {
+      return { state: 'signed-in', profile: await login({ resume_token: key }) }
+    } catch (recoveryError) {
+      // 金鑰指向的名片不存在。**不清掉它** —— 資料庫重建過的話它之後可能又有效，
+      // 而清掉是不可逆的。畫面靠 `reason` 說出實話（`S10`）。
+      if (isNotFound(recoveryError)) return { state: 'guest', reason: 'recovery-key-rejected' }
+      return { state: 'unavailable', cause: recoveryError }
+    }
+  }
 }
