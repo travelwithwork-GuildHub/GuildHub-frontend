@@ -1,6 +1,8 @@
 import { IdentityBadge } from '@/identity/IdentityBadge'
 import { IdentityProvider } from '@/identity/IdentityProvider'
 import { AvatarDraftProvider } from '@/identity/AvatarDraftProvider'
+import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
+import { AvatarPicker } from './AvatarPicker'
 import { FirstEntryNotice } from './FirstEntryNotice'
 import { OtherTabNotice } from './OtherTabNotice'
 import { WorldGate } from './WorldGate'
@@ -16,14 +18,20 @@ export default function WorldPage() {
   return (
     <IdentityProvider>
       <AvatarDraftProvider>
+        <RealtimeGenerationProvider>
         <WorldGate>
           <main className="flex h-dvh flex-col">
             {/* ⚠️ **`IdentityBadge` 是 client component，這一頁仍然是同步的
                 Server Component** —— 上面那段註解說的限制沒有改變。
                 身分的查詢在瀏覽器端發生，因為它要帶 cookie。 */}
-            <div className="p-gutter flex shrink-0 items-baseline gap-gutter">
+            {/* ⚠️ **`relative` 是換角色面板 `absolute` 的定位基準。**
+                少了它，面板會相對於整個視窗定位。 */}
+            <div className="p-gutter relative flex shrink-0 items-center gap-gutter">
               <h1 className="text-title">GuildHub</h1>
               <IdentityBadge />
+              {/* ⚠️ **入口一直都在**（規格 `FE-A05-S11`）。它在標題列裡，
+                  也就是 `<Canvas>` 的兄弟 —— 所以天生不會被 3D 畫面蓋住。 */}
+              <AvatarPicker />
             </div>
             <OtherTabNotice />
             {/* ⚠️ **`relative` 是引導層 `absolute inset-0` 的定位基準。**
@@ -34,6 +42,7 @@ export default function WorldPage() {
             </div>
           </main>
         </WorldGate>
+        </RealtimeGenerationProvider>
       </AvatarDraftProvider>
     </IdentityProvider>
   )
