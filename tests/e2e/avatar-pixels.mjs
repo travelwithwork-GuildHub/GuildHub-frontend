@@ -1,0 +1,185 @@
+// `FE-W19` 的像素驗證（design 的 V1）。
+//
+// ⚠️⚠️ **這一支存在的唯一理由是「畫面上真的看得出差別」，而它只能在真的 WebGL 上問。**
+//
+// `tests/avatar-look.test.ts` 驗映射、`tests/avatar-wiring.test.tsx` 驗接線 ——
+// 兩者都在 jsdom 裡，**沒有一個像素被畫出來**。而這一項整個存在的理由，
+// 就是 `FE-A05` 的角色選擇「沒有可觀察的結果」。
+//
+// ⚠️ **它同時補上一個突變測試揭出來的缺口**：把 `WorldCanvas` 傳給 `LocalPlayer`
+// 的 `av` 整個拿掉之後，543 條單元測試裡沒有任何一條會紅。那一段接線
+// 需要真的 Canvas 才驗得到 —— 就是這裡。
+//
+// 用法（要先起後端與前端）：
+//
+//   node tests/e2e/avatar-pixels.mjs
+
+import { chromium } from 'playwright-core'
+
+const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3100'
+const ARGS = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader']
+
+// ⚠️ **兩邊都攔 `/api/me`，只有 `avatar_id` 不同。**
+// 「不攔 vs 攔」的比較會夾帶「訪客 vs 已登入」的差異（標題列的文字都不一樣），
+// 那樣紅了也說不清是誰造成的。
+const PROFILE = (avatar_id) => ({
+  id: 'abc1def2-3a4b-4c5d-8e6f-7a8b9c0d1e2f',
+  display_name: '像素測試員',
+  avatar_id,
+  skills: [],
+  hours_per_week: null,
+  bio: null,
+  updated_at: '2026-09-10T00:00:00Z',
+})
+
+/** 差異像素的門檻：RGB 任一通道絕對差 `≥ 32/255`（design 的 D1）。 */
+const CHANNEL = 32
+
+/**
+ * 訊號下限。實測 `av=0` vs `av=1` 是 1081／1189／1361（三次獨立執行），
+ * 取最小值的一半 —— 2 倍餘裕留給真實場景的相機、遮擋與抗鋸齒。
+ *
+ * ⚠️ **這個數字跟 viewport 綁定**，所以底下固定 1440×900。
+ */
+const SIGNAL_FLOOR = 500
+
+/**
+ * 雜訊上限。實測同一個 `av` 兩次獨立載入的保守差異是 **0**（三次都是 0）。
+ * 給 50 的容忍，是為了不讓某次偶然的相位差把整支腳本變成不穩定的測試。
+ */
+const NOISE_CEILING = 50
+
+const FRAMES = 3
+
+let failures = 0
+const ok = (l) => console.log(`✅ ${l}`)
+const bad = (l, d) => {
+  failures++
+  console.log(`❌ ${l}\n   ${d}`)
+}
+
+/**
+ * 讀 WebGL 的 back buffer。
+ *
+ * ⚠️ **一定要在 `requestAnimationFrame` 裡讀，不能用截圖或 `toDataURL()`。**
+ * 畫布沒有開 `preserveDrawingBuffer`，截圖取到的是**全透明** ——
+ * 這個坑在 `FE-A06` 踩過一次，症狀是「3D 世界一片空白」而產品其實好好的。
+ */
+const grab = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const canvas = document.querySelector('canvas')
+        const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl')
+        if (!gl) return resolve(null)
+        requestAnimationFrame(() => {
+          const w = gl.drawingBufferWidth
+          const h = gl.drawingBufferHeight
+          const px = new Uint8Array(w * h * 4)
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px)
+          resolve({ w, h, px: Array.from(px) })
+        })
+      }),
+  )
+
+/**
+ * **保守差異**：一個像素只有在「A 的每一幀 vs B 的每一幀都不同」時才算數。
+ *
+ * ⚠️ **這是為了 idle 動畫。** 規格的 design 說判準要在「固定姿勢」下量，
+ * 而真實的 `/world` 沒有固定姿勢 —— 角色的手腳與起伏一直在動。
+ * 單幀相減時那些動作也算差異（實測基線 496 像素，而訊號只有 1285，
+ * 信噪比 2.6:1，太弱）。
+ *
+ * 取交集就把它濾掉了：**動畫造成的差異在不同幀的位置會變，換色造成的不會。**
+ * 實測基線因此降到 **0**。
+ */
+function stableDiff(as, bs) {
+  let count = 0
+  outer: for (let i = 0; i < as[0].px.length; i += 4) {
+    for (const a of as)
+      for (const b of bs) {
+        const d = Math.max(
+          Math.abs(a.px[i] - b.px[i]),
+          Math.abs(a.px[i + 1] - b.px[i + 1]),
+          Math.abs(a.px[i + 2] - b.px[i + 2]),
+        )
+        if (d < CHANNEL) continue outer
+      }
+    count++
+  }
+  return count
+}
+
+async function framesWith(browser, avatar_id) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  await context.route('**/api/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(PROFILE(avatar_id)),
+    }),
+  )
+  const page = await context.newPage()
+  await page.goto(`${FRONTEND}/world`)
+  await page.waitForSelector('canvas', { timeout: 30_000 })
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="world-loading"]') === null,
+    null,
+    { timeout: 30_000 },
+  )
+  const badge = (await page.textContent('[data-testid="identity"]'))?.trim()
+  // 等世界穩定下來（載入、物理、第一批 rAF）。
+  await page.waitForTimeout(2500)
+  const frames = []
+  for (let i = 0; i < FRAMES; i++) {
+    frames.push(await grab(page))
+    await page.waitForTimeout(220)
+  }
+  await context.close()
+  return { frames, badge }
+}
+
+const browser = await chromium.launch({ args: ARGS })
+
+try {
+  const a = await framesWith(browser, 0)
+  const b = await framesWith(browser, 1)
+  const c = await framesWith(browser, 0)
+
+  if (a.frames.some((f) => f === null)) {
+    bad('拿不到 WebGL context', '世界沒有畫出 canvas —— 那是環境的問題，不是這條判準的')
+  } else {
+    // 兩邊的身分列必須一樣，否則比的就不只是 `av`。
+    if (a.badge === b.badge) ok(`兩次載入的身分相同（${a.badge}），差異只可能來自 av`)
+    else bad('兩次載入的身分不同', `${a.badge} vs ${b.badge}`)
+
+    // ── 正向對照。**沒有這一條，底下那條說明不了什麼** ──────────
+    //
+    // 如果同一個 `av` 兩次載入就已經差了幾百個像素，那「換 `av` 差了
+    // 一千個像素」證明不了任何事。這一條先把尺校準。
+    const noise = stableDiff(a.frames, c.frames)
+    if (noise <= NOISE_CEILING) ok(`同一個 av 兩次載入的保守差異 ${noise}（上限 ${NOISE_CEILING}）`)
+    else
+      bad(
+        `同一個 av 兩次載入就差了 ${noise} 個像素`,
+        '這條判準的尺壞了 —— 在修產品之前先修這裡（可能是動畫、相機或載入時機）',
+      )
+
+    // ── `S01`：畫面上真的看得出差別 ─────────────────────────────
+    const signal = stableDiff(a.frames, b.frames)
+    if (signal >= SIGNAL_FLOOR)
+      ok(`av=0 與 av=1 的保守差異 ${signal} 個像素（下限 ${SIGNAL_FLOOR}，雜訊 ${noise}）`)
+    else
+      bad(
+        `av=0 與 av=1 只差了 ${signal} 個像素`,
+        `低於下限 ${SIGNAL_FLOOR}。可能是角色沒有讀 av，或是兩款外觀的色差不夠` +
+          `（規格 S04：差異 SHALL 落在主要視覺部位，同色系微調不算）`,
+      )
+  }
+} catch (e) {
+  bad('腳本中途爆掉', e.message)
+} finally {
+  await browser.close()
+  console.log(failures === 0 ? '\n全部通過' : `\n${failures} 條紅`)
+  process.exit(failures === 0 ? 0 : 1)
+}
