@@ -76,13 +76,25 @@ const measure = (page) =>
       }))
       return {
         kind,
-        label: (el.textContent || el.getAttribute('aria-label') || el.name || '(無標籤)')
+        label: (
+          el.textContent ||
+          el.getAttribute('aria-label') ||
+          // 輸入框自己沒有文字，去問包著它的 `<label>`。
+          // **紅燈要說得出是哪一個框** —— 全部叫「(無標籤)」的話，
+          // 三個輸入框的紅燈長得一模一樣。
+          el.closest('label')?.textContent ||
+          '(無標籤)'
+        )
           .trim()
           .slice(0, 24),
         disabled: el.disabled === true,
         w: box.width,
         h: box.height,
         fill: toRgba(cs.backgroundColor),
+        // `disabled:opacity-40` 改的是這個，而它不會出現在
+        // 背景色或邊框色裡 —— 少了它，S08 量不到差別。
+        opacity: parseFloat(cs.opacity),
+        cursor: cs.cursor,
         back: backdrop(el),
         sides,
       }
@@ -145,6 +157,13 @@ try {
     ['/', '首次進入流程'],
   ]) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+    // ⚠️ **一定要攔 `/api/me`，而且要回「沒有身分」。**
+    //
+    // `/` 在問不到身分時會 `router.replace('/world')`（那是刻意的 ——
+    // 後端一抖就沒有人進得去的話，代價比誤放大）。所以不攔的話，
+    // 這支腳本會在 `/world` 上量，然後回報「一個啟用中的控制項都沒有」
+    // —— 而那個紅燈看起來像產品壞了。
+    await page.route('**/api/me', (route) => route.fulfill({ status: 401, body: '' }))
     await page.goto(`${FRONTEND}${path}`)
     await page.waitForSelector('button', { timeout: 30_000 })
     // **不要碰任何控制項** —— 規格要求在「未聚焦」的狀態下量（`S04`）。
@@ -177,19 +196,27 @@ try {
 
     // ── `S08`：`disabled` 看得出來不能按 ───────────────────────
     //
-    // ⚠️ **這一條不要求 disabled 也達 3:1** —— 降低對比正是「不能按」的
+    // ⚠️ **要主動把按鈕設成 `disabled` 再量一次，不能等它自然出現。**
+    // 這兩頁載入時每個按鈕都是啟用的（`disabled={busy}` 而 `busy` 是
+    // `false`），所以「篩出 disabled 的按鈕來比」會篩到空集合 ——
+    // 而那個迴圈跑零次**不會有任何紅燈**，S08 就靜默地沒有被驗到。
+    //
+    // ⚠️ 這一條不要求 `disabled` 也達 3:1 —— 降低對比正是「不能按」的
     // 正常表達方式，而 S01／S02／S04 都明寫只管啟用中的控制項。
-    const dead = controls.filter((c) => c.disabled && c.kind === '按鈕')
-    for (const d of dead) {
-      const same = live.find((l) => l.kind === '按鈕')
-      if (same === undefined) continue
+    const before = live.find((c) => c.kind === '按鈕')
+    if (before !== undefined) {
+      await page.evaluate(() => {
+        document.querySelector('button').disabled = true
+      })
+      const after = (await measure(page)).find((c) => c.kind === '按鈕')
       const differs =
-        bestSignal(d).ratio.toFixed(2) !== bestSignal(same).ratio.toFixed(2) ||
-        d.fill[3] !== same.fill[3]
-      if (differs) ok(`${name}：disabled 的「${d.label}」與啟用中的按鈕看得出差別`)
+        bestSignal(after).ratio.toFixed(2) !== bestSignal(before).ratio.toFixed(2) ||
+        after.opacity !== before.opacity ||
+        after.cursor !== before.cursor
+      if (differs) ok(`${name}：「${before.label}」在 disabled 之後看得出差別`)
       else
         bad(
-          `${name}：disabled 的「${d.label}」跟啟用中的按鈕長得一樣`,
+          `${name}：「${before.label}」設成 disabled 之後長得一模一樣`,
           '使用者會一直按一個沒有反應的按鈕，然後認定網站壞了（S08）',
         )
     }
