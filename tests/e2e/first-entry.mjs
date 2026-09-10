@@ -85,7 +85,7 @@ try {
         [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('複製鑰匙')) ??
           null,
       ),
-      declare: inView(byText('我已經自己保存了')),
+      proof: inView(byText('填回來')),
       enter: inView(
         [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('進入世界')) ??
           null,
