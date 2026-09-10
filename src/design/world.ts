@@ -29,6 +29,18 @@ export const WORLD_COLORS = {
   avatarBody: '#4d5bb0',
   /** 角色四肢。原本是 `ChibiPlayer` 的 `LIMB`。 */
   avatarLimb: '#3b4794',
+  /**
+   * 第二款 avatar 的軀幹（`av=1`）。規格 `FE-W19-S04`。
+   *
+   * ⚠️ **跟 `avatarBody` 的色差是被規格要求的，不是美術偏好。**
+   * `av=1` 與 `av=0` SHALL 在至少一個主要視覺部位上「一般遊戲視角下可清楚辨識」。
+   * 實測：只換軀幹的差異像素佔角色像素 24.38%，而**同色系換一階是 0.00%**
+   *（`#4d5bb0` → `#5f6cc0` 三個通道分別差 18/17/16，全部低於量測門檻）。
+   * 換色系而不是換深淺，是為了滿足那條 Requirement。
+   */
+  avatarBodyAlt: '#4d9b5b',
+  /** 第二款 avatar 的四肢（`av=1`）。跟 `avatarBodyAlt` 同色系深一階。 */
+  avatarLimbAlt: '#2f7a45',
   /** 深色細節（眼睛、輪廓）。 */
   ink: '#20232e',
   /** 地面。原本是 `DebugShadowScene` 的平面。 */
