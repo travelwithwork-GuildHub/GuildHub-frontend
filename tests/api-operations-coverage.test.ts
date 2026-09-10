@@ -46,7 +46,9 @@ const MESSAGE = {
 /** 每一個操作：怎麼呼叫、server 要回什麼、預期的 method 與路徑。 */
 const CASES: Array<[string, () => Promise<unknown>, unknown, string, string]> = [
   ['login', () => ops.login({ nickname: '阿福' }), PROFILE, 'POST', '/api/login'],
-  ['getMyProfile', () => ops.getMyProfile(), PROFILE, 'GET', '/api/profiles/me'],
+  // ⚠️ 這一列曾經寫成 `/api/profiles/me`，跟被測的程式碼**抄了同一個錯誤** ——
+  // 所以它永遠是綠的。抓得到那種錯的是型別層的 `FE-A01-S13`／`S14`，不是這裡。
+  ['getMyProfile', () => ops.getMyProfile(), PROFILE, 'GET', '/api/me'],
   ['updateMyProfile', () => ops.updateMyProfile({ bio: 'x' }), PROFILE, 'PATCH', '/api/profiles/me'],
   ['listProfiles', () => ops.listProfiles(), [PROFILE], 'GET', '/api/profiles'],
   ['getProfile', () => ops.getProfile(UUID), PROFILE, 'GET', `/api/profiles/${UUID}`],

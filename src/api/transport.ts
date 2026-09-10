@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import { REST_CREDENTIALS, dataAdapter, restBase } from '@/config/env'
+import type { paths } from './contract/schema'
 import { ErrorEnvelope } from './contract/errors'
 
 // 所有 domain operation 的共同管道。規格 `FE-O02`。
@@ -56,10 +57,39 @@ export class HttpError extends Error {
   }
 }
 
-export interface RequestSpec {
-  method: 'GET' | 'POST' | 'PATCH'
-  /** 路徑樣板，例如 `/api/projects/{project_id}/seats`。 */
-  path: string
+/**
+ * 這個管道認得的 HTTP method → 產出型別檔裡的鍵。
+ *
+ * ⚠️ **要多支援一個 method 就要在這裡加一列**，而不是在 `RequestSpec` 裡
+ * 把字面值聯集加寬 —— 加寬那邊而漏掉這裡的話，新的 method 會退化成
+ * 「路徑完全不受約束」，而那正是下面這一整套要防的事。
+ */
+type METHODS = {
+  GET: 'get'
+  POST: 'post'
+  PATCH: 'patch'
+}
+
+/**
+ * 產出型別檔中、`M` 這個 method 確實存在的路徑。
+ *
+ * ⚠️ **這是 `schema.d.ts` 唯一被當成「型別來源」用的地方，而且是刻意的。**
+ * `GENERATED.md` 說不要 import 它來當型別用 —— 那條講的是**實體的資料形狀**
+ *（型別的來源是 `rest.ts` 的 Zod，複製第二份就會漂）。
+ * 路徑不一樣：路徑只有後端說了算，前端沒有第二份定義可以漂，
+ * 而產出的型別檔是它在這個 repo 裡唯一的形式化紀錄。
+ *
+ * openapi-typescript 對「這條路徑上沒有這個 method」產的是 `get?: never`，
+ * 所以那一格的型別是 `undefined`；有的話是 `operations["…"]`。
+ * **判斷條件因此是 `extends undefined` 而不是 `extends never`** ——
+ * 寫成後者的話每一格都不符合，聯集會變成 `never`，
+ * 而 `never` 會讓每一個呼叫點都紅（看起來像「防禦很嚴格」，實際上是壞掉）。
+ */
+type PathsWith<M extends METHODS[keyof METHODS]> = {
+  [P in keyof paths]: paths[P][M] extends undefined ? never : P
+}[keyof paths]
+
+interface RequestBase {
   /** 路徑參數。**會做 URL 編碼** —— 不編碼的話 id 裡的斜線會改變路由。 */
   params?: Record<string, string>
   /** 已經通過契約驗證的 body。`undefined` 代表不送 body。 */
@@ -75,6 +105,26 @@ export interface RequestSpec {
 }
 
 /**
+ * 一個要送出去的請求。規格 `FE-A01-S13`／`S14`／`S15`。
+ *
+ * ⚠️⚠️ **`path` 不是 `string`，而且那是這整段的重點。**
+ * 它是**跟 `method` 綁在一起**的字面值聯集 —— `GET` 只收產出型別檔中
+ * 真的有 `get` 的路徑，`POST` 只收真的有 `post` 的。
+ *
+ * 這條約束在的理由是一個**已經發生過的 bug**：`getMyProfile` 打
+ * `GET /api/profiles/me`，而那個端點從來不存在（該路徑只有 `PATCH`）。
+ * 它活過了每一次 CI，因為 `tests/api-operations-coverage.test.ts`
+ * **把同一個錯誤的字串抄進了斷言** —— 斷言與被測物來自同一個錯誤。
+ *
+ * ⚠️ **把 `path` 改回 `string` 的話，沒有任何測試會紅。**
+ * 兩個獨立的審查者都確認過這一點。它是這件事唯一的守門員，
+ * 而唯一的守門員被拿掉時不會有人知道 —— 所以這段話寫在這裡。
+ */
+export type RequestSpec = {
+  [M in keyof METHODS]: RequestBase & { method: M; path: PathsWith<METHODS[M]> }
+}[keyof METHODS]
+
+/**
  * 組出要送出去的 `Request`。
  *
  * **拆出來是為了驗得到 `credentials`。** 端到端的 cookie 在單元測試的環境裡
@@ -84,7 +134,11 @@ export interface RequestSpec {
  * 所以「有沒有寫那一行」是量得出來的。規格 `FE-O02-S01`。
  */
 export function buildRequest(spec: RequestSpec): Request {
-  let path = spec.path
+  // ⚠️ **型別標註不能省。** `spec.path` 是字面值聯集，推論出來的 `path`
+  // 會跟著窄成那個聯集，而下一行的 `.replace()` 回傳 `string` —— 不標的話
+  // 「填完路徑參數之後的字串」會被當成違反契約。窄的是**送進來的樣板**，
+  // 不是填完之後的結果。
+  let path: string = spec.path
   for (const [key, value] of Object.entries(spec.params ?? {})) {
     path = path.replace(`{${key}}`, encodeURIComponent(value))
   }

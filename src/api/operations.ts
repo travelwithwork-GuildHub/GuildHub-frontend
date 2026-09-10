@@ -32,8 +32,15 @@ export async function login(input: contract.LoginIn) {
   }, contract.ProfileOut)
 }
 
+/**
+ * ⚠️ **路徑是 `/api/me`，不是 `/api/profiles/me`。**
+ * 後者只有 `PATCH`（見下面那個操作）—— 它的 `GET` 從來不存在，
+ * 而這個函式打了它好幾週沒有人發現，因為
+ * `tests/api-operations-coverage.test.ts` 把同一個錯字串抄進了斷言。
+ * 現在 `RequestSpec.path` 綁住了型別，這一行改錯會 typecheck 紅（`FE-A01-S14`）。
+ */
 export async function getMyProfile() {
-  return send('getMyProfile', { method: 'GET', path: '/api/profiles/me' }, contract.ProfileOut)
+  return send('getMyProfile', { method: 'GET', path: '/api/me' }, contract.ProfileOut)
 }
 
 export async function updateMyProfile(input: contract.ProfileUpdate) {

@@ -4,8 +4,8 @@
 產生指令    npm run contract:generate
 產生器      openapi-typescript@7.13.0
 來源        http://localhost:8000/openapi.json
-後端 commit 27c3077（GuildHub-backend）
-產生時間    2026-09-08
+後端 commit cd2929c（GuildHub-backend）
+產生時間    2026-09-10
 ```
 
 ## 它是哨兵，不是型別來源
@@ -29,11 +29,31 @@
 
 ```bash
 cd ~/Desktop/workshop/fergus/GuildHub-backend
-bash run.sh        # ./run.sh 沒有執行權限
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+  --ws-ping-interval 20 --ws-ping-timeout 20
 ```
+
+⚠️ **`bash run.sh` 在 macOS／Linux 上跑不起來**（2026-09-10 實測）：
+後端 `cd2929c` 之後 `run.sh` 變成 CRLF 換行，`set -e\r` 會是
+`set: -: invalid option`，然後整支腳本語法錯誤。要開一張後端票，
+在那之前用上面那一行直接叫 uvicorn。
 
 REST 的型別不需要資料庫 —— OpenAPI 是從程式碼標註產的，
 DB 沒接上時後端仍然會回 `/openapi.json`。
+
+## 這次重產證明了什麼
+
+**它紅了。** `27c3077` → `cd2929c` 之間後端改了兩件事，
+而重產之後 `npm run typecheck` 立刻指出兩處：
+
+```
+drift.ts(73): _coverage  —— 後端多了 RegisterIn，登錄表沒有
+drift.ts(86): _LoginIn   —— nickname 從必填變成選填，另外多了三個欄位
+```
+
+哨兵本身是好的。壞的是**沒有人叫它去看** —— 從 9/8 到 9/10 它一直是綠的，
+而那兩天後端往前走了六個 commit。這件事的處置是「契約哨兵的新鮮度」那張票，
+不是改哨兵。
 
 ## 為什麼是 `npx` 而不是 devDependency
 

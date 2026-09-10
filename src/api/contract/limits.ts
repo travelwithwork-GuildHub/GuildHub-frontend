@@ -25,6 +25,7 @@ export const UNBOUNDED = null
  *
  * `sql/001_schema.sql`
  *   13  display_name   text not null check (char_length(display_name) between 1 and 20)
+ *   14  login_id       text unique check (char_length(login_id) between 3 and 32)
  *   17  bio            text check (char_length(bio) <= 300)
  *   27  title          text not null                     ← 沒有 check
  *   28  body           text not null                     ← 沒有 check
@@ -33,10 +34,24 @@ export const UNBOUNDED = null
  *
  * `app/realtime/presence.py`
  *   10  STATUS_MAX_CHARS = 12
+ *
+ * `app/models.py`
+ *  122  password: str = Field(min_length=8)
  */
 export const LIMITS = {
   /** `profiles.display_name`。 */
   displayName: { min: 1, max: 20 },
+  /** `profiles.login_id`。帳號，**不是**世界裡顯示的名字（那是 `display_name`）。 */
+  loginId: { min: 3, max: 32 },
+  /**
+   * 註冊時的明文密碼。
+   *
+   * ⚠️ **這一條的出處不是資料庫，是 `app/models.py` 的 Pydantic。**
+   * 明文不會進資料庫（存的是 `password_hash`），SQL 無從驗起 ——
+   * 所以它是唯一一個只寫在後端應用層的長度規則，上面的出處表因此多了一段。
+   * 上限後端沒有訂。
+   */
+  password: { min: 8, max: UNBOUNDED },
   /** `profiles.bio`。可以是空的。 */
   bio: { min: 0, max: 300 },
   /** `messages.body`。站內信內文。 */

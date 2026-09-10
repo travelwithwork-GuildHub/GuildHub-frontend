@@ -20,12 +20,56 @@ const datetime = z.string()
 // ---------------------------------------------------------------- 身分
 
 /**
- * `POST /api/login`。
+ * `POST /api/login`。**三種入場方式，剛好給一組。**
+ *
+ * | 給的東西 | 意思 |
+ * |---|---|
+ * | `nickname` | 建立一張新名片 |
+ * | `resume_token` | 拿回既有的名片。它就是 `ProfileOut.id`，登入時已經回過了 |
+ * | `login_id` ＋ `password` | 帳號密碼登入（L3）。**只有這一種在驗證身分** |
+ *
+ * ⚠️ **每一欄都是選填，但「都不給」跟「給兩組」一樣是 422。**
+ * 後端刻意不做「都給就以某一邊為準」——那是在互相打架的意圖裡自己挑一邊信，
+ * 而呼叫端不會知道被挑掉的是哪一個。
+ *
+ * **這裡沒有把「剛好一組」寫成 Zod 的 `.refine()`**：`drift.ts` 對這個 schema
+ * 做的是雙向型別相等，而多一層 wrapper 會讓那條斷言的形狀對不上。
+ * 「剛好一組」由呼叫端（`src/identity/`）負責，判準在 `FE-A01-S01`。
  *
  * ⚠️ `nickname` 直接寫進 `profiles.display_name`（`auth.py` 的 insert），
  * 所以它吃的是 display_name 的 1–20 —— **超長會是資料庫錯誤，回 500**。
+ *
+ * ⚠️ **`resume_token` 不是密碼。** 拿到它的人就是那張名片的人。
+ * 它解掉的是「清掉 cookie 或換一台電腦就再也回不去」（`BE-G01`），
+ * 不是「證明這個身分屬於我」。這件事要讓使用者知道，判準在 `FE-A01-S09`。
  */
 export const LoginIn = z.object({
+  nickname: z
+    .string()
+    .min(LIMITS.displayName.min)
+    .max(LIMITS.displayName.max)
+    .nullable()
+    .optional(),
+  resume_token: z.string().nullable().optional(),
+  login_id: z.string().min(LIMITS.loginId.min).max(LIMITS.loginId.max).nullable().optional(),
+  password: z.string().min(LIMITS.password.min).nullable().optional(),
+})
+
+/**
+ * `POST /api/register`。帳號密碼註冊（L3，後端 9/8 裁決）。
+ *
+ * ⚠️ **這裡有 schema，`operations.ts` 卻沒有對應的操作，而那是刻意的。**
+ * 註冊 UI 是 `FE-A01` 明文寫下的 Non-goal（design D1），
+ * 而 `openspec/changes/fe-a01-login/design.md` 的 D1 要求它在 `governance/`
+ * 裡變成一個工作項目 —— 憑空補一個沒有呼叫端的 `register()` 只會是殭屍程式碼。
+ *
+ * 它出現在契約層的理由是 `drift.ts` 的**涵蓋率斷言**：後端多一個實體時
+ * 那條斷言會紅，而修好它的方式就是把實體寫進來。
+ * 這正是那條斷言存在的用途 —— 它今天第一次真的擋住了東西。
+ */
+export const RegisterIn = z.object({
+  login_id: z.string().min(LIMITS.loginId.min).max(LIMITS.loginId.max),
+  password: z.string().min(LIMITS.password.min),
   nickname: z.string().min(LIMITS.displayName.min).max(LIMITS.displayName.max),
 })
 
@@ -161,6 +205,7 @@ export const RoomDoorOut = z.object({
 // ---------------------------------------------------------------- 型別
 
 export type LoginIn = z.infer<typeof LoginIn>
+export type RegisterIn = z.infer<typeof RegisterIn>
 export type ProfileOut = z.infer<typeof ProfileOut>
 export type ProfileUpdate = z.infer<typeof ProfileUpdate>
 export type ProjectStatus = z.infer<typeof ProjectStatus>

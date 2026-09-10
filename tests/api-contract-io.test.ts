@@ -42,7 +42,9 @@ describe('domain operation 的一次完整往返', () => {
 
     expect(profile.display_name).toBe('阿福')
     expect(server.calls[0]?.method).toBe('GET')
-    expect(server.calls[0]?.pathname).toBe('/api/profiles/me')
+    // ⚠️ 這裡曾經是 `/api/profiles/me` —— 同一個不存在的端點在這個 repo 裡
+    // 一共被抄了四次（生產碼一次、測試三次），而它們互相印證所以永遠是綠的。
+    expect(server.calls[0]?.pathname).toBe('/api/me')
   })
 
   it('[FE-O02-S04] 輸入不合契約時，在送出之前就失敗', async () => {
