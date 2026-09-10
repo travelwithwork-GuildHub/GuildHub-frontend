@@ -54,4 +54,4 @@
 - [x] 6.1 `npm run lint`、`npm run typecheck`、`npm test` 全綠
 - [x] 6.2 確認 `FE-A06` 既有的 18 條端到端斷言沒有變紅
 - [x] 6.3 確認 `FE-X01` 的 design token 判準沒有變紅（顏色沒有離開 token）
-- [ ] 6.4 ⚠️ `docs/WBS.md` 這一列的敘述漏了輸入框 —— 開一個 `governance/` PR 補
+- [x] 6.4 ⚠️ `docs/WBS.md` 這一列的敘述漏了輸入框 —— 開一個 `governance/` PR 補
