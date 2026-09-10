@@ -57,3 +57,14 @@ export class NicknameLengthError extends Error {
     super(`暱稱要 ${min} 到 ${max} 個字，現在是 ${actual} 個。`)
   }
 }
+
+/** 這把恢復金鑰後端找不到（404）。`S10`／`S17`。 */
+export class RecoveryKeyRejectedError extends Error {
+  override name = 'RecoveryKeyRejectedError'
+  constructor() {
+    super(
+      '這把恢復金鑰對應的名片不存在。它可能被刪掉了，或者資料庫重建過。' +
+        '不會自動改成建立一張新名片 —— 那樣你會以為自己的東西不見了。',
+    )
+  }
+}
