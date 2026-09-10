@@ -77,11 +77,39 @@ describe('typecheck 真的會擋', () => {
   it('[FE-X01-S11] 沒有那個檔案的時候 typecheck 是綠的（陽性對照）', () => {
     // **沒有這一條，上一條是恆真的** —— 一個永遠失敗的 typecheck
     // 也會讓上面那條通過。
-    const out = execFileSync('npm', ['run', 'typecheck'], {
-      cwd: ROOT,
-      encoding: 'utf8',
-      stdio: 'pipe',
-    })
-    expect(out).toBeDefined()
+    //
+    // ⚠️ **失敗訊息一定要帶上 tsc 說了什麼。**
+    //
+    // 原本是 `const out = execFileSync(...); expect(out).toBeDefined()` ——
+    // 非零離開碼時 `execFileSync` 直接丟錯，而 `error.stdout` 不會被印出來，
+    // 所以紅燈長成一句「陽性對照失敗」，**看不到 tsc 抱怨的是哪一個檔案**。
+    //
+    // 2026-09-10 這條在完整 `npm test` 下 10 次紅 2 次，而我為了找根因猜了三次
+    // 全錯（tsbuildinfo 陳舊快取、`next build` 與 typecheck 爭用 `.next/types/`、
+    // dev server 重編譯的賽跑），另外跑了 23 次都沒能重現。
+    // **查不出來的原因就是這裡沒有留下證據。** 與其繼續猜，不如讓下一次紅燈可診斷。
+    let code = 0
+    let output = ''
+    try {
+      output = execFileSync('npm', ['run', 'typecheck'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      })
+    } catch (e) {
+      const err = e as { status?: number; stdout?: string; stderr?: string }
+      code = err.status ?? 0
+      output = (err.stdout ?? '') + (err.stderr ?? '')
+    }
+
+    expect(
+      code,
+      [
+        '陽性對照紅了 —— 乾淨的 src/ 底下 typecheck 竟然不是綠的。',
+        '這通常不是產品壞了，而是有東西在跟 tsc 搶 .next/types/ 或 tsconfig.tsbuildinfo。',
+        'tsc 的完整輸出：',
+        output,
+      ].join('\n'),
+    ).toBe(0)
   }, 120_000)
 })
