@@ -3,20 +3,22 @@ import { render, screen } from '@testing-library/react'
 import nextConfig from '../next.config'
 import NotFound from '@/app/not-found'
 
-describe('根路徑導向世界', () => {
-  it('[FE-X01-S01] `/` 轉址到 `/world`，而且是暫時轉址（307）不是永久（308）', async () => {
-    const redirects = await nextConfig.redirects?.()
-    const root = redirects?.find((r) => r.source === '/')
+describe('根路徑是網站的入口', () => {
+  it('[FE-X01-S01] `/` 不再被轉址走 —— 它自己是一個頁面', async () => {
+    // ⚠️ **這一條原本要求 `/` 以 307 轉到 `/world`，而 `FE-A06` 把它改了。**
+    // 原文自己就寫著那個轉址是暫時的：「根路徑之後會改為其他入口，
+    // 永久轉址會被瀏覽器快取且使用者無法自行清除」。`FE-A06` 就是那個「之後」。
+    //
+    // ⚠️⚠️ **這一條是負向的，而它非有不可**：`redirects()` 的優先序
+    // **在路由之前**。把那條轉址留著的話，新的首頁做好了也永遠看不到 ——
+    // 而**畫面上看不出任何異狀**（打開 `/` 就是跳到世界，跟以前一模一樣）。
+    const redirects = (await nextConfig.redirects?.()) ?? []
 
-    expect(root, 'next.config 沒有 `/` 的轉址規則').toBeDefined()
-    expect(root?.destination).toBe('/world')
-    // `permanent: false` → 307。true 會是 308，被瀏覽器永久快取且使用者清不掉。
-    expect(root?.permanent).toBe(false)
+    expect(
+      redirects.find((r) => r.source === '/'),
+      '`/` 還有轉址規則 —— 首次進入的頁面會被它蓋掉，而且看不出來',
+    ).toBeUndefined()
   })
-
-  // ⚠️ 上面只證明到**設定層**。「HTTP 回應真的是 307」這件事，
-  // 設定寫對了也可能被 middleware 或 rewrite 蓋掉，而這個測試照樣綠。
-  // 那個缺口由 design.md〈驗證方式〉的 V1 用 curl 打真的 server 補上。
 
   it('[FE-X01-S02] 未定義的路徑得到可辨識的 404，不會被轉址規則吃掉', async () => {
     render(<NotFound />)

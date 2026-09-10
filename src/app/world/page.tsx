@@ -1,5 +1,6 @@
 import { IdentityBadge } from '@/identity/IdentityBadge'
 import { IdentityProvider } from '@/identity/IdentityProvider'
+import { FirstEntryNotice } from './FirstEntryNotice'
 import { OtherTabNotice } from './OtherTabNotice'
 import { WorldGate } from './WorldGate'
 import { WorldBoundary } from './WorldBoundary'
@@ -23,8 +24,11 @@ export default function WorldPage() {
             <IdentityBadge />
           </div>
           <OtherTabNotice />
-          <div className="min-h-0 flex-1">
+          {/* ⚠️ **`relative` 是引導層 `absolute inset-0` 的定位基準。**
+              少了它，引導層會相對於整個視窗定位 —— 蓋到標題列上。 */}
+          <div className="relative min-h-0 flex-1">
             <WorldBoundary />
+            <FirstEntryNotice />
           </div>
         </main>
       </WorldGate>
