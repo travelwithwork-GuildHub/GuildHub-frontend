@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { FirstEntryFlow } from '@/first-entry/FirstEntryFlow'
 import { firstEntryDone, markFirstEntryDone } from '@/first-entry/seen'
-import { useIdentity } from '@/identity/IdentityProvider'
+import { useAdoptIdentity, useIdentity } from '@/identity/IdentityProvider'
 import { layer } from '@/design/layers'
 
 // 世界裡給訪客看的引導。規格 `FE-A06-S04`／`S05`／`S06`。
@@ -21,6 +21,7 @@ import { layer } from '@/design/layers'
 
 export function FirstEntryNotice() {
   const identity = useIdentity()
+  const adopt = useAdoptIdentity()
   const [dismissed, setDismissed] = useState(false)
   // ⚠️ **lazy initializer，不是每次繪製都讀。** 每次都讀的話，
   // 走完流程之後這個元件會在同一次繪製裡自己消失，而「進入世界」的
@@ -47,8 +48,12 @@ export function FirstEntryNotice() {
         </h2>
         <p>取一個名字，世界裡的其他人就看得到你是誰。</p>
         <FirstEntryFlow
-          onDone={() => {
+          onDone={(next) => {
             markFirstEntryDone()
+            // ⚠️ **這一行少了的話，標題列會繼續顯示「訪客」直到重整。**
+            // 端到端第一次跑就紅在這裡，而單元判準原本抓不到 ——
+            // `IdentityBadge` 與這個元件在那些判準裡是分開掛載的。
+            adopt(next)
             setDismissed(true)
           }}
         />
