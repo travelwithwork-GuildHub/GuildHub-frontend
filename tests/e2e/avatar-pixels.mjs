@@ -82,10 +82,31 @@ const grab = (page) =>
           const h = gl.drawingBufferHeight
           const px = new Uint8Array(w * h * 4)
           gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px)
-          resolve({ w, h, px: Array.from(px) })
+          // ⚠️⚠️ **不可以回傳 `Array.from(px)`。**
+          //
+          // Playwright 會把回傳值 JSON 序列化，而 `Uint8Array` 傳不過去 ——
+          // 所以原本這裡是 `Array.from(px)`，也就是 1440×900×4 = **518 萬個
+          // JS number**。V8 裡每個至少 8 bytes 再加上陣列開銷，一幀就好幾十 MB；
+          // 七個 context × 3 幀 = 21 幀，**吃掉好幾 GB**。
+          //
+          // 實測後果不是「比較慢」而是**整台機器開始 swap**：V1 那三個 context
+          // 跑完之後，V2 的四個卡了 35 分鐘還沒算完（而 dev server 的 log 顯示
+          // 七次 `GET /world` 全部 200 —— 頁面早就載入完了）。
+          // 同一段時間有四則背景任務「因記憶體不足被停止」的通知。
+          //
+          // base64 傳回來、Node 端存成 `Buffer` 之後，一幀是 5.2 MB 的二進位，
+          // 21 幀約 110 MB。**像素值與比較邏輯完全沒變，閾值不受影響。**
+          let s = ''
+          const CHUNK = 8192
+          for (let i = 0; i < px.length; i += CHUNK)
+            s += String.fromCharCode.apply(null, px.subarray(i, i + CHUNK))
+          resolve({ w, h, b64: btoa(s) })
         })
       }),
   )
+
+/** base64 → `Buffer`。`stableDiff` 只用索引讀，所以底下完全不用改。 */
+const decode = (f) => (f === null ? null : { w: f.w, h: f.h, px: Buffer.from(f.b64, 'base64') })
 
 /**
  * **保守差異**：一個像素只有在「A 的每一幀 vs B 的每一幀都不同」時才算數。
@@ -185,7 +206,7 @@ async function framesWith(browser, avatar_id, remote) {
   await page.waitForTimeout(2500)
   const frames = []
   for (let i = 0; i < FRAMES; i++) {
-    frames.push(await grab(page))
+    frames.push(decode(await grab(page)))
     await page.waitForTimeout(220)
   }
   await context.close()
