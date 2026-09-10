@@ -4,6 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense, useRef, useState } from 'react'
 import { layer } from '@/design/layers'
 import { useIdentity } from '@/identity/IdentityProvider'
+import { myAvatar } from '@/identity/myAvatar'
 import { isWebGL2Available } from './webgl'
 import { WorldShell } from './environment/WorldShell'
 import { WorldCamera } from './WorldCamera'
@@ -69,7 +70,7 @@ export default function WorldCanvas() {
   // 才有 profile；其餘一律不給值，交給 `avatarLook()` 回預設 ——
   // **在這裡寫 `?? 0` 會製造第二份值域規則**，而兩份規則一定會漂。
   const identity = useIdentity()
-  const myAvatar = identity.state === 'signed-in' ? identity.profile.avatar_id : undefined
+  const av = myAvatar(identity)
 
   // 相機的跟隨目標。**是 ref 不是 state** —— CONTEXT.md：高頻資料不進 React。
   // FE-W03 接上角色之後，這個 ref 會指向角色的位置；現在它是靜止的原點。
@@ -116,7 +117,7 @@ export default function WorldCanvas() {
           />
           <Suspense fallback={null}>
             <WorldShell />
-            <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={myAvatar} />
+            <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} />
             {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
                 WorldCanvas 不知道即時層的存在，也不該知道。 */}
             <RemoteWorld poseRef={localPose} />
