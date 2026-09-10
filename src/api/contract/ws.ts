@@ -75,10 +75,22 @@ export const ClientMessage = z.discriminatedUnion('t', [Move, StatusIn, ChatIn])
 /**
  * `snapshot` 與 `presence.join` 的元素（`presence.py` 的 `Player.as_dict`）。
  *
- * ⚠️ 兩個欄位目前是常數，不要照著它們設計功能：
- *   `name` —— **每個人都是「訪客」**。`main.py` 讀 `session["name"]`，
- *             而那個鍵在整個後端從來沒有被設定過（`BE-G02`）。
- *   `av`   —— **遠端玩家一律 0**。`presence.join()` 沒收 avatar（`BE-G03`）。
+ * ⚠️ **`name` 與 `av` 曾經是常數，現在不是了 —— 但要登入才看得到差別。**
+ *
+ * 後端 `BE-G02`／`BE-G03` 已修（`bfb3609`／`fd8c00f`）：`auth.py` 的 `_remember()`
+ * 會把 `display_name` 與 `avatar_id` 寫進 session，`presence.join()` 收得到它們。
+ *
+ * `FE-A01` 做完之後**第一次實測到**（2026-09-10，本機後端 ＋ 真瀏覽器）：
+ *
+ *     {"t":"snapshot","players":[{"id":"ba48…","name":"名字測試員","av":0,…}]}
+ *
+ * **沒有登入的連線仍然是「訪客」、`av` 仍然是 0** —— 那不是 bug，
+ * 是「這條連線背後沒有名片」的正確表現。判準在
+ * `openspec/changes/fe-a01-login/`（`FE-A01-S11`）。
+ *
+ * ⚠️ **世界目前不畫遠端玩家的名字。** 協定送得到，畫面沒有讀 ——
+ * 那是 `FE-W08`（ProceduralAvatar）與 `FE-R10`（Presence）的範圍，
+ * 所以 tasks 4.2「兩個瀏覽器互相看得見對方的名字」現在**還做不到**。
  */
 export const Player = z.object({
   id: z.string(),
