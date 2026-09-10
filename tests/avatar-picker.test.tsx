@@ -61,12 +61,21 @@ const okResult: SaveAvatarResult = {
  */
 const click = (el: HTMLElement) => act(() => void fireEvent.click(el))
 
-/** 把草稿掛出來看 —— `S03` 要驗的是「放棄之後草稿沒了」。 */
-let seenDraft: number | undefined
+/**
+ * 把草稿**渲染出來**看 —— `S03` 要驗的是「放棄之後草稿沒了」。
+ *
+ * ⚠️ **不要在 render 裡賦值給外部變數。** 第一版是
+ * `seenDraft = useAvatarDraft().draft`，而 `react-hooks/globals` 直接擋下來：
+ * 那是 render 期間的 side effect，重繪時機一變行為就不一樣。
+ * 渲染成文字之後讀 DOM，順便讓這幾條判準問的是**畫面上的事實**。
+ */
 function DraftProbe() {
-  seenDraft = useAvatarDraft().draft
-  return null
+  const { draft } = useAvatarDraft()
+  return <span data-testid="draft">{draft === undefined ? 'none' : String(draft)}</span>
 }
+
+/** 現在的草稿，`undefined` 用字串 `'none'` 表示。 */
+const draftNow = () => screen.getByTestId('draft').textContent
 
 const wrap = (ui: ReactNode) => (
   <AvatarDraftProvider>
@@ -76,7 +85,6 @@ const wrap = (ui: ReactNode) => (
 )
 
 beforeEach(() => {
-  seenDraft = undefined
   rejoin.mockClear()
   adopt.mockClear()
   mockedSave.mockReset()
@@ -99,7 +107,7 @@ describe('換角色', () => {
     click(screen.getByRole('button', { name: '更換角色' }))
     click(screen.getByRole('button', { name: /角色 2/ }))
 
-    expect(seenDraft, '選了角色但草稿沒變 —— 世界裡的自己不會有任何反應').toBe(1)
+    expect(draftNow(), '選了角色但草稿沒變 —— 世界裡的自己不會有任何反應').toBe('1')
     expect(mockedSave, '選一下就送出去了 —— 預覽跟儲存要分開（S02）').not.toHaveBeenCalled()
     expect(rejoin, '還沒儲存就重連了').not.toHaveBeenCalled()
   })
@@ -108,14 +116,14 @@ describe('換角色', () => {
     render(wrap(<AvatarPicker />))
     click(screen.getByRole('button', { name: '更換角色' }))
     click(screen.getByRole('button', { name: /角色 2/ }))
-    expect(seenDraft).toBe(1)
+    expect(draftNow()).toBe('1')
 
     click(screen.getByRole('button', { name: '取消' }))
 
     expect(
-      seenDraft,
+      draftNow(),
       '取消之後草稿還在 —— 畫面會停在使用者沒有選的那一個角色',
-    ).toBeUndefined()
+    ).toBe('none')
   })
 
   it('[FE-A05-S04] 儲存成功之後才重連', async () => {
@@ -154,7 +162,7 @@ describe('換角色', () => {
       '存失敗了卻還是重連 —— 別人會看到你離開又進來，而你的外觀根本沒變',
     ).not.toHaveBeenCalled()
     expect(adopt, '存失敗了卻換掉了畫面上的身分').not.toHaveBeenCalled()
-    expect(seenDraft, '存失敗了但預覽留著 —— 使用者下次進來會發現自己「變回去了」').toBeUndefined()
+    expect(draftNow(), '存失敗了但預覽留著 —— 使用者下次進來會發現自己「變回去了」').toBe('none')
   })
 
   it('[FE-A05-S01] 沒選過就不能儲存', async () => {
