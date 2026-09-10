@@ -6,6 +6,7 @@ import { layer } from '@/design/layers'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { shownAvatar } from '@/identity/avatarDraft'
 import { useAvatarDraft } from '@/identity/AvatarDraftProvider'
+import { useRealtimeGeneration } from '@/realtime/RealtimeGenerationProvider'
 import { isWebGL2Available } from './webgl'
 import { WorldShell } from './environment/WorldShell'
 import { WorldCamera } from './WorldCamera'
@@ -77,6 +78,8 @@ export default function WorldCanvas() {
   const identity = useIdentity()
   const { draft } = useAvatarDraft()
   const av = shownAvatar(identity, draft)
+  // ⚠️ **同樣要在 Canvas 外面讀**（context 跨不過 R3F 的邊界）。
+  const { generation } = useRealtimeGeneration()
 
   // 相機的跟隨目標。**是 ref 不是 state** —— CONTEXT.md：高頻資料不進 React。
   // FE-W03 接上角色之後，這個 ref 會指向角色的位置；現在它是靜止的原點。
@@ -126,7 +129,7 @@ export default function WorldCanvas() {
             <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} />
             {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
                 WorldCanvas 不知道即時層的存在，也不該知道。 */}
-            <RemoteWorld poseRef={localPose} />
+            <RemoteWorld poseRef={localPose} generation={generation} />
             {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
                 提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
                 那是 FE-W12（W3）。 */}
