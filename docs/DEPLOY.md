@@ -7,6 +7,31 @@
 > 機器守得住的只有「建置時設定不合法就紅」，而那件事由
 > `tests/deploy-build-gate.test.ts` 對真的 `next build` 驗結束碼。
 
+## ⚠️ 2026-09-10：線上曾經停在 17 小時前的版本，而沒有任何東西講
+
+查證的方式是這一行：
+
+```bash
+gh api repos/travelwithwork-GuildHub/GuildHub-frontend/deployments
+```
+
+**它是空的。** Vercel 的 Git 整合連上的話，每一次 push 都會在那裡留一筆。
+主控台上看得到的那幾筆全部是**本機 `vercel deploy` 推的** ——
+作者欄是人不是 bot，而「wip」那種標題是 CLI 的預設值。
+
+期間合併了五十幾個 PR，線上一次都沒有更新。
+**PR 上不會少一個 check，CI 全綠，只有打開網站的人看得到。**
+
+處置是 `.github/workflows/deploy.yml`（要一個 `VERCEL_TOKEN` secret）。
+**那支 workflow 是暫時的** —— Git 整合接上之後就該刪掉，
+判斷的方式就是上面那一行 `gh api` 開始有東西。
+
+### 為什麼 workflow 裡是 `vercel build` ＋ `vercel deploy --prebuilt` 兩步
+
+一步的 `vercel deploy` 是把原始碼送上去、在 Vercel 那邊建置 ——
+**建置失敗時 GitHub 這邊是綠的**，失敗只出現在 Vercel 主控台上。
+分兩步的話，上面那個「設定不合法就建置失敗」的閘門**會在 PR 上紅**。
+
 ## 兩種部署情境
 
 ### 一、沒有即時後端（今天就能上線）

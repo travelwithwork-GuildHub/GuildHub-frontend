@@ -1,0 +1,139 @@
+# Vercel 部署。規格 `FE-O14`。
+#
+# ⚠️⚠️ **這支 workflow 存在的理由是 Vercel 的 Git 整合沒有接上。**
+#
+# 2026-09-10 查證：`gh api repos/<org>/<repo>/deployments` 是**空的** ——
+# Git 整合連上的話，每一次 push 都會在那裡留一筆。Vercel 主控台上看得到的
+# 那幾筆全部是**本機 `vercel deploy` 推的**（作者是人不是 bot，
+# 而「wip」那種標題是 CLI 的預設值）。
+#
+# 症狀是「線上是 17 小時前的版本」，而中間合併了五十幾個 PR。
+# **沒有任何東西會告訴你這件事** —— PR 上不會少一個 check，
+# CI 全綠，只有打開網站的人看得到。
+#
+# ⚠️ **接上 Git 整合之後，這支 workflow 應該刪掉。**
+# 兩套並存會對同一個 commit 部署兩次，而且 preview 網址會有兩個。
+# 判斷的方式就是上面那一行 `gh api`：它開始有東西了，就是接上了。
+#
+# ## 要設什麼
+#
+# repo 的 Settings → Secrets and variables → Actions → New repository secret：
+#
+#   VERCEL_TOKEN   在 https://vercel.com/account/tokens 產生
+#
+# **只有這一個。** 下面那兩個 ID 不是憑證 —— 它們是專案的識別碼，
+# 單獨拿到沒有任何用處，而且本來就寫在 `.vercel/project.json` 裡
+#（那個檔案被 gitignore，不是因為它是機密，是因為它是本機連結狀態）。
+#
+# ## 環境變數怎麼來
+#
+# **不在這裡設。** `vercel pull` 會把 Vercel 專案上設好的那一份拉下來，
+# 所以 `NEXT_PUBLIC_APP_ENV` 那些東西只有一個來源。
+# 在這裡再設一份的話，兩邊一定會漂 —— 而漂掉的症狀是
+#「本機建置得起來、線上白畫面」（`docs/DEPLOY.md` 記著那次）。
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # 同一個分支只留最後一次。**不取消 production** ——
+  # 取消到一半的正式部署會讓線上停在一個沒有人選過的版本
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  VERCEL_ORG_ID: team_sjiIZjxESpb0QFN6Rm0azcOD
+  VERCEL_PROJECT_ID: prj_L5FGJvuH17OJA5VvSZnJ3MuSt2bu
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # 沒有 token 就整個跳過，而不是紅一片。**還沒設 secret 的人不該被擋住**
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: 沒有 VERCEL_TOKEN 就明白說出來，不要假裝成功
+        id: gate
+        env:
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::沒有設 VERCEL_TOKEN，跳過部署。設定方式見 .github/workflows/deploy.yml 的檔頭。"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 安裝 Vercel CLI
+        if: steps.gate.outputs.ready == 'true'
+        run: npm install --global vercel@latest
+
+      - name: 拉環境設定（preview）
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'pull_request'
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 拉環境設定（production）
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push'
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      # ⚠️ **`vercel build` 跟 `vercel deploy --prebuilt` 分成兩步是刻意的。**
+      # 一步的 `vercel deploy` 是把原始碼送上去在 Vercel 那邊建置 ——
+      # 建置失敗時這裡是綠的，而失敗只出現在 Vercel 主控台上。
+      # 分兩步的話，`docs/DEPLOY.md` 那個「設定不合法就建置失敗」的閘門
+      # **會在這裡紅**，PR 上看得到。
+      - name: 建置（preview）
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'pull_request'
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 建置（production）
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push'
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 部署
+        if: steps.gate.outputs.ready == 'true'
+        id: deploy
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          else
+            URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "部署好了：$URL"
+          echo "### 部署好了" >> "$GITHUB_STEP_SUMMARY"
+          echo "$URL" >> "$GITHUB_STEP_SUMMARY"
+
+      # PR 上留一則留言，而且**同一個 PR 只留一則**（後續 push 就地更新）。
+      # 每次都新增一則的話，一個十刀的 change 底下會有十則一模一樣的東西
+      - name: 把網址貼在 PR 上
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.url }}'
+            const marker = '<!-- vercel-preview -->'
+            const body = `${marker}\n**Preview**：${url}\n\n_由 \`.github/workflows/deploy.yml\` 部署 —— Vercel 的 Git 整合接上之後這支 workflow 就該刪掉。_`
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, per_page: 100,
+            })
+            const mine = comments.find((c) => c.body?.startsWith(marker))
+            if (mine) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: mine.id, body,
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body,
+              })
+            }
