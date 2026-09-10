@@ -14,6 +14,7 @@ import { chromium } from 'playwright-core'
 const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3100'
 const SLOW = Number(process.env.SLOW ?? 400)
 const SHOTS = process.env.SHOTS ?? '/tmp/guildhub-two-windows'
+const BACKEND = process.env.BACKEND ?? 'http://127.0.0.1:8000'
 
 let failures = 0
 const ok = (l) => console.log(`✅ ${l}`)
@@ -130,10 +131,12 @@ try {
 
   // ⚠️ **「畫面上有名字」還不夠。** 那可能只是前端把輸入回填上去。
   // 要問後端：這個 session 現在到底是誰。
-  const me = await b.evaluate(async () => {
-    const r = await fetch('http://127.0.0.1:8000/api/me', { credentials: 'include' })
-    return { status: r.status, body: r.ok ? await r.json() : null }
-  })
+  //
+  // ⚠️ **用 `context.request` 而不是在頁面裡 `fetch`。** 它共用 B 的 cookie jar，
+  // 所以問到的是同一個 session；而頁面裡的 `fetch` 會被 `no-restricted-globals`
+  // 擋下來 —— 那條規則是對的（元件裡不准出現 fetch），這裡不該去 disable 它。
+  const res = await ctxB.request.get(`${BACKEND}/api/me`)
+  const me = { status: res.status(), body: res.ok() ? await res.json() : null }
   check('後端也認得 B 是誰（`GET /api/me` 不是 401）', me.status, 200)
   check('而且後端回的名字就是 A 建立的那個', me.body?.display_name, NAME)
   check('後端回的 id 就是那把金鑰', me.body?.id, key)
