@@ -51,8 +51,27 @@ export async function updateMyProfile(input: contract.ProfileUpdate) {
   }, contract.ProfileOut)
 }
 
-export async function listProfiles() {
-  return send('listProfiles', { method: 'GET', path: '/api/profiles' }, z.array(contract.ProfileOut))
+/**
+ * 人才清單。規格 `FE-B01-S04`／`S05`。
+ *
+ * ⚠️⚠️ **分頁參數是 `page`，0-based，沒有 `limit`。**
+ * `docs/WBS.md` 的 `FE-B01` 那一列寫的是「offset 翻頁」，**跟契約對不上** ——
+ * 後端收 `page`，換算成 SQL `offset` 是它內部的事：
+ *
+ *     async def list_profiles(page: int = 0, ...):
+ *         "... limit $1 offset $2", PAGE_SIZE, max(page, 0) * PAGE_SIZE
+ *
+ * **沒有 `limit` 代表不能多抓一筆來探測有沒有下一頁** —— 那是兩個外部審查者
+ * 第一輪都選為最乾淨的方案，而它在這個契約下做不到（見 `design.md` 的 `D1`）。
+ *
+ * ⚠️ **超過尾頁回空陣列，不是 404。** 翻到底是正常操作，不是錯誤。
+ */
+export async function listProfiles(options: { page?: number; signal?: AbortSignal } = {}) {
+  return send(
+    'listProfiles',
+    { method: 'GET', path: '/api/profiles', query: { page: options.page }, signal: options.signal },
+    z.array(contract.ProfileOut),
+  )
 }
 
 export async function getProfile(profileId: string) {
@@ -65,8 +84,22 @@ export async function getProfile(profileId: string) {
 
 // ---------------------------------------------------------------- 專案
 
-export async function listProjects() {
-  return send('listProjects', { method: 'GET', path: '/api/projects' }, z.array(contract.ProjectOut))
+/**
+ * 案件清單。規格 `FE-B01-S04`／`S05`。分頁同 `listProfiles`。
+ *
+ * ⚠️ **`status` 刻意沒有開出來。** 契約有這個參數（預設 `recruiting`），
+ * 但 `FE-B01` 的畫面上沒有任何東西可以切換它 —— 那是 `FE-B05`（W6，
+ * 被 `BE-G05` 擋）。現在開出來是替一個觸發不了的情境預先建模。
+ *
+ * ⚠️ 而這件事**已經寫進了 request identity 的設計**：`FE-B05` 來的時候
+ * 把 `status` 加進 identity 即可，提交規則與 `S14`／`S15` 不用重寫（`design.md` 的 `D3`）。
+ */
+export async function listProjects(options: { page?: number; signal?: AbortSignal } = {}) {
+  return send(
+    'listProjects',
+    { method: 'GET', path: '/api/projects', query: { page: options.page }, signal: options.signal },
+    z.array(contract.ProjectOut),
+  )
 }
 
 export async function createProject(input: contract.ProjectCreate) {

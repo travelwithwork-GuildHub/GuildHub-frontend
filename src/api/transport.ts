@@ -133,6 +133,16 @@ interface RequestBase {
    *（`FE-W12` 的輪詢契約踩過這個矛盾）。
    */
   signal?: AbortSignal
+  /**
+   * Query string。**值會做 URL 編碼。**
+   *
+   * ⚠️ **`undefined` 的項目會被整個略過，而 `0` 不會。**
+   * 分頁的第一頁是 `page=0`（後端 `max(page, 0) * PAGE_SIZE`），
+   * 而 `0` 是 falsy —— 用 `if (value)` 過濾的話第一頁會靜默變成
+   * 「不帶參數」。那剛好也是預設值，所以**畫面完全正常**，
+   * 只有在後端改掉預設值的那天才會炸。規格 `FE-B01-S04`。
+   */
+  query?: Record<string, string | number | undefined>
 }
 
 /**
@@ -154,6 +164,20 @@ interface RequestBase {
 export type RequestSpec = {
   [M in keyof METHODS]: RequestBase & { method: M; path: PathsWith<METHODS[M]> }
 }[keyof METHODS]
+
+/**
+ * 把 query 物件變成 `?a=1&b=2`。沒有任何項目時回空字串（**不是 `?`**）。
+ *
+ * ⚠️ **`undefined` 略過，`0` 保留** —— 見 `RequestBase.query`。
+ */
+function queryString(query: RequestBase['query']): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== undefined) search.set(key, String(value))
+  }
+  const text = search.toString()
+  return text === '' ? '' : `?${text}`
+}
 
 /**
  * 組出要送出去的 `Request`。
@@ -182,7 +206,7 @@ export function buildRequest(spec: RequestSpec): Request {
     init.body = JSON.stringify(spec.body)
     init.headers = { 'content-type': 'application/json' }
   }
-  return new Request(`${restBase()}${path}`, init)
+  return new Request(`${restBase()}${path}${queryString(spec.query)}`, init)
 }
 
 /**

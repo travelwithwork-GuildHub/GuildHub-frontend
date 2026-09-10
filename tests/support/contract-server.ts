@@ -42,6 +42,14 @@ export interface RecordedCall {
   pathname: string
   /** 路徑樣板。路徑參數已經還原成 `{name}`。 */
   template: string
+  /**
+   * Query string，**含前導的 `?`**；沒有的話是空字串。
+   *
+   * ⚠️ **分頁的判準要靠它。** `pathname` 把 `?` 之後切掉了 ——
+   * 只看 `pathname` 的話，「送 `page=0`」與「完全不送 `page`」
+   * 在這把尺上是同一件事（規格 `FE-B01-S04`）。
+   */
+  search: string
   headers: Record<string, string | undefined>
   body: unknown
   /** 請求 body 有沒有通過契約。**沒有列在 `REQUEST_SCHEMAS` 的端點是 `null`。** */
@@ -64,7 +72,10 @@ export async function startContractServer(): Promise<ContractServer> {
     let raw = ''
     req.on('data', (chunk) => (raw += chunk))
     req.on('end', () => {
-      const pathname = (req.url ?? '/').split('?')[0] as string
+      const url = req.url ?? '/'
+      const pathname = url.split('?')[0] as string
+      const queryIndex = url.indexOf('?')
+      const search = queryIndex === -1 ? '' : url.slice(queryIndex)
       const template = templateFor(pathname)
       const schema = REQUEST_SCHEMAS[`${req.method} ${template}`]
 
@@ -83,6 +94,7 @@ export async function startContractServer(): Promise<ContractServer> {
         method: req.method ?? '',
         pathname,
         template,
+        search,
         headers: req.headers as Record<string, string | undefined>,
         body,
         contractOk,
