@@ -34,9 +34,18 @@ export interface LocalPlayerProps {
    * 而不是角色在的位置。規格 FE-R03。
    */
   poseRef: RefObject<LocalPose>
+  /**
+   * 自己的 `av`。規格 `avatar-appearance`（`FE-W19`）。
+   *
+   * ⚠️ **當 prop 傳而不是在這裡讀 identity**：這個元件在 `<Canvas>` 裡面，
+   * 而 React context 不會自動跨過 R3F 的 renderer 邊界。
+   * `av` 是低頻資料（只有選擇角色時才變），當 prop 傳不會有重繪成本 ——
+   * 跟位置與朝向不同，那兩個每秒變十次，所以走 ref。
+   */
+  av?: unknown
 }
 
-export function LocalPlayer({ targetRef, poseRef }: LocalPlayerProps) {
+export function LocalPlayer({ targetRef, poseRef, av }: LocalPlayerProps) {
   const rootRef = useRef<Group>(null)
   const bodyRef = useRef<Group>(null)
   /** 子部位查一次就快取。查不到的話動畫會靜默停止 —— 見 partsRef 的初始化。 */
@@ -207,7 +216,7 @@ export function LocalPlayer({ targetRef, poseRef }: LocalPlayerProps) {
 
   return (
     <group ref={rootRef}>
-      <ChibiPlayer ref={bodyRef} />
+      <ChibiPlayer ref={bodyRef} av={av} />
     </group>
   )
 }

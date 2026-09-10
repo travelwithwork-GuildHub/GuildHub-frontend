@@ -39,9 +39,17 @@ export interface RemotePlayerProps {
   motion: ReadonlyMap<string, RemoteMotion>
   /** 單調時間來源。**與寫入樣本用的是同一個。** */
   now: () => number
+  /**
+   * 這個人的 `av`。規格 `avatar-appearance`（`FE-W19`）。
+   *
+   * ⚠️ **這個可以當 prop 傳，位置不行。** `av` 只在名單改變時變
+   *（join / leave 才動），而位置每秒變十次 —— 後者當 prop 傳會是
+   * 每秒 10 次 React 重繪 × 40 個角色。
+   */
+  av?: unknown
 }
 
-export function RemotePlayer({ id, motion, now }: RemotePlayerProps) {
+export function RemotePlayer({ id, motion, now, av }: RemotePlayerProps) {
   const rootRef = useRef<Group>(null)
 
   useFrame(() => {
@@ -75,7 +83,7 @@ export function RemotePlayer({ id, motion, now }: RemotePlayerProps) {
 
   return (
     <group ref={rootRef}>
-      <ChibiPlayer />
+      <ChibiPlayer av={av} />
     </group>
   )
 }
