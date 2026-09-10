@@ -146,6 +146,21 @@ describe('金鑰要真的被帶走，才進得了世界', () => {
     expect(enterButton().disabled).toBe(true)
   })
 
+  it('[FE-A06-S08] 按下複製的當下還不算數 —— 要等寫入真的回報成功', async () => {
+    // ⚠️ **這一條是突變測試逼出來的。** 一個「先樂觀顯示已複製、失敗再改回來」
+    // 的實作，**最終狀態跟正確的版本一模一樣**，所以其他六條全綠 ——
+    // 而中間那一瞬間按鈕是可按的，使用者可以在金鑰**沒有被複製**的情況下進去。
+    //
+    // 用一個永遠不 settle 的剪貼簿把那一瞬間停住。
+    const hanging: ClipboardPort = { write: () => new Promise<void>(() => {}) }
+    await reachKey(hanging)
+
+    click(screen.getByRole('button', { name: '複製鑰匙' }))
+
+    expect(enterButton().disabled, '寫入還沒回報就放行了').toBe(true)
+    expect(screen.queryByRole('status'), '寫入還沒回報就說已複製').toBeNull()
+  })
+
   it('[FE-A06-S09] 金鑰本身看得到，兩句警語也在', async () => {
     await reachKey(workingClipboard)
 
