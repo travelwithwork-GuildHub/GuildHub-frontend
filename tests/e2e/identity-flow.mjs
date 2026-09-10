@@ -16,12 +16,20 @@
 // 而症狀是「登入回 200，接著每個請求都 401」。後端 `cd2929c` 的 commit 訊息
 // 逐字寫著這個坑。
 
-// ⚠️⚠️ **截圖裡的 3D 世界是空白的，而世界沒有壞。**
-// 實測（three 的 devtools hook）：場景有 29 個物件、8 秒跑了 161 幀。
-// 空白是**擷取**的問題 —— WebGL 畫布沒有開 `preserveDrawingBuffer`，
-// 截圖與 `drawImage()` 取到的是全透明。
-// **這一頁的截圖只能用來看 DOM 那一層**（標題列的身分、入口、金鑰面板）。
-// 世界長得對不對要人眼在真的瀏覽器上看 —— 那一條沒有自動化。
+// ⚠️⚠️ **截圖裡的 3D 世界是空白的，而世界沒有壞** —— 但證明它的方式改過一次，
+// 而**第一次的證明是不合格的**。
+//
+// 第一次我用 three 的 devtools hook 量到「場景有 29 個物件、8 秒跑了 161 幀」，
+// 就下結論說世界沒壞。**兩個審查者獨立指出那個推論站不住**：那只證明
+// 場景圖建起來了、render loop 還在跑 —— 相機對著虛空、光照全黑、
+// 物件全飛出視野、或有一層透明的 div 蓋在畫布上，那兩個數字**一模一樣**。
+//
+// 現在的證明是 `worldPixels()`：**直接讀 WebGL 的 back buffer**。
+// 截圖之所以是空白，是因為畫布沒開 `preserveDrawingBuffer`，
+// 而 `gl.readPixels()` 在 `requestAnimationFrame` 裡讀得到 —— 那一輪還沒 present。
+//
+// **所以這一頁的截圖只能用來看 DOM 那一層**（標題列的身分、入口、金鑰面板），
+// 而世界有沒有畫出東西由像素判準守。**世界長得對不對**仍然只有人眼答得出來。
 //
 // 這是這一支腳本第二次「紅燈是尺不是產品」。第一次是
 // `[role="alert"]` 抓到 Next 開發覆蓋層的空字串（見下面那段註解）。
@@ -60,6 +68,48 @@ async function badge(page) {
     { timeout: 15_000 },
   )
   return (await page.textContent('[data-testid="identity"]')).trim()
+}
+
+/**
+ * 世界那塊畫布**真的畫出了什麼**。
+ *
+ * ⚠️ **讀的是 WebGL 的 back buffer，不是截圖。** 畫布沒開
+ * `preserveDrawingBuffer`，所以 `page.screenshot()` 與 `canvas.drawImage()`
+ * 取到的都是全透明 —— 那是擷取的限制，不是世界的狀態。
+ * `gl.readPixels()` 在 `requestAnimationFrame` 裡讀得到，因為那一輪還沒 present。
+ *
+ * ⚠️ **`canvas.getContext()` 拿到的是 R3F 正在用的那個 context**，不是新的
+ * —— 同一個 canvas 重複呼叫會回同一個。所以這裡讀的是真的那一塊。
+ */
+async function worldPixels(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const canvas = document.querySelector('canvas')
+        const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl')
+        if (!gl) return resolve({ error: '拿不到 WebGL context' })
+        requestAnimationFrame(() => {
+          const w = gl.drawingBufferWidth
+          const h = gl.drawingBufferHeight
+          const px = new Uint8Array(w * h * 4)
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px)
+          const colors = new Map()
+          let opaque = 0
+          for (let i = 0; i < px.length; i += 4) {
+            if (px[i + 3] > 0) opaque++
+            const key = `${px[i]},${px[i + 1]},${px[i + 2]}`
+            colors.set(key, (colors.get(key) ?? 0) + 1)
+          }
+          const [dominant] = [...colors.entries()].sort((a, b) => b[1] - a[1])
+          resolve({
+            distinctColors: colors.size,
+            opaqueRatio: opaque / (w * h),
+            dominant: dominant?.[0] ?? null,
+            dominantShare: (dominant?.[1] ?? 0) / (w * h),
+          })
+        })
+      }),
+  )
 }
 
 /** 走完一次登入。回傳畫面上顯示的那把恢復金鑰。 */
@@ -104,6 +154,37 @@ try {
   await page.goto(`${FRONTEND}/world`)
   check('[4.1] 世界裡的名字是自己輸入的那個（BE-G02 的第一次可見證明）', await badge(page), '阿福')
   await page.screenshot({ path: `${SHOTS}/3-signed-in-world.png` })
+
+  // ── 世界真的畫得出東西 ────────────────────────────────────────────
+  //
+  // ⚠️ **這三條不是 `FE-A01` 的 Scenario**，它們守的是上面那句「截圖空白
+  // 不代表世界壞了」——**沒有它們，那句話就只是我說的**。
+  await page.waitForTimeout(3000)
+  const pixels = await worldPixels(page)
+  if (pixels.error) {
+    bad('[世界] 讀不到畫布的像素', pixels.error)
+  } else {
+    // 單一顏色代表「什麼都沒畫」。真的場景有牆、地毯、看板、光照漸層
+    check('[世界] 畫布上不只一種顏色', pixels.distinctColors > 50, true)
+    // 全透明代表 render 根本沒發生
+    check('[世界] 畫布是不透明的', pixels.opaqueRatio, 1)
+    // ⚠️⚠️ **最重要的一條，而且它是被突變測試逼出來的。**
+    //
+    // 原本這裡寫的是「主色不是頁面背景色」。突變測試（把 `LAYOUT` 清空、
+    // 世界裡一件家具都不擺）證明**那條太弱**：畫面上還有地面與光照漸層，
+    // 主色仍然不是頁面背景，**三條全綠**。
+    //
+    // 分得開兩者的是**主色佔多少**：
+    //
+    //     完整的世界   1450 種顏色，主色 51.9%
+    //     清空的世界    141 種顏色，主色 99.5%   ← 相機看得到的只剩地面
+    //
+    // 一整片單色正是「相機對著虛空」與「東西全飛出視野」的樣子。
+    check('[世界] 畫面不是一整片單色（相機真的看得到東西）', pixels.dominantShare < 0.9, true)
+    console.log(
+      `   （${pixels.distinctColors} 種顏色，主色 ${pixels.dominant} 佔 ${(pixels.dominantShare * 100).toFixed(1)}%）`,
+    )
+  }
 
   // ── 4.3 重整之後名字還在 ─────────────────────────────────────────
   await page.reload()
