@@ -47,6 +47,7 @@ const ENTITIES = {
   ProjectCreate: rest.ProjectCreate,
   ProjectOut: rest.ProjectOut,
   ProjectStatus: rest.ProjectStatus,
+  RegisterIn: rest.RegisterIn,
   RoomDoorOut: rest.RoomDoorOut,
   SeatClaim: rest.SeatClaim,
   SeatOut: rest.SeatOut,
@@ -91,6 +92,7 @@ type _ProfileUpdate = Expect<Equal<Inferred<'ProfileUpdate'>, Schema<'ProfileUpd
 type _ProjectCreate = Expect<Equal<Inferred<'ProjectCreate'>, Schema<'ProjectCreate'>>>
 type _ProjectOut = Expect<Equal<Inferred<'ProjectOut'>, Schema<'ProjectOut'>>>
 type _ProjectStatus = Expect<Equal<Inferred<'ProjectStatus'>, Schema<'ProjectStatus'>>>
+type _RegisterIn = Expect<Equal<Inferred<'RegisterIn'>, Schema<'RegisterIn'>>>
 type _RoomDoorOut = Expect<Equal<Inferred<'RoomDoorOut'>, Schema<'RoomDoorOut'>>>
 type _SeatClaim = Expect<Equal<Inferred<'SeatClaim'>, Schema<'SeatClaim'>>>
 type _SeatOut = Expect<Equal<Inferred<'SeatOut'>, Schema<'SeatOut'>>>

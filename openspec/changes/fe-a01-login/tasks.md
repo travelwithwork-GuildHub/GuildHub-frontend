@@ -5,16 +5,65 @@
 
 ## 1. 契約與路徑判準（先做 —— 後面每一刀都靠它）
 
-- [ ] 1.1 起本機後端（`cd ~/Desktop/workshop/fergus/GuildHub-backend && bash run.sh`），
-      重新產生 `src/api/contract/schema.d.ts`，更新 `GENERATED.md` 的後端 commit 與日期
-- [ ] 1.2 `RequestSpec` 的 `path` 收窄成「產出型別檔中該 method 確實存在的路徑」
-- [ ] 1.3 修 `getMyProfile` 的路徑：`/api/profiles/me` → `/api/me`
-- [ ] 1.4 修 `tests/api-operations-coverage.test.ts:49` 抄錯的那條斷言
-- [ ] 1.5 `LoginIn` 契約補 `resume_token`（三選一的語意寫進註解）
-- [ ] 1.6 **突變測試**：`FE-A01-S13`／`S14`／`S15` 各拿掉一次，確認 typecheck 由綠變紅
-      - [ ] `'/api/me'` → `'/api/mee'` 必須紅
-      - [ ] `getMyProfile` 改回 `GET /api/profiles/me` 必須紅
-      - [ ] `RequestSpec.path` 放寬成 `string`，確認上面兩條**變綠**（證明 S15 有守到東西）
+- [x] 1.1 起本機後端，重新產生 `src/api/contract/schema.d.ts`，
+      更新 `GENERATED.md` 的後端 commit 與日期
+      - ⚠️ **`bash run.sh` 跑不起來** —— 後端 `cd2929c` 之後它是 CRLF 換行，
+        macOS 上 `set -e\r` 直接語法錯誤。改成直接叫 uvicorn，並記進 `GENERATED.md`。
+        要開一張後端票。
+      - **重產讓哨兵第一次真的紅了**：`_coverage`（後端多了 `RegisterIn`）
+        與 `_LoginIn`（`nickname` 變選填、多三個欄位）。它在 9/8–9/10 之間
+        一直是綠的，而後端那兩天走了六個 commit —— 見 5.3 那張票。
+- [x] 1.2 `RequestSpec` 的 `path` 收窄成「產出型別檔中該 method 確實存在的路徑」
+      —— `PathsWith<M>` ＋ 跟 `method` 綁在一起的判別式聯集
+- [x] 1.3 修 `getMyProfile` 的路徑：`/api/profiles/me` → `/api/me`
+- [x] 1.4 修抄錯的斷言。**不只一條** —— 同一個不存在的端點被抄了四次：
+      生產碼一次、`api-operations-coverage`／`api-transport`／`api-contract-io`
+      各一次。四份互相印證，所以永遠是綠的。
+- [x] 1.5 `LoginIn` 契約補 `resume_token`／`login_id`／`password`
+      （三選一的語意寫進註解。**不寫成 `.refine()`** —— `drift.ts` 的雙向型別
+      相等會被 wrapper 打斷）。順帶把 `RegisterIn` 補進契約層與登錄表，
+      但**不開對應的操作**：註冊 UI 是本 change 的 Non-goal。
+- [x] 1.6 **突變測試**：跑了四次，結果如下
+
+      | # | 突變 | 預期 | 實測 |
+      |---|---|---|---|
+      | 1 | `'/api/me'` → `'/api/mee'` | 紅 | ✅ `TS2820` 指名建議 `'/api/me'` |
+      | 2 | `getMyProfile` 改回 `GET /api/profiles/me` | 紅 | ✅ `TS2345` |
+      | 3a | `path` 放寬成 `string` ＋ 突變 1 | typecheck 變綠 | ✅ 綠（S13／S14 失效）<br>執行期測試仍紅 —— 見下 |
+      | 3b | 3a 再把**測試的期望值也一起抄錯** | 全綠 | ✅ **454 條測試全綠、typecheck 綠、lint 綠**，而客戶端打的是不存在的端點 |
+      | 4 | 3b 的狀態把型別約束裝回去 | 紅 | ✅ 6 個 `error TS` |
+
+      **3a 修正了規格裡的一句話。** 規格寫「拿掉這條約束之後沒有任何其他測試
+      或型別斷言會變紅」——**在今天的 repo 上這句話已經不完全成立**：
+      1.4 把三個測試的期望值改對了，所以現在一個單獨改壞的路徑會被執行期
+      測試抓到。真正只有型別約束抓得到的是 **3b**：生產碼與測試**抄同一個錯**。
+      那正是這個 bug 實際發生的形狀，而執行期測試在結構上就抓不到它 ——
+      它比對的是人抄過去的常數，型別約束比對的是後端自己宣告的事實。
+      **這一條要寫進 5.1 送審的清單**（規格已在 main 上，`feat/` 分支不得回改它）。
+
+- [x] 1.7 **送兩邊審**（提前做 5.1 的一部分）。三件事改了：
+
+      | # | 誰 | 發現 | 處置 |
+      |---|---|---|---|
+      | a | Gemini | 我在 `rest.ts` 寫的「`.refine()` 會打斷 `drift.ts` 的雙向相等」**是假的** | 實測 `Equal<z.infer<Plain>, z.infer<Refined>>` 為 `true` —— 它是對的。註解改成真正的理由：**已合併的規格裡沒有任何 Scenario 要求前端擋「剛好一組」**，那是要先談定的 Requirement |
+      | b | codex | `PathsWith` 需要自己的 compile-time sentinel | 採用。**壞掉的兩個方向不對稱**：太窄→每個呼叫點都紅（23 個錯誤，看得見）；太寬→**沒有任何東西會紅** |
+      | c | Gemini | `PathsWith` 在「產出檔缺該 method 鍵」時會靜默漏判 | **方向對、判斷錯**：實測是 `TS2536`，打在型別定義本身。保留現在的寫法，量測結果寫進註解 |
+
+      三條哨兵的突變測試：
+
+      | # | 突變 | 實測 |
+      |---|---|---|
+      | 5 | `PathsWith` 改成恆等於 `P`（太寬鬆） | ✅ 紅，`TS2344` 打在第二條哨兵上。**同一個突變下 `api-operations-coverage` 的 17 條全綠** —— 哨兵是唯一抓到的 |
+      | 6 | `PathsWith` 恆為 `never`（太窄） | ✅ 紅，23 個錯誤散在每一個呼叫點 |
+      | 7 | 只留第二條哨兵，再讓 `PathsWith` 恆為 `never` | ✅ **第二條通過了** —— 證明第三條（成對那條）不能省 |
+
+      **還沒處置的一條，兩邊獨立指到同一個地方**：`params` 是型別黑洞。
+      `params?: Record<string, string>` 收任何鍵，把 `profile_id` 打成 `id` 的話
+      `path.replace('{id}', …)` 找不到東西，客戶端會送出字面值
+      `/api/profiles/{profile_id}`。codex 另外補了兩點：沒有驗「每個
+      `{parameter}` 都有對應的 `params`」，而 `String.replace()` 只換第一個相符項。
+      **這是 `S13`／`S14` 的同一個缺陷類別，但沒有任何已合併的 Requirement 涵蓋它**
+      —— 要先談定，見 5.5。
 
 ## 2. 身分的取得與恢復
 
@@ -65,7 +114,40 @@
 - [ ] 5.2 開後端票：**`POST /api/logout`**（沒有它 `FE-A02` 做不完）
 - [ ] 5.3 開票：**契約哨兵的新鮮度** —— 自動重產或比對後端 commit
       （本 change 的 D5 記著它綠得合乎設計，但後端動兩天沒有聲音）
+- [x] 5.5 `params` 的型別約束：**談完了，共識是另開工作項目**（不進本 change）。
+
+      第一輪分歧：codex 選「補進 `FE-A01` 的規格」（理由：跟 `S13`／`S14`
+      是同一缺陷類別，選另開會「把 identity 建在已知不可靠的契約層上」）；
+      Gemini 選「另開」（理由：9/22 只剩十幾天、107 項未開始，非阻擋性的
+      範圍蔓延是致命的）。
+
+      **第二輪 codex 改變主張**，而改變它的是一個雙方第一輪都沒拿到的事實：
+      **下一刀 `src/identity/` 只用 `POST /api/login` 與 `GET /api/me`，
+      這兩個都沒有路徑參數。** 有路徑參數的操作全部屬於 W3 之後。
+      所以那個型別黑洞**不在下一刀的執行路徑上**。
+
+      codex 第二輪逐字：「它仍是應修的契約缺陷，但不應重新打開 FE-A01、
+      阻塞 identity；應獨立追蹤，並**在 W3 首個帶路徑參數的功能開始前完成**。」
+      —— 那個時間點就是這張票的期限，要寫進工作項目（見 5.4）。
+
+- [x] 5.5b `path.replace()` 只換第一個相符項：**兩邊都說現在不修。**
+      目前 16 個端點沒有任何一條路徑出現同一個 placeholder 兩次，
+      改成全域替換是在替不存在的呼叫端設計行為。
+      差別只在要不要留 TODO：codex 說連 TODO 都不要（「TODO 只會把猜測永久化」），
+      Gemini 說留一行。**採 codex** —— 這個 repo 的 `docs/DECISIONS.md`
+      本來就是「拒絕過什麼」的存放處，猜測不該散在程式碼裡。這一條記在這裡。
+
+- [ ] 5.5c **發表日的範圍裁決材料**：兩個審查者對「現在最該做什麼」的答案
+      **完全一致** —— 不是 params、不是 identity、是範圍裁決。
+      那是專案負責人的決定，我能做的是把材料備好。兩邊給的欄位收斂成：
+      ID＋名稱 / **剩餘成本**（狀態＋點數）/ **不做的話發表日失去什麼**
+      ＋時序與相依。codex 特別指出第二欄不能只寫「阻塞原因」，
+      要寫「若不做，發表日會失去什麼」，否則負責人得重新理解整份 WBS。
+- [ ] 5.6 開後端票：**`run.sh` 是 CRLF 換行**，macOS／Linux 上
+      `bash run.sh` 直接語法錯誤（後端 `cd2929c` 帶進來的）
 - [ ] 5.4 `governance/` PR：
       - [ ] `FE-A06` 標成**發表前阻擋項目**（design D5 的條件，不落上去中間解就退化）
       - [ ] `FE-R10`／`FE-J14` 標成**別的組員負責**
       - [ ] 帳號密碼登入與註冊：新增工作項目（design D1）
+      - [ ] `params` 的型別約束：新增工作項目，**期限是 W3 第一個帶路徑參數的
+            功能開始之前**（見 5.5）

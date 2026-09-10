@@ -15,12 +15,52 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description [P12] login_anonymous(nickname)。
+         * @description [P12] login_anonymous(nickname)，以及 BE-G01 的 resume。
          *
          *     沒有密碼欄位、沒有 OAuth（守則 §3）。登入即建立一張名片 —— 帳號與名片
          *     是同一個東西，profiles 就是使用者表。
+         *
+         *     給 `resume_token` 則是拿回既有的名片，不建新的。**它不是驗證身分**：
+         *     拿到 token 的人就是那張名片的人。這解掉的是「清掉 cookie 或換一台電腦
+         *     就再也回不去」，不是「證明這個身分屬於我」——後者要帳號密碼，那會動到
+         *     schema 與規格書 §9，是另一個決定。
+         *
+         *     給 `login_id` + `password` 則是**驗證身分**（L3）：帳號不存在與密碼錯誤
+         *     回同一句話，不透露哪一個錯了。用 403 而不是 401 —— 401 在整合指南 §4 的
+         *     約定是「導向登入畫面」，而使用者本來就在登入畫面上，導過去會變成迴圈；
+         *     403 的約定是「顯示 detail，密碼錯則留在密碼框」，那正是這裡要的行為。
          */
         post: operations["login_api_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register
+         * @description 建立一個帶帳號密碼的名片（L3，9/8 裁決）。
+         *
+         *     註冊完直接是登入狀態 —— 註冊後再叫人登入一次，是拿使用者的時間去補一個
+         *     系統自己就能做的動作。
+         *
+         *     撞名由 profiles.login_id 的 unique 擋，不先查再寫（守則 §1 規則 4）：
+         *     先查再寫在單機測試裡永遠是對的，兩個人同時註冊同一個帳號才會露出來。
+         *
+         *     這裡不做 email、不做驗證信、不做密碼重設 —— 沒有寄信管道，做出來的
+         *     「忘記密碼」會是一條走不完的路。使用者忘記密碼就用 resume_token 回來，
+         *     或重新註冊一個。
+         */
+        post: operations["register_api_register_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -192,15 +232,23 @@ export interface paths {
          * Close Project
          * @description [P35] 結案。§6.1：座位全數釋放、門從走廊移除。
          *
-         *     ⚠ 這裡有一個規格內部的矛盾，需要 P1 裁決：
-         *       · §4.1 說「專案結束時座位自動釋放」的機制是 on delete cascade
-         *       · 但 cascade 只在「刪除專案列」時觸發，而 §6.1 的生命週期圖顯示
-         *         closed 是專案保留下來的一個狀態（門移除，專案還在）
-         *       · 任務表 [P34] 又註明「須由 DB cascade 達成，不得在應用層逐筆刪除」
+         *     **2026-09-08 P1 裁決（選項 A）：維持這個行為，改正文件。**
          *
-         *     目前的作法：同一個交易內把 status 改成 closed，並以「一句 delete」釋放
-         *     座位（集合操作，不是在 Python 裡逐筆迴圈）。若 P1 認定結案就該刪除專案
-         *     列，改成 delete 即可，cascade 會自然接手。
+         *     背景是規格書內部的矛盾：§4.1 說「專案結束時座位自動釋放」的機制是
+         *     on delete cascade，但 cascade 只在刪除專案列時觸發，而 §6.1 的生命週期圖
+         *     裡 closed 是專案**保留下來**的狀態 —— 專案還在，cascade 不會發生。
+         *
+         *     裁決保留的作法：同一個交易內把 status 改成 closed，並以**一句 delete**
+         *     釋放座位。是集合操作，不是在 Python 裡逐筆迴圈，所以任務表 [P34] 的
+         *     「不得在應用層逐筆刪除」仍然成立。
+         *
+         *     被否決的兩個選項與理由：
+         *       · 結案即刪除專案列（讓 cascade 真的發生）—— 專案歷史隨之消失，
+         *         前端的 BE-G22／FE-T（合作紀錄與聲譽）就永遠做不成了
+         *       · 加 trigger —— 為了一句文件引入這個 repo 目前沒有的隱藏控制流
+         *
+         *     **代價（明寫在這裡，因為它不再由資料庫保證）：** 座位釋放是這一段程式的
+         *     責任。刪掉下面那句 delete，沒有任何約束會擋，而測試會是唯一的守門員。
          */
         post: operations["close_project_api_projects__project_id__close_post"];
         delete?: never;
@@ -385,10 +433,36 @@ export interface components {
         /**
          * LoginIn
          * @description 規格書 §9：匿名登入，暱稱即可，不走 OAuth。沒有密碼欄位。
+         *
+         *     兩種模式，剛好給一個：
+         *
+         *     - `nickname` —— 建立一張新名片
+         *     - `resume_token` —— 拿回既有的名片。它就是 `ProfileOut.id`，登入時已經
+         *       回給前端了，所以不必為它新增任何欄位或端點
+         *
+         *     **`resume_token` 不是密碼。** 拿到它的人就是那張名片的人。它解的是「同一
+         *     個人換裝置、或清掉 cookie 之後回得去」（BE-G01），不是「證明這個身分屬於
+         *     我」。要後者得做帳號密碼，那會動到 sql/001_schema.sql 與規格書 §9，是另一
+         *     個決定。
+         *
+         *     - `login_id` + `password` —— 帳號密碼登入（L3，9/8 裁決）。這一組才是**驗證
+         *       身分**：它證明這個身分屬於你，前兩種都不證明
+         *
+         *     剛好給一組，多給或少給都是 422。刻意不做「都給就以某一邊為準」——
+         *     那是在互相打架的意圖裡自己挑一邊信，而呼叫端不會知道被挑掉的是哪一個。
+         *
+         *     三種模式並存不是折衷，是三種不同的入場方式：發表日現場走匿名（§9，不能
+         *     卡在註冊），一般使用者走帳號密碼，換裝置的人走 resume_token。
          */
         LoginIn: {
             /** Nickname */
-            nickname: string;
+            nickname?: string | null;
+            /** Resume Token */
+            resume_token?: string | null;
+            /** Login Id */
+            login_id?: string | null;
+            /** Password */
+            password?: string | null;
         };
         /** MessageCreate */
         MessageCreate: {
@@ -530,6 +604,25 @@ export interface components {
          */
         ProjectStatus: "recruiting" | "active" | "closed";
         /**
+         * RegisterIn
+         * @description 註冊一個帳號（L3）。
+         *
+         *     `login_id` 是帳號，`nickname` 是世界裡顯示的名字 —— 兩者刻意分開：
+         *     `display_name` 沒有唯一約束而且改得動，拿它當帳號的話，改名就等於換帳號。
+         *
+         *     `login_id` 的長度規則寫在 sql/001_schema.sql 的 check，這裡不重複
+         *     （守則 §1 規則 3）。密碼長度是唯一的例外：**明文不會進資料庫**，
+         *     SQL 無從驗起，所以它只能寫在這裡 —— 這不是「兩邊各寫一份」。
+         */
+        RegisterIn: {
+            /** Login Id */
+            login_id: string;
+            /** Password */
+            password: string;
+            /** Nickname */
+            nickname: string;
+        };
+        /**
          * RoomDoorOut
          * @description 全案唯一合併兩層的回應（附錄 B ★）。
          *
@@ -607,6 +700,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_api_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterIn"];
             };
         };
         responses: {
