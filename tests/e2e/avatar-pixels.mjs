@@ -237,6 +237,22 @@ try {
     const none = await framesWith(browser, 0, null)
     const peer0 = await framesWith(browser, 0, 0)
     const peer1 = await framesWith(browser, 0, 1)
+    const peer0b = await framesWith(browser, 0, 0)
+
+    // ── V2 的雜訊對照 ─────────────────────────────────────────
+    //
+    // ⚠️ **本地那條的 `noise = 0` 不能直接拿來用。**
+    // 遠端角色的畫面位置是**插值出來的**（`FE-R08`）—— 樣本 ＋ 時間游標，
+    // 而兩次載入的相位不一樣。這是整條路上最可能生出假訊號的地方，
+    // 所以它要自己量一次。
+    const remoteNoise = stableDiff(peer0.frames, peer0b.frames)
+    if (remoteNoise <= NOISE_CEILING)
+      ok(`同一個遠端 av 兩次載入的保守差異 ${remoteNoise}（上限 ${NOISE_CEILING}）`)
+    else
+      bad(
+        `同一個遠端 av 兩次載入就差了 ${remoteNoise} 個像素`,
+        '遠端這條判準的尺壞了 —— 先看插值的相位（兩次載入的樣本時間不同）',
+      )
 
     // ── V2a：鄰居真的被畫出來了 ────────────────────────────────
     //
@@ -257,7 +273,7 @@ try {
     // ── V2b：遠端的 av=0 與 av=1 看得出差別 ────────────────────
     const remoteSignal = stableDiff(peer0.frames, peer1.frames)
     if (remoteSignal >= REMOTE_FLOOR)
-      ok(`遠端 av=0 與 av=1 的保守差異 ${remoteSignal} 個像素（下限 ${REMOTE_FLOOR}）`)
+      ok(`遠端 av=0 與 av=1 的保守差異 ${remoteSignal} 個像素（下限 ${REMOTE_FLOOR}，雜訊 ${remoteNoise}）`)
     else
       bad(
         `遠端玩家的 av=0 與 av=1 只差了 ${remoteSignal} 個像素`,
