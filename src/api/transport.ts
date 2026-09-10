@@ -89,6 +89,37 @@ type PathsWith<M extends METHODS[keyof METHODS]> = {
   [P in keyof paths]: paths[P][M] extends undefined ? never : P
 }[keyof paths]
 
+/**
+ * `PathsWith` 自己的哨兵。**三條，而且缺一不可。**
+ *
+ * ⚠️ **上面那個型別壞掉的兩個方向不對稱，而只有一個方向會自己被發現。**
+ *
+ * - **太窄**（極端是恆為 `never`）：每一個呼叫點都紅（實測 23 個錯誤）。
+ *   吵，但看得見。
+ * - **太寬**（極端是等於 `keyof paths`）：**沒有任何東西會紅。**
+ *   `S13`／`S14` 會靜靜失效，而那正是這一整套要防的事 ——
+ *   一個看起來還在的防禦，實際上什麼都不擋。
+ *
+ * 所以下面三條把它釘在**已知的事實**上：一條已知存在、一條已知不存在、
+ * 一條成對。**第三條不能省** —— 少了它，「恆為 `never`」會讓第二條通過。
+ *
+ * 這三條同時也是產生器升級的擋板：openapi-typescript 換一種寫法表達
+ * 「這條路徑上沒有這個 method」的話，這裡會先紅。
+ *
+ * ⚠️ 另一種寫法（`M extends keyof paths[P] ? … : never`）也被評估過。
+ * 它防的是「產出檔某條路徑上完全沒有那個 method 鍵」——**實測那種情況是
+ * `TS2536`，打在上面那個型別定義本身**，不是靜默漏判。
+ * 保留現在的寫法，是因為它讓錯誤落在原因所在的那一行。
+ */
+type Expect<T extends true> = T
+
+/** `GET /api/me` 是存在的 —— `getMyProfile` 打的就是它。 */
+type _hasGetMe = Expect<'/api/me' extends PathsWith<'get'> ? true : false>
+/** `GET /api/profiles/me` **不存在**（該路徑只有 `PATCH`）。這是那個 bug 的原點。 */
+type _lacksGetProfilesMe = Expect<'/api/profiles/me' extends PathsWith<'get'> ? false : true>
+/** 同一條路徑的 `PATCH` 是存在的 —— 成對，證明上一條不是因為整個聯集是空的。 */
+type _hasPatchProfilesMe = Expect<'/api/profiles/me' extends PathsWith<'patch'> ? true : false>
+
 interface RequestBase {
   /** 路徑參數。**會做 URL 編碼** —— 不編碼的話 id 裡的斜線會改變路由。 */
   params?: Record<string, string>

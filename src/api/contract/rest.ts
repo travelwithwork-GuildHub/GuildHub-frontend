@@ -32,9 +32,17 @@ const datetime = z.string()
  * 後端刻意不做「都給就以某一邊為準」——那是在互相打架的意圖裡自己挑一邊信，
  * 而呼叫端不會知道被挑掉的是哪一個。
  *
- * **這裡沒有把「剛好一組」寫成 Zod 的 `.refine()`**：`drift.ts` 對這個 schema
- * 做的是雙向型別相等，而多一層 wrapper 會讓那條斷言的形狀對不上。
- * 「剛好一組」由呼叫端（`src/identity/`）負責，判準在 `FE-A01-S01`。
+ * ⚠️ **「剛好一組」今天沒有被前端擋住，而理由不是技術限制。**
+ * 這裡原本寫著「不能用 `.refine()`，會打斷 `drift.ts` 的雙向型別相等」——
+ * **那句話是錯的，實測過**：`z.infer` 對 refine 前後完全一樣
+ *（`Equal<z.infer<typeof Plain>, z.infer<typeof Refined>>` 是 `true`），
+ * 而且 refine 過的 schema 仍然指派得進 `z.ZodType`。
+ *
+ * 真正的理由是**已合併的規格裡沒有任何一條 Scenario 要求它**。
+ * 送一組非法組合過去，後端回 422 —— 而前端要不要先擋、擋了要怎麼讓使用者知道，
+ * 是一條要先談定的 Requirement，不是實作順手加的防禦
+ *（`AGENTS.md`：規格沒談定之前不寫產品程式碼）。
+ * 這一條列進 `tasks.md` 5.1 送審的清單。
  *
  * ⚠️ `nickname` 直接寫進 `profiles.display_name`（`auth.py` 的 insert），
  * 所以它吃的是 display_name 的 1–20 —— **超長會是資料庫錯誤，回 500**。
