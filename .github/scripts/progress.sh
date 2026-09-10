@@ -41,6 +41,14 @@
 #         「明文不做」才是牆。詳見 docs/WBS.md 的阻塞類型表。
 #   標記  算不出來的人為決定：Cancelled / Pending / TBD / Alarm，後面接理由。
 #
+# 第八欄是選填的**負責人**（表頭要逐字寫 `負責人`）：
+#
+#   負責人  這一項由誰開發。**留空的意思是「還沒指派」，不是「我做」** ——
+#           兩者在排下一步時是不同的答案。只寫在 ID 那一列，續行留空。
+#
+# ⚠️ **它不影響任何狀態計算。** 一項工作是不是做完了，跟誰負責無關 ——
+# 把負責人混進狀態推導，會變成「他還沒做」跟「還沒有人做」算成同一件事。
+#
 # 它印出來的**狀態**（沒有人寫，全部是算的）：
 #
 #   未開始      有排週次，還沒有人動
@@ -767,12 +775,20 @@ if wbs_path.exists():
             in_table = len(cells) >= 5
             if in_table:
                 ncols = len(cells)
-            # **表格最多七欄。** 多出來的欄位沒有意義，而畫面上還是一張正常
-            # 的表 —— 底下每一列的解讀會跟著移位。
-            if in_table and len(cells) > 7:
+            # **表格最多八欄，而第八欄只能是負責人。** 多出來的欄位沒有意義，
+            # 而畫面上還是一張正常的表 —— 底下每一列的解讀會跟著移位。
+            #
+            # ⚠️ **第八欄要驗表頭的字，不能只驗欄數。** 只驗欄數的話，
+            # 任何人多打一個 `|` 都會變成一張「有負責人欄」的表，而那一欄
+            # 裡的東西會被當成負責人印出來 —— 錯得很安靜。
+            if in_table and len(cells) > 8:
                 violations.append(
-                    f"docs/WBS.md 第 {lineno} 行：工作分解表最多 7 欄，"
+                    f"docs/WBS.md 第 {lineno} 行：工作分解表最多 8 欄，"
                     f"這張表有 {len(cells)} 欄")
+            elif in_table and len(cells) == 8 and plain(cells[7]).strip() != "負責人":
+                violations.append(
+                    f"docs/WBS.md 第 {lineno} 行：第八欄的表頭要逐字寫「負責人」，"
+                    f"現在是「{plain(cells[7]).strip()}」")
             found_table = found_table or in_table
             cur = None
             continue
@@ -803,9 +819,10 @@ if wbs_path.exists():
                               f"{line[:50]}")
             continue
         wid, name, _work, week, pts = cells[0], cells[1], cells[2], cells[3], cells[4]
-        # 第六、七欄是選填的。舊的五欄表格照樣讀得動。
+        # 第六、七、八欄是選填的。舊的五欄表格照樣讀得動。
         blocked = cells[5].strip() if len(cells) > 5 else ""
         mark = cells[6].strip() if len(cells) > 6 else ""
+        owner = cells[7].strip() if len(cells) > 7 else ""
         is_id_row = bool(re.fullmatch(ID_RE, wid))   # 跟引用掃描同一份文法
         # 第一欄有東西、卻不是合法 ID —— 例如 `FE-P3` 少打一個 0 ——
         # 原本會被當成上一個項目的續行，把內容默默併過去。**要報。**
@@ -819,7 +836,7 @@ if wbs_path.exists():
                 violations.append(f"{wid} 在表裡出現不只一次（第 {lineno} 行）")
             cur = wid
             wbs[wid] = {"name": name, "weeks": set(), "pts": 0,
-                        "blocked": "", "mark": "", "blockers": set(),
+                        "blocked": "", "mark": "", "owner": "", "blockers": set(),
                         "deadline": None, "fallback": False, "rows": [],
                         "detail": []}
             order.append(wid)
@@ -940,6 +957,13 @@ if wbs_path.exists():
         if is_id_row:
             wbs[cur]["blocked"] = blocked
             wbs[cur]["mark"] = mark
+            wbs[cur]["owner"] = owner
+        elif owner:
+            # 續行上的負責人**不會被讀到**，而畫面上它看起來已經指派好了。
+            # 一個人把名字寫在第二列，然後以為整項都是他的 —— 要報。
+            violations.append(
+                f"{cur}：負責人只能寫在 ID 那一列，續行的負責人欄要留空"
+                f"（第 {lineno} 行寫了「{owner}」）")
 
     # 全文提到的工作項目 ID。**不只阻塞欄** ——
     # 敘述與理由裡也會指來指去（「由 FE-M09 取代」「擋住 FE-S02/03」），
@@ -1287,7 +1311,8 @@ for wid in order:
         continue
     # 名稱裡的 markdown 強調符號在終端機是雜訊，拿掉。
     label = re.sub(r"[*`]", "", info["name"])[:18]
-    rows.append((colour, wid, label, weeks, info["pts"], state, detail))
+    rows.append((colour, wid, label, weeks, info["pts"], state, detail,
+                 info.get("owner", "")))
 
 # ── 治理不變量 ─────────────────────────────────────────────────────
 def week_min(wk):
@@ -1400,6 +1425,7 @@ if JSON:
             "weeks": sorted(info["weeks"], key=lambda s: int(re.findall(r"\d+", s)[0])),
             "pts": info["pts"], "blockers": sorted(info["blockers"]),
             "blocked": info["blocked"], "marks": sorted(marks), "reason": reason,
+            "owner": info["owner"],
             "deadline": info["deadline"], "state": _state_of[wid], "rows": info["detail"],
             # **change 的關聯以前只存在於終端機表格。** `--json` 是網頁與
             # Excel 的唯一資料來源，那邊看不到就等於這件事沒有被算過 ——
@@ -1440,11 +1466,19 @@ if not wbs:
         print(f"{D}（沒有 docs/WBS.md，所以沒有「還有哪些沒做」的視角。{X}")
         print(f"{D} 有工作分解表的話把它放在 docs/WBS.md，格式見這支腳本的開頭註解。）{X}")
 elif rows:
-    print(f"{B}{'ID':<9} {'項目':<20} {'週':<8} {'點':>3}  {'狀態':<12} {'change'}{X}")
-    print("─" * 78)
-    for colour, wid, name, weeks, pts, state, detail in rows:
+    # **負責人那一欄只在真的有人被指派時才出現。** 一整欄空白會把每一列
+    # 都推寬 8 個字，而它什麼都沒說 —— 讀表的人要為一個空欄付版面。
+    any_owner = any(r[7] for r in rows)
+    own_head = f" {'負責人':<8}" if any_owner else ""
+    print(f"{B}{'ID':<9} {'項目':<20} {'週':<8} {'點':>3}  {'狀態':<12}{own_head} {'change'}{X}")
+    print("─" * (78 + (9 if any_owner else 0)))
+    for colour, wid, name, weeks, pts, state, detail, owner in rows:
         pad = 20 - sum(2 if ord(ch) > 0x2E80 else 1 for ch in name)
-        print(f"{colour}{wid:<9} {name}{' ' * max(pad,1)}{weeks:<8} {pts:>3}  {state:<12} {detail}{X}")
+        own = ""
+        if any_owner:
+            opad = 8 - sum(2 if ord(ch) > 0x2E80 else 1 for ch in owner)
+            own = f" {owner}{' ' * max(opad, 1)}"
+        print(f"{colour}{wid:<9} {name}{' ' * max(pad,1)}{weeks:<8} {pts:>3}  {state:<12}{own} {detail}{X}")
     print()
 
 # ── docs/WBS.md 的機器區塊 ─────────────────────────────────────────
