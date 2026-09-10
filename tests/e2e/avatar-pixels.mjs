@@ -49,6 +49,11 @@ const SIGNAL_FLOOR = 500
  */
 const NOISE_CEILING = 50
 
+/** 鄰居出現在畫面上要佔多少像素。**待實測填入。** */
+const PEER_FLOOR = 1
+/** 遠端 `av=0` 與 `av=1` 的差異下限。**待實測填入。** */
+const REMOTE_FLOOR = 1
+
 const FRAMES = 3
 
 let failures = 0
@@ -110,7 +115,54 @@ function stableDiff(as, bs) {
   return count
 }
 
-async function framesWith(browser, avatar_id) {
+/**
+ * 遠端玩家要放在哪。
+ *
+ * ⚠️ **一定要在鏡頭裡，而這件事沒有任何東西會替你檢查。**
+ * 放到視野外的話，差異是 0 —— 而那個紅燈跟「遠端角色沒有讀 `av`」
+ * 長得一模一樣。底下 `V2a` 那條對照就是為了把這兩者分開。
+ *
+ * 本地角色出生在世界座標 `(0, -1)`（`guildHallLayout` 的 `SPAWN`），
+ * 協定像素是世界座標 × 32（`coords.ts` 的 `PIXELS_PER_UNIT`）。
+ * 鄰居放在它右邊兩個單位 —— 夠遠不會被本地角色遮住，夠近仍在鏡頭內。
+ */
+const PEER_AT = { x: 2 * 32, y: -1 * 32 }
+const SELF_WS_ID = '11111111-1111-4111-8111-111111111111'
+const PEER_WS_ID = '22222222-2222-4222-8222-222222222222'
+
+/**
+ * 假的即時層。**完全接管 `/ws`，不連真後端。**
+ *
+ * ⚠️ **後端送不出可用的測資** —— 遠端玩家的 `av` 來自那條連線背後的 session，
+ * 而要讓後端送出 `av=1`，得先有第二個真的瀏覽器、真的登入、真的改過 `avatar_id`。
+ * 那是 `FE-A05` 的功能，這一項還在它前面。
+ *
+ * `peers` 是名單上除了自己以外的人；`null` 表示只有自己。
+ */
+const fakeRealtime = (context, peers) =>
+  context.routeWebSocket(/\/ws(\?|$)/, (ws) => {
+    const player = (id, av, at) => ({ id, name: '訪客', av, x: at.x, y: at.y, f: 0, st: 'idle' })
+    // ⚠️ **`hello` 要先送，而且 `you` 要對得上 snapshot 裡的自己。**
+    // 對不上的話畫面會多一個跟本地角色重疊、還跟著它走的分身
+    // （`remotePlayers.ts` 的 `selfId` 就是在擋這個）。
+    ws.send(JSON.stringify({ t: 'hello', you: SELF_WS_ID, hz: 10 }))
+    ws.send(
+      JSON.stringify({
+        t: 'snapshot',
+        players: [
+          player(SELF_WS_ID, 0, { x: 0, y: -32 }),
+          ...(peers === null ? [] : [player(PEER_WS_ID, peers, PEER_AT)]),
+        ],
+      }),
+    )
+  })
+
+/**
+ * @param avatar_id 本地角色的 `av`（走 `/api/me`）。
+ * @param remote `undefined` 完全不攔即時層（V1 用，走真後端）；
+ *               `null` 攔但名單上沒有別人；數字則是那個鄰居的 `av`（V2 用）。
+ */
+async function framesWith(browser, avatar_id, remote) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   await context.route('**/api/me', (route) =>
     route.fulfill({
@@ -119,6 +171,7 @@ async function framesWith(browser, avatar_id) {
       body: JSON.stringify(PROFILE(avatar_id)),
     }),
   )
+  if (remote !== undefined) await fakeRealtime(context, remote)
   const page = await context.newPage()
   await page.goto(`${FRONTEND}/world`)
   await page.waitForSelector('canvas', { timeout: 30_000 })
@@ -174,6 +227,42 @@ try {
         `av=0 與 av=1 只差了 ${signal} 個像素`,
         `低於下限 ${SIGNAL_FLOOR}。可能是角色沒有讀 av，或是兩款外觀的色差不夠` +
           `（規格 S04：差異 SHALL 落在主要視覺部位，同色系微調不算）`,
+      )
+
+    // ── `S02`：**遠端玩家也要吃得到 `av`** ─────────────────────
+    //
+    // ⚠️ **這不是 V1 的重複。** 本地角色的 `av` 走 `/api/me`，
+    // 遠端的走 WebSocket 的 `snapshot` —— 兩條完全不同的路。
+    // 把 `RemotePlayers` 傳給子元件的 `av` 拿掉，上面每一條都還是綠的。
+    const none = await framesWith(browser, 0, null)
+    const peer0 = await framesWith(browser, 0, 0)
+    const peer1 = await framesWith(browser, 0, 1)
+
+    // ── V2a：鄰居真的被畫出來了 ────────────────────────────────
+    //
+    // ⚠️ **少了這一條，下面那條的紅燈說不出是哪一種壞。**
+    // 「注入的 snapshot 根本沒有走到畫面上」（測試自己壞了）與
+    // 「鄰居畫出來了但沒有讀 `av`」（產品壞了）都會讓差異變成 0。
+    const appeared = stableDiff(none.frames, peer0.frames)
+    if (appeared >= PEER_FLOOR)
+      ok(`注入的鄰居在畫面上佔了 ${appeared} 個像素（下限 ${PEER_FLOOR}）`)
+    else
+      bad(
+        `注入的鄰居只讓畫面差了 ${appeared} 個像素`,
+        `低於下限 ${PEER_FLOOR}。**這是量測壞了，不是產品壞了** —— ` +
+          `snapshot 沒有走到畫面上（或者鄰居被放到鏡頭外了，見 PEER_AT）。` +
+          `在看下面那條之前先修這裡`,
+      )
+
+    // ── V2b：遠端的 av=0 與 av=1 看得出差別 ────────────────────
+    const remoteSignal = stableDiff(peer0.frames, peer1.frames)
+    if (remoteSignal >= REMOTE_FLOOR)
+      ok(`遠端 av=0 與 av=1 的保守差異 ${remoteSignal} 個像素（下限 ${REMOTE_FLOOR}）`)
+    else
+      bad(
+        `遠端玩家的 av=0 與 av=1 只差了 ${remoteSignal} 個像素`,
+        `低於下限 ${REMOTE_FLOOR}。鄰居有被畫出來（上一條 ${appeared} 個像素），` +
+          `所以問題在**遠端那條路沒有把 av 傳下去** —— 看 RemotePlayers.tsx`,
       )
   }
 } catch (e) {
