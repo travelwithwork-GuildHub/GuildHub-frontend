@@ -128,9 +128,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G18 | 已取消 | — |
 | BE-G19 | 已取消 | — |
 
-共 167 項：未開始 112、已封存 24、等外部 16、已取消 6、已完成 3、規格已合併 3、待裁決 2、常態 1
+共 168 項：未開始 113、已封存 24、等外部 16、已取消 6、已完成 3、規格已合併 3、待裁決 2、常態 1
 
-來源指紋 `3c33f66b8f2c2028`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `865c0aca1aaa3584`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -384,6 +384,7 @@ bash .github/scripts/wbs-page.sh --open
 | BE-G24 | **沒有合作紀錄與聲譽** | 已加入／已完成的專案數、準時或中途退出、合作時間長度、回覆率、帳號年齡 —— 一個都沒有。它依賴 BE-G22 先拆開生命週期 —— **【沒答案就】**不做任何信任訊號，並接受「每一次媒合都要從零開始相信陌生人」。 | 決策≤W9 | — | 待銜接 | Alarm｜這是媒合平台的核心 |
 | BE-G25 | **沒有外部帳號驗證** | 後端排除 OAuth，理由是「匿名暱稱登入即可」——但 OAuth 在這裡的產品價值**不是省一次密碼，是證明某個外部身分屬於我**（已驗證的 GitHub／Figma／LinkedIn）。這兩個是不同的提案 —— **【沒答案就】**profile 上的外部連結一律標示「未驗證」，不要讓它看起來像是被證實過的。 | 決策≤W8 | — | `待裁決` | TBD｜要做就得先翻後端的產品決策 |
 | BE-G26 | **沒有聯絡邊界設定** | 誰可以私訊我、是否接受邀請、狀態對誰可見、離線是否接收通知 —— 全部沒有。**空間產品會放大接近感，邊界感要比普通網站更強** —— **【沒答案就】**所有人都能私訊所有人，並在 UI 明說這件事，讓使用者自己決定要不要填 profile。 | 決策≤W6 | — | 待銜接 | Alarm｜陌生人可以無限私訊，使用者沒有任何自保手段 |
+| BE-G30 | **`resume_token` 就是 `ProfileOut.id` —— 同一個值同時是公開識別碼與登入憑證** | `auth.py` 逐字寫著「它就是 `ProfileOut.id`，登入時已經回給前端了，**所以不必為它新增任何欄位或端點**」。省下欄位的代價是：**一個會出現在 API 回應、日誌、未來公開功能裡的識別碼，同時是 bearer credential** —— 拿到它的人就是那張名片的人。`FE-A01` 封存前 codex 指出這一點，逐字：「Profile ID 通常是識別資料⋯⋯不應同時承擔祕密憑證的角色」。⚠️ **今天還沒有洩漏路徑**（前端只在登入完成的金鑰面板顯示它，不進 URL／錯誤訊息／遙測），但那是靠紀律維持的，不是靠設計。較安全的做法是獨立產生一次可顯示的高熵金鑰、後端只存雜湊，並提供撤銷與輪替。**這需要後端改 schema，前端單方面做不到。** **【沒答案就】**維持現狀 ＋ 前端的曝光面紀律（寫在 `src/identity/recoveryKey.ts` 的檔頭），並在 UI 明說它不是密碼 | 決策≤W5 | — | | Alarm｜**靠紀律而不是靠設計** —— 哪天有人把 `id` 印進日誌就破功 |
 | BE-G28 | **沒有 logout 端點** | `grep -rn 'logout\|session.clear\|session.pop' app/` 在整個後端是空的。session 是 Starlette 簽章過的 **HttpOnly cookie**，不是 server-side store —— **前端的 JS 清不掉它**，而且沒有端點可以叫後端清。⚠️ **`FE-A02 登出` 沒有它就做不完**：能做的只有「忘掉本地的恢復金鑰」，而那不是登出 —— cookie 還在，重整回來仍然是同一個人。這一點在 `FE-A01` 的 design D4 已經寫成已知限制。**最晚 W2 結束前要答案。** **【沒答案就】**`FE-A02` 只交付「忘掉這台裝置上的金鑰」，並在 UI 明說「這不會讓你在這台電腦上登出」 | 決策≤W2 | — | | Alarm｜**`FE-A02` 的硬阻塞**。前端做不出真正的登出 |
 | BE-G29 | **`run.sh` 是 CRLF 換行，macOS／Linux 上跑不起來** | 後端 `cd2929c`（部署改走 Railway）之後 `run.sh` 變成 CRLF。`bash run.sh` 的第一個症狀是 `set: -: invalid option`，接著 `cd: .: No such file or directory`，最後 `syntax error: unexpected end of file` —— **三個症狀沒有一個指向換行符號**。2026-09-10 實測。繞法（直接叫 `uvicorn`）已經記在 `src/api/contract/GENERATED.md`。**這一項不擋任何前端工作，但它擋每一個第一次 clone 後端的人。** **【沒答案就】**照 `GENERATED.md` 的那一行直接叫 uvicorn | 決策≤W2 | — | | Alarm｜**新人第一次起後端就會撞到**，而錯誤訊息指不到原因 |
 | BE-G27 | **沒有公開活動物件** | 「某團隊正在開招募說明」「某桌在找設計師」「某人開放 portfolio review」——空間裡沒有任何**正在發生、可旁觀、可加入**的東西。**沒有這個，3D 就只是一條很貴的導覽列** —— **【沒答案就】**接受 3D 只提供品牌與情緒價值，**並且不要再宣稱它是產品機制**。 | 決策≤W3 | — | 待銜接 | Alarm｜它決定 3D 這條路成不成立 |
@@ -473,7 +474,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-A04 | Profile | 顯示／編輯：Display Name、Skills、Hours、Bio；RHF + Zod + 更新 | W2 | 8 | | |
 | FE-A05 | Avatar | 角色選擇流程與即時預覽。**MVP 先做預設角色 N 選 1** | W2 | 8 | | |
 | | | 六維外觀（Body / Hair / HairColor / Outfit / OutfitColor / Skin）與編碼 | — | — | BE-G03、BE-G04 | TBD｜`avatar_id` 是角色圖索引不是編碼欄位，而且遠端一律 0 |
-| FE-A06 | 首次進入 | 暱稱 → 角色選擇 → 進入 Guild Hall；已建立過的直接恢復 | W2 | 6 | | Alarm｜**發表前阻擋項目。** `FE-A01` 的 design D5 把「`/world` 不擋匿名」這個中間解建立在一個條件上，而條件就是這一列：兩個審查者第二輪都同意「`FE-A01` 只做登入本身 ＋ 顯示身分、導流留給 `FE-A06`」，codex 的但書逐字是「唯一條件是 `FE-A06` 必須列為發表前阻擋項目；若發表版本可能只交付 A01、不交付 A06，Gemini 的擔憂仍成立」。**不交付這一項，發表日「每個人有名字」就破局** —— 訪客可以整場不登入 |
+| FE-A06 | 首次進入 | 暱稱 → 角色選擇 → 進入 Guild Hall；已建立過的直接恢復 | W2 | 6 | | Alarm｜**發表前阻擋項目。** `FE-A01` 的 design D5 把「`/world` 不擋匿名」這個中間解建立在一個條件上，而條件就是這一列：兩個審查者第二輪都同意「`FE-A01` 只做登入本身 ＋ 顯示身分、導流留給 `FE-A06`」，codex 的但書逐字是「唯一條件是 `FE-A06` 必須列為發表前阻擋項目；若發表版本可能只交付 A01、不交付 A06，Gemini 的擔憂仍成立」。**不交付這一項，發表日「每個人有名字」就破局** —— 訪客可以整場不登入。**另外承接一條發表日風險**：封存前審查時兩個審查者一致指出「陌生人不會保存恢復金鑰，離開之後永久拿不回剛建立的名片」——(a) 放在登入畫面太早（玩家還沒體驗到價值就逼他存金鑰）、(c) 帳號密碼太重，所以落在這一列。**判準**：使用者離開首次進入流程之前，畫面 SHALL 說明「恢復金鑰是再次使用這張名片的唯一方式，任何取得它的人都能使用」，並提供可操作的複製功能與複製成功的回饋；使用者 SHALL 能在一個全新的瀏覽器儲存空間裡只憑那把金鑰取回同一張名片。**突變條件**：拿掉提示或複製入口，這一項的驗收要變紅 |
 | FE-A08 | 帳號密碼登入與註冊 | `POST /api/register`（`login_id` ＋ `password` ＋ `nickname`）與 `POST /api/login` 的第三種模式。**這是三種入場方式裡唯一在驗證身分的那一種** —— 另外兩種（暱稱、`resume_token`）都不證明身分屬於你。後端 9/8 已經做完（`9530070`），契約層的 `RegisterIn` 也已經進來了（`FE-A01` 第一刀），**缺的只有前端流程**。⚠️ 密碼錯與帳號不存在回**同一句話**、用 **403 不是 401**（401 的約定是導向登入頁，而使用者本來就在登入頁，會變成迴圈） | W2 | 8 | | TBD｜`FE-A01` 的 Non-goal（design D1）拆出來的。**發表日走匿名**（規格書 §9：不能卡在註冊），這一項是給一般使用者的路 |
 | FE-A07 | 聯絡偏好 | 誰可以私訊我、是否接受陌生邀請、狀態對誰可見、離線時是否接收通知 | W11 | 6 | BE-G26 待銜接 | |
 | | | **這一項跟 `FE-V06` 分級可見度是同一套規則的兩面**，由這裡擁有規則，`FE-V06` 只負責在空間裡呈現 | W11 | 3 | | |
@@ -668,7 +669,7 @@ bash .github/scripts/wbs-page.sh --open
 | | | `interactionTarget` → React DOM Panel（**3D 負責空間，DOM 負責產品操作**） | W1 | 3 | | |
 | FE-W07 | 資源生命週期 | 場景切換時 geometry / material / texture 的釋放；**重複進出十次記憶體不得成長**（可量測的驗收） | W1 | 3 | | |
 | | | Rapier world 與 R3F tree 的拆除順序 | W4 | 3 | | |
-| FE-W08 | ProceduralAvatar | Head / Hair / Body / Arms / Legs 模組化 Chibi Avatar；Idle / Walk 正式版，Local 與 Remote 共用 | W3 | 10 | | |
+| FE-W08 | ProceduralAvatar | Head / Hair / Body / Arms / Legs 模組化 Chibi Avatar；Idle / Walk 正式版，Local 與 Remote 共用。**另外接手：把遠端玩家的名字畫出來。** 協定早就送得到（`FE-A01` 實測 snapshot 是 `{"name":"名字測試員",…}`），但世界從來沒有讀過它 —— 那條驗收原本誤放在 `FE-A01` 的 tasks 4.2，封存前兩個審查者一致認定它超出 `FE-A01` 已合併的 17 條 Scenario（那些只講**自己**的名字）。這一列負責**渲染能力**，雙瀏覽器互見的驗收在 `FE-R10` | W3 | 10 | | |
 | | | 顯示 Display Name / Status | W3 | 2 | | Alarm｜後端已修（`BE-G02`），但**前端不登入就仍然全是「訪客」** —— 先做 `FE-A02` |
 | FE-W09 | WorldDesignSystem | 3D 色票、材質、比例、圓角、Outline、Shadow 規範（**所有場景元件只能用統一 tokens**）；RoundedBox / Capsule / Sphere / Cylinder primitive；StylizedMaterial / Outline / Shadow conventions | W3 | 11 | | |
 | FE-W10 | EnvironmentComponents | Floor / Wall / Carpet / Platform；Desk / Chair / Shelf / Plant / Lamp / Sign；GuildBanner / ProjectBoard / TalentBoard / Door | W3 | 15 | | |
@@ -707,7 +708,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-R09 | BrowserLoadTest | **1 個真實瀏覽器 ＋ N 個 WebSocket client**，量被測瀏覽器渲染 N 個 Remote 時的 FPS。**40 個真實 Chromium 做不到** —— 量出來一個空白 WebGL 頁面就要 225 MB，40 × 225 = 9 GB 超過這台機器的實體記憶體（判定見 `docs/adr/0004`） | W1 | 10 | | Alarm｜這個綠燈**不涵蓋**「40 個完整前端在同一台機器上」 | |
 | | | 另跑 40 WebSocket client network baseline，區分 Server／Protocol 與 Browser Rendering 問題 | W1 | 2 | | | |
 | | | **只准打自己本機起的後端。** 後端已有 `tools/run_swarm.py --n 40 --seconds 300` 可直接調插值，`--n 5 --idle` 驗證靜止時封包數為 0 | W1 | 1 | | | |
-| FE-R10 | Presence | Online snapshot / player status / offline cleanup / online count | W3 | 6 | | | 小玉 |
+| FE-R10 | Presence | Online snapshot / player status / offline cleanup / online count。**另外接手一條驗收**：兩個瀏覽器（不是兩個分頁 —— 分頁共用 cookie）各登入一個名字，**互相看得見對方的名字**。原本誤放在 `FE-A01` 的 tasks 4.2，而 `FE-A01` 已合併的 17 條 Scenario 沒有任何一條要求它。⚠️ **依賴 `FE-W08` 的名稱渲染能力** —— 它做完之前這條驗收跑不了 | W3 | 6 | | TBD｜從 `FE-A01` 轉交過來的驗收，範圍與點數沒有改。**先後順序寫在〈跨項依賴〉** | 小玉 |
 | FE-R11 | RealtimeChat | Lobby / Room scene chat 送收；client memory 保留近期訊息，refresh 後清空 | W3 | 6 | | | |
 | FE-R12 | 斷線與復原 | 重連後重新握手、重建 snapshot、**清掉舊的 remote players 避免鬼影**；指數退避與 jitter | W5 | 5 | | | |
 | | | **重連後自己的位置會回到 (0,0)**，狀態文字被清空 —— 要重送 | W5 | 3 | | | |
@@ -847,6 +848,7 @@ bash .github/scripts/wbs-page.sh --open
 | `FE-T01` 事實型聲譽 | `FE-J09` 結案確認（沒有確認過的完成紀錄不算數） |
 | `FE-T05` 合作後回饋 | `FE-J09` 結案確認 |
 | `FE-J05` 執行狀態 | `FE-J06` 狀態轉移規則 |
+| `FE-R10` 的「兩個瀏覽器互相看得見對方的名字」 | `FE-W08` 的名稱渲染能力（協定送得到 `name`，但世界沒有讀它 —— 這條驗收是從 `FE-A01` tasks 4.2 轉交過來的） |
 
 ### ⚠️ 「本地做得出來」不等於「可以上線」
 
