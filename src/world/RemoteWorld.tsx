@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { realtimeAdapter } from '@/config/env'
 import { RealtimeClient } from '@/realtime/client'
+import { useWorldLease } from '@/realtime/WorldLeaseProvider'
 import { createMessageValidator, type ProtocolViolation } from '@/realtime/protocol'
 import {
   applyMessage,
@@ -54,6 +55,9 @@ export function RemoteWorld({ poseRef, now = monotonicNow }: RemoteWorldProps) {
   // 換 scene 時它被換掉，`PositionSync` 靠比對身分決定要不要重置節流。
   const clientRef = useRef<RealtimeClient | null>(null)
   const motion: ReadonlyMap<string, RemoteMotion> = state.motion
+  // 規格 `FE-R06-S02`：同一個身分已經在別的分頁連著時，這裡**不建立連線**。
+  // 匿名一律 `true` —— 兩個匿名分頁在世界裡是兩個人（`S01`）。
+  const { allowed } = useWorldLease()
 
   useEffect(() => {
     // 規格 `FE-O14-S07`：即時層的資料來源是 `none` 時
@@ -63,6 +67,14 @@ export function RemoteWorld({ poseRef, now = monotonicNow }: RemoteWorldProps) {
     // 不是錯誤。在這裡 `console.warn` 一行會讓每一個單人預覽的訪客
     // 在 console 看到一則警告，而那會教人忽略警告。
     if (realtimeAdapter() === 'none') return
+
+    // ⚠️ **這個早退要在建立 client 之前，不是在 `connect()` 之前。**
+    // 建了再不連的話，`clientRef` 上會掛一個永遠 `idle` 的 client，
+    // 而 `PositionSync` 是靠 client 物件的身分判斷 session generation 的
+    // —— 那會讓「取得資格之後接手」多一次莫名其妙的重置。
+    //
+    // 規格 `FE-R06-S02`：「第二個分頁 **MUST NOT 建立 world 連線**」。
+    if (!allowed) return
 
     // 違規通報。**必填** —— `FE-R02` 的契約明文寫著它保證不了呼叫端有沒有在看，
     // 所以這裡要真的接上一個東西，而不是傳一個空函式。
@@ -103,7 +115,7 @@ export function RemoteWorld({ poseRef, now = monotonicNow }: RemoteWorldProps) {
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now])
+  }, [state, now, allowed])
 
   return (
     <>

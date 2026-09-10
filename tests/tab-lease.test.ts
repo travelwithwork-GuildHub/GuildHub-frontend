@@ -113,6 +113,24 @@ describe('同一個瀏覽器裡誰有資格連 world', () => {
     expect([a.held(), b.held(), c.held()]).toEqual([true, true, true])
   })
 
+  it('[FE-R06-S03] 關掉分頁（`pagehide`）也會讓出資格', async () => {
+    // ⚠️ **這一條是端到端驗證逼出來的，而它在 jsdom 裡差點測不到。**
+    // 判準裡的「關掉分頁」原本是呼叫 `release()` —— 那當然會讓出資格。
+    // 真的關掉一個分頁時**沒有人會呼叫它**，而症狀是「另一個分頁永遠卡在
+    // 『你已經在另一個分頁裡』，而那個分頁已經不存在了」。
+    const first = open()
+    await settle()
+    const second = open()
+    await settle()
+    expect(second.held()).toBe(false)
+
+    // 不呼叫 `release()`，只發 `pagehide` —— 那就是關頁時真正發生的事
+    globalThis.dispatchEvent(new Event('pagehide'))
+    await settle()
+
+    expect(second.held(), '持有的分頁關掉了，另一個沒有接手').toBe(true)
+  })
+
   it('資格變化會通知訂閱者', async () => {
     const seen: boolean[] = []
     const first = open()

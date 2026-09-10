@@ -166,6 +166,25 @@ export function claimTabLease(key: string, options: TabLeaseOptions = {}): TabLe
 
   ask()
 
+  /**
+   * ⚠️ **關掉分頁不會跑 React 的 effect cleanup，所以要自己聽 `pagehide`。**
+   *
+   * 這是端到端驗證抓到的，而 jsdom 差點抓不到：判準裡的「關掉分頁」原本是
+   * 呼叫 `release()`，那當然會讓出資格。真的關掉一個分頁時**沒有人會呼叫它**
+   * —— 症狀是「把持有的分頁關掉，另一個分頁永遠卡在『你已經在另一個分頁裡』，
+   * 而那個分頁已經不存在了」。
+   *
+   * 用 `pagehide` 不用 `beforeunload`：後者在 iOS Safari 與 bfcache 底下
+   * 不保證觸發，而且註冊它會讓頁面失去 bfcache 資格。
+   *
+   * ⚠️ **這補不了分頁崩潰**（沒有機會跑任何 handler）—— 規格已經把那一種
+   * 列為這個守衛擋不住的情況之一。
+   */
+  const onPageHide = () => {
+    if (holding) post({ kind: 'released', from: me })
+  }
+  globalThis.addEventListener?.('pagehide', onPageHide)
+
   return {
     held: () => holding,
     takeOver() {
@@ -181,6 +200,7 @@ export function claimTabLease(key: string, options: TabLeaseOptions = {}): TabLe
       // **讓出來的人才需要通知。** 本來就沒有資格的分頁關掉時送 `released`，
       // 會讓正在等待的分頁以為輪到自己了
       if (wasHolding) post({ kind: 'released', from: me })
+      globalThis.removeEventListener?.('pagehide', onPageHide)
       channel.close()
       listeners.clear()
     },
