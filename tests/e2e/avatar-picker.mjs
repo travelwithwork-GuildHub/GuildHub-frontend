@@ -181,8 +181,19 @@ try {
   if (before.some((f) => f === null)) {
     bad('拿不到 WebGL context', '世界沒有畫出 canvas —— 那是環境的問題，不是這條判準的')
   } else {
-    // 正向對照：同一個狀態連拍兩組，差異要接近 0。
+    // 正向對照：同一個狀態拍兩組，差異要接近 0。
     // **沒有它，底下那條說明不了什麼。**
+    //
+    // ⚠️⚠️ **兩組之間的時間跨度要跟訊號那組一樣長，否則這把尺是歪的。**
+    //
+    // 第一版沒有等，緊接著就拍第二組 —— 實測雜訊 **104**（上限 50）而紅。
+    // 原因不是產品：多幀交集能濾掉 idle 動畫，靠的是**不同幀落在不同相位**，
+    // 而兩組只隔 220 毫秒時，六幀全部擠在同一個相位附近，濾不乾淨。
+    // 訊號那組中間隔了兩次點擊加 800 毫秒，所以這裡也要隔一樣久。
+    //
+    // （對照：`FE-W19` 的雜訊是「兩次獨立載入」，各自重新開始動畫，
+    // 相位分佈本來就夠廣，所以那裡不需要這一步。）
+    await page.waitForTimeout(800)
     const noise = stableDiff(before, await burst(page, 3))
     if (noise <= NOISE_CEILING) ok(`什麼都沒做時的保守差異 ${noise}（上限 ${NOISE_CEILING}）`)
     else
@@ -212,14 +223,41 @@ try {
     await page.waitForTimeout(800)
     const cancelled = await burst(page, 3)
 
-    const restored = stableDiff(before, cancelled)
-    if (restored <= NOISE_CEILING)
-      ok(`取消之後畫面回到原樣（差 ${restored}，上限 ${NOISE_CEILING}）`)
+    // ⚠️⚠️ **這一條刻意問一個方向相反的問題，而那是量了三次才想通的。**
+    //
+    // 直覺的寫法是「取消之後畫面要跟 `before` 一樣」。實測那個殘差是
+    // **0 ／ 56 ／ 160**（三次獨立執行）—— 它在跳，因為這組畫面離 `before`
+    // 隔了三次點擊與三段等待，累積的 idle 動畫相位差比雜訊對照那組大得多。
+    //
+    // **一直調高上限直到它變綠，是在配合噪音。** 改成問：
+    //
+    //   取消**造成了改變**嗎？（`picked` → `cancelled` 要差很多）
+    //
+    // 這用的是同一把尺（`SIGNAL_FLOOR`），而且兩邊都是大數字，
+    // 累積相位差那幾十個像素完全影響不了它。
+    const undone = stableDiff(picked, cancelled)
+    if (undone >= SIGNAL_FLOOR)
+      ok(`取消之後畫面變回去了（差 ${undone} 個像素，下限 ${SIGNAL_FLOOR}）`)
     else
       bad(
-        `取消之後畫面沒有回到原樣（差了 ${restored} 個像素）`,
+        `取消之後畫面沒有變回去（只差了 ${undone} 個像素）`,
         '**畫面停在使用者沒有選的那一個角色**（規格 S03）—— ' +
           '關閉選擇器時要把草稿丟掉',
+      )
+
+    // ⚠️ **上一條只證明「變了」，不證明「變回原來那個」。**
+    // 少了這一條，一個「取消時隨便換成第三種外觀」的實作也會通過。
+    //
+    // 這裡用比例而不是固定值：實測殘差最大 160、而訊號是 1161（13.8%），
+    // 取三分之一當上限，2.4 倍餘裕留給相位差。
+    const drift = stableDiff(before, cancelled)
+    const ceiling = Math.round(signal / 3)
+    if (drift <= ceiling)
+      ok(`而且變回的是原來那一個（殘差 ${drift}，上限 ${ceiling} ＝訊號的三分之一）`)
+    else
+      bad(
+        `取消之後變成了第三種樣子（殘差 ${drift}，上限 ${ceiling}）`,
+        '畫面既不是草稿也不是已儲存值 —— 那比停在草稿更難查',
       )
   }
 
