@@ -5,16 +5,41 @@
 
 ## 1. 契約與路徑判準（先做 —— 後面每一刀都靠它）
 
-- [ ] 1.1 起本機後端（`cd ~/Desktop/workshop/fergus/GuildHub-backend && bash run.sh`），
-      重新產生 `src/api/contract/schema.d.ts`，更新 `GENERATED.md` 的後端 commit 與日期
-- [ ] 1.2 `RequestSpec` 的 `path` 收窄成「產出型別檔中該 method 確實存在的路徑」
-- [ ] 1.3 修 `getMyProfile` 的路徑：`/api/profiles/me` → `/api/me`
-- [ ] 1.4 修 `tests/api-operations-coverage.test.ts:49` 抄錯的那條斷言
-- [ ] 1.5 `LoginIn` 契約補 `resume_token`（三選一的語意寫進註解）
-- [ ] 1.6 **突變測試**：`FE-A01-S13`／`S14`／`S15` 各拿掉一次，確認 typecheck 由綠變紅
-      - [ ] `'/api/me'` → `'/api/mee'` 必須紅
-      - [ ] `getMyProfile` 改回 `GET /api/profiles/me` 必須紅
-      - [ ] `RequestSpec.path` 放寬成 `string`，確認上面兩條**變綠**（證明 S15 有守到東西）
+- [x] 1.1 起本機後端，重新產生 `src/api/contract/schema.d.ts`，
+      更新 `GENERATED.md` 的後端 commit 與日期
+      - ⚠️ **`bash run.sh` 跑不起來** —— 後端 `cd2929c` 之後它是 CRLF 換行，
+        macOS 上 `set -e\r` 直接語法錯誤。改成直接叫 uvicorn，並記進 `GENERATED.md`。
+        要開一張後端票。
+      - **重產讓哨兵第一次真的紅了**：`_coverage`（後端多了 `RegisterIn`）
+        與 `_LoginIn`（`nickname` 變選填、多三個欄位）。它在 9/8–9/10 之間
+        一直是綠的，而後端那兩天走了六個 commit —— 見 5.3 那張票。
+- [x] 1.2 `RequestSpec` 的 `path` 收窄成「產出型別檔中該 method 確實存在的路徑」
+      —— `PathsWith<M>` ＋ 跟 `method` 綁在一起的判別式聯集
+- [x] 1.3 修 `getMyProfile` 的路徑：`/api/profiles/me` → `/api/me`
+- [x] 1.4 修抄錯的斷言。**不只一條** —— 同一個不存在的端點被抄了四次：
+      生產碼一次、`api-operations-coverage`／`api-transport`／`api-contract-io`
+      各一次。四份互相印證，所以永遠是綠的。
+- [x] 1.5 `LoginIn` 契約補 `resume_token`／`login_id`／`password`
+      （三選一的語意寫進註解。**不寫成 `.refine()`** —— `drift.ts` 的雙向型別
+      相等會被 wrapper 打斷）。順帶把 `RegisterIn` 補進契約層與登錄表，
+      但**不開對應的操作**：註冊 UI 是本 change 的 Non-goal。
+- [x] 1.6 **突變測試**：跑了四次，結果如下
+
+      | # | 突變 | 預期 | 實測 |
+      |---|---|---|---|
+      | 1 | `'/api/me'` → `'/api/mee'` | 紅 | ✅ `TS2820` 指名建議 `'/api/me'` |
+      | 2 | `getMyProfile` 改回 `GET /api/profiles/me` | 紅 | ✅ `TS2345` |
+      | 3a | `path` 放寬成 `string` ＋ 突變 1 | typecheck 變綠 | ✅ 綠（S13／S14 失效）<br>執行期測試仍紅 —— 見下 |
+      | 3b | 3a 再把**測試的期望值也一起抄錯** | 全綠 | ✅ **454 條測試全綠、typecheck 綠、lint 綠**，而客戶端打的是不存在的端點 |
+      | 4 | 3b 的狀態把型別約束裝回去 | 紅 | ✅ 6 個 `error TS` |
+
+      **3a 修正了規格裡的一句話。** 規格寫「拿掉這條約束之後沒有任何其他測試
+      或型別斷言會變紅」——**在今天的 repo 上這句話已經不完全成立**：
+      1.4 把三個測試的期望值改對了，所以現在一個單獨改壞的路徑會被執行期
+      測試抓到。真正只有型別約束抓得到的是 **3b**：生產碼與測試**抄同一個錯**。
+      那正是這個 bug 實際發生的形狀，而執行期測試在結構上就抓不到它 ——
+      它比對的是人抄過去的常數，型別約束比對的是後端自己宣告的事實。
+      **這一條要寫進 5.1 送審的清單**（規格已在 main 上，`feat/` 分支不得回改它）。
 
 ## 2. 身分的取得與恢復
 
