@@ -4,7 +4,8 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense, useRef, useState } from 'react'
 import { layer } from '@/design/layers'
 import { useIdentity } from '@/identity/IdentityProvider'
-import { myAvatar } from '@/identity/myAvatar'
+import { shownAvatar } from '@/identity/avatarDraft'
+import { useAvatarDraft } from '@/identity/AvatarDraftProvider'
 import { isWebGL2Available } from './webgl'
 import { WorldShell } from './environment/WorldShell'
 import { WorldCamera } from './WorldCamera'
@@ -69,8 +70,13 @@ export default function WorldCanvas() {
   // ⚠️ **還沒登入的人不是錯誤。** `identity` 有四種狀態，只有 `signed-in`
   // 才有 profile；其餘一律不給值，交給 `avatarLook()` 回預設 ——
   // **在這裡寫 `?? 0` 會製造第二份值域規則**，而兩份規則一定會漂。
+  //
+  // ⚠️⚠️ **這裡讀的是「正在挑的那個」，不是已儲存的那個**（`FE-A05-S01`）：
+  // 選了就要立刻看得到，不必先儲存。而**其他人看到的仍然是已儲存值**
+  // （`S02`）—— 那條路走的是 WebSocket，跟這一行無關。
   const identity = useIdentity()
-  const av = myAvatar(identity)
+  const { draft } = useAvatarDraft()
+  const av = shownAvatar(identity, draft)
 
   // 相機的跟隨目標。**是 ref 不是 state** —— CONTEXT.md：高頻資料不進 React。
   // FE-W03 接上角色之後，這個 ref 會指向角色的位置；現在它是靜止的原點。
