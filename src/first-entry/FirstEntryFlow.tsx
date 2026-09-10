@@ -40,13 +40,35 @@ const SECONDARY = 'border-line rounded border px-gutter py-2'
 /** 勾選框那一列：讓框跟字之間有距離，而且整列都點得到。 */
 const CHECK_ROW = 'flex items-center gap-2'
 
+/**
+ * 要填回幾個字元。
+ *
+ * ⚠️ **兩個方向的代價不對稱，所以這個數字不是隨便挑的**（design D5）：
+ *
+ *   太短（1–2 碼）  猜得到 —— 16 進位的 UUID 尾碼一碼只有 16 種
+ *   太長（整把 36） 等於逼人重打，會把**手抄的人擋在門外**
+ *
+ * codex 說末 6–8、Gemini 說最後 4，取中間。
+ */
+const PROOF_LENGTH = 6
+
 /** 金鑰有沒有被帶走。**兩條路，而第二條不是裝飾。** */
 type Taken =
   | { readonly how: 'not-yet' }
   /** 真的寫進剪貼簿了（寫入回報成功）。 */
   | { readonly how: 'copied' }
-  /** 使用者明確表示自己保存了。**剪貼簿不可用時這是唯一的路。** */
-  | { readonly how: 'declared' }
+  /**
+   * 使用者**證明**自己手上有這把金鑰（填回結尾那一小段）。
+   *
+   * ⚠️ **這裡原本是一個「我已經自己保存了」的勾選框，而它注定變成裝飾。**
+   * 封存前送審時兩個審查者獨立指出同一件事 —— Gemini 逐字：
+   * 「在『妥善保存一串金鑰』和『打勾以立刻獲得服務』之間，
+   * 急躁的使用者會**毫不猶豫地選擇打勾**」。
+   *
+   * 換成填回尾碼之後，它證明的是**那串字已經離開這個畫面而且在他手上** ——
+   * 而且**不依賴剪貼簿**：複製成功、手抄在紙上、用手機拍照都填得出來。
+   */
+  | { readonly how: 'proved' }
   /** 寫入失敗。**不是 `not-yet`** —— 畫面要說出發生了什麼，並給手動的路。 */
   | { readonly how: 'copy-failed'; readonly reason: string }
 
@@ -66,6 +88,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
   const [remember, setRemember] = useState(false)
   const [identity, setIdentity] = useState<Identity>({ state: 'unknown' })
   const [taken, setTaken] = useState<Taken>({ how: 'not-yet' })
+  const [proof, setProof] = useState('')
   const [error, setError] = useState<unknown>(null)
   const [busy, setBusy] = useState(false)
 
@@ -136,7 +159,10 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
   }
 
   const key = identity.profile.id
-  const done = taken.how === 'copied' || taken.how === 'declared'
+  const tail = key.slice(-PROOF_LENGTH)
+  const done = taken.how === 'copied' || taken.how === 'proved'
+  // **填錯要說得出來，但還沒填完不算填錯** —— 每打一個字就罵人是另一種騷擾
+  const proofWrong = proof.length >= PROOF_LENGTH && proof.toLowerCase() !== tail.toLowerCase()
 
   return (
     <section aria-labelledby="key-heading" className="flex max-w-prose flex-col items-start gap-gutter">
@@ -170,15 +196,32 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
       )}
 
       {/* ⚠️ **這條路一定要在，而且不能只在複製失敗時出現。**
-          有些人本來就想手抄。判準 `S10` 驗的是它自己就放行得了 */}
-      <label className={CHECK_ROW}>
+          有些人本來就想手抄。判準 `S10` 驗的是它自己就放行得了。
+
+          ⚠️⚠️ **它問的是「證明」不是「宣稱」。** 原本是一個勾選框，
+          而兩個審查者獨立指出那注定變成裝飾 —— 填回尾碼才證明得了
+          「那串字已經離開這個畫面」。 */}
+      <label className="flex flex-col gap-2">
+        <span>
+          或者，把鑰匙<strong>最後 {PROOF_LENGTH} 個字</strong>填回來（抄的、拍照的都算）
+        </span>
         <input
-          type="checkbox"
-          checked={taken.how === 'declared'}
-          onChange={(e) => setTaken(e.target.checked ? { how: 'declared' } : { how: 'not-yet' })}
+          value={proof}
+          onChange={(e) => {
+            const next = e.target.value
+            setProof(next)
+            // ⚠️ **比對用小寫。** UUID 是 16 進位，使用者手抄時大小寫不一定一致，
+            // 而「抄對了卻被說填錯」比沒有這條路更糟
+            if (next.toLowerCase() === tail.toLowerCase()) setTaken({ how: 'proved' })
+            else if (taken.how === 'proved') setTaken({ how: 'not-yet' })
+          }}
         />
-        我已經自己保存了這把鑰匙
       </label>
+      {proofWrong && (
+        <p role="alert" className="text-danger">
+          跟鑰匙的結尾對不上。
+        </p>
+      )}
 
       <button type="button" className={PRIMARY} disabled={!done} onClick={() => onDone(identity)}>
         進入世界

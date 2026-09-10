@@ -16,7 +16,11 @@ import { startContractServer, type ContractServer } from './support/contract-ser
 // 真的剪貼簿由 `tests/e2e/first-entry.mjs` 驗（`S11`），那一條不用替身。
 
 let server: ContractServer
-const ME = '11111111-1111-1111-1111-111111111111'
+// ⚠️ **這個 id 裡一定要有 16 進位的字母。**
+// 原本是 `1111…`（全是數字），而那讓「大小寫不一致也該通過」那條判準
+// **恆真** —— `.toUpperCase()` 對數字什麼都不做。
+// 突變測試抓到的：把比對改成大小寫敏感，11 條全綠。
+const ME = 'abc1def2-3a4b-5c6d-7e8f-9012ab34cdef'
 const PROFILE = {
   id: ME,
   display_name: '阿福',
@@ -62,6 +66,7 @@ async function reachKey(clipboard: ClipboardPort) {
 }
 
 const enterButton = () => screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement
+const proofField = () => screen.getByLabelText(/最後 6 個字/) as HTMLInputElement
 
 beforeEach(async () => {
   entered = 0
@@ -112,14 +117,55 @@ describe('金鑰要真的被帶走，才進得了世界', () => {
     expect(screen.getByRole('alert').textContent).toContain('選起來')
   })
 
-  it('[FE-A06-S10] 明確表示已經保存，也放行 —— 而且不必先複製失敗', async () => {
+  it('[FE-A06-S10] 填回金鑰的尾碼就放行 —— 而且不必先複製失敗', async () => {
     await reachKey(workingClipboard)
 
-    click(screen.getByLabelText('我已經自己保存了這把鑰匙'))
+    type(proofField(), ME.slice(-6))
 
     expect(enterButton().disabled).toBe(false)
     click(enterButton())
     expect(entered).toBe(1)
+  })
+
+  it('[FE-A06-S12] 填錯不放行，而且說得出來', async () => {
+    // ⚠️⚠️ **這一條才是「持有證明」跟「勾一個框」的差別所在。**
+    // 少了它，一個「有填東西就放行」的實作跟原本的勾選框**完全等價** ——
+    // 而那正是兩個審查者說會退化成裝飾的東西。
+    await reachKey(workingClipboard)
+
+    type(proofField(), 'abcdef')
+
+    expect(enterButton().disabled, '填錯了竟然放行').toBe(true)
+    expect(screen.getByRole('alert').textContent).toContain('對不上')
+  })
+
+  it('[FE-A06-S12] 還沒填完不算填錯', async () => {
+    // 每打一個字就罵人是另一種騷擾
+    await reachKey(workingClipboard)
+
+    type(proofField(), ME.slice(-6).slice(0, 3))
+
+    expect(screen.queryByRole('alert'), '才打三個字就說填錯').toBeNull()
+    expect(enterButton().disabled).toBe(true)
+  })
+
+  it('[FE-A06-S10] 手抄的人大小寫不一定一致，那不該被擋', async () => {
+    // 「抄對了卻被說填錯」比沒有這條路更糟
+    await reachKey(workingClipboard)
+
+    type(proofField(), ME.slice(-6).toUpperCase())
+
+    expect(enterButton().disabled).toBe(false)
+  })
+
+  it('[FE-A06-S12] 填對之後又改壞，放行要收回去', async () => {
+    await reachKey(workingClipboard)
+    type(proofField(), ME.slice(-6))
+    expect(enterButton().disabled).toBe(false)
+
+    type(proofField(), 'zzzzzz')
+
+    expect(enterButton().disabled, '改壞了還放行').toBe(true)
   })
 
   it('[FE-A06-S10] 剪貼簿完全不能用的人，走得完整條路', async () => {
@@ -127,23 +173,11 @@ describe('金鑰要真的被帶走，才進得了世界', () => {
     // 非安全來源／拒絕授權／舊瀏覽器的人**永遠進不去世界**
     await reachKey(brokenClipboard)
     click(screen.getByRole('button', { name: '複製鑰匙' }))
-    await waitFor(() => expect(screen.getByRole('alert')).toBeDefined())
+    await waitFor(() => expect(screen.getAllByRole('alert').length).toBeGreaterThan(0))
 
-    click(screen.getByLabelText('我已經自己保存了這把鑰匙'))
+    type(proofField(), ME.slice(-6))
 
     expect(enterButton().disabled).toBe(false)
-  })
-
-  it('[FE-A06-S07] 取消勾選會把放行收回去', async () => {
-    await reachKey(workingClipboard)
-    const checkbox = screen.getByLabelText('我已經自己保存了這把鑰匙')
-    click(checkbox)
-    expect(enterButton().disabled).toBe(false)
-
-    click(checkbox)
-
-    // 勾了又取消還放行的話，那個勾選框就只是一個一次性的開關
-    expect(enterButton().disabled).toBe(true)
   })
 
   it('[FE-A06-S08] 按下複製的當下還不算數 —— 要等寫入真的回報成功', async () => {
