@@ -15,11 +15,34 @@ import type { Identity } from './types'
 // 任何東西⋯⋯在這裡先裝等於替 `FE-X02` 裁決」。這個 provider 掛在需要它的
 // 路由段上，等 `FE-X02` 決定全域狀態怎麼組再說。
 
-const IdentityContext = createContext<Identity | null>(null)
+interface IdentityContextValue {
+  readonly identity: Identity
+  /**
+   * 採用一個**剛從後端拿回來**的身分。
+   *
+   * ⚠️ **這不是「在前端設定身分」。** 傳進來的必須是後端回應的那張名片
+   *（`POST /api/login` 的 `ProfileOut`）—— 它跟 `GET /api/me` 回的是同一個東西，
+   * 只是不必再問一次。
+   *
+   * ⚠️⚠️ **少了它會有一個只在真瀏覽器裡看得到的 bug**：在世界裡走完首次進入
+   * 流程之後，標題列仍然顯示「訪客」，要重整才會變。
+   * 單元判準抓不到，因為那兩個元件在判準裡是分開掛載的。
+   * **端到端第一次跑就紅在這裡。**
+   */
+  readonly adopt: (identity: Identity) => void
+}
 
-/** 沒有 provider 時是 `null` —— **不是** `guest`。分不清「還沒問」與「問完沒有」是這一整層的原罪。 */
+const IdentityContext = createContext<IdentityContextValue | null>(null)
+
+/** 沒有 provider 時是 `unknown` —— **不是** `guest`。分不清「還沒問」與「問完沒有」是這一整層的原罪。 */
 export function useIdentity(): Identity {
-  return use(IdentityContext) ?? { state: 'unknown' }
+  return use(IdentityContext)?.identity ?? { state: 'unknown' }
+}
+
+/** 拿到採用新身分的動作。沒有 provider 時是 no-op。 */
+export function useAdoptIdentity(): (identity: Identity) => void {
+  const value = use(IdentityContext)
+  return value?.adopt ?? (() => {})
 }
 
 export function IdentityProvider({ children }: { children: ReactNode }) {
@@ -36,5 +59,10 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  return <IdentityContext value={identity}>{children}</IdentityContext>
+  // ⚠️ **每次繪製建立一個新的 value 物件是刻意的、也是安全的**：
+  // 這個 context 的消費者本來就要跟著 `identity` 重繪，
+  // 而 `useMemo` 在這裡只會多一層讀不出好處的間接。
+  return (
+    <IdentityContext value={{ identity, adopt: setIdentity }}>{children}</IdentityContext>
+  )
 }

@@ -27,8 +27,13 @@ type Taken =
   | { readonly how: 'copy-failed'; readonly reason: string }
 
 export interface FirstEntryFlowProps {
-  /** 走完了。`/` 導向世界，引導層則是關掉自己。 */
-  onDone: () => void
+  /**
+   * 走完了。`/` 導向世界，引導層則是關掉自己。
+   *
+   * **`identity` 一定要交出去。** 少了它，在世界裡走完流程之後標題列仍然
+   * 顯示「訪客」，要重整才會變 —— 而那是端到端第一次跑就抓到的 bug。
+   */
+  onDone: (identity: Identity) => void
   clipboard?: ClipboardPort
 }
 
@@ -150,7 +155,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
         我已經自己保存了這把鑰匙
       </label>
 
-      <button type="button" disabled={!done} onClick={onDone}>
+      <button type="button" disabled={!done} onClick={() => onDone(identity)}>
         進入世界
       </button>
     </section>
