@@ -1,9 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { resolveIdentity } from './session'
-import type { Identity } from './types'
+import { useIdentity } from './IdentityProvider'
 
 // 世界裡「你是誰」的顯示。規格 `FE-A01-S11`／`S12`／`S16`。
 //
@@ -29,18 +27,9 @@ function SignInEntry() {
 }
 
 export function IdentityBadge() {
-  const [identity, setIdentity] = useState<Identity>({ state: 'unknown' })
-
-  useEffect(() => {
-    let live = true
-    void resolveIdentity().then((next) => {
-      // 元件已經卸載就不要再 setState —— 世界的路由切換比這個請求快
-      if (live) setIdentity(next)
-    })
-    return () => {
-      live = false
-    }
-  }, [])
+  // ⚠️ **不自己問後端。** 同一個畫面上的世界連線守衛也要知道身分，
+  // 兩邊各問一次的話每次載入都會打兩次 `GET /api/me`。
+  const identity = useIdentity()
 
   switch (identity.state) {
     case 'unknown':
