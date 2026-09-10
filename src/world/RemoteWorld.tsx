@@ -36,11 +36,25 @@ export interface RemoteWorldProps {
    * **沒有任何錯誤訊息**。測試靠傳一個假的來控制時間。
    */
   now?: () => number
+  /**
+   * 第幾代連線。**變了就整條連線關掉重開**（規格 `FE-A05-S04`）。
+   *
+   * ⚠️ **為什麼需要它**：即時層每個人的 `av` 來自那條連線背後的 session，
+   * 而後端是在**登入時**把 `avatar_id` 寫進 session 的。改了 profile 之後
+   * **已經在場的其他人看到的仍然是舊外觀** —— 除非連線重建。
+   *
+   * ⚠️ **它是 prop 不是 `useContext`。** 這個元件在 `<Canvas>` 裡面，
+   * 而 React context **不會自動跨過 R3F 的 renderer 邊界** ——
+   * 跟 `av` 是同一個理由（見 `WorldCanvas`）。
+   *
+   * ⚠️ 重連的代價寫在規格 `S05`：其他人可能短暫看到這個人離開又進來。
+   */
+  generation?: number
 }
 
 const monotonicNow = () => performance.now()
 
-export function RemoteWorld({ poseRef, now = monotonicNow }: RemoteWorldProps) {
+export function RemoteWorld({ poseRef, now = monotonicNow, generation = 0 }: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
   // **動態不在 React 裡**（每秒 400 次）。這個容器建立一次就不再換掉，
@@ -115,7 +129,7 @@ export function RemoteWorld({ poseRef, now = monotonicNow }: RemoteWorldProps) {
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now, allowed])
+  }, [state, now, allowed, generation])
 
   return (
     <>
