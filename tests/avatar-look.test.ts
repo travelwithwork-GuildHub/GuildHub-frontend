@@ -67,9 +67,28 @@ describe('av 換成外觀', () => {
   })
 
   it('[FE-W19-S09] 缺值與非數字回到預設', () => {
-    for (const bad of [null, undefined, NaN, '1', true, {}, []]) {
+    for (const bad of [null, undefined, NaN, true, {}, []]) {
       expect(avatarLook(bad), `${String(bad)} 沒有回到預設`).toEqual(avatarLook(0))
     }
+  })
+
+  // ⚠️⚠️ **這一條單獨拉出來，是突變測試逼出來的。**
+  //
+  // 把 `Number.isInteger` 與範圍檢查**兩層整個拿掉**之後，
+  // 這個檔案裡只有這一條會紅（9 條裡的 1 條）。原因是
+  // `LOOKS[index] ?? DEFAULT_LOOK` 自己就擋下了負數、`999` 與 `1.5`
+  // —— 它們當索引都是 `undefined`。
+  //
+  // **`'1'` 是唯一漏得過去的形狀**：陣列索引會把字串 `'1'` 當成 `1`，
+  // 於是它拿到第二款外觀。埋在上面那個迴圈裡的話，紅燈只會說
+  // 「有個值沒回到預設」，不會說是這個形狀 —— 而這個形狀正是
+  // 顯式值域檢查唯一還在守的東西。
+  it('[FE-W19-S09] 字串形式的數字 SHALL NOT 被當成合法的 `av`', () => {
+    expect(
+      avatarLook('1'),
+      "字串 `'1'` 拿到了第二款外觀 —— 陣列索引會把它轉成數字，所以顯式的 `Number.isInteger` 檢查不能省",
+    ).toEqual(avatarLook(0))
+    expect(avatarLook('1')).not.toEqual(avatarLook(1))
   })
 
   // ── `S11`：顏色沒有離開 design token ─────────────────────────
