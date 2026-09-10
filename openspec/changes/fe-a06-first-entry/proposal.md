@@ -71,4 +71,8 @@ Gemini 的描述最具體：急著體驗的陌生人，注意力會被「進入�
 ## Capabilities
 
 - `first-entry`（新）
+- `app-shell`（**MODIFIED** —— `FE-X01-S01` 從「`/` 307 轉到 `/world`」
+  改成「`/` 是首次進入流程」。⚠️ **那條轉址是已封存規格的一部分**，
+  不能在實作 PR 上悄悄拿掉：`redirects()` 的優先序在路由之前，
+  留著的話新的首頁永遠看不到，而畫面上看不出任何異狀）
 - `identity-session`（既有 —— 這一項 MUST NOT 讓它的任何一條變紅）
