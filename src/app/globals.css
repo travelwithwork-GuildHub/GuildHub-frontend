@@ -15,6 +15,15 @@
   --color-danger: oklch(0.56 0.19 26);
   --color-line: oklch(0.9 0.008 260);
 
+  /* 控制項的邊界。**跟 --color-line 是兩個東西，不要合併**（規格 FE-X13）：
+     line 給分隔線與卡片邊界，那些不需要達到可辨識控制項的對比門檻；
+     這一個給按鈕與輸入框，SHALL 對 --color-surface 達 3:1。
+
+     實測 3.70:1（把顏色畫到 canvas 上讀 pixel 算的 —— getComputedStyle
+     對 oklch() 原樣回傳字串，直接 parse 會算出 1.00:1 而且看起來很合理）。
+     對照組：line 是 1.27:1、surface-raised 是 1.06:1，兩個都不夠。 */
+  --color-control-edge: oklch(0.6 0.02 260);
+
   --text-caption: 0.8125rem;
   --text-body: 1rem;
   --text-title: 1.5rem;

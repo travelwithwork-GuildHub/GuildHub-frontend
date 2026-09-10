@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signInWithNickname, signInWithRecoveryKey } from '@/identity/session'
 import { NicknameLengthError, RecoveryKeyRejectedError, type Identity } from '@/identity/types'
+import { CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
 
 // 登入畫面。規格 `FE-A01-S01`／`S02`／`S03`／`S07`／`S09`／`S17`。
 //
@@ -73,6 +74,7 @@ export function LoginForm() {
   return (
     <div className="flex flex-col gap-section">
       <form
+        className={FORM}
         aria-labelledby="nickname-heading"
         onSubmit={(event) => {
           event.preventDefault()
@@ -82,11 +84,11 @@ export function LoginForm() {
         <h2 id="nickname-heading" className="text-title">
           取一個名字就可以進去
         </h2>
-        <label>
+        <label className={FIELD_LABEL}>
           在世界裡顯示的名字
-          <input value={nickname} onChange={(e) => setNickname(e.target.value)} />
+          <input className={FIELD} value={nickname} onChange={(e) => setNickname(e.target.value)} />
         </label>
-        <label>
+        <label className={CHECK_ROW}>
           <input
             type="checkbox"
             checked={remember}
@@ -99,12 +101,13 @@ export function LoginForm() {
         <p className="text-caption text-ink-muted">
           不勾的話，這台裝置不會留下任何東西 —— 換裝置或清掉資料就要靠恢復金鑰回來。
         </p>
-        <button type="submit" disabled={busy}>
+        <button type="submit" className={PRIMARY} disabled={busy}>
           進入世界
         </button>
       </form>
 
       <form
+        className={FORM}
         aria-labelledby="resume-heading"
         onSubmit={(event) => {
           event.preventDefault()
@@ -115,11 +118,11 @@ export function LoginForm() {
           已經有身分了？
         </h2>
         {/* `S17`：手上有金鑰的人，在一台全新的裝置上回得去 */}
-        <label>
+        <label className={FIELD_LABEL}>
           貼上你的恢復金鑰
-          <input value={key} onChange={(e) => setKey(e.target.value)} />
+          <input className={FIELD} value={key} onChange={(e) => setKey(e.target.value)} />
         </label>
-        <button type="submit" disabled={busy}>
+        <button type="submit" className={SECONDARY} disabled={busy}>
           用金鑰回來
         </button>
       </form>
