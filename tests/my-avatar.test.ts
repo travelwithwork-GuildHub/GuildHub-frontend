@@ -19,7 +19,10 @@ const profile = (avatar_id: number): ProfileOut => ({
   id: 'abc1def2-3a4b-4c5d-8e6f-7a8b9c0d1e2f',
   display_name: '某人',
   avatar_id,
-  created_at: '2026-09-10T00:00:00Z',
+  skills: [],
+  hours_per_week: null,
+  bio: null,
+  updated_at: '2026-09-10T00:00:00Z',
 })
 
 describe('自己的 av 從身分來', () => {
