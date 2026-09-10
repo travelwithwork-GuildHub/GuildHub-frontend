@@ -27,7 +27,20 @@
 import { chromium } from 'playwright-core'
 import { burst, stableDiff } from './lib/pixels.mjs'
 
-const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3100'
+// ⚠️⚠️ **這裡是 `localhost` 不是 `127.0.0.1`，而那個差別會讓整支腳本
+// 看起來像產品壞了。**
+//
+// 兩者是**不同的 origin**。後端的 CORS 白名單認的是 `localhost:3100`，
+// 所以從 `127.0.0.1:3100` 發出的請求全部被擋 —— 而前端拿不到 `/api/me` 時
+// `identity` 會變成 `unavailable`，`/` 就**直接把人轉去 `/world`**
+//（那是刻意的：後端一抖就沒有人進得去的話，代價比誤放大）。
+//
+// 症狀是「首次進入流程上找不到輸入框」，看起來完全像 `FE-A06` 壞了。
+// 實測 console：`Access to fetch at 'http://localhost:8000/api/rooms'
+// from origin 'http://127.0.0.1:3100' has been blocked by CORS policy`。
+//
+// 其他 e2e 腳本用 `127.0.0.1` 沒事，因為它們**攔掉 API**、不碰真後端。
+const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
 const ARGS = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader']
 
 /**
@@ -54,15 +67,32 @@ const bad = (l, d) => {
 async function enterWorld(context, name) {
   const page = await context.newPage()
   await page.goto(`${FRONTEND}/`)
-  await page.waitForSelector('input', { timeout: 30_000 })
-  await page.fill('input', name)
+  // ⚠️ **不能用 `input` 這個選擇器** —— 那一頁上還有「記住我」的勾選框，
+  // 而 Playwright 的 strict mode 會因為配到兩個而直接丟錯。
+  const TEXTBOX = 'input:not([type=checkbox])'
+  await page.waitForSelector(TEXTBOX, { timeout: 30_000 })
+  await page.fill(TEXTBOX, name)
   await page.click('button:has-text("建立我的身分")')
 
-  const key = (await page.textContent('[data-testid="recovery-key"]', { timeout: 30_000 }))?.trim()
-  if (!key) throw new Error(`${name} 沒有拿到恢復金鑰`)
+  // ⚠️ **拿不到金鑰時要說出畫面上有什麼。**
+  // 少了這一段，紅燈只會說「等 `[data-testid=recovery-key]` 逾時」——
+  // 而那句話對「後端拒絕了這個名字」「按鈕根本沒被點到」「CORS 又壞了」
+  // 是同一句。這個專案為了「證據被吞掉」繞過很多次遠路。
+  let key
+  try {
+    key = (await page.textContent('[data-testid="recovery-key"]', { timeout: 30_000 }))?.trim()
+  } catch {
+    const alert = await page.locator('[role=alert]').allTextContents()
+    const body = (await page.textContent('body'))?.replace(/\s+/g, ' ').trim().slice(0, 300)
+    throw new Error(
+      `${name} 沒有拿到恢復金鑰。\n   畫面上的警告：${alert.join(' / ') || '（沒有）'}` +
+        `\n   畫面文字：${body}`,
+    )
+  }
+  if (!key) throw new Error(`${name} 的恢復金鑰是空的`)
   // ⚠️ **拿到金鑰之後表單整段被換掉，畫面上只剩證明框那一個 input。**
   // 用 `nth=1` 會 timeout —— 這個坑在 `two-windows.mjs` 踩過。
-  await page.fill('input', key.slice(-6))
+  await page.fill(TEXTBOX, key.slice(-6))
   await page.click('button:has-text("進入世界")')
 
   await page.waitForSelector('canvas', { timeout: 30_000 })
