@@ -15,6 +15,7 @@
 //   node tests/e2e/avatar-pixels.mjs
 
 import { chromium } from 'playwright-core'
+import { burst, stableDiff } from './lib/pixels.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3100'
 const ARGS = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader']
@@ -31,9 +32,6 @@ const PROFILE = (avatar_id) => ({
   bio: null,
   updated_at: '2026-09-10T00:00:00Z',
 })
-
-/** 差異像素的門檻：RGB 任一通道絕對差 `≥ 32/255`（design 的 D1）。 */
-const CHANNEL = 32
 
 /**
  * 訊號下限。實測 `av=0` vs `av=1` 是 1081／1189／1361（三次獨立執行），
@@ -77,78 +75,9 @@ const bad = (l, d) => {
   console.log(`❌ ${l}\n   ${d}`)
 }
 
-/**
- * 讀 WebGL 的 back buffer。
- *
- * ⚠️ **一定要在 `requestAnimationFrame` 裡讀，不能用截圖或 `toDataURL()`。**
- * 畫布沒有開 `preserveDrawingBuffer`，截圖取到的是**全透明** ——
- * 這個坑在 `FE-A06` 踩過一次，症狀是「3D 世界一片空白」而產品其實好好的。
- */
-const grab = (page) =>
-  page.evaluate(
-    () =>
-      new Promise((resolve) => {
-        const canvas = document.querySelector('canvas')
-        const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl')
-        if (!gl) return resolve(null)
-        requestAnimationFrame(() => {
-          const w = gl.drawingBufferWidth
-          const h = gl.drawingBufferHeight
-          const px = new Uint8Array(w * h * 4)
-          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px)
-          // ⚠️⚠️ **不可以回傳 `Array.from(px)`。**
-          //
-          // Playwright 會把回傳值 JSON 序列化，而 `Uint8Array` 傳不過去 ——
-          // 所以原本這裡是 `Array.from(px)`，也就是 1440×900×4 = **518 萬個
-          // JS number**。V8 裡每個至少 8 bytes 再加上陣列開銷，一幀就好幾十 MB；
-          // 七個 context × 3 幀 = 21 幀，**吃掉好幾 GB**。
-          //
-          // 實測後果不是「比較慢」而是**整台機器開始 swap**：V1 那三個 context
-          // 跑完之後，V2 的四個卡了 35 分鐘還沒算完（而 dev server 的 log 顯示
-          // 七次 `GET /world` 全部 200 —— 頁面早就載入完了）。
-          // 同一段時間有四則背景任務「因記憶體不足被停止」的通知。
-          //
-          // base64 傳回來、Node 端存成 `Buffer` 之後，一幀是 5.2 MB 的二進位，
-          // 21 幀約 110 MB。**像素值與比較邏輯完全沒變，閾值不受影響。**
-          let s = ''
-          const CHUNK = 8192
-          for (let i = 0; i < px.length; i += CHUNK)
-            s += String.fromCharCode.apply(null, px.subarray(i, i + CHUNK))
-          resolve({ w, h, b64: btoa(s) })
-        })
-      }),
-  )
-
-/** base64 → `Buffer`。`stableDiff` 只用索引讀，所以底下完全不用改。 */
-const decode = (f) => (f === null ? null : { w: f.w, h: f.h, px: Buffer.from(f.b64, 'base64') })
-
-/**
- * **保守差異**：一個像素只有在「A 的每一幀 vs B 的每一幀都不同」時才算數。
- *
- * ⚠️ **這是為了 idle 動畫。** 規格的 design 說判準要在「固定姿勢」下量，
- * 而真實的 `/world` 沒有固定姿勢 —— 角色的手腳與起伏一直在動。
- * 單幀相減時那些動作也算差異（實測基線 496 像素，而訊號只有 1285，
- * 信噪比 2.6:1，太弱）。
- *
- * 取交集就把它濾掉了：**動畫造成的差異在不同幀的位置會變，換色造成的不會。**
- * 實測基線因此降到 **0**。
- */
-function stableDiff(as, bs) {
-  let count = 0
-  outer: for (let i = 0; i < as[0].px.length; i += 4) {
-    for (const a of as)
-      for (const b of bs) {
-        const d = Math.max(
-          Math.abs(a.px[i] - b.px[i]),
-          Math.abs(a.px[i + 1] - b.px[i + 1]),
-          Math.abs(a.px[i + 2] - b.px[i + 2]),
-        )
-        if (d < CHANNEL) continue outer
-      }
-    count++
-  }
-  return count
-}
+// ⚠️ **`grab`／`decode`／`stableDiff`／`CHANNEL` 搬到 `./lib/pixels.mjs` 了。**
+// `FE-A05` 的驗證要問一模一樣的問題，而兩份實作一定會漂 ——
+// 尤其是那個多幀交集的演算法與 `CHANNEL` 這個門檻。
 
 /**
  * 遠端玩家要放在哪。
@@ -218,11 +147,7 @@ async function framesWith(browser, avatar_id, remote) {
   const badge = (await page.textContent('[data-testid="identity"]'))?.trim()
   // 等世界穩定下來（載入、物理、第一批 rAF）。
   await page.waitForTimeout(2500)
-  const frames = []
-  for (let i = 0; i < FRAMES; i++) {
-    frames.push(decode(await grab(page)))
-    await page.waitForTimeout(220)
-  }
+  const frames = await burst(page, FRAMES)
   await context.close()
   return { frames, badge }
 }
