@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { browserClipboard, type ClipboardPort } from '@/identity/clipboard'
 import { signInWithNickname } from '@/identity/session'
 import { NicknameLengthError, type Identity } from '@/identity/types'
+import { CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
 
 // 首次進入的流程本身。規格 `FE-A06`。
 //
@@ -28,17 +29,6 @@ import { NicknameLengthError, type Identity } from '@/identity/types'
 // 今天的登入畫面已經顯示金鑰、也寫了兩句警語，而兩個獨立的審查者都指出：
 // 急著體驗的人會直接按「進入世界」，**連看都不看那串亂碼**。
 // 資訊在畫面上不等於資訊被帶走了。
-
-/**
- * 主要動作的外觀。**`disabled` 要看得出來是 disabled** ——
- * 看不出來的話，使用者會一直按一個沒有反應的按鈕，然後認定網站壞了。
- */
-const PRIMARY =
-  'bg-accent rounded px-gutter py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-40'
-/** 次要動作。有邊框，所以看得出來是可以按的。 */
-const SECONDARY = 'border-line rounded border px-gutter py-2'
-/** 勾選框那一列：讓框跟字之間有距離，而且整列都點得到。 */
-const CHECK_ROW = 'flex items-center gap-2'
 
 /**
  * 要填回幾個字元。
@@ -122,7 +112,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
   if (identity.state !== 'signed-in') {
     return (
       <form
-        className="flex max-w-prose flex-col items-start gap-gutter"
+        className={FORM}
         aria-labelledby="first-entry-heading"
         onSubmit={(event) => {
           event.preventDefault()
@@ -132,9 +122,9 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
         <h2 id="first-entry-heading" className="text-title">
           取一個名字就可以進去
         </h2>
-        <label>
+        <label className={FIELD_LABEL}>
           在世界裡顯示的名字
-          <input value={nickname} onChange={(e) => setNickname(e.target.value)} />
+          <input className={FIELD} value={nickname} onChange={(e) => setNickname(e.target.value)} />
         </label>
         <label className={CHECK_ROW}>
           <input
@@ -165,7 +155,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
   const proofWrong = proof.length >= PROOF_LENGTH && proof.toLowerCase() !== tail.toLowerCase()
 
   return (
-    <section aria-labelledby="key-heading" className="flex max-w-prose flex-col items-start gap-gutter">
+    <section aria-labelledby="key-heading" className={FORM}>
       <h2 id="key-heading" className="text-title">
         帶走這把鑰匙，再進去
       </h2>
@@ -201,11 +191,12 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
           ⚠️⚠️ **它問的是「證明」不是「宣稱」。** 原本是一個勾選框，
           而兩個審查者獨立指出那注定變成裝飾 —— 填回尾碼才證明得了
           「那串字已經離開這個畫面」。 */}
-      <label className="flex flex-col gap-2">
+      <label className={FIELD_LABEL}>
         <span>
           或者，把鑰匙<strong>最後 {PROOF_LENGTH} 個字</strong>填回來（抄的、拍照的都算）
         </span>
         <input
+          className={FIELD}
           value={proof}
           onChange={(e) => {
             const next = e.target.value
