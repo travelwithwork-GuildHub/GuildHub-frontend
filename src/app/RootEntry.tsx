@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { FirstEntryFlow } from '@/first-entry/FirstEntryFlow'
-import { useIdentity } from '@/identity/IdentityProvider'
+import { useAdoptIdentity, useIdentity } from '@/identity/IdentityProvider'
 import { markFirstEntryDone } from '@/first-entry/seen'
 
 // `/` 的內容。規格 `FE-A06-S01`／`S02`／`S03`。
@@ -18,6 +18,7 @@ import { markFirstEntryDone } from '@/first-entry/seen'
 
 export function RootEntry() {
   const identity = useIdentity()
+  const adopt = useAdoptIdentity()
   const router = useRouter()
 
   // ⚠️ **`unavailable` 也放行進世界。** 問不到身分的時候擋在門口的話，
@@ -39,8 +40,9 @@ export function RootEntry() {
     <main className="p-gutter flex flex-col gap-gutter" data-testid="root-entry">
       <h1 className="text-title">GuildHub</h1>
       <FirstEntryFlow
-        onDone={() => {
+        onDone={(next) => {
           markFirstEntryDone()
+          adopt(next)
           router.replace('/world')
         }}
       />

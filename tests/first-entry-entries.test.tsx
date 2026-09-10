@@ -4,6 +4,7 @@ import { act } from 'react'
 import nextConfig from '../next.config'
 import { FirstEntryNotice } from '@/app/world/FirstEntryNotice'
 import { RootEntry } from '@/app/RootEntry'
+import { IdentityBadge } from '@/identity/IdentityBadge'
 import { IdentityProvider } from '@/identity/IdentityProvider'
 import { markFirstEntryDone } from '@/first-entry/seen'
 import { startContractServer, type ContractServer } from './support/contract-server'
@@ -32,6 +33,13 @@ const PROFILE = {
 }
 
 const wrap = (node: React.ReactNode) => render(<IdentityProvider>{node}</IdentityProvider>)
+function type(field: HTMLElement, value: string) {
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    setter?.call(field, value)
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
 const click = (el: HTMLElement) =>
   act(() => {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -91,6 +99,45 @@ describe('根路徑是網站的入口', () => {
 
     // 誤擋讓人完全進不去；誤放最多是他以訪客的身分逛（世界本來就允許訪客）
     await waitFor(() => expect(replaced).toEqual(['/world']))
+  })
+})
+
+describe('走完流程之後，身分立刻反映在畫面上', () => {
+  it('[FE-A06-S02] 在世界裡走完流程，標題列不必重整就變成新名字', async () => {
+    // ⚠️⚠️ **這一條是端到端第一次跑就抓到的 bug，而單元判準原本抓不到。**
+    // 症狀：在世界裡走完首次進入流程之後，標題列仍然顯示「訪客」，
+    // 要重整才會變。原因是 `IdentityProvider` 只在掛載時問一次後端，
+    // 而流程建立的新身分沒有交給它。
+    //
+    // 抓不到的理由也要寫下來：`IdentityBadge` 與 `FirstEntryNotice` 在原本的
+    // 判準裡是**分開掛載**的，各自有一個 provider —— 所以「一邊變了另一邊
+    // 沒變」這件事在那裡不存在。**這一條把它們放進同一個 provider。**
+    server.reply(401, { detail: '未登入' })
+    server.reply(200, PROFILE)
+    render(
+      <IdentityProvider>
+        <IdentityBadge />
+        <FirstEntryNotice />
+      </IdentityProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('identity').textContent).toContain('訪客'))
+
+    type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
+    click(screen.getByRole('button', { name: '建立我的身分' }))
+    await waitFor(() => expect(screen.getByTestId('recovery-key')).toBeDefined())
+    click(screen.getByLabelText('我已經自己保存了這把鑰匙'))
+    // ⚠️ **等按鈕真的被啟用再按。** 少了這一步這條判準會**不穩定** ——
+    // 本機夠快所以綠，CI 慢一點就會在 React 還沒把 `disabled` 拿掉的時候
+    // 按下去，而按一個 disabled 的按鈕什麼都不會發生。
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
+    )
+    click(screen.getByRole('button', { name: '進入世界' }))
+
+    await waitFor(() => expect(screen.getByTestId('identity').textContent).toContain('阿福'))
+    expect(screen.getByTestId('identity').textContent, '走完了還顯示訪客').not.toContain('訪客')
   })
 })
 
