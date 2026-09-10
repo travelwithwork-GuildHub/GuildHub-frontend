@@ -94,17 +94,15 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-W09 | 已封存 | `fe-w09-world-design-system` |
 | FE-W10 | 已封存 | `fe-w10-environment-components` |
 | FE-W11 | 已封存 | `fe-w11-guild-hall` |
+| FE-W12 | 已封存 | `fe-w12-interactive-objects` |
 | FE-X01 | 已封存 | `fe-x01-appshell` |
 | FE-O10 | 已完成 | 標記 `Done` |
 | FE-R04 | 規格已合併 | `fe-r04-background-tab` |
 | FE-R06 | 規格已合併 | `fe-r06-multi-tab` |
-| FE-W12 | 規格已合併 | `fe-w12-interactive-objects` |
 | FE-O18 | 常態 | — |
 | BE-G04 | 待裁決 | — |
 | BE-G25 | 待裁決 | — |
 | BE-G01 | 等外部 | — |
-| BE-G02 | 等外部 | — |
-| BE-G03 | 等外部 | — |
 | BE-G05 | 等外部 | — |
 | BE-G06 | 等外部 | — |
 | BE-G09 | 等外部 | — |
@@ -128,9 +126,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G18 | 已取消 | — |
 | BE-G19 | 已取消 | — |
 
-共 162 項：未開始 107、已封存 23、等外部 19、已取消 6、規格已合併 3、待裁決 2、已完成 1、常態 1
+共 162 項：未開始 109、已封存 24、等外部 17、已取消 6、待裁決 2、規格已合併 2、已完成 1、常態 1
 
-來源指紋 `3c7484756940c829`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `d9d835cc3bf7fab7`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -358,9 +356,9 @@ bash .github/scripts/wbs-page.sh --open
 
 | ID | 缺口 | 證據與在有答案之前怎麼辦 | 週 | 點 | 阻塞 | 標記 |
 |---|---|---|---|---|---|---|
-| BE-G01 | **身分無法跨裝置恢復** | `POST /api/login` 每次都 `uuid4()` 新建一張名片（`app/api/auth.py:14`）—— 同一個暱稱登入兩次是兩個人；身分只活在 session cookie，清 cookie 或換裝置就永久失去專案與訊息。`CLAUDE.md` 又明文排除 OAuth／第三方登入、帳號刪除、資料匯出。**W12 的回訪／最近專案／未讀全部不成立**，前端不要承諾 —— **最晚 W2 開工前要答案。** 沒答案就照 (c) 走：接受「每次都是新的人」，把回訪相關項目全部標 `Cancelled` 並寫明原因。 **【沒答案就】**接受「每次都是新的人」，把回訪相關項目全部標 `Cancelled` 並寫明原因。 | 決策≤W1 | — | 待銜接 + `BE-拒` | Alarm｜它決定 W2 之後的所有範圍 |
-| BE-G02 | **世界裡每個人的名字都是「訪客」** | `app/main.py:79` 回 `session.get("name") or "訪客"`，但 `session["name"]` 在整個後端**從來沒有被設定過**（`auth.py:27` 只設 `user_id`）。FE-W09「顯示 Display Name」做出來會全部一樣，**看起來像前端壞了** —— **最晚 W3 開工前要答案。** 沒答案的 fallback：世界裡不顯示名字（只顯示狀態），**不要顯示一堆「訪客」**。 **【沒答案就】**世界裡不顯示名字，只顯示狀態 —— **不要顯示一整片「訪客」**。 | 決策≤W1 | — | 後端行為有誤 | Alarm｜FE-W09 現在做出來會全部顯示「訪客」 |
-| BE-G03 | **遠端玩家一律 avatar 0** | `manager.py:91` 呼叫 `presence.join()` 時沒傳 avatar，`presence.py:45` 預設 `0`。就算前端把外觀做完，別人看到的還是同一隻 **【沒答案就】**固定預設角色，**不做角色選擇 UI** —— 做了別人也看不到。 | 決策≤W1 | — | 待銜接 | Pending｜等後端把 `avatar_id` 帶進 presence |
+| BE-G01 | ~~**身分無法跨裝置恢復**~~ **後端已修（2026-09-07，`f278e2c`）** | `POST /api/login` 現在收 `resume_token`：帶著它是拿回既有的名片，不建新的（`app/api/auth.py:60`，`tests/test_resume_token.py`）。⚠️ **前端還沒用它** —— `src/api/contract/rest.ts` 的 `LoginIn` 要補這個欄位，而且要決定 token 存哪裡。〔以下是原本的缺口描述〕`POST /api/login` 每次都 `uuid4()` 新建一張名片（`app/api/auth.py:14`）—— 同一個暱稱登入兩次是兩個人；身分只活在 session cookie，清 cookie 或換裝置就永久失去專案與訊息。`CLAUDE.md` 又明文排除 OAuth／第三方登入、帳號刪除、資料匯出。**W12 的回訪／最近專案／未讀全部不成立**，前端不要承諾 —— **最晚 W2 開工前要答案。** 沒答案就照 (c) 走：接受「每次都是新的人」，把回訪相關項目全部標 `Cancelled` 並寫明原因。 **【沒答案就】**接受「每次都是新的人」，把回訪相關項目全部標 `Cancelled` 並寫明原因。 | 決策≤W1 | — | `BE-拒` | Alarm｜**後端已修，但前端還沒接** —— `LoginIn` 要補 `resume_token` |
+| BE-G02 | ~~**世界裡每個人的名字都是「訪客」**~~ **後端已修（2026-09-06，`bfb3609`）** | `auth.py:27` 現在寫 `session["name"] = row["display_name"]`，`main.py:101` 讀得到。⚠️⚠️ **但前端看不到差別，因為前端從來不登入** —— `/world` 是匿名連線，`_identify` 走匿名路徑，名字仍然是「訪客」。**要看到名字，`FE-A02` 登入必須先做。**〔以下是原本的缺口描述〕`app/main.py:79` 回 `session.get("name") or "訪客"`，但 `session["name"]` 在整個後端**從來沒有被設定過**（`auth.py:27` 只設 `user_id`）。FE-W09「顯示 Display Name」做出來會全部一樣，**看起來像前端壞了** —— **最晚 W3 開工前要答案。** 沒答案的 fallback：世界裡不顯示名字（只顯示狀態），**不要顯示一堆「訪客」**。 **【沒答案就】**世界裡不顯示名字，只顯示狀態 —— **不要顯示一整片「訪客」**。 | 決策≤W1 | — |  | Alarm｜**後端已修，但前端不登入就仍然全是「訪客」** —— 卡在 `FE-A02` |
+| BE-G03 | ~~**遠端玩家一律 avatar 0**~~ **後端已修（2026-09-07，`fd8c00f`）** | `manager.py:98` 現在把 `avatar_id` 傳給 `presence.join()`，而它來自 `session["avatar_id"]`（`auth.py:32`）。⚠️ **同 `BE-G02`：前端不登入就仍然是 0。**〔以下是原本的缺口描述〕`manager.py:91` 呼叫 `presence.join()` 時沒傳 avatar，`presence.py:45` 預設 `0`。就算前端把外觀做完，別人看到的還是同一隻 **【沒答案就】**固定預設角色，**不做角色選擇 UI** —— 做了別人也看不到。 | 決策≤W1 | — |  | Alarm｜**後端已修，但前端不登入就仍然是 0** —— 卡在 `FE-A02` |
 | BE-G04 | **`avatar_id` 的語意是「角色圖索引」，不是六維編碼欄位** | `API-前端整合指南.md:185`「smallint，前端據此挑角色圖」。把它當成 6 維 × 各 4 種的位元編碼，是**重新詮釋一個已經有語意的欄位**。MVP 先做**預設角色 N 選 1** —— **最晚 W2 開工前要答案。** 沒答案就做預設角色 N 選 1，並且**不宣稱多人可見的角色選擇已完成**。 **【沒答案就】**做預設角色 N 選 1，並且**不宣稱多人可見的角色選擇已完成**。 | 決策≤W1 | — | `待裁決` | TBD｜要不要六維外觀還沒裁決 |
 | BE-G05 | **沒有搜尋與篩選** | `profiles.py:16` docstring 明寫「只做翻頁，不做搜尋與篩選」；`projects.py:92` 只能用 `status` 篩。`PAGE_SIZE=20`，**沒有 total／`has_more`**，也沒有穩定排序的第二鍵。前端只能過濾**已載入的那 20 筆** —— **不可以叫它搜尋**，符合條件的人可能在下一頁，那是假陰性 —— **最晚 W2 開工前要答案。** 沒答案就把介面誠實地叫「瀏覽」，不放搜尋框。 **【沒答案就】**介面誠實地叫「瀏覽」，**不放搜尋框**。 | 決策≤W1 | — | 待銜接 | Alarm｜這是 Marketplace 的核心價值 |
 | BE-G06 | **沒有標記已讀的端點** | `read_at` 在回傳裡，但 `messages.py` 只有 POST / GET，沒有任何端點寫得到它。只能做 session-local 的「本次看過」，重整就沒了 —— **不是可靠的未讀** **【沒答案就】**不做未讀，Inbox 只有清單與詳情。 | 決策≤W1 | — | 待銜接 | Pending｜等後端提供寫得到 `read_at` 的端點 |
@@ -464,8 +462,8 @@ bash .github/scripts/wbs-page.sh --open
 | FE-A01 | 登入與 session | 匿名暱稱登入、session 保存、重整恢復 | W2 | 5 | | |
 | | | **session 過期**與 cookie 被清除後的行為 | W2 | 3 | | |
 | FE-A02 | 登出 | 終止目前 session、多分頁怎麼反映、**WS 是否立即斷線**、清掉 room token 與本地敏感快取、登出後回到哪裡 | W2 | 5 | | |
-| | | **匿名身分登出後能不能再登入回來** —— 目前不能（BE-G01），UI 要講清楚，不要讓人以為登出是安全的 | W2 | 3 | BE-G01 待銜接 | Alarm｜這是使用者會永久失去資料的地方 |
-| FE-A03 | 持續身分 | 唯一帳號、名稱歷史、帳號年齡。**匿名不是問題，可被任意冒充才是** | W10 | 6 | BE-G01 待銜接 | |
+| | | **匿名身分登出後能不能再登入回來** —— 目前不能（BE-G01），UI 要講清楚，不要讓人以為登出是安全的 | W2 | 3 | | Alarm｜後端已修（`resume_token`），但**前端的 `LoginIn` 還沒有那個欄位** |
+| FE-A03 | 持續身分 | 唯一帳號、名稱歷史、帳號年齡。**匿名不是問題，可被任意冒充才是** | W10 | 6 | | |
 | FE-A04 | Profile | 顯示／編輯：Display Name、Skills、Hours、Bio；RHF + Zod + 更新 | W2 | 8 | | |
 | FE-A05 | Avatar | 角色選擇流程與即時預覽。**MVP 先做預設角色 N 選 1** | W2 | 8 | | |
 | | | 六維外觀（Body / Hair / HairColor / Outfit / OutfitColor / Skin）與編碼 | — | — | BE-G03、BE-G04 | TBD｜`avatar_id` 是角色圖索引不是編碼欄位，而且遠端一律 0 |
@@ -664,7 +662,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-W07 | 資源生命週期 | 場景切換時 geometry / material / texture 的釋放；**重複進出十次記憶體不得成長**（可量測的驗收） | W1 | 3 | | |
 | | | Rapier world 與 R3F tree 的拆除順序 | W4 | 3 | | |
 | FE-W08 | ProceduralAvatar | Head / Hair / Body / Arms / Legs 模組化 Chibi Avatar；Idle / Walk 正式版，Local 與 Remote 共用 | W3 | 10 | | |
-| | | 顯示 Display Name / Status | W3 | 2 | BE-G02 後端行為有誤 | Alarm｜真後端目前每個人的名字都會是「訪客」 |
+| | | 顯示 Display Name / Status | W3 | 2 | | Alarm｜後端已修（`BE-G02`），但**前端不登入就仍然全是「訪客」** —— 先做 `FE-A02` |
 | FE-W09 | WorldDesignSystem | 3D 色票、材質、比例、圓角、Outline、Shadow 規範（**所有場景元件只能用統一 tokens**）；RoundedBox / Capsule / Sphere / Cylinder primitive；StylizedMaterial / Outline / Shadow conventions | W3 | 11 | | |
 | FE-W10 | EnvironmentComponents | Floor / Wall / Carpet / Platform；Desk / Chair / Shelf / Plant / Lamp / Sign；GuildBanner / ProjectBoard / TalentBoard / Door | W3 | 15 | | |
 | FE-W11 | Guild Hall | spawn、Board、社交區、Corridor 配置；簡化 Collider 與固定 Camera 構圖驗證 | W3 | 14 | | |
@@ -738,7 +736,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-V04 | 漸進式接近 | 看見 → 靠近（顯示更多）→ 旁聽 → 打招呼 → 正式申請。**每一步都要能退回上一步** | W11 | 5 | BE-G27 待銜接 | |
 | FE-V05 | 群體訊號 | 不能只呈現「在線人數」。要能回答：人在哪裡 → 為什麼聚集 → 跟我有沒有關 → 我能不能旁觀 → 我怎麼低風險加入 | W11 | 5 | BE-G09、BE-G27 | Alarm｜**這條鏈不成立的話，Presence 只是裝飾** |
 | FE-V06 | 分級可見度 | 「正在找 React 隊友」可以公開，「在某個保密專案工作」不行。呈現**經過同意、分級抽象**的活動。**規則由 `FE-A07` 擁有，這裡只負責在空間裡呈現** | W11 | 5 | | |
-| FE-V07 | Office Presence | 看見附近成員的 Display Name / Status / Profile；工作桌 | W5 | 6 | BE-G02 後端行為有誤 | |
+| FE-V07 | Office Presence | 看見附近成員的 Display Name / Status / Profile；工作桌 | W5 | 6 | | |
 | FE-V08 | Room Presence | Project Room 顯示團隊成員、在線狀態、座位 | W11 | 5 | | |
 | FE-V09 | 共享儀式 | 固定招募市集、demo day、office hours、配對時段、結案展示。**空間記憶** —— 知道某類人與機會通常出現在哪裡 | W12 | 6 | BE-G13 待銜接 | |
 | FE-V10 | 冷啟動 | 第一個使用者進來，世界是空的。降低傷害：預先策展的公開案件、固定時段活動、展示非即時內容、**先集中一個技能社群或一種案件類型** | W12 | 5 | | Alarm｜這是市場營運問題，不是做一個功能就解決 |
