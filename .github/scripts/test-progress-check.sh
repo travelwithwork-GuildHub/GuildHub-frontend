@@ -603,7 +603,7 @@ edit "| FE-C01 | AppShell | 專案骨架 | W1 | 3 | | | |" \
      "| FE-C01 | AppShell | 專案骨架 | W1 | 3 | | | 小明 |"
 run 0 "八欄的負責人表：綠燈" ""
 run_all_has "負責人印在 --all 上" "小明"
-run_field_has "負責人進得了 --json" FE-C01 '"owner": "小明"'
+run_field_has "負責人進得了 --json" FE-C01 owner 小明
 
 # 只驗欄數不驗表頭的話，任何人多打一個 `|` 都會變成「有負責人欄」的表，
 # 而那一欄裡的東西會被當成負責人印出來。
