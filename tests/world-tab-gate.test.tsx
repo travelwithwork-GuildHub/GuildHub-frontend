@@ -77,6 +77,23 @@ describe('登入之後的分頁守衛', () => {
     expect(screen.queryByRole('status'), '匿名分頁被擋了').toBeNull()
   })
 
+  it('[FE-R06-S01] 兩個匿名分頁**同時**都連得上', async () => {
+    // ⚠️ **這一條是被突變測試逼出來的。** 原本只驗「一個匿名分頁不被別人
+    // 佔著的鎖擋住」，而那在「匿名也拿一把共用的鎖」的實作下**照樣全綠**
+    // —— 因為別人佔的是另一把鎖。真正要驗的是**兩個匿名分頁彼此不互斥**。
+    server.reply(401, { detail: '未登入' })
+    server.reply(401, { detail: '未登入' })
+    const first = mount()
+    const second = mount()
+
+    await waitFor(() => {
+      const flags = screen.getAllByTestId('allowed').map((el) => el.textContent)
+      expect(flags, '兩個匿名分頁互相擋住了').toEqual(['true', 'true'])
+    })
+    first.unmount()
+    second.unmount()
+  })
+
   it('[FE-R06-S01] 問不到身分時放行 —— 誤擋與誤放的代價不對稱', async () => {
     server.reply(500, { detail: '壞掉了' })
     otherTabHolds()
