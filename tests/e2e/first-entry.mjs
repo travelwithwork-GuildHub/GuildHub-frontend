@@ -17,6 +17,7 @@
 import { chromium } from 'playwright-core'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3100'
+const SHOTS = process.env.SHOTS ?? '/tmp/guildhub-first-entry-shots'
 const ARGS = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader']
 
 let failures = 0
@@ -37,6 +38,8 @@ try {
   // —— 那時候紅的是「沒有複製成功」，看起來像產品壞了。
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: FRONTEND })
   const page = await context.newPage()
+  // **發表版的實際 viewport**，不是 Playwright 的預設 1280×720
+  await page.setViewportSize({ width: 1440, height: 900 })
 
   // ── `S01`：根路徑就是首次進入流程，不是轉址 ──────────────────────
   const response = await page.goto(`${FRONTEND}/`)
@@ -57,6 +60,42 @@ try {
   await page.waitForSelector('text=已經複製了', { timeout: 15_000 })
   const fromClipboard = await page.evaluate(() => navigator.clipboard.readText())
   check('[S11] 剪貼簿裡的內容跟畫面上的金鑰逐字相同', fromClipboard, key)
+
+  // ── 4.1：金鑰、警語、按鈕、回饋**同時看得見**，不用捲動 ─────────
+  //
+  // ⚠️ **這是 codex 那條要求機器答得出來的那一半。** 它逐字說
+  // 「不能只靠 DOM 存在、文字查詢或元件 snapshot 判定完成」——
+  // 而「在畫面上」跟「在 DOM 裡」是兩件事（`FE-W12` 的六扇門就在 DOM 裡）。
+  //
+  // ⚠️ **它答不出來的那一半是「讀起來清不清楚」** —— 那要人眼（tasks 4.2）。
+  const visibility = await page.evaluate(() => {
+    const inView = (el) => {
+      if (el === null) return null
+      const r = el.getBoundingClientRect()
+      return r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth
+    }
+    const byText = (needle) =>
+      [...document.querySelectorAll('p, span, label')].find((e) => e.textContent?.includes(needle)) ??
+      null
+    return {
+      key: inView(document.querySelector('[data-testid="recovery-key"]')),
+      warnBecome: inView(byText('就能成為你')),
+      warnLost: inView(byText('回不來')),
+      copyButton: inView(
+        [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('複製鑰匙')) ??
+          null,
+      ),
+      declare: inView(byText('我已經自己保存了')),
+      enter: inView(
+        [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('進入世界')) ??
+          null,
+      ),
+    }
+  })
+  for (const [name, ok_] of Object.entries(visibility)) {
+    check(`[4.1] ${name} 在視窗裡（不用捲動）`, ok_, true)
+  }
+  await page.screenshot({ path: `${SHOTS}/first-entry-key.png` })
 
   // ── `S08`：複製成功之後放行 ─────────────────────────────────────
   check('[S08] 複製成功之後「進入世界」可以按了', await page.isDisabled('button:has-text("進入世界")'), false)
@@ -101,4 +140,5 @@ if (failures > 0) {
   console.log(`\n${failures} 條沒過。`)
   process.exit(1)
 }
+console.log(`\n截圖在 ${SHOTS}`)
 console.log('\n全部通過。')

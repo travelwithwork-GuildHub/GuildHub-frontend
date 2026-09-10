@@ -11,10 +11,34 @@ import { NicknameLengthError, type Identity } from '@/identity/types'
 // `/world` 用它當可關掉的引導層。**不得為了兩個入口各寫一套狀態機** ——
 // 那是封存前審查時 codex 的條件（design D1），而理由是兩套一定會漂。
 //
+// ⚠️⚠️ **按鈕要看起來像按鈕，而這件事是截圖抓到的。**
+// Tailwind 的 preflight 把 `<button>` 的預設外觀清光了，所以在加上樣式之前
+// 「複製鑰匙」與「進入世界」在畫面上是**兩行漂著的字** ——
+// 18 條端到端斷言全綠，而那個 CTA 沒有人會認得出來。
+// **這是 `FE-W12`「門看不出來是門」的同一種形狀**（那次也是測試全綠、
+// 六扇門在畫面上是 10 像素的細縫）。
+//
+// ⚠️ 這裡的樣式是**這個流程自己的最小可用外觀**，不是設計系統。
+// 表單與按鈕的一致性是 `FE-X05`（W2，未開始）——
+// 它做完之後這幾個字串要換成共用的東西。
+//
+// ⚠️⚠️ **`/login`（`FE-A01`）有同一個問題**，而它已經封存了。要另外處理。
+//
 // ⚠️⚠️ **「進入世界」預設不能按，而那是這一整項的重點。**
 // 今天的登入畫面已經顯示金鑰、也寫了兩句警語，而兩個獨立的審查者都指出：
 // 急著體驗的人會直接按「進入世界」，**連看都不看那串亂碼**。
 // 資訊在畫面上不等於資訊被帶走了。
+
+/**
+ * 主要動作的外觀。**`disabled` 要看得出來是 disabled** ——
+ * 看不出來的話，使用者會一直按一個沒有反應的按鈕，然後認定網站壞了。
+ */
+const PRIMARY =
+  'bg-accent rounded px-gutter py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-40'
+/** 次要動作。有邊框，所以看得出來是可以按的。 */
+const SECONDARY = 'border-line rounded border px-gutter py-2'
+/** 勾選框那一列：讓框跟字之間有距離，而且整列都點得到。 */
+const CHECK_ROW = 'flex items-center gap-2'
 
 /** 金鑰有沒有被帶走。**兩條路，而第二條不是裝飾。** */
 type Taken =
@@ -75,6 +99,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
   if (identity.state !== 'signed-in') {
     return (
       <form
+        className="flex max-w-prose flex-col items-start gap-gutter"
         aria-labelledby="first-entry-heading"
         onSubmit={(event) => {
           event.preventDefault()
@@ -88,7 +113,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
           在世界裡顯示的名字
           <input value={nickname} onChange={(e) => setNickname(e.target.value)} />
         </label>
-        <label>
+        <label className={CHECK_ROW}>
           <input
             type="checkbox"
             checked={remember}
@@ -96,7 +121,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
           />
           在這台裝置上記住我
         </label>
-        <button type="submit" disabled={busy}>
+        <button type="submit" className={PRIMARY} disabled={busy}>
           建立我的身分
         </button>
         {error !== null && (
@@ -114,7 +139,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
   const done = taken.how === 'copied' || taken.how === 'declared'
 
   return (
-    <section aria-labelledby="key-heading" className="flex flex-col gap-gutter">
+    <section aria-labelledby="key-heading" className="flex max-w-prose flex-col items-start gap-gutter">
       <h2 id="key-heading" className="text-title">
         帶走這把鑰匙，再進去
       </h2>
@@ -130,7 +155,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
         沒有把它帶走、又清掉瀏覽器資料的話，這個身分就回不來了。
       </p>
 
-      <button type="button" onClick={() => void copy(key)}>
+      <button type="button" className={SECONDARY} onClick={() => void copy(key)}>
         複製鑰匙
       </button>
 
@@ -146,7 +171,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
 
       {/* ⚠️ **這條路一定要在，而且不能只在複製失敗時出現。**
           有些人本來就想手抄。判準 `S10` 驗的是它自己就放行得了 */}
-      <label>
+      <label className={CHECK_ROW}>
         <input
           type="checkbox"
           checked={taken.how === 'declared'}
@@ -155,7 +180,7 @@ export function FirstEntryFlow({ onDone, clipboard = browserClipboard() }: First
         我已經自己保存了這把鑰匙
       </label>
 
-      <button type="button" disabled={!done} onClick={() => onDone(identity)}>
+      <button type="button" className={PRIMARY} disabled={!done} onClick={() => onDone(identity)}>
         進入世界
       </button>
     </section>
