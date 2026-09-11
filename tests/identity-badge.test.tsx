@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import LoginPage from '@/app/login/page'
 import { IdentityBadge } from '@/identity/IdentityBadge'
+import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { IdentityProvider } from '@/identity/IdentityProvider'
 import { RECOVERY_KEY_STORAGE_KEY } from '@/identity/recoveryKey'
 import { startContractServer, type ContractServer } from './support/contract-server'
@@ -42,9 +43,12 @@ const badge = () => screen.getByTestId('identity').textContent ?? ''
 // ⚠️ **`IdentityBadge` 不自己問後端了** —— 它讀 `IdentityProvider`。
 // 這裡包的是**真的 provider**（不是假的 context 值），所以這些判準走的
 // 仍然是真的 `resolveIdentity()` ＋ 真的 HTTP server。
+// `FE-A04` 之後名字是開名片面板的按鈕，要有 `ProfilePanelProvider`（只是開關狀態；這些判準不開面板）。
 const mount = () => render(
   <IdentityProvider>
-    <IdentityBadge />
+    <ProfilePanelProvider>
+      <IdentityBadge />
+    </ProfilePanelProvider>
   </IdentityProvider>,
 )
 
