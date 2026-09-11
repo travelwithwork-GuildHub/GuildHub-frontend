@@ -11,7 +11,7 @@
 
 ### Requirement: 名字是入口，面板是阻斷式的
 
-`IdentityBadge` 已登入時顯示的名字 SHALL 是一個 `button`（accessible name「我的名片」），按下 SHALL 開面板；
+`IdentityBadge` 已登入時顯示的名字 SHALL 是一個 `button`（accessible name 以「我的名片」開頭並含畫面上的名字，如「我的名片：阿福」—— WCAG 2.5.3 label-in-name，語音控制唸名字要按得到），按下 SHALL 開面板；
 面板開著時 SHALL 持有世界輸入鎖、Tab 只在面板內循環、Escape 關最上層（`FE-X06` 的那一套）；關閉後焦點 SHALL 回到那個按鈕。
 
 #### Scenario: [FE-A04-S01] 按名字開面板，世界鎖住
@@ -65,8 +65,8 @@
 
 #### Scenario: [FE-A04-S07] 不送 avatar_id：身分在別處被更新過，名片送出不會蓋回去
 
-- **WHEN** 面板開著（表單已填好但還沒送）時，身分的 `avatar_id` 被別處從 0 更新成 3 且**後端已寫入**（測試直接走 `saveAvatar(3)` —— 阻斷式面板的 focus trap 下標題列的 picker 本來就碰不到，這條測的是「別處更新」不是使用者操作 picker），然後名片表單送出
-- **THEN** body SHALL 沒有 `avatar_id` 鍵；成功後身分 SHALL 是伺服器回應的那份（唯一 canonical），其 `avatar_id` 是 3
+- **WHEN** 面板開著（表單已填好但還沒送）時，身分的 `avatar_id` 被別處從 0 更新成 1 且**後端已寫入**（測試直接走 `saveAvatar(1)` —— `AVATAR_COUNT` 是 2，`saveAvatar(3)` 會以 out-of-range 拒絕（`FE-A05-S10`）；阻斷式面板的 focus trap 下標題列的 picker 本來就碰不到，這條測的是「別處更新」不是使用者操作 picker），然後名片表單送出
+- **THEN** body SHALL 沒有 `avatar_id` 鍵；成功後身分 SHALL 是伺服器回應的那份（唯一 canonical），其 `avatar_id` 是 1
 
 #### Scenario: [FE-A04-S08] 超過本站上限的技能數
 
