@@ -33,4 +33,4 @@
 ## 5. 收尾
 
 - [x] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠；本機 `db:reset --init` 一次、人工驗 `S12` 的 `next build`
-- [ ] 5.2 封存（`archive/fe-o04-disposable-db`，獨立 PR）
+- [x] 5.2 封存（`archive/fe-o04-disposable-db`，下一個 PR）
