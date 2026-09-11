@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { act, useEffect, type RefObject } from 'react'
 import type { MessageOut } from '@/api/contract/rest'
@@ -20,6 +20,10 @@ import { startContractServer, type ContractServer } from './support/contract-ser
 //
 // 整棵樹跟真實頁面同一個形狀：`IdentityProvider（真的，contract-server 給 /api/me）> InboxPanelProvider > [ header(InboxButton), InteractionProvider > ListPanelProvider > BoardPanel + InboxPanel ]`。
 // 所有請求走真的 `src/api/` 到本機自己起的 HTTP server。**不連任何外部服務。**
+
+// 每條判準都是好幾個真的 HTTP 往返（登入、第 0 頁、名字、寄信、重取）＋ 面板開關的 effect；CI 機器忙的時候 5 秒不夠（第一次 CI：S01 在 5015ms 被砍，
+// 第二次綠）。15 秒對真的紅燈沒差，對假的紅燈是關鍵（同 `vitest.setup.ts` 對 `asyncUtilTimeout` 的理由）。
+vi.setConfig({ testTimeout: 15_000 })
 
 let server: ContractServer
 const ME = '11111111-1111-1111-1111-111111111111'
