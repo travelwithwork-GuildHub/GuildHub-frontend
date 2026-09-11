@@ -3,7 +3,7 @@
 ## 1. 規格
 
 - [x] 1.1 規格已在 PR 上談定（`spec/fe-b01-list-container`）
-- [ ] 1.2 `docs/WBS.md` 的 `governance/` PR：修正「offset 翻頁」的敘述，
+- [x] 1.2 `docs/WBS.md` 的 `governance/` PR：修正「offset 翻頁」的敘述，
       並新增「資料驅動的世界看板摘要」一列（`D5` 的缺口）
 
 ## 2. 資料存取（`src/api/`）
@@ -65,4 +65,4 @@
 
 - [x] 8.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
 - [x] 8.2 端到端只打**本機自己起的** dev server，**不連任何團隊共用位址**
-- [ ] 8.3 封存（`archive/fe-b01-list-container`，獨立 PR）
+- [x] 8.3 封存（`archive/fe-b01-list-container`，獨立 PR）
