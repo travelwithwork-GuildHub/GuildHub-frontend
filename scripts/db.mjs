@@ -44,10 +44,21 @@ export function assertLoopback(url) {
   return parsed
 }
 
-/** `db/schema/` 底下全部 `.sql`，依檔名排序。 */
-export async function schemaFiles() {
-  const names = (await readdir(SCHEMA_DIR)).filter((n) => n.endsWith('.sql')).sort()
-  return names.map((name) => path.join(SCHEMA_DIR, name))
+/** 前端自己加的檔案（`1xx_*.sql`）第一行必須是這個開頭 —— 交給後端時一眼看得出哪些是我們加的。 */
+export const FRONTEND_HEADER = '-- 前端自己加的，後端沒有：'
+
+/** `db/schema/` 底下全部 `.sql`，依檔名排序；`1xx_*.sql` 沒有標頭就拋（`S06`）。 */
+export async function schemaFiles(dir = SCHEMA_DIR) {
+  const names = (await readdir(dir)).filter((n) => n.endsWith('.sql')).sort()
+  const files = names.map((name) => path.join(dir, name))
+  for (const file of files) {
+    if (!/^1\d\d_/.test(path.basename(file))) continue
+    const firstLine = (await readFile(file, 'utf8')).split('\n')[0] ?? ''
+    if (!firstLine.startsWith(FRONTEND_HEADER)) {
+      throw new DbScriptError(`${path.basename(file)} 的第一行必須是「${FRONTEND_HEADER}」開頭的註解 —— 前端自己加的檔案要標明。`)
+    }
+  }
+  return files
 }
 
 async function hasMarker(client) {
@@ -64,8 +75,10 @@ async function userTableCount(client) {
  * 回到乾淨狀態。`init` 只給空庫的第一次。
  * 回傳執行過的檔名（給標記與測試用）。
  */
-export async function reset({ url, init = false }) {
+export async function reset({ url, init = false, dir = SCHEMA_DIR }) {
   assertLoopback(url)
+  // 檔案先驗（標頭、能不能讀），再碰資料庫：驗不過就什麼都沒動。
+  const files = await schemaFiles(dir)
   const client = new pg.Client({ connectionString: url })
   await client.connect()
   try {
@@ -86,7 +99,6 @@ export async function reset({ url, init = false }) {
       'select pg_terminate_backend(pid) from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid()',
     )
     await client.query('drop schema public cascade; create schema public;')
-    const files = await schemaFiles()
     for (const file of files) {
       await client.query(await readFile(file, 'utf8'))
     }
