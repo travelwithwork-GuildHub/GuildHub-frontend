@@ -3,35 +3,41 @@
   "cases": {
     "login {}": {
       "status": 422,
+      "contentType": "application/json",
       "loc0": "body",
       "type": "value_error",
-      "contentType": "application/json"
+      "loc": [
+        "body"
+      ]
     },
     "login {nickname:null}": {
       "status": 422,
+      "contentType": "application/json",
       "loc0": "body",
       "type": "value_error",
-      "contentType": "application/json"
+      "loc": [
+        "body"
+      ]
     },
     "login {nickname:123}": {
       "status": 422,
+      "contentType": "application/json",
       "loc0": "body",
       "type": "string_type",
       "loc": [
         "body",
         "nickname"
-      ],
-      "contentType": "application/json"
+      ]
     },
     "login {resume_token:'not-a-uuid'}": {
       "status": 422,
+      "contentType": "application/json",
       "loc0": "body",
       "type": "uuid_parsing",
       "loc": [
         "body",
         "resume_token"
-      ],
-      "contentType": "application/json"
+      ]
     },
     "login two modes": {
       "status": 422,
@@ -47,25 +53,31 @@
     },
     "login body literal null": {
       "status": 422,
+      "contentType": "application/json",
       "loc0": "body",
       "type": "missing",
-      "contentType": "application/json"
+      "loc": [
+        "body"
+      ]
     },
     "login not json": {
       "status": 422,
+      "contentType": "application/json",
       "loc0": "body",
       "type": "json_invalid",
       "loc": [
         "body",
         0
-      ],
-      "contentType": "application/json"
+      ]
     },
     "login json without content-type": {
       "status": 422,
+      "contentType": "application/json",
       "loc0": "body",
       "type": "model_attributes_type",
-      "contentType": "application/json"
+      "loc": [
+        "body"
+      ]
     },
     "profiles page=abc": {
       "status": 422,
