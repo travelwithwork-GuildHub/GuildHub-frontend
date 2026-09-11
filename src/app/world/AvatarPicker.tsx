@@ -108,6 +108,9 @@ export function AvatarPicker() {
         <section
           ref={popover}
           onBlur={onBlur}
+          // `tabIndex=-1`：點到裡面沒有可聚焦的地方（空白、字）時焦點落在這個容器上，不是 `body` ——
+          // 不然 `relatedTarget` 是 null、當成「移出範圍」把自己關了（審查抓到的）。
+          tabIndex={-1}
           aria-label="更換角色"
           // 面板是浮的，所以它要自己宣告層級。**堆疊層級走 `design/layers`**
           // —— 散在各處的 z-index 會互相打架，而症狀是「有時候被蓋住」。

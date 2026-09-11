@@ -273,6 +273,22 @@ try {
   const anchor = await page.evaluate(() => document.activeElement?.getAttribute('data-focus-anchor') ?? `(${document.activeElement?.tagName ?? 'null'})`)
   if (anchor === 'world') ok('[X06-S13] 面板關了，焦點在世界焦點錨上')
   else bad('[X06-S13] 面板關了焦點不在錨上', `activeElement 是 ${anchor}`)
+  // ── FE-X06 S17：picker 開著時真的按 E：面板開、picker 關（焦點移出）───
+  await page.click('button:has-text("更換角色")')
+  const pickerOpen = await page.$('section[aria-label="更換角色"]')
+  if (pickerOpen === null) bad('[X06-S17] 「更換角色」沒開出 picker', '')
+  else {
+    await page.keyboard.press('KeyE')
+    const panelAfterE = await page.waitForSelector('[data-testid="list-panel"]', { timeout: 5_000 }).catch(() => null)
+    const pickerAfterE = await page.$('section[aria-label="更換角色"]')
+    if (panelAfterE !== null && pickerAfterE === null) ok('[X06-S17] picker 開著按 E：面板開、picker 因失焦而關')
+    else bad('[X06-S17] picker 開著按 E 不對', `panel=${panelAfterE !== null}，picker=${pickerAfterE !== null}`)
+    const focusInPanel = await page.evaluate(() => document.querySelector('[data-testid="list-panel"]')?.contains(document.activeElement) ?? false)
+    if (focusInPanel) ok('[X06-S17] 面板取得焦點')
+    else bad('[X06-S17] 面板沒有取得焦點', '')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+  }
   // 再打開人才看板讓後面 401 那一段照舊（它會自己按 Escape 關）
 
   // ── FE-X04 S04：訪客按 E 看到的是「要登入」，不是空白 ─────────────
