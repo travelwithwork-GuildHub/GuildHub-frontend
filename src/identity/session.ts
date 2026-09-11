@@ -1,8 +1,8 @@
 import { LIMITS, codePointLength, violates } from '@/api/contract/limits'
-import { getMyProfile, login } from '@/api/operations'
+import { getMyProfile, login, register } from '@/api/operations'
 import { toUiError } from '@/errors/uiError'
 import { browserRecoveryKeyStore, type RecoveryKeyStore } from './recoveryKey'
-import { NicknameLengthError, RecoveryKeyRejectedError, type Identity } from './types'
+import { CredentialsRejectedError, LoginIdTakenError, NicknameLengthError, RecoveryKeyRejectedError, type Identity } from './types'
 
 // 身分的取得與恢復。規格 `FE-A01`（identity-session）。
 //
@@ -26,6 +26,16 @@ function isUnauthorized(error: unknown): boolean {
 /** 「找不到」在登入這條路徑上只有一個意思：那把金鑰指向的名片不存在。 */
 function isNotFound(error: unknown): boolean {
   return toUiError(error).kind === 'not-found'
+}
+
+/** 403 在帳號密碼登入這一次請求上只有一個意思：帳號或密碼錯。**只在 `signInWithPassword` 裡用**（`FE-A08` design `D2`）。 */
+function isForbidden(error: unknown): boolean {
+  return toUiError(error).kind === 'permission-denied'
+}
+
+/** 409 在註冊這一次請求上只有一個意思：帳號撞名。**只在 `registerAccount` 裡用**。 */
+function isConflict(error: unknown): boolean {
+  return toUiError(error).kind === 'conflict'
 }
 
 /**
@@ -101,6 +111,50 @@ export async function signInWithRecoveryKey(
     profile = await login({ resume_token: key })
   } catch (error) {
     if (isNotFound(error)) throw new RecoveryKeyRejectedError()
+    throw error
+  }
+  persist(store, profile.id, remember)
+  return { state: 'signed-in', profile }
+}
+
+/**
+ * 用帳號密碼登入。規格 `FE-A08`〈帳號密碼登入驗證身分，錯了不透露哪一個錯〉。
+ *
+ * ⚠️ **只把這一次 `POST /api/login` 的 403 轉成 `CredentialsRejectedError`**（design `D2`）；別的 status 原樣拋、走 `toUiError`。
+ * 不在 transport 或這一層的通用位置按 status 全域轉 —— 那會把別的端點的 403 說成密碼錯。
+ * 三欄原值原樣送（不 trim、不折疊大小寫）：後端沒有這些規則，前端加了會讓註冊與登入的值對不上。
+ */
+export async function signInWithPassword(
+  loginId: string,
+  password: string,
+  { remember = false, store = browserRecoveryKeyStore() }: SignInOptions = {},
+): Promise<Identity> {
+  let profile
+  try {
+    profile = await login({ login_id: loginId, password })
+  } catch (error) {
+    if (isForbidden(error)) throw new CredentialsRejectedError()
+    throw error
+  }
+  persist(store, profile.id, remember)
+  return { state: 'signed-in', profile }
+}
+
+/**
+ * 註冊一個帶帳號密碼的名片，**成功即登入**（後端寫 session）。規格 `FE-A08`〈註冊建立一張帶帳號密碼的名片，成功即登入〉。
+ *
+ * ⚠️ **只把這一次 `POST /api/register` 的 409 轉成 `LoginIdTakenError`**；別的原樣拋。
+ * 不先查「帳號可不可用」：後端明寫先查再寫是競態，撞名由 409 說。
+ */
+export async function registerAccount(
+  input: { loginId: string; password: string; nickname: string },
+  { remember = false, store = browserRecoveryKeyStore() }: SignInOptions = {},
+): Promise<Identity> {
+  let profile
+  try {
+    profile = await register({ login_id: input.loginId, password: input.password, nickname: input.nickname })
+  } catch (error) {
+    if (isConflict(error)) throw new LoginIdTakenError()
     throw error
   }
   persist(store, profile.id, remember)

@@ -58,6 +58,25 @@ export class NicknameLengthError extends Error {
   }
 }
 
+/**
+ * 帳號或密碼錯（403）。規格 `FE-A08`。**不分「帳號不存在」與「密碼錯」**：後端刻意回同一句（不送出帳號存在性），
+ * 這個型別也只有一種 —— 文案是前端寫的（`describeError`），不是後端的 `detail`。
+ */
+export class CredentialsRejectedError extends Error {
+  override name = 'CredentialsRejectedError'
+  constructor() {
+    super('帳號或密碼錯誤。')
+  }
+}
+
+/** 註冊時帳號撞名（409）。規格 `FE-A08`。 */
+export class LoginIdTakenError extends Error {
+  override name = 'LoginIdTakenError'
+  constructor() {
+    super('這個帳號已經有人用了。')
+  }
+}
+
 /** 這把恢復金鑰後端找不到（404）。`S10`／`S17`。 */
 export class RecoveryKeyRejectedError extends Error {
   override name = 'RecoveryKeyRejectedError'
