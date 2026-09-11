@@ -38,6 +38,32 @@ export async function insertProfile(id: string, displayName: string): Promise<Pr
   return r.rows[0] as ProfileRow
 }
 
+/** `profiles.login_id` 的 unique constraint —— Postgres 對欄位上的 `unique` 取的名字（`001_schema.sql:14`）。 */
+export const LOGIN_ID_UNIQUE = 'profiles_login_id_key'
+
+/** 只有這一個 constraint 的 23505 是「帳號已經有人用了」；別的 unique 違反是別的事，照 `FE-O03` 回 500。 */
+export function isLoginIdTaken(error: unknown): boolean {
+  const e = error as { code?: unknown; constraint?: unknown } | null
+  return typeof e === 'object' && e !== null && e.code === '23505' && e.constraint === LOGIN_ID_UNIQUE
+}
+
+/**
+ * 建一張帶帳號密碼的名片（`POST /api/register`）。**不先查再寫**：撞名由 unique 擋（後端守則 §1 規則 4 —— 先查再寫在單機永遠對，
+ * 兩個人同時註冊同一個帳號才會露出來）。撞名回 `null`；別的錯誤原樣拋。
+ */
+export async function insertAccount(id: string, displayName: string, loginId: string, passwordHash: string): Promise<ProfileRow | null> {
+  try {
+    const r = await db().query<ProfileRow>(
+      `insert into profiles (id, display_name, login_id, password_hash) values ($1, $2, $3, $4) returning ${PROFILE_COLUMNS}`,
+      [id, displayName, loginId, passwordHash],
+    )
+    return r.rows[0] as ProfileRow
+  } catch (error) {
+    if (isLoginIdTaken(error)) return null
+    throw error
+  }
+}
+
 export async function credentialsOf(loginId: string): Promise<{ id: string; password_hash: string | null } | null> {
   const r = await db().query<{ id: string; password_hash: string | null }>('select id, password_hash from profiles where login_id = $1', [loginId])
   return r.rows[0] ?? null
