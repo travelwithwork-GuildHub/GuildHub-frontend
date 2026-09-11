@@ -1,4 +1,4 @@
-import { LIMITS } from '@/api/contract/limits'
+import { LIMITS, codePointLength, violates } from '@/api/contract/limits'
 import { getMyProfile, login } from '@/api/operations'
 import { toUiError } from '@/errors/uiError'
 import { browserRecoveryKeyStore, type RecoveryKeyStore } from './recoveryKey'
@@ -37,9 +37,9 @@ function isNotFound(error: unknown): boolean {
  * 用 `.length` 會拒絕後端收得下的字串。這件事 `limits.ts` 的檔頭有一整段。
  */
 export function nicknameProblem(nickname: string): NicknameLengthError | null {
-  const size = [...nickname].length
+  // 算法只有一份：`limits.ts` 的 `violates`／`codePointLength`（`FE-O06`）。這裡不再自己 `[...s].length`。
   const { min, max } = LIMITS.displayName
-  return size < min || size > max ? new NicknameLengthError(min, max, size) : null
+  return violates(LIMITS.displayName, nickname) === null ? null : new NicknameLengthError(min, max, codePointLength(nickname))
 }
 
 export interface SignInOptions {

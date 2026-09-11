@@ -37,7 +37,7 @@ export const Move = z.object({
   t: z.literal('move'),
   x: z.number().int(),
   y: z.number().int(),
-  f: z.number().int().min(0).max(3),
+  f: z.number().int().min(LIMITS.facing.min).max(LIMITS.facing.max),
 })
 
 /**
