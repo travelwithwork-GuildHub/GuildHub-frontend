@@ -95,14 +95,12 @@ describe('「還有沒有下一頁」只能靠實際取到的資料判定', () =
     expect(reduce(s, NEXT)).toBe(s)
   })
 
-  it('連點兩次之後撲空：只證明了那一頁是空的，中間那一頁要再問', () => {
-    // 從第 0 頁連點兩次 → identity 在第 2 頁。第 2 頁空，不代表第 1 頁空 ——
-    // 直接宣告「到底」會讓一張確實存在的第 1 頁消失。
-    const s = reduce(reduce(probingSecond(), NEXT), resolved(P(2), []))
-    expect(s.identity, '第 2 頁撲空就宣告到底 —— 第 1 頁根本還沒問').toEqual(P(1))
-    expect(s.phase).toBe('loading')
-    expect(s.next).toBe('maybe')
-    expect(s.shown?.page).toBe(0)
+  it('探測期間再按一次「下一頁」是 no-op —— 一次只探測一頁', () => {
+    // ⚠️ 允許的話，手滑連點會從第 0 頁跳到第 2 頁，而這一列沒有「上一頁」：
+    // 跳過的那一頁只能關掉面板重開才回得去。
+    const s = probingSecond()
+    expect(reduce(s, NEXT), '探測第 1 頁的時候又前進到第 2 頁了').toBe(s)
+    expect(s.identity).toEqual(P(1))
   })
 })
 
@@ -140,18 +138,27 @@ describe('請求失敗 SHALL NOT 被當成翻到底', () => {
 })
 
 describe('晚到的回應不得覆蓋畫面', () => {
-  it('[FE-B01-S14] 連續前進兩頁，較早那一頁的回應較晚到達 —— 畫面是較新那一頁', () => {
-    // 第 0 頁滿 → 點兩次 → identity 在第 2 頁。第 2 頁先到，第 1 頁後到。
-    // ⚠️ 這個 bug 的畫面上全是合法卡片：頁碼 2、內容第 1 頁。
-    const twoAhead = reduce(probingSecond(), NEXT)
-    expect(twoAhead.identity).toEqual(P(2))
-    const s = reduce(reduce(twoAhead, resolved(P(2), page(2, 4))), resolved(P(1), page(1, PAGE_SIZE)))
-    expect(s.shown?.page).toBe(2)
-    expect(s.shown?.items[0]?.id, '第 1 頁的回應蓋掉了第 2 頁 —— 回應提交前沒有比對 identity').toBe(
-      'p2-0',
+  it('[FE-B01-S14] 探測第 2 頁時灌入一個 identity 已失效的第 1 頁回應：頁次與列表 SHALL 不為所動', () => {
+    // ⚠️ **誠實地說，這一條測的是 invariant，不是規格 WHEN 裡的使用者操作。**
+    // 「連續前進兩頁」由 UI 到不了 —— 探測期間 `next` 是 no-op（見上面那條）——
+    // 所以「較早那一頁的回應較晚到達」在真實網路上排不出來。這裡灌的是一個合法事件：
+    // 第 1 頁已經提交過、identity 已經走到第 2 頁，第 1 頁的回應又到了一次。
+    // 它守的是 Requirement 本文那一句：只有 identity 仍然有效的回應才能提交。
+    // 這個 bug 的畫面上全是合法卡片：頁碼 2、內容第 1 頁。
+    const probingThird = run(
+      resolved(P(0), page(0, PAGE_SIZE)),
+      NEXT,
+      resolved(P(1), page(1, PAGE_SIZE)),
+      NEXT,
     )
-    // 第 1 頁滿 20 筆也不能把「確定沒有」改回「不確定」。
-    expect(s.next).toBe('none')
+    expect(probingThird.identity).toEqual(P(2))
+    const s = reduce(probingThird, resolved(P(1), page(1, 5)))
+    expect(s, '第 1 頁的回應改了狀態 —— 回應提交前沒有比對 identity').toBe(probingThird)
+    expect(s.shown?.page).toBe(1)
+    expect(s.identity).toEqual(P(2))
+    expect(s.phase).toBe('loading')
+    // 對照：第 2 頁的回應正常提交。
+    expect(reduce(s, resolved(P(2), page(2, 4))).shown?.items[0]?.id).toBe('p2-0')
   })
 
   it('[FE-B01-S15] 換一種資料之後，前一種的回應 SHALL NOT 混進來', () => {
@@ -175,11 +182,10 @@ describe('晚到的回應不得覆蓋畫面', () => {
     expect(s.shown?.items).toHaveLength(7)
   })
 
-  it('晚到的失敗也 SHALL NOT 提交 —— 中止前一個請求不是這一個請求的錯誤', () => {
+  it('identity 已失效的失敗也 SHALL NOT 提交', () => {
     // 驅動層會在 identity 改變時中止前一個請求；那個中止的 rejection 帶著舊 identity。
-    // 這裡不擋的話，每一次翻頁都會先閃一下錯誤狀態。
-    const twoAhead = reduce(probingSecond(), NEXT)
-    const s = reduce(twoAhead, failed(P(1)))
+    const afterSwitch = reduce(probingSecond(), { type: 'open', kind: 'profiles' })
+    const s = reduce(afterSwitch, failed(P(1)))
     expect(s.phase).toBe('loading')
     expect(s.error).toBeNull()
   })

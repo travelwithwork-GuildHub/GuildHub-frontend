@@ -71,7 +71,13 @@ export function reduce<T>(state: PagingState<T>, event: PagingEvent<T>): PagingS
     case 'next':
       // 沒有已呈現的頁就沒有東西可以「前進」；確定沒有下一頁就不再請求（`S07`）；
       // 錯誤狀態要先重試同一頁（`S11`），不能拿失敗的那一頁當跳板。
-      if (state.shown === null || state.next === 'none' || state.phase === 'error') return state
+      //
+      // ⚠️ **探測期間再按一次是 no-op，一次只探測一頁。**
+      // 允許的話，手滑連點會從第 0 頁跳到第 2 頁 —— 而這一列**沒有「上一頁」**
+      //（`design.md` 待答問題 3），跳過的那一頁只能關掉面板重開才回得去。
+      // 它也會讓「第 2 頁撲空」變成一個第 1 頁沒人答過的狀態，要多一條「退一步再問」。
+      // 兩個外部審查者第三輪在這個事實上收斂到同一邊。
+      if (state.shown === null || state.next === 'none' || state.phase !== 'ready') return state
       return {
         ...state,
         identity: { ...state.identity, page: state.identity.page + 1 },
@@ -98,13 +104,8 @@ export function reduce<T>(state: PagingState<T>, event: PagingEvent<T>): PagingS
         }
       }
       // 前進之後撲空（`S09`）：留在原頁，並記下「確定沒有下一頁」。
-      // 連點了不只一頁的話，只證明了**那一頁**是空的 —— 中間那幾頁還不知道，
-      // 所以退一步再問；identity 變了，驅動它的那一層會重新請求。
-      const previous = event.identity.page - 1
-      if (previous === state.shown.page) {
-        return { ...state, phase: 'ready', identity: { ...state.identity, page: previous }, next: 'none' }
-      }
-      return { ...state, identity: { ...state.identity, page: previous } }
+      // identity 也退回畫面上那一頁 —— 一次只探測一頁，所以退回的一定是 `shown.page`。
+      return { ...state, phase: 'ready', identity: { ...state.identity, page: state.shown.page }, next: 'none' }
     }
 
     case 'failed':

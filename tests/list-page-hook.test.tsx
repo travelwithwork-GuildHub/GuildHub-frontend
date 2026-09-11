@@ -96,22 +96,19 @@ describe('驅動層：identity 變了就請求', () => {
     expect(result.current.state.shown?.page).toBe(1)
   })
 
-  it('連點兩次之後撲空：退一步再問中間那一頁，而且是真的問', async () => {
-    // 兩次 `next` 在同一個 act 裡：第 1 頁的請求根本不會送（被第 2 頁蓋掉），
-    // 第 2 頁空 → identity 退回第 1 頁 → 驅動層要補問第 1 頁。
+  it('連點兩次：只送一個請求，停在第 1 頁', async () => {
+    // 探測期間 `next` 是 no-op —— 這一列沒有「上一頁」，跳過的頁回不去。
     server.reply(200, many(project, PAGE_SIZE))
-    server.reply(200, [])
-    server.reply(200, many(project, 4))
+    server.reply(200, many(project, PAGE_SIZE))
     const { result } = renderHook(() => useListPage('projects'))
     await waitFor(() => expect(result.current.state.phase).toBe('ready'))
     act(() => {
       result.current.next()
       result.current.next()
     })
-    await waitFor(() => expect(result.current.state.shown?.page).toBe(1))
-    expect(searches()).toEqual(['?page=0', '?page=2', '?page=1'])
-    expect(result.current.state.shown?.items).toHaveLength(4)
-    expect(edgeState(result.current.state)).toBe('exhausted')
+    await waitFor(() => expect(result.current.state.phase).toBe('ready'))
+    expect(searches(), '連點兩次跳到第 2 頁了').toEqual(['?page=0', '?page=1'])
+    expect(result.current.state.shown?.page).toBe(1)
   })
 })
 
