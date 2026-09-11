@@ -12,6 +12,7 @@ import { WorldShell } from './environment/WorldShell'
 import { WorldCamera } from './WorldCamera'
 import { LocalPlayer } from './player/LocalPlayer'
 import { RemoteWorld } from './RemoteWorld'
+import { EditableFocusLock } from './interaction/EditableFocusLock'
 import { InteractionProvider } from './interaction/InteractionProvider'
 import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
@@ -111,6 +112,8 @@ export default function WorldCanvas() {
           面板在 Canvas 外面 —— 同樣要包住兩者。**要在 `InteractionProvider` 裡面**：
           面板開著時要鎖世界的移動輸入，那把鎖在互動層。 */}
       <ListPanelProvider>
+        {/* 文字輸入框有焦點時打字不是走路（`FE-X06`）。今天世界裡還沒有輸入框 —— 先掛著。 */}
+        <EditableFocusLock />
         <div data-testid="world-canvas-container" className="relative h-full w-full">
           <Canvas
             shadows
