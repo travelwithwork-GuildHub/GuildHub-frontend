@@ -137,7 +137,12 @@ describe('中止不是失敗', () => {
 })
 
 describe('換一種資料', () => {
-  it('[FE-B01-S15] 案件還沒回來就改開人才：畫面上只有人才，也沒有閃過錯誤', async () => {
+  it('案件還沒回來就改開人才：舊請求被中止、沒有閃過錯誤，最後畫面上是人才', async () => {
+    // ⚠️ **這一條驗不到 identity 的比對** —— 中止讓案件的回應根本不會進 reducer，
+    // 把 `sameIdentity` 拿掉它照樣綠。`S15` 的葉測試在 `list-paging-state.test.ts`。
+    // 這裡驗的是驅動層自己的三件事：kind 變了有沒有重開、中止有沒有被當成失敗、
+    // 人才的請求有沒有真的送出去。
+    //
     // ⚠️ 不能用 `reply()`：案件的請求會被中止，中止得夠早的話它根本不會到 server，
     // 排給它的回應就會被人才的請求拿走 —— 然後契約驗證失敗，紅在錯的地方。
     server.replyFor('/api/projects', 200, many(project, 3))
@@ -178,6 +183,9 @@ describe('換一種資料', () => {
     )
     await waitFor(() => expect(result.current.state.shown?.items).toHaveLength(3))
     rerender('profiles')
+    // 同步斷言，不等 effect：換種類的那一格回的就要是人才的（空的）狀態。
+    expect(result.current.state.identity.kind).toBe('profiles')
+    expect(result.current.state.shown).toBeNull()
     await waitFor(() => expect(result.current.state.shown?.items).toHaveLength(2))
     const leaked = frames.filter((f) => f.kind === 'profiles' && f.items.some((i) => 'title' in i))
     expect(leaked, 'prop 已經是人才、回的卻還是案件 —— 舊種類的狀態多活了一格').toEqual([])
