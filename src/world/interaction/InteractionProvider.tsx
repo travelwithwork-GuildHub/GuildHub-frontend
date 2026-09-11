@@ -1,6 +1,16 @@
 'use client'
 
-import { createContext, useContext, useMemo, useState, type ReactNode, type RefObject } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { createInteractableRegistry, type InteractableRegistry } from './registry'
 
 // 互動層的共用狀態。規格 `FE-W06`。
@@ -23,13 +33,23 @@ interface InteractionValue {
   target: ActiveTarget
   setTarget: (target: ActiveTarget) => void
   /**
-   * 世界的移動輸入要不要停。`true` = 停（有 DOM 面板開著，鍵盤是它的）。
-   * 規格 `FE-B01-S17`／`S18`。
+   * 世界命令（移動、E 互動、之後的熱鍵）要不要停。`true` = 停。規格 `FE-X06`。
    *
-   * **是 ref 不是 state** —— `LocalPlayer` 每幀讀它，而它在整個生命週期裡
-   * 不重繪（`FE-W03-S13`）。寫它的是開面板的那一層，讀它的是角色。
+   * **是 ref 不是 state** —— `LocalPlayer` 每幀讀它，而它在整個生命週期裡不重繪（`FE-W03-S13`）。
+   * **是推導值，不准直接寫** —— 有任何持有者就 `true`。寫它的是 `holdInputLock`。
    */
   inputLockRef: RefObject<boolean>
+  /**
+   * 取得鎖；回傳釋放函式。規格 `FE-X06-S03`／`S04`。
+   *
+   * ⚠️ **每一次呼叫是獨立的一次**（token 式，不是 reason 字串的 Set）：同一個 reason 可以同時
+   * 持有兩次（StrictMode 雙重掛載、兩個同類面板）。**釋放冪等**：同一個釋放呼叫兩次只移除自己，
+   * 不影響別的持有者。`reason` 只給除錯看。
+   *
+   * 單一 boolean 的鎖是這一列最可能做錯的地方：輸入框還有焦點時關掉一個面板，面板把鎖寫回
+   * `false` —— 接著打字就變成走路。
+   */
+  holdInputLock: (reason: string) => () => void
 }
 
 const InteractionContext = createContext<InteractionValue | null>(null)
@@ -69,11 +89,35 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
   const [registry] = useState(createInteractableRegistry)
   // **目標進 React**（低頻，走過去才變）。位置每幀變的那一半不在這裡。
   const [target, setTarget] = useState<ActiveTarget>(NO_TARGET)
-  const [inputLockRef] = useState<RefObject<boolean>>(() => ({ current: false }))
+  // 持有者的集合與推導出來的 boolean。都是 ref：每幀讀、不重繪；只在 callback 裡改，不在繪製期間讀。
+  const holdersRef = useRef<Set<symbol>>(new Set())
+  const inputLockRef = useRef(false)
+
+  const holdInputLock = useCallback((reason: string) => {
+    const token = Symbol(reason)
+    holdersRef.current.add(token)
+    inputLockRef.current = true
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      holdersRef.current.delete(token)
+      inputLockRef.current = holdersRef.current.size > 0
+    }
+  }, [])
+
+  // provider 卸載時清空：鎖是 provider 的，不能活得比它久。
+  useEffect(
+    () => () => {
+      holdersRef.current.clear()
+      inputLockRef.current = false
+    },
+    [],
+  )
 
   const value = useMemo(
-    () => ({ registry, target, setTarget, inputLockRef }),
-    [registry, target, inputLockRef],
+    () => ({ registry, target, setTarget, inputLockRef, holdInputLock }),
+    [registry, target, holdInputLock],
   )
 
   return <InteractionContext.Provider value={value}>{children}</InteractionContext.Provider>

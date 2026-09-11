@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useInteraction } from '@/world/interaction/InteractionProvider'
 import type { ListKind } from './paging'
 
@@ -28,26 +28,37 @@ export function useListPanel(): ListPanelValue {
 }
 
 export function ListPanelProvider({ children }: { children: ReactNode }) {
-  const { inputLockRef } = useInteraction()
+  const { holdInputLock } = useInteraction()
   const [open, setOpen] = useState<ListKind | null>(null)
+  /** 面板開著時持有的那一把；`null` = 沒持有。 */
+  const releaseRef = useRef<(() => void) | null>(null)
 
-  // 鎖跟著開關走，**同步寫**，不等 effect —— 開面板的那個 E 之後的第一個方向鍵就該被擋。
+  // 鎖跟著開關走，**同步持有**，不等 effect —— 開面板的那個 E 之後的第一個方向鍵就該被擋。
+  // 面板已經開著時再開（換一塊看板）：不再持有第二把，那一把還在。
   const openPanel = useCallback(
     (kind: ListKind) => {
-      inputLockRef.current = true
+      releaseRef.current ??= holdInputLock('list-panel')
       setOpen(kind)
     },
-    [inputLockRef],
+    [holdInputLock],
   )
   const closePanel = useCallback(() => {
-    // ⚠️ **這一行是 `S17`。** 少了它，關掉面板之後人走不動，要用滑鼠點一下畫面
+    // ⚠️ **這一行是 `FE-B01-S17`。** 少了它，關掉面板之後人走不動，要用滑鼠點一下畫面
     // —— 而只驗 `S18` 的話，「開了就永遠鎖住」是全綠的。
-    inputLockRef.current = false
+    // 釋放的是**自己那一把**：輸入框還有焦點時它的那一把還在（`FE-X06-S10`）。
+    releaseRef.current?.()
+    releaseRef.current = null
     setOpen(null)
-  }, [inputLockRef])
+  }, [])
 
-  // 這一層開著的時候被卸載（例如路由切走）：鎖是共用的，不還的話世界回來時人走不動。
-  useEffect(() => () => void (inputLockRef.current = false), [inputLockRef])
+  // 這一層開著的時候被卸載（例如路由切走）：不還的話世界回來時人走不動。
+  useEffect(
+    () => () => {
+      releaseRef.current?.()
+      releaseRef.current = null
+    },
+    [],
+  )
 
   const value = useMemo(() => ({ open, openPanel, closePanel }), [open, openPanel, closePanel])
   return <ListPanelContext.Provider value={value}>{children}</ListPanelContext.Provider>

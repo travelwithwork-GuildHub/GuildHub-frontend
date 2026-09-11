@@ -27,7 +27,7 @@ export interface SpatialInteractionProps {
 }
 
 export function SpatialInteraction({ poseRef }: SpatialInteractionProps) {
-  const { registry, setTarget } = useInteraction()
+  const { registry, setTarget, inputLockRef } = useInteraction()
   /** 上一幀的目標 id。**這道比對就是「不進 React」的那一半。** */
   const previous = useRef<string | null>(null)
   /** 給按鍵處理讀的目前目標。**用 ref 不用 state** —— 監聽器只掛一次，
@@ -64,6 +64,9 @@ export function SpatialInteraction({ poseRef }: SpatialInteractionProps) {
     const onKey = (e: KeyboardEvent) => {
       // **是 `code` 不是 `key`** —— 讀的是實體鍵位，跟鍵盤配置無關。
       if (e.code !== 'KeyE') return
+      // 鎖著就不動作（規格 `FE-X06-S05`）：面板開著、或某個文字輸入框有焦點 ——
+      // 後者打一個 `e` 字母不該開出一個面板。**也不 `preventDefault`**，那個字要進得了欄位。
+      if (inputLockRef.current) return
       const id = currentId.current
       if (id === null) return
       // ⚠️ **再查一次註冊表**（規格 `FE-W06-S12`）。
@@ -75,7 +78,7 @@ export function SpatialInteraction({ poseRef }: SpatialInteractionProps) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [registry])
+  }, [registry, inputLockRef])
 
   return null
 }
