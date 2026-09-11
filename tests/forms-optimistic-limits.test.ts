@@ -69,6 +69,20 @@ describe('createOptimistic', () => {
     expect(optimistic.inFlight).toBe(false)
   })
 
+  it('snapshot 同步拋錯：沒東西可還原，但要解鎖', async () => {
+    const optimistic = createOptimistic<string, string, string>({
+      snapshot: () => {
+        throw new Error('no snapshot')
+      },
+      apply: () => {},
+      request: () => Promise.resolve('never'),
+      restore: () => {},
+    })
+    const r = await optimistic.run('B')
+    expect(r).toMatchObject({ ok: false, reason: 'failed', input: 'B' })
+    expect(optimistic.inFlight).toBe(false)
+  })
+
   it('[FE-X05-S09] 成功以伺服器值為準', async () => {
     const h = harness()
     const p = h.optimistic.run('B')
