@@ -43,12 +43,14 @@ const PROJECTS = ['案件甲', '案件乙', '案件丙'].map((title, i) => ({
 const PROFILES = ['人才丁', '人才戊'].map((display_name, i) => ({
   id: uuid(i + 11),
   display_name,
-  avatar_id: 0,
-  skills: [],
-  hours_per_week: null,
-  bio: null,
+  avatar_id: i,
+  skills: ['Three.js', 'TypeScript'],
+  hours_per_week: i === 0 ? 12 : null,
+  bio: i === 0 ? '列表上的舊自介' : null,
   updated_at: '2026-09-09T00:00:00Z',
 }))
+/** 詳情端點回的那一筆 —— `bio` 刻意跟列表不同，證明詳情用的是這一個（`FE-B04-S06`）。 */
+const DETAIL = { ...PROFILES[0], bio: '詳情端點回的新自介：做過三個 3D 專案。' }
 
 let failures = 0
 const ok = (l) => console.log(`✅ ${l}`)
@@ -115,6 +117,9 @@ try {
   })
   await page.route('**/api/rooms', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  )
+  await page.route(`**/api/profiles/${PROFILES[0].id}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DETAIL) }),
   )
 
   const response = await page.goto(`${FRONTEND}/world`).catch(() => null)
@@ -184,6 +189,32 @@ try {
     else bad('[S02] 面板開了但不是人才、或混進了案件', `data-kind=${kind}，內容：${text?.slice(0, 80)}`)
   }
   await page.screenshot({ path: path.join(OUT, 'talent-board-open.png') })
+
+  // ── FE-B04：卡片 → 詳情（真的按 Enter）→ 返回 ────────────────────
+  // 面板開著時焦點在列表上；Tab 一下到第一張卡。
+  await page.keyboard.press('Tab')
+  const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? null)
+  if (focused === 'talent-card') ok('[B04-S05] Tab 一下就到了第一張人才卡（它是可聚焦的按鈕）')
+  else bad('[B04-S05] Tab 之後焦點不在人才卡上', `activeElement 是 ${focused}`)
+  await page.keyboard.press('Enter')
+  const detail = await page.waitForSelector('[data-testid="talent-detail"][data-phase="ready"]', { timeout: 5_000 }).catch(() => null)
+  if (detail === null) bad('[B04-S05] 按 Enter 沒有開出詳情', '')
+  else {
+    const bio = await page.$eval('[data-testid="talent-bio"]', (n) => n.textContent ?? '')
+    if (bio.includes('詳情端點回的新自介')) ok('[B04-S06] 詳情呈現的是 GET /api/profiles/{id} 回的那一筆，不是列表那一筆')
+    else bad('[B04-S06] 詳情用的是列表那一筆', `bio：${bio}`)
+    const inert = await page.$eval('[data-testid="list-panel-list"]', (n) => n.hasAttribute('inert'))
+    if (inert) ok('[B04-S16] 詳情開著時列表區是 inert')
+    else bad('[B04-S16] 列表區沒有 inert', '')
+  }
+  await page.screenshot({ path: path.join(OUT, 'talent-detail-open.png') })
+  await page.click('button:has-text("返回")')
+  await page.waitForTimeout(200)
+  const stillDetail = await page.$('[data-testid="talent-detail"]')
+  const cardCount = (await page.$$('[data-testid="talent-card"]')).length
+  if (stillDetail === null && cardCount === PROFILES.length) ok(`[B04-S11] 返回之後列表還在（${cardCount} 張卡）`)
+  else bad('[B04-S11] 返回之後列表不對', `detail=${stillDetail !== null}，卡片 ${cardCount} 張`)
+
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
 
