@@ -22,13 +22,13 @@ const ComposeSchema = z.object({
 
 export const COMPOSE_LABELS = { body: '寫一封信', send: '寄出' }
 
-export function ComposeForm({ onSend, sending }: { onSend: (body: string) => Promise<void>; sending: boolean }) {
+export function ComposeForm({ onSend, sending }: { onSend: (body: string) => Promise<boolean>; sending: boolean }) {
   const { form, visibleErrors, canSubmit, submitError, onSubmit } = useForm({
     schema: ComposeSchema,
     defaultValues: { body: '' },
     onSubmit: async ({ body }) => {
-      await onSend(body)
-      form.reset({ body: '' })
+      // `false` = provider 那層擋掉了（已有一封在送）：什麼都沒寄出去，草稿不能清（審查提醒）。
+      if (await onSend(body)) form.reset({ body: '' })
     },
     describeError: (cause) => (cause instanceof RecipientGoneError ? cause.message : null),
   })

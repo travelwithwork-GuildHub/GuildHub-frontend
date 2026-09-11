@@ -19,7 +19,7 @@ import { groupThreads, mergeById, type Thread } from './threads'
 // 分頁（design `D2`）：後端是 offset 分頁的混合清單。所有分頁請求（開啟的第 0 頁、載入更多、201 後的第 0 頁）
 // 共用**一個 in-flight 槽**並帶 `generation`：舊世代的回應只合併訊息（以 `id`、只增不減），不動 `pagesLoaded`／`exhausted`／錯誤。
 // 401 → 清掉信與名字、`dataGeneration` 加一：**所有**在飛的回應（含 POST 的 201、名字解析）回來一律丟掉（session 沒了不該再看到私訊）。
-// 身分換了（登出、換帳號）同樣整份失效 —— 不能等某次請求剛好回 401。
+// 身分換了（登出、換帳號）：整個狀態樹以 `key` 重建，同樣整份失效。
 
 export type InboxView = { kind: 'closed' } | { kind: 'list' } | { kind: 'thread'; with: string; openedFrom: 'list' | 'talent' }
 
@@ -57,8 +57,8 @@ export interface InboxValue {
   names: Record<string, string | null | undefined>
   /** 確保這些 id 的名字被解析過（同一批去重、成功的不再打、失敗的下一次開啟再試）。 */
   resolveNames: (ids: readonly string[]) => void
-  /** 寄一封。201 → 合併、重取第 0 頁；失敗拋出去（`useForm` 接）。 */
-  send: (withId: string, body: string) => Promise<void>
+  /** 寄一封。201 → 合併、重取第 0 頁、回 `true`；已有一封在送 → 什麼都不做、回 `false`（呼叫端不要清表單）；失敗拋出去（`useForm` 接）。 */
+  send: (withId: string, body: string) => Promise<boolean>
   /** 送出中的對方（任何一封在送，所有寄信表單都先不能再送）。 */
   sendingTo: string | null
 }
@@ -81,7 +81,16 @@ const isUnauthorized = (error: unknown) => toUiError(error).kind === 'authentica
 export function InboxPanelProvider({ children }: { children: ReactNode }) {
   const identity = useIdentity()
   const me = identity.state === 'signed-in' ? identity.profile.id : null
+  // 身分換了（登出、換帳號）：整份私訊資料失效 —— 用 `key` 讓整個狀態樹重建，不靠 effect 一個一個清（effect 是渲染之後才跑，
+  // 會有一幀用新的 me 配舊的信；審查提醒）。舊實例在飛的請求回來時 setState 落在已卸載的元件上，什麼都不會寫。
+  return (
+    <InboxState key={me ?? 'anon'} me={me}>
+      {children}
+    </InboxState>
+  )
+}
 
+function InboxState({ me, children }: { me: string | null; children: ReactNode }) {
   const [view, setView] = useState<InboxView>({ kind: 'closed' })
   const openerRef = useRef<HTMLElement | null>(null)
   const restoreFocusRef = useRef<'opener' | 'world' | null>(null)
@@ -97,7 +106,7 @@ export function InboxPanelProvider({ children }: { children: ReactNode }) {
   const [names, setNames] = useState<Record<string, string | null | undefined>>({})
   const [sendingTo, setSendingTo] = useState<string | null>(null)
 
-  // 世代：`generation` 每次從關閉打開＋1（分頁控制狀態只聽目前世代）；`dataGeneration` 401／換身分時＋1（所有在飛的回應都丟）。
+  // 世代：`generation` 每次從關閉打開＋1（分頁控制狀態只聽目前世代）；`dataGeneration` 401 時＋1（所有在飛的回應都丟）。
   const generationRef = useRef(0)
   const dataGenerationRef = useRef(0)
   const inFlightRef = useRef(false)
@@ -241,14 +250,11 @@ export function InboxPanelProvider({ children }: { children: ReactNode }) {
 
   /** provider 層的 guard（同步 ref）：`sendingTo` 是 UI 狀態，擋不住同一批次的第二次。 */
   const sendInFlightRef = useRef(false)
-  /** 寄信的世代：身分換了就＋1，舊請求的 `finally` 不能清掉新世代的鎖（審查抓到）。 */
-  const sendGenerationRef = useRef(0)
   const send = useCallback(
     async (withId: string, body: string) => {
-      if (sendInFlightRef.current) return
+      if (sendInFlightRef.current) return false
       sendInFlightRef.current = true
       const dataGeneration = dataGenerationRef.current
-      const sendGeneration = sendGenerationRef.current
       setSendingTo(withId)
       try {
         let sent: MessageOut
@@ -265,42 +271,20 @@ export function InboxPanelProvider({ children }: { children: ReactNode }) {
           if (toUiError(error).kind === 'not-found') throw new RecipientGoneError()
           throw error
         }
-        if (dataGeneration !== dataGenerationRef.current) return
+        if (dataGeneration !== dataGenerationRef.current) return false
         setMessages((prev) => mergeById(prev, [sent]))
         // offset 分頁被這封擠了一格：重取第 0 頁、合併（只增不減）；載入更多從第 1 頁重來。
         generationRef.current += 1
         void fetchPage(0, 'first')
+        return true
       } finally {
-        if (sendGeneration === sendGenerationRef.current) {
-          sendInFlightRef.current = false
-          setSendingTo(null)
-        }
+        sendInFlightRef.current = false
+        setSendingTo(null)
       }
     },
     [fetchPage, clearForUnauthorized],
   )
 
-  // 身分換了（登出、換帳號）：整份私訊資料失效 —— 不能等某次請求剛好回 401（審查抓到的）。
-  const previousMeRef = useRef(me)
-  useEffect(() => {
-    if (previousMeRef.current === me) return
-    previousMeRef.current = me
-    dataGenerationRef.current += 1
-    generationRef.current += 1
-    sendGenerationRef.current += 1
-    sendInFlightRef.current = false
-    setSendingTo(null)
-    pendingFirstRef.current = false
-    askedThisOpenRef.current = new Set()
-    setMessages([])
-    setNames({})
-    setPagesLoaded(0)
-    setExhausted(false)
-    setLoadError(null)
-    setMoreError(null)
-    setBlocked(false)
-    setView({ kind: 'closed' })
-  }, [me])
 
   const threads = useMemo(() => (me === null ? [] : groupThreads(messages, me)), [messages, me])
 
