@@ -3,7 +3,7 @@
 權限：**適用** —— 只能編輯自己的名片（`PATCH /api/profiles/me`；別人的沒有編輯入口）
 併發：**適用** —— 面板開著時 `AvatarPicker` 可能改了 `avatar_id`；送出中再按送出
 持久資料相容性：**不適用** —— 不讀寫持久資料（名片在後端）
-失敗路徑：**適用** —— 載入失敗、送出失敗、超長、未儲存就關
+失敗路徑：**適用** —— 送出失敗、超長、未儲存就關（沒有「載入失敗」：名片來自 `IdentityProvider`，同步可得）
 
 測試連到什麼：jsdom ＋ `tests/support/contract-server`（本機自己起的 HTTP server）；**不連任何外部服務。**
 
@@ -86,7 +86,7 @@ dirty 時**任何關閉意圖**（Escape、面板殼的關閉鈕、表單的「�
 - **THEN** SHALL 出現確認；按「繼續編輯」SHALL 留在表單且 `bio` 不變、確認層消失
 - **WHEN** 再按面板殼的關閉鈕
 - **THEN** 確認 SHALL 再出現；按「丟棄」SHALL 回到顯示、`bio` 顯示的是身分目前的值
-- **WHEN** 只把 `skills` 從 `React, TypeScript` 改成 `React，  typescript`（正規化後相同），按「取消」
+- **WHEN** 再按「編輯」，只把 `skills` 從 `React, TypeScript` 改成 `React，  typescript`（正規化後相同），按「取消」
 - **THEN** SHALL **不問**，直接回到顯示
 
 #### Scenario: [FE-A04-S10] 送出中關不掉：三種關法都無效

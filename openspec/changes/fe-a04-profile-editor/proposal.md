@@ -14,7 +14,7 @@
 - **編輯**：`FE-X05` 的 `useForm` ＋ Zod；四欄 `display_name`（1–20）、`skills`（逗號分隔，含全形逗號、trim、去空、去重，≤10 項、每項 ≤40）、
   `hours_per_week`（整數 0–80 或空）、`bio`（≤300）。送 `PATCH /api/profiles/me`，**payload 白名單四欄**（不送 `avatar_id`：`AvatarPicker` 中途改的不被覆蓋）；
   可空欄清空送 `null`、`skills` 清空送 `[]`。**悲觀更新**：成功才 `adopt(identity)`、回到顯示、呈現伺服器回傳的值；失敗留在表單、值不清、可重試。
-- **未儲存就關**：有修改時按 Escape／關閉 SHALL 先確認；送出中不可關。面板重開從目前 identity 初始化。
+- **未儲存就關**：有修改（正規化後 payload 跟初始不同）時，Escape／面板殼的關閉鈕／表單的「取消」都 SHALL 先確認；送出中三種都無效。面板重開從目前 identity 初始化。
 
 ## ⚠️ 討論談定的取捨
 
