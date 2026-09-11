@@ -30,7 +30,10 @@ function isDisabled(el: HTMLElement): boolean {
 /** 在 `root` 裡、瀏覽器會 Tab 到的元素，DOM 順序。 */
 export function tabbablesIn(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(CANDIDATES)).filter((el) => {
-    if (el.tabIndex < 0) return false
+    // `contenteditable` 在瀏覽器裡預設 tabIndex 是 0，jsdom 回 -1 —— 看屬性，沒寫就當 0。
+    const attr = el.getAttribute('tabindex')
+    const tabIndex = attr !== null ? Number(attr) : el.matches('[contenteditable]') ? 0 : el.tabIndex
+    if (Number.isNaN(tabIndex) || tabIndex < 0) return false
     if (isDisabled(el)) return false
     if (el.hidden || el.closest('[inert]') !== null || el.closest('[hidden]') !== null) return false
     if (el instanceof HTMLInputElement && el.type === 'hidden') return false
