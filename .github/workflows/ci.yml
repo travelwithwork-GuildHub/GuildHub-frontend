@@ -27,6 +27,23 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
+    # 契約測試的 `internal` 那一輪要一個可拋棄的 Postgres（規格 FE-O05〈CI 只跑 internal；guildhub 在本機〉）。
+    # AGENTS.md〈測試環境隔離〉第 2 條：CI 不提供任何服務 —— 需要資料庫的測試在 CI 裡**自己起一份**（service container）。
+    # 這個容器每次 run 都是新的、跑完就丟；連線字串只指向它。**CI 沒有 GUILDHUB_BACKEND_DIR，也沒有任何一步跑 run.sh。**
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: guildhub
+          POSTGRES_PASSWORD: guildhub
+          POSTGRES_DB: guildhub_frontend_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U guildhub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -205,3 +222,24 @@ jobs:
           NEXT_TELEMETRY_DISABLED: '1'
           NEXT_PUBLIC_APP_ENV: local
         run: npm run build
+
+      # 契約測試（規格 FE-O05）：同一組測試對 `internal` 目標跑 —— harness 自己 `next start` 上面 Build 出來的產物、
+      # `db:reset` 這個 run 自己的 Postgres（第一次是空的，要 --init）。`guildhub` 那一輪**不在 CI**（沒有真後端，
+      # 也不該有）—— `.github/scripts/check-contract-ci.py` 在下面那一步驗這件事。
+      - name: Contract (internal)
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_APP_ENV: local
+          INTERNAL_TEST_DATABASE_URL: postgresql://guildhub:guildhub@localhost:5432/guildhub_frontend_test
+        run: |
+          node scripts/db.mjs reset --init --test
+          npm run test:contract:internal
+
+      # 上面那一步的形狀自檢（FE-O05-S15）：解析這個 workflow 的 YAML —— 有 postgres service 的 job 裡有 step 跑
+      # test:contract:internal；所有 job 的所有 step 的 run／uses 都沒有 contract-guildhub、run.sh、CONTRACT_TARGET=guildhub。
+      # 比的是 step 的內容，不是整檔文字（註解與 step 名稱不算）。
+      - name: Contract CI gate
+        run: python3 .github/scripts/check-contract-ci.py .github/workflows/ci.yml
+
+      - name: Contract CI gate tests
+        run: bash .github/scripts/test-check-contract-ci.sh
