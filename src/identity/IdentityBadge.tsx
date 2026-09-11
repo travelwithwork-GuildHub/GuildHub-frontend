@@ -43,7 +43,13 @@ export function IdentityBadge() {
       // **顯示的是查詢的結果**，不是任何前端保存的值（`S04`／`S11`）
       return (
         <p data-testid="identity">
-          <button type="button" aria-label="我的名片" className="text-accent underline" onClick={(e) => openPanel(e.currentTarget)}>
+          {/* accessible name 以「我的名片」開頭、**含**畫面上看得到的名字（WCAG 2.5.3 label-in-name：語音控制唸名字要按得到）。 */}
+          <button
+            type="button"
+            aria-label={`我的名片：${identity.profile.display_name}`}
+            className="text-accent underline"
+            onClick={(e) => openPanel(e.currentTarget)}
+          >
             {identity.profile.display_name}
           </button>
         </p>

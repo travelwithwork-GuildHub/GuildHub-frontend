@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 // 「我的名片」面板現在開著沒有。規格 `FE-A04`〈名字是入口，面板是阻斷式的〉；design `D1`（修正後）。
 //
@@ -39,18 +39,26 @@ export function useProfilePanelIfProvided(): ProfilePanelValue | null {
 export function ProfilePanelProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const openerRef = useRef<HTMLElement | null>(null)
+  const restoreFocusRef = useRef(false)
 
   const openPanel = useCallback((opener: HTMLElement | null) => {
     openerRef.current = opener
     setOpen(true)
   }, [])
   const closePanel = useCallback(() => {
+    restoreFocusRef.current = true
     setOpen(false)
-    // 焦點回開啟它的按鈕（`S02`）：不是 `body`（鍵盤使用者迷航）、不是世界焦點錨（這次操作跟世界無關）。
-    // 記的是元素不是 `document.activeElement`：Safari 點按鈕不會給它焦點。
-    openerRef.current?.focus()
-    openerRef.current = null
   }, [])
+  // 焦點回開啟它的按鈕（`S02`）：不是 `body`（鍵盤使用者迷航）、不是世界焦點錨（這次操作跟世界無關）。
+  // **等面板真的卸載之後**才還（effect，不在 closePanel 裡同步做）：面板還掛著時 focus trap 還在，同步 focus 出去可能被拉回來（審查抓到的）。
+  // 記的是元素不是 `document.activeElement`：Safari 點按鈕不會給它焦點。
+  useEffect(() => {
+    if (open || !restoreFocusRef.current) return
+    restoreFocusRef.current = false
+    const opener = openerRef.current
+    openerRef.current = null
+    if (opener?.isConnected) opener.focus()
+  }, [open])
 
   const value = useMemo(() => ({ open, openPanel, closePanel }), [open, openPanel, closePanel])
   return <ProfilePanelContext value={value}>{children}</ProfilePanelContext>

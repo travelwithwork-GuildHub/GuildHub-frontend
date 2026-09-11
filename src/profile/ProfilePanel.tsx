@@ -24,7 +24,7 @@ export const PROFILE_PANEL_LABELS = { title: '我的名片', close: '關閉' }
 function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
   const { closePanel } = useProfilePanel()
   const { holdInputLock } = useInteraction()
-  const root = useRef<HTMLElement>(null)
+  const root = useRef<HTMLDivElement>(null)
 
   // 世界輸入鎖：面板開著人不能走（`S01`）；關了要放（`S02`）。
   useEffect(() => holdInputLock('profile-panel'), [holdInputLock])
@@ -35,9 +35,10 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
 
   return (
     <PanelShell title={PROFILE_PANEL_LABELS.title} closeLabel={PROFILE_PANEL_LABELS.close} testId="profile-panel" onCloseRequest={closePanel}>
-      <section ref={root} tabIndex={-1} aria-label={PROFILE_PANEL_LABELS.title} className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto outline-none">
+      {/* 只是捲動容器與初始焦點，不是第二個 landmark（殼的 section 已經叫「我的名片」）。 */}
+      <div ref={root} tabIndex={-1} className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto outline-none">
         <TalentFacts profile={profile} />
-      </section>
+      </div>
     </PanelShell>
   )
 }

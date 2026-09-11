@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { act, useEffect, type RefObject } from 'react'
 import { IdentityBadge } from '@/identity/IdentityBadge'
@@ -82,7 +82,7 @@ async function mountSignedIn() {
       </ProfilePanelProvider>
     </IdentityProvider>,
   )
-  const button = await screen.findByRole('button', { name: '我的名片' })
+  const button = await screen.findByRole('button', { name: /^我的名片/ })
   return button
 }
 const click = (el: HTMLElement) =>
@@ -98,6 +98,7 @@ describe('名字是入口，面板是阻斷式的', () => {
   it('[FE-A04-S01] 按名字開面板：面板出現、世界輸入鎖持有、焦點在面板內', async () => {
     const button = await mountSignedIn()
     expect(button.textContent, '按鈕上顯示的是名字').toBe('阿福')
+    expect(button.getAttribute('aria-label')).toBe('我的名片：阿福')
     expect(screen.queryByTestId('profile-panel')).toBeNull()
     expect(locked()).toBe(false)
 
@@ -111,7 +112,7 @@ describe('名字是入口，面板是阻斷式的', () => {
   it('[FE-A04-S02] Escape 關面板：面板不再顯示、鎖放開、焦點回按鈕', async () => {
     const button = await mountSignedIn()
     click(button)
-    expect(screen.getByTestId('profile-panel')).toBeDefined()
+    expect(screen.queryByTestId('profile-panel')).not.toBeNull()
 
     escape()
 
@@ -133,7 +134,8 @@ describe('名字是入口，面板是阻斷式的', () => {
 describe('顯示我的名片', () => {
   it('[FE-A04-S03] 面板用 TalentFacts 呈現自己的四欄，而且沒有多打 GET /api/profiles/{id}（編輯鈕在下一片）', async () => {
     const button = await mountSignedIn()
-    const before = server.calls.length
+    // 「沒有請求」不能靠等幾十毫秒：直接看 fetch 有沒有被叫（審查抓到恆真）。
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
     click(button)
     const facts = screen.getByTestId('talent-facts')
     expect(facts.dataset.profileId).toBe(ME.id)
@@ -141,8 +143,9 @@ describe('顯示我的名片', () => {
     expect(screen.getAllByTestId('talent-skill').map((el) => el.textContent)).toEqual(['React', 'TypeScript'])
     expect(screen.getByTestId('talent-hours').textContent).toContain('12')
     expect(screen.getByTestId('talent-bio').textContent).toBe('寫前端的。')
-    await new Promise((r) => setTimeout(r, 30))
-    expect(server.calls.length, '開面板多打了請求 —— 內容應該來自 IdentityProvider 手上那份').toBe(before)
+    await act(async () => {})
+    expect(fetchSpy.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input)), '開面板多打了請求 —— 內容應該來自 IdentityProvider 手上那份').toEqual([])
+    fetchSpy.mockRestore()
   })
 
   it('面板開著時身分不再是 signed-in：面板消失、鎖放開', async () => {
@@ -154,7 +157,7 @@ describe('顯示我的名片', () => {
     expect(locked()).toBe(false)
     // 再登入：面板**不會**自己彈回來（開關狀態真的關了，不只是不渲染）。
     act(() => adopt()({ state: 'signed-in', profile: ME }))
-    await screen.findByRole('button', { name: '我的名片' })
+    await screen.findByRole('button', { name: /^我的名片/ })
     expect(screen.queryByTestId('profile-panel'), '身分回來面板自己彈開了 —— 開關狀態沒關').toBeNull()
   })
 })
