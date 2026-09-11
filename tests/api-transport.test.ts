@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConfigError, dataAdapter } from '@/config/env'
-import { AdapterNotImplementedError, buildRequest, send } from '@/api/transport'
+import { AdapterNotImplementedError, NetworkError, buildRequest, send } from '@/api/transport'
 import { ProfileOut } from '@/api/contract/rest'
 
 // 規格：openspec/changes/fe-o02-data-access/specs/data-access/spec.md
@@ -97,5 +97,47 @@ describe('資料存取的傳輸層', () => {
 
   it('[FE-O02-S03] 沒有設定時預設 guildhub —— 今天只有它可用', () => {
     expect(dataAdapter()).toBe('guildhub')
+  })
+})
+
+// 規格：openspec/changes/fe-x03-error-vocabulary/specs/error-vocabulary/spec.md
+//   Requirement: 每一個失敗都有一個封閉種類 —— S08 的來源端：`send()` 是唯一呼叫 `fetch` 的地方，
+//   它把「拿到回應之前失敗」包成 `NetworkError`，而且**只包那一種**。
+describe('fetch 的失敗在 send() 變成 NetworkError', () => {
+  const spec = { method: 'GET', path: '/api/me' } as const
+
+  it('[FE-X03-S08] 連線被拒 → NetworkError，原因留在 cause', async () => {
+    process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
+    // port 9 是 discard，沒有人在聽 —— 不連任何外部服務。
+    process.env.NEXT_PUBLIC_GUILDHUB_REST = 'http://127.0.0.1:9'
+    const error = await send('getMyProfile', spec, ProfileOut).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(NetworkError)
+    expect((error as NetworkError).cause).toBeInstanceOf(TypeError)
+  })
+
+  it('[FE-X03-S17] 被中止的請求原樣往上丟，不包成 NetworkError', async () => {
+    // 包了的話，每一次換頁的中止都會被翻成「連不上伺服器」（實作審查第二輪抓到的）。
+    process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
+    process.env.NEXT_PUBLIC_GUILDHUB_REST = 'http://127.0.0.1:9'
+    const controller = new AbortController()
+    controller.abort()
+    const error = await send('getMyProfile', { ...spec, signal: controller.signal }, ProfileOut).catch(
+      (e: unknown) => e,
+    )
+    expect(error).not.toBeInstanceOf(NetworkError)
+    expect((error as { name?: string }).name).toBe('AbortError')
+  })
+
+  it('[FE-X03-S19] 位址沒設是設定錯誤，不是 NetworkError', async () => {
+    // `buildRequest` 要在 try 外面：設定錯誤包成 NetworkError 就是把「位址沒設」說成「檢查一下網路」。
+    process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
+    process.env.NEXT_PUBLIC_APP_ENV = 'production'
+    delete process.env.NEXT_PUBLIC_GUILDHUB_REST
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const error = await send('getMyProfile', spec, ProfileOut).catch((e: unknown) => e)
+    delete process.env.NEXT_PUBLIC_APP_ENV
+    expect(error).toBeInstanceOf(ConfigError)
+    expect(error).not.toBeInstanceOf(NetworkError)
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

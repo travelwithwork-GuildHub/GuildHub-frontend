@@ -244,10 +244,19 @@ export async function send<T>(
     throw new AdapterNotImplementedError(operation, adapter)
   }
 
+  // ⚠️ `buildRequest` 在 `try` **外面**：它拋的是設定錯誤或程式 bug，
+  // 包成 `NetworkError` 就是把「位址沒設」說成「檢查一下網路」。
+  const request = buildRequest(spec)
   let response: Response
   try {
-    response = await fetch(buildRequest(spec))
+    response = await fetch(request)
   } catch (cause) {
+    // 被中止的請求也是 `fetch` 的 rejection —— 但那是呼叫端自己做的事，不是連不上。
+    // 原樣往上丟，翻譯層認得它（`FE-X03-S17`）。
+    if (cause instanceof Error && cause.name === 'AbortError') throw cause
+    if (typeof DOMException !== 'undefined' && cause instanceof DOMException && cause.name === 'AbortError') {
+      throw cause
+    }
     throw new NetworkError(operation, cause)
   }
 
