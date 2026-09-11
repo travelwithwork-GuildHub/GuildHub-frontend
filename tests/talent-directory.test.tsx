@@ -82,11 +82,15 @@ let server: ContractServer
 const LIST = '/api/profiles'
 const detailPath = (id: string) => `/api/profiles/${id}`
 
+/** 給判準讀世界的輸入鎖（`inputLockRef`）—— 詳情開著時它要是鎖著的（`S13` 的 DOM 半邊）。 */
+const lock: { ref: RefObject<boolean> | null } = { ref: null }
+
 function Grab({ sinkRef }: { sinkRef: RefObject<InteractableRegistry | null> }) {
-  const { registry } = useInteraction()
+  const { registry, inputLockRef } = useInteraction()
   useEffect(() => {
     sinkRef.current = registry
-  }, [sinkRef, registry])
+    lock.ref = inputLockRef
+  }, [sinkRef, registry, inputLockRef])
   return null
 }
 
@@ -171,9 +175,24 @@ describe('詳情蓋在列表上（接線）', () => {
   })
 })
 
-describe('詳情層的 Escape 照今天的全域契約', () => {
-  it('[FE-B04-S14] 詳情開著按 Escape：詳情不再顯示、面板關閉', async () => {
-    // 世界的移動輸入那一半在 `talent-detail-input.test.tsx`（要 three 的 renderer）。
+describe('詳情層的鍵盤不驅動世界，Escape 照今天的全域契約', () => {
+  it('[FE-B04-S13] 詳情開著時，世界的輸入鎖是鎖著的', async () => {
+    // 「鎖著 → 人不動」那一半走真的 LocalPlayer，在 `talent-detail-input.test.tsx`。
+    // 這裡證明的是**詳情開啟與鎖的連動**：詳情蓋在面板上、面板沒關、鎖沒放 ——
+    // 哪天詳情被改成面板外的獨立 modal 而漏接了鎖，這一條會紅（審查指出）。
+    server.replyFor(LIST, 200, [profile(0)])
+    server.replyFor(detailPath(UUID(0)), 200, profile(0))
+    openTalentBoard()
+    await waitFor(() => expect(cards()).toHaveLength(1))
+    expect(lock.ref?.current).toBe(true)
+    fireEvent.click(cards()[0] as HTMLElement)
+    await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
+    expect(lock.ref?.current, '詳情開著，世界的移動輸入沒有鎖').toBe(true)
+    expect(screen.getByTestId('list-panel')).toBeInTheDocument()
+  })
+
+  it('[FE-B04-S14] 詳情開著按 Escape：詳情不再顯示、面板關閉、鎖放開', async () => {
+    // 「鎖放開 → 人走得動」那一半走真的 LocalPlayer，在 `talent-detail-input.test.tsx`。
     server.replyFor(LIST, 200, [profile(0)])
     server.replyFor(detailPath(UUID(0)), 200, profile(0))
     openTalentBoard()
@@ -185,6 +204,7 @@ describe('詳情層的 Escape 照今天的全域契約', () => {
     })
     expect(screen.queryByTestId('talent-detail')).toBeNull()
     expect(screen.queryByTestId('list-panel'), '詳情層的 Escape 沒有照 FE-B01-S16 關面板').toBeNull()
+    expect(lock.ref?.current, '面板關了鎖沒放').toBe(false)
   })
 })
 
@@ -205,6 +225,8 @@ describe('返回列表時，頁碼與捲動位置都還在', () => {
     expect(cards(), '返回之後回到第一頁了').toHaveLength(3)
     expect(cards()[0]?.dataset.profileId).toBe(UUID(PAGE_SIZE))
     expect(calls().filter((c) => c.startsWith(`${LIST}?`)).length, '返回時重打了列表').toBe(listCallsBefore)
+    // 焦點也要還給列表 —— 不還的話鍵盤使用者的下一個 Tab 跑去標題列（真瀏覽器的 e2e 抓到的）。
+    expect(document.activeElement, '返回之後焦點掉到 body 了').toBe(screen.getByRole('list'))
   })
 
   it('[FE-B04-S12] 捲動位置還在，列表在 DOM 裡而且不是 display:none', async () => {

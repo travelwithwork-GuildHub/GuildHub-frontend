@@ -190,15 +190,25 @@ try {
   }
   await page.screenshot({ path: path.join(OUT, 'talent-board-open.png') })
 
-  // ── FE-B04：卡片 → 詳情（真的按 Enter）→ 返回 ────────────────────
-  // 面板開著時焦點在列表上；Tab 一下到第一張卡。
-  await page.keyboard.press('Tab')
-  const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? null)
-  if (focused === 'talent-card') ok('[B04-S05] Tab 一下就到了第一張人才卡（它是可聚焦的按鈕）')
-  else bad('[B04-S05] Tab 之後焦點不在人才卡上', `activeElement 是 ${focused}`)
-  await page.keyboard.press('Enter')
+  // ── FE-B04：卡片 → 詳情（真的按 Enter、再一次真的按 Space）→ 返回 ─────
+  // 面板開著時焦點在列表上；Tab 一下到第一張卡。規格 S05 要 Enter 與 Space **各一次**。
+  for (const keyName of ['Space', 'Enter']) {
+    await page.keyboard.press('Tab')
+    const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? null)
+    if (focused === 'talent-card') ok(`[B04-S05] Tab 一下就到了第一張人才卡（${keyName} 那一輪）`)
+    else bad(`[B04-S05] Tab 之後焦點不在人才卡上（${keyName} 那一輪）`, `activeElement 是 ${focused}`)
+    await page.keyboard.press(keyName)
+    const opened = await page.waitForSelector('[data-testid="talent-detail"]', { timeout: 5_000 }).catch(() => null)
+    if (opened === null) { bad(`[B04-S05] 按 ${keyName} 沒有開出詳情`, ''); continue }
+    ok(`[B04-S05] 按 ${keyName} 開出了詳情`)
+    if (keyName === 'Space') {
+      // Space 那一輪只驗開得了；返回，再用 Enter 走完整條。
+      await page.click('button:has-text("返回")')
+      await page.waitForTimeout(200)
+    }
+  }
   const detail = await page.waitForSelector('[data-testid="talent-detail"][data-phase="ready"]', { timeout: 5_000 }).catch(() => null)
-  if (detail === null) bad('[B04-S05] 按 Enter 沒有開出詳情', '')
+  if (detail === null) bad('[B04-S06] 詳情沒有載入完成', '')
   else {
     const bio = await page.$eval('[data-testid="talent-bio"]', (n) => n.textContent ?? '')
     if (bio.includes('詳情端點回的新自介')) ok('[B04-S06] 詳情呈現的是 GET /api/profiles/{id} 回的那一筆，不是列表那一筆')

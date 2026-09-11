@@ -54,10 +54,12 @@ const key = (type: 'keydown' | 'keyup', code: string) =>
     window.dispatchEvent(new KeyboardEvent(type, { code }))
   })
 
-describe('詳情層的鍵盤不驅動世界', () => {
-  it('[FE-B04-S13] 人才面板開著（詳情蓋在上面也一樣）按方向鍵，角色不動', async () => {
+describe('詳情層的鍵盤不驅動世界（世界那一半：鎖著 → 人不動；放開 → 走得動）', () => {
+  it('[FE-B04-S13] 鎖著的時候按方向鍵，角色不動', async () => {
+    // ⚠️ **這一條沒有真的開詳情**（詳情是 DOM，three 的 renderer 畫不了）。它證明的是
+    // 「面板開著 → 鎖著 → 人不動」；「詳情開著 → 鎖著」在 `talent-directory.test.tsx` 的 S13。
+    // 兩條合起來才是規格的 S13 —— 組合證據，不是單一測試。
     const { renderer, poseRef } = await mounted()
-    // 開人才面板 = 開詳情所需的前提；詳情是面板內的覆蓋層，鎖是同一把。
     await ReactThreeTestRenderer.act(async () => panel().openPanel('profiles'))
     await key('keydown', 'ArrowRight')
     await frames(renderer, 30)
@@ -65,7 +67,7 @@ describe('詳情層的鍵盤不驅動世界', () => {
     await key('keyup', 'ArrowRight')
   })
 
-  it('[FE-B04-S14] Escape 之後面板關了，人走得動', async () => {
+  it('[FE-B04-S14] 面板關了（Escape 的終點），人走得動', async () => {
     const { renderer, poseRef } = await mounted()
     await ReactThreeTestRenderer.act(async () => panel().openPanel('profiles'))
     // Escape 走的是 `ListPanel` 的監聽 → `closePanel`；這裡直接呼叫 `closePanel` 代表那條路的終點，
