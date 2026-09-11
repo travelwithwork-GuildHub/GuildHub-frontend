@@ -34,10 +34,10 @@
 
 對應 Requirement〈CI 只跑 internal；guildhub 在本機〉
 
-- [ ] 5.1 `governance/`：ci.yml 加 job（service container Postgres、`next build` 產物、`test:contract:internal`）＋ `check-contract-ci.py`（解析 YAML）
-- [ ] 5.2 判準：`S15`
+- [x] 5.1 `governance/`：ci.yml 加 job（service container Postgres、`next build` 產物、`test:contract:internal`）＋ `check-contract-ci.py`（解析 YAML）
+- [x] 5.2 判準：`S15`
 
 ## 6. 收尾
 
-- [ ] 6.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠；`test:contract:internal` 在 CI 綠；`test:contract:guildhub` 本機綠（輸出貼進 PR）
-- [ ] 6.2 封存（`archive/fe-o05-contract-tests`，獨立 PR）
+- [x] 6.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠；`test:contract:internal` 在 CI 綠；`test:contract:guildhub` 本機綠（輸出貼進 PR）
+- [x] 6.2 封存（`archive/fe-o05-contract-tests`，下一個 PR）
