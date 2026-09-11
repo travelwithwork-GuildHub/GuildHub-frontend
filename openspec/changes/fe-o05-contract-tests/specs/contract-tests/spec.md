@@ -59,8 +59,9 @@ harness 的 client SHALL 維護 cookie jar（`Set-Cookie` → 後續的 `Cookie`
 
 ### Requirement: 成對邊界從 `limits.ts` 產生
 
-邊界案例 SHALL 由 `tests/contract/boundaries.ts` 從 `LIMITS` **產生**（不是手寫數字）：每一個有 `max` 的欄位 → `max` 個 code point 接受、`max+1` 拒絕；
-有 `min > 0` 的 → `min-1` 拒絕。長度單位 SHALL 是 Unicode code point：`max` 個 CJK 字與 `max` 個 emoji（各是 2 個 UTF-16 code unit）都要接受。
+邊界案例 SHALL 由 `tests/contract/boundaries.ts` 產生：**值**來自 `FE-O06` 的 `boundaryValues(limit)`（`src/api/contract/boundaries.ts`，
+純函式：`max` 個 CJK、`max` 個 emoji 接受；`max+1` 拒絕；`min > 0` 時 `min-1` 拒絕），這裡只負責把每個欄位對到**端點與鍵**（`via`）。
+測試檔 SHALL NOT 出現任何長度數字。
 W2 端點到得了的欄位：`displayName`（`POST /api/login` 的 `nickname`、`PATCH` 的 `display_name`）、`bio`（`PATCH`）。
 到不了的（`messageBody`、`seatIndex`、`password`、`loginId`）SHALL 在表裡標成 `pending: '<能力>'`，測試 SHALL 印出 pending 的清單但不算失敗。
 「拒絕」的形狀由表指定：資料庫 check 擋的是 `500 text/plain`；應用層擋的是 `422`。
@@ -85,8 +86,8 @@ W2 端點到得了的欄位：`displayName`（`POST /api/login` 的 `nickname`�
 ### Requirement: 形狀與型別：兩邊一字不差
 
 以下案例 SHALL 對兩個目標得到相同的 status、`Content-Type`、與 body 形狀（`detail` 的字串逐字相同；422 陣列比 `loc[0]` 與 `type` 的存在）：
-`page=abc`、`page=1.5`、`page=-1`、`status=bogus`、`POST /api/login` 送 `null` body、送非 JSON、缺 `Content-Type`、
-`resume_token` 不是 uuid、`{"nickname": null}`、`{"nickname": 123}`。
+`page=abc`、`page=1.5`、`page=-1`、`status=bogus`、`POST /api/login` 送 body 字面 `null`、送非 JSON 的文字、JSON 但缺 `Content-Type`、
+`resume_token` 不是 uuid、`{"nickname": null}`、`{"nickname": 123}`。**每一個都要有 Scenario 或在 golden 表裡**（`S16`）。
 時間欄位（`updated_at`、`expires_at`）SHALL 是同一個 regex 能匹配的形狀（design 待答：實測真後端後定案，寫進 golden）。
 
 #### Scenario: [FE-O05-S10] 型別強制轉換不會靜默成功
@@ -99,10 +100,16 @@ W2 端點到得了的欄位：`displayName`（`POST /api/login` 的 `nickname`�
 - **WHEN** `POST /api/login` 送 `{"nickname": null}`、`{}`、`{"nickname": 123}`、`{"resume_token": "not-a-uuid"}`
 - **THEN** 四次 SHALL 都是 `422`，`detail` SHALL 是陣列且每一項通過 `ValidationError` 解析
 
-#### Scenario: [FE-O05-S12] golden 形狀對得上
+#### Scenario: [FE-O05-S12] golden 形狀對得上，而且錄製那一次不算驗收
 
-- **WHEN** 對 `guildhub` 目標跑一次，把每個 422 回應的 `{status, contentType, loc[0], type}` 與 `tests/contract/golden/422.json` 比
-- **THEN** SHALL 逐項相同；對 `internal` 跑 SHALL 也相同 —— golden 是兩邊共同的裁判，不是「以 internal 為準」
+- **WHEN** `CONTRACT_RECORD=1` 對 `guildhub` 錄一次（寫 `tests/contract/golden/422.json`），再**不帶** `CONTRACT_RECORD` 對 `guildhub` 與 `internal` 各跑一次
+- **THEN** 錄製那一次 SHALL 回報「已錄製，不算通過」（exit code 非 0 或明確標記），之後兩次 SHALL 逐項相同；
+  compare 模式下 golden 檔 SHALL 是唯讀（跑完 `git diff` 沒有變化）
+
+#### Scenario: [FE-O05-S16] body 的三種壞法與負頁碼
+
+- **WHEN** `POST /api/login` 分別送：body 字面 `null`、文字 `not json`、合法 JSON 但沒有 `Content-Type`；以及 `GET /api/profiles?page=-1`
+- **THEN** 前三個的 `{status, contentType, loc[0]?}` SHALL 與 golden 相同（兩個目標）；`page=-1` SHALL 與 `page=0` 回同樣的 20 筆（兩個目標）
 
 ### Requirement: WS 契約對兩邊各跑一次
 
@@ -126,7 +133,8 @@ CI SHALL 有一個 job 跑 `CONTRACT_TARGET=internal`（service container 的 Po
 CI SHALL NOT 設定 `GUILDHUB_BACKEND_DIR`，也 SHALL NOT 有任何步驟跑 `contract-guildhub.mjs`。
 `npm run test:contract:internal`、`npm run test:contract:guildhub` 兩個指令 SHALL 存在；後者就是 wrapper。
 
-#### Scenario: [FE-O05-S15] CI 的 job 存在且只跑 internal
+#### Scenario: [FE-O05-S15] CI 的 job 結構：有 Postgres service、跑 internal、不起真後端
 
-- **WHEN** 讀 `.github/workflows/ci.yml`
-- **THEN** SHALL 有一個 step 跑 `test:contract:internal`；SHALL 沒有任何一行含 `guildhub` 目標或 `run.sh`（`test-progress-check` 那類的自檢腳本比對）
+- **WHEN** 解析 `.github/workflows/ci.yml` 的 YAML
+- **THEN** SHALL 存在一個 job：`services` 裡有 `postgres`，且某個 step 的 `run` 含 `test:contract:internal`；
+  所有 job 的所有 step 的 `run`／`uses` SHALL 沒有 `contract-guildhub`、`run.sh`、`CONTRACT_TARGET=guildhub`（比的是 step 內容，不是整檔文字 —— 註解與 step 名稱不算）

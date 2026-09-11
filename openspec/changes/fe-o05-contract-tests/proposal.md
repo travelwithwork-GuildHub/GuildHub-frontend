@@ -16,7 +16,9 @@ WBS：「這是唯一能防止本地後端漂走的東西。」
 - **唯一一份**契約測試 `tests/contract/**`，同一組對兩個目標各跑一次：`CONTRACT_TARGET=internal`（harness 自己起 `next start`＋可拋棄 Postgres）
   與 `CONTRACT_TARGET=guildhub`（wrapper 自己起 `./run.sh`，DB 指向可拋棄的庫）。**兩邊都走真 HTTP**，不 import Route Handler。
 - 契約 client：cookie jar（Node 的 `fetch` 不會自己記 `Set-Cookie`）、**raw request**（不經 `operations.ts` 的 Zod —— 經過的話 `max+1` 在送出前就被擋，永遠看不到後端）。
-- **成對邊界從 `limits.ts` 產生**：`max` 接受、`max+1` 拒絕；有 `min` 的加 `min-1` 拒絕。只送超長抓不到收緊。
+- **成對邊界從 `limits.ts` 產生**：值由 `FE-O06` 的 `boundaryValues()` 算（`max` 接受、`max+1` 拒絕；有 `min` 的加 `min-1` 拒絕），這裡對到端點。只送超長抓不到收緊。
+- **順序與所有權**：這一列先出 **harness 片**（`vitest.contract.mts`、`tests/contract/harness.ts`、`client.ts`、wrapper；判準 `S01`～`S06`，其中 `S03` 對 guildhub 驗）
+  → `FE-O03` 加自己端點的案例 → 這一列再出邊界／golden／WS／CI 片。harness 只有這裡有。
 - 空字串、純空白、Unicode 長度單位（code point，不是 UTF-16 code unit）、`null` 與缺欄、型別強制轉換、status 與 error shape、拒絕後不得部分寫入。
 - WS：未知 `t`、浮點座標、超長狀態文字、靜止時封包數為 0 —— 對替身與真後端各跑一次。
 - **CI 只跑 `internal`**（`.github/` 的 job 走 `governance/` PR）；`guildhub` 那一輪在本機跑，**只准打自己起的**：位址必須是 loopback，而且 wrapper 持有自己起的 PID。

@@ -22,15 +22,17 @@
 
 `.env.example` 的 `TEST_DATABASE_URL` 在後端是給**它自己的** pytest 用的（會 drop schema）；我們不碰它，也不碰它的 `DATABASE_URL` 開發庫。
 
-## D4｜邊界表是資料，測試是迴圈
+## D4｜邊界表是資料，測試是迴圈；值在 `FE-O06`，端點在這裡
 
-`boundaries.ts` 匯出 `BOUNDARY_CASES: Array<{ field, via: { method, path, key }, accept: string[], reject: Array<{ value, expect: 500 | 422 }>, pending?: string }>`，
-從 `LIMITS` 算出來。測試 `for (const c of BOUNDARY_CASES)` 一條一條打。`pending` 的印出來不跑。
-`FE-O06` 盯的就是這個檔案「真的從 `LIMITS` 取值」（`FE-O06-S01`）。
+`src/api/contract/boundaries.ts`（`FE-O06`）：`boundaryValues(limit) → { accept: string[], reject: string[] }`，純函式。
+`tests/contract/boundaries.ts`（這裡）：`BOUNDARY_CASES: Array<{ field, via: { method, path, key }, expectReject: 500 | 422, pending?: string }>`，
+測試 `for (const c of BOUNDARY_CASES)` 用 `boundaryValues(LIMITS[c.field])` 的值一條一條打。`pending` 的印出來不跑。
+所以 `FE-O06` 可以先做（純函式有自己的判準），這裡接上。
 
-## D5｜golden 是兩邊共同的裁判
+## D5｜golden 是兩邊共同的裁判；錄製那一次不算通過
 
-`tests/contract/golden/422.json` 由**第一次對 guildhub 跑**時產生（`CONTRACT_RECORD=1`），之後兩邊都對它比。
+`tests/contract/golden/422.json` 由 `CONTRACT_RECORD=1` 對 guildhub 跑產生。**錄製模式 exit 非 0 並印「已錄製」** ——
+同一次執行既寫又比是把輸出跟自己比（審查抓到的恆真通道）。之後兩邊都在 compare 模式對它比，compare 模式不寫檔。
 「以 internal 為準」會讓替身的形狀變成契約；「以 guildhub 每次的即時回應為準」在 CI 沒有 guildhub。golden 檔進版控，重錄要 PR。
 
 ## 待答問題
@@ -44,7 +46,7 @@
 - `S01`、`S02`、`S04`：純檔案／環境變數判準，`npm test` 裡跑（不需要後端）。
 - `S03`、`S07`～`S14`：契約套件本身（`internal` 在 CI；`guildhub` 本機）。
 - `S05`、`S06`：wrapper 的判準（node 測試，起一個假的 8000 監聽 → wrapper 要拒絕）。
-- `S15`：`.github/scripts/test-*.sh` 形狀的自檢（走 `governance/`）。
+- `S15`：`.github/scripts/check-contract-ci.py` 解析 YAML 看 job 結構（走 `governance/`）；`S16`：golden。
 - **不連任何團隊共用的位址。**
 - 驗收不是全綠：`S09` 本身就是突變；jar 拿掉 → `S03` 紅；loopback 檢查拿掉 → `S04` 紅；wrapper 借用既有 8000 → `S05` 紅；
   邊界表寫死數字 → `FE-O06-S01` 紅。
