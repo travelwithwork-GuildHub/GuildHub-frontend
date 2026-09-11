@@ -33,7 +33,7 @@ import next from 'eslint-config-next'
 const DATA_ACCESS_PATHS = ['src/api/**', 'src/app/api/**']
 // 契約測試（FE-O05）刻意走真 HTTP、**刻意不經 `src/api/`**（經過的話 `max+1` 在送出前就被 Zod 擋掉，看不到後端）。
 // 精確到檔案，不是 `tests/**`：測試檔裡順手 fetch 的那一次還是要被擋。
-const CONTRACT_HTTP_PATHS = ['tests/contract/client.ts', 'tests/contract/harness.ts', 'scripts/contract-guildhub.mjs']
+const CONTRACT_HTTP_PATHS = ['tests/contract/client.ts', 'tests/contract/harness.ts', 'scripts/contract-guildhub.mjs', 'tests/contract/ws/rooms.contract.ts']
 // 本地後端問即時層替身人數（FE-O03 design D5）：伺服器對自己 loopback 的一次 HTTP，跟「元件裡的 fetch」是兩件事。精確到檔案。
 const SERVER_LOOPBACK_PATHS = ['src/server/realtime.ts']
 

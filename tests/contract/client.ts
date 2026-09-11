@@ -98,11 +98,22 @@ export function unimplemented(): string[] {
   return inject('contractUnimplemented')
 }
 
+/** 替身的 `/online` 查詢口；真後端沒有 → null。 */
+export function onlineUrl(): string | null {
+  return inject('contractOnlineUrl')
+}
+/** 一間 seed 房間的 scene 與 token；真後端的 token 由 `enter` 簽發（W4）→ null。 */
+export function roomToken(): { scene: string; token: string; malformed: { scene: string; token: string } } | null {
+  return inject('contractRoomToken')
+}
+
 declare module 'vitest' {
   export interface ProvidedContext {
     contractBaseUrl: string
     contractWsUrl: string
     contractDatabaseUrl: string
     contractUnimplemented: string[]
+    contractOnlineUrl: string | null
+    contractRoomToken: { scene: string; token: string; malformed: { scene: string; token: string } } | null
   }
 }

@@ -18,7 +18,8 @@
     "db:reset": "node scripts/db.mjs reset",
     "db:seed": "node scripts/db.mjs seed",
     "test:contract:internal": "CONTRACT_TARGET=internal vitest run --config vitest.contract.mts",
-    "test:contract:guildhub": "node scripts/contract-guildhub.mjs"
+    "test:contract:guildhub": "node scripts/contract-guildhub.mjs",
+    "realtime:stub": "tsx scripts/realtime-stub.ts"
   },
   "dependencies": {
     "@react-three/fiber": "9.7.0",
@@ -43,6 +44,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@types/three": "0.185.4",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "6.1.1",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.4",
@@ -50,8 +52,10 @@
     "lockfile-lint": "5.0.1",
     "playwright-core": "^1.63.0",
     "tailwindcss": "4.3.3",
+    "tsx": "^4.23.13",
     "typescript": "6.0.3",
     "vite": "8.2.2",
-    "vitest": "5.0.0"
+    "vitest": "5.0.0",
+    "ws": "^8.21.3"
   }
 }

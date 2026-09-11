@@ -7,6 +7,7 @@
 // **不連任何團隊共用的位址；不接受任何既有的程序。**
 
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
+import { createHmac } from 'node:crypto'
 import { access } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import net from 'node:net'
@@ -156,6 +157,9 @@ export default async function setup(project: TestProject): Promise<() => Promise
     project.provide('contractDatabaseUrl', assertLoopbackDb(process.env.INTERNAL_TEST_DATABASE_URL))
     // 真後端 17 個端點都在。
     project.provide('contractUnimplemented', [])
+    // 真後端沒有 `/online`，room token 由 `enter` 簽發（W4）：這兩個能力在這一輪不存在。
+    project.provide('contractOnlineUrl', null)
+    project.provide('contractRoomToken', null)
     return async () => {}
   }
 
@@ -170,6 +174,32 @@ export default async function setup(project: TestProject): Promise<() => Promise
   })
   await reset({ url: db.url })
 
+  // 即時層替身：另一個程序、另一個 port；`GET /api/rooms` 透過 INTERNAL_REALTIME_PORT 找到它。
+  const stubPort = await freePort()
+  const stub = spawn('npx', ['tsx', 'scripts/realtime-stub.ts'], {
+    cwd: ROOT,
+    env: { ...process.env, INTERNAL_DATABASE_URL: db.url, INTERNAL_SESSION_SECRET: CONTRACT_SESSION_SECRET, INTERNAL_REALTIME_PORT: String(stubPort) },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  })
+  let stubLog = ''
+  const collectStub = (d: Buffer) => {
+    stubLog += d.toString()
+  }
+  stub.stdout?.on('data', collectStub)
+  stub.stderr?.on('data', collectStub)
+  try {
+    await waitForLine(stub, () => stubLog, new RegExp(`ws://127\\.0\\.0\\.1:${stubPort}/ws`), 30_000)
+  } catch (e) {
+    await stop(stub)
+    throw e
+  } finally {
+    stub.stdout?.off('data', collectStub)
+    stub.stderr?.off('data', collectStub)
+    stub.stdout?.resume()
+    stub.stderr?.resume()
+  }
+
   const port = await freePort()
   const base = `http://127.0.0.1:${port}`
   const child = spawn('npx', ['next', 'start', '-p', String(port), '-H', '127.0.0.1'], {
@@ -178,6 +208,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
       ...process.env,
       INTERNAL_DATABASE_URL: db.url,
       INTERNAL_SESSION_SECRET: CONTRACT_SESSION_SECRET,
+      INTERNAL_REALTIME_PORT: String(stubPort),
       NEXT_PUBLIC_APP_ENV: 'local',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -194,6 +225,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
     await waitUntilReady(child, port, 60_000, () => log)
   } catch (e) {
     await stop(child)
+    await stop(stub)
     throw e
   } finally {
     child.stdout?.off('data', collect)
@@ -202,12 +234,51 @@ export default async function setup(project: TestProject): Promise<() => Promise
     child.stderr?.resume()
   }
   project.provide('contractBaseUrl', assertLoopbackBase(base, 'internal base'))
-  project.provide('contractWsUrl', `ws://127.0.0.1:${port}/ws`)
+  project.provide('contractWsUrl', `ws://127.0.0.1:${stubPort}/ws`)
   project.provide('contractDatabaseUrl', db.url)
+  project.provide('contractOnlineUrl', `http://127.0.0.1:${stubPort}/online`)
+  // seed 第一間 active 專案的房間 token（`HMAC(secret, scene)`，跟替身同一把）—— 給 S22 用。
+  const sign = (scene: string) => createHmac('sha256', CONTRACT_SESSION_SECRET).update(scene).digest('base64url')
+  project.provide('contractRoomToken', {
+    scene: 'room:22222222-0000-4000-8000-0000000000f1',
+    token: sign('room:22222222-0000-4000-8000-0000000000f1'),
+    // 一個 uuid 不合法、但 token 算對的 scene：替身要因為「不是 uuid」拒絕，不是因為 token（只擋 token 的實作會放它進去）。
+    malformed: { scene: 'room:------------------------------------', token: sign('room:------------------------------------') },
+  })
   // 本地版 W2 刻意沒做的端點（`FE-O03-S05`）：測試對這些要求 Next 自己的 404／405、不是本地版假造的 detail。
   // 這是目標的**能力**，不是目標的名字 —— 測試檔仍然不知道自己在打誰。
   project.provide('contractUnimplemented', ['POST /api/projects', 'GET /api/messages', 'POST /api/messages', 'GET /api/projects/{id}/seats'])
   return async () => {
     await stop(child)
+    await stop(stub)
   }
+}
+
+/** 等某個子程序的輸出出現某段字（替身印出它聽的位址）；先退出就失敗。 */
+function waitForLine(child: ChildProcess, log: () => string, pattern: RegExp, ms: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timer)
+      child.stdout?.off('data', check)
+      child.stderr?.off('data', check)
+      child.off('exit', onExit)
+    }
+    const timer = setTimeout(() => {
+      cleanup()
+      reject(new Error(`${ms} ms 內沒有看到 ${pattern}\n${log()}`))
+    }, ms)
+    const check = () => {
+      if (pattern.test(log())) {
+        cleanup()
+        resolve()
+      }
+    }
+    const onExit = (code: number | null) => {
+      cleanup()
+      reject(new Error(`程序在 ready 之前就退出了（code ${code}）\n${log()}`))
+    }
+    child.stdout?.on('data', check)
+    child.stderr?.on('data', check)
+    child.once('exit', onExit)
+  })
 }
