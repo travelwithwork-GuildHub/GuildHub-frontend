@@ -28,7 +28,7 @@
 對應 Requirement〈網址改變時世界不重掛〉
 
 - [ ] 4.1 判準：`S12` 的 jsdom 探針（輔）
-- [ ] 4.2 Playwright（`S12` 主判準）：深連結直達開詳情、Escape 兩次、上一頁、下一頁，`canvas` element handle 仍連著且唯一；截圖進 `docs/evidence/fe-b09/`
+- [ ] 4.2 Playwright（`S12` 主判準，序列與 `S12` 完全一致）：從 `/world` 走到看板按 E 開清單、點卡開詳情、上一頁、下一頁、Escape 兩次；一開始抓住的 `canvas` element handle 仍連著且唯一；`S11` 的深連結直達 Escape 另跑一段；截圖進 `docs/evidence/fe-b09/`
 
 ## 5. 收尾
 
