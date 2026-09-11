@@ -49,6 +49,26 @@ describe('createOptimistic', () => {
     expect(h.calls.restore).toBe(1)
   })
 
+  it('request 同步拋錯（Promise 還沒建出來）：一樣還原、一樣解鎖（審查抓到會永遠 in-flight）', async () => {
+    let state = 'A'
+    const optimistic = createOptimistic<string, string, string>({
+      snapshot: () => state,
+      apply: (input) => {
+        state = input
+      },
+      request: () => {
+        throw new Error('sync boom')
+      },
+      restore: (snapshot) => {
+        state = snapshot
+      },
+    })
+    const r = await optimistic.run('B')
+    expect(r).toEqual({ ok: false, reason: 'failed', error: expect.any(Error), input: 'B' })
+    expect(state).toBe('A')
+    expect(optimistic.inFlight).toBe(false)
+  })
+
   it('[FE-X05-S09] 成功以伺服器值為準', async () => {
     const h = harness()
     const p = h.optimistic.run('B')

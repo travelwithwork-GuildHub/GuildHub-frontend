@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { signInWithNickname, signInWithRecoveryKey } from '@/identity/session'
 import { NicknameLengthError, RecoveryKeyRejectedError, type Identity } from '@/identity/types'
@@ -82,7 +83,8 @@ export function LoginForm() {
     onSubmit: async ({ key }) => setIdentity(await signInWithRecoveryKey(key, { remember: nick.form.getValues('remember') })),
     describeError: describeDomainError,
   })
-  const nickname = nick.form.watch('nickname')
+  // `useWatch` 只訂閱這一欄（`form.watch()` 在 render 裡是整份訂閱，也是 React Compiler 認定的不相容用法）。
+  const nickname = useWatch({ control: nick.form.control, name: 'nickname' })
   const nicknameRemaining = remaining(LIMITS.displayName, nickname)
   const nicknameViolation = violates(LIMITS.displayName, nickname)
   // 兩個表單其中一個在送，另一個也不能按（跟遷移前一樣：一個人一次只建立一個身分）。

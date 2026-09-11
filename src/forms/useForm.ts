@@ -48,11 +48,26 @@ export interface FormApi<TInput extends FieldValues, TOutput extends FieldValues
   onSubmit: (event?: React.BaseSyntheticEvent) => Promise<void>
 }
 
+type LeafError = { type?: string; message?: string; types?: Record<string, unknown> }
+const isLeaf = (node: object): node is LeafError => 'type' in node || 'message' in node || 'types' in node
+
+/** RHF 的 `FieldErrors` 是巢狀的（`profile.nickname`、`skills.0`）；攤平成 RHF 的 path，跟 `register()` 的名字對得起來。 */
+function leaves(node: unknown, prefix: string, out: Array<[string, LeafError]>) {
+  if (typeof node !== 'object' || node === null) return
+  if (isLeaf(node)) {
+    out.push([prefix, node])
+    return
+  }
+  for (const [key, child] of Object.entries(node)) leaves(child, prefix ? `${prefix}.${key}` : key, out)
+}
+
 function classify<TInput extends FieldValues>(errors: FieldErrors<TInput>, submitted: boolean) {
   const visible: Partial<Record<Path<TInput>, string>> = {}
   let hasImmediate = false
-  for (const [name, error] of Object.entries(errors) as Array<[Path<TInput>, { type?: string; message?: string; types?: Record<string, unknown> } | undefined]>) {
-    if (!error) continue
+  const flat: Array<[string, LeafError]> = []
+  leaves(errors, '', flat)
+  for (const [path, error] of flat) {
+    const name = path as Path<TInput>
     // criteriaMode 'all'：一個欄位可能同時有多個 code；只要有一個不是 deferred 就是即時。
     const codes = error.types ? Object.keys(error.types) : error.type ? [error.type] : []
     const immediate = codes.some((c) => !DEFERRED_CODES.has(c))
@@ -91,21 +106,33 @@ export function useForm<TSchema extends z.ZodType<FieldValues, FieldValues>>({
   const { visible, hasImmediate } = classify<TInput>(form.formState.errors, form.formState.submitCount > 0)
 
   const submit = useCallback(
-    (event?: React.BaseSyntheticEvent) =>
-      form.handleSubmit(async (values) => {
-        if (inFlightRef.current) return
-        inFlightRef.current = true
-        setBusy(true)
-        setSubmitError(null)
-        try {
-          await onSubmit(values as z.output<TSchema>)
-        } catch (cause) {
-          setSubmitError(describeError?.(cause) ?? toUiError(cause).message)
-        } finally {
-          inFlightRef.current = false
-          setBusy(false)
-        }
-      })(event),
+    (event?: React.BaseSyntheticEvent) => {
+      // guard 與 busy 在 submit 事件的**當下**就設，不等 resolver（它是非同步的；等它的話「立刻進入 busy」會晚幾個 microtask，
+      // 同一批次的第二個 submit 也會溜過 —— 審查抓到的）。驗證沒過 → 解鎖，鈕照 S02 仍可按。
+      if (inFlightRef.current) {
+        event?.preventDefault?.()
+        return Promise.resolve()
+      }
+      inFlightRef.current = true
+      setBusy(true)
+      setSubmitError(null)
+      const release = () => {
+        inFlightRef.current = false
+        setBusy(false)
+      }
+      return form.handleSubmit(
+        async (values) => {
+          try {
+            await onSubmit(values as z.output<TSchema>)
+          } catch (cause) {
+            setSubmitError(describeError?.(cause) ?? toUiError(cause).message)
+          } finally {
+            release()
+          }
+        },
+        () => release(),
+      )(event)
+    },
     [form, onSubmit, describeError],
   )
 

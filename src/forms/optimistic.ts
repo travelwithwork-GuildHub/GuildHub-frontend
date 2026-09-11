@@ -30,14 +30,22 @@ export function createOptimistic<TInput, TSnapshot, TValue>(options: OptimisticO
       if (inFlight) return Promise.resolve({ ok: false, reason: 'in-flight' })
       inFlight = true
       const snapshot = options.snapshot()
-      options.apply(input)
-      return options
-        .request(input)
+      const failed = (error: unknown): OptimisticResult<TInput, TValue> => {
+        options.restore(snapshot)
+        return { ok: false, reason: 'failed', error, input }
+      }
+      // `apply`／`request` **同步**拋錯（request 在建出 Promise 之前就炸）也要還原、也要解鎖 —— 不然快照丟了、實例永遠 in-flight（審查抓到的）。
+      let pending: Promise<TValue>
+      try {
+        options.apply(input)
+        pending = options.request(input)
+      } catch (error) {
+        inFlight = false
+        return Promise.resolve(failed(error))
+      }
+      return pending
         .then((value): OptimisticResult<TInput, TValue> => ({ ok: true, value }))
-        .catch((error: unknown): OptimisticResult<TInput, TValue> => {
-          options.restore(snapshot)
-          return { ok: false, reason: 'failed', error, input }
-        })
+        .catch(failed)
         .finally(() => {
           inFlight = false
         })

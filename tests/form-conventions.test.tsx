@@ -43,10 +43,15 @@ function Fixture({ onSent, describeError }: { onSent?: (count: number) => void; 
     },
     describeError,
   })
+  // 規格：欄位錯誤用 aria-invalid ＋ aria-describedby 掛到欄位，不各自 role=alert。
   const field = (name: 'a' | 'b' | 'c' | 'd' | 'n') => (
     <div>
-      <input {...form.register(name)} aria-label={name} aria-invalid={visibleErrors[name] ? true : undefined} />
-      {visibleErrors[name] && <span data-testid={`error-${name}`}>{visibleErrors[name]}</span>}
+      <input {...form.register(name)} aria-label={name} aria-invalid={visibleErrors[name] ? true : undefined} aria-describedby={visibleErrors[name] ? `error-${name}` : undefined} />
+      {visibleErrors[name] && (
+        <span id={`error-${name}`} data-testid={`error-${name}`}>
+          {visibleErrors[name]}
+        </span>
+      )}
     </div>
   )
   return (
@@ -104,6 +109,9 @@ describe('驗證時機', () => {
     await type('d', '字'.repeat(21))
     await waitFor(() => expect(error('d')?.textContent).toBe('d 最多 20 字'))
     expect(button().disabled).toBe(true)
+    // 錯誤文字跟欄位有無障礙關聯：aria-describedby 指到那個元素、aria-invalid 是 true。
+    expect(input('d').getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById(input('d').getAttribute('aria-describedby') ?? '')).toBe(error('d'))
     await type('d', '字'.repeat(20))
     await waitFor(() => expect(error('d')).toBeNull())
     expect(button().disabled).toBe(false)
@@ -159,12 +167,16 @@ describe('驗證時機', () => {
 })
 
 describe('送出中、失敗、重試', () => {
-  it('[FE-X05-S05] 連按兩次只送一次', async () => {
+  it('[FE-X05-S05] 連按兩次只送一次；busy 在 submit 的當下就生效', async () => {
     server.reply(200, { ok: true })
     render(<Fixture />)
     await fill()
-    await act(async () => {
+    // 同步的 act：resolver 還沒跑完，鈕就已經 disabled（規格「送出開始 SHALL 立刻進入 busy」）。
+    act(() => {
       button().form?.requestSubmit()
+    })
+    expect(button().disabled, 'busy 等到 resolver 跑完才生效').toBe(true)
+    await act(async () => {
       button().form?.requestSubmit()
     })
     await waitFor(() => expect(server.calls).toHaveLength(1))
@@ -225,5 +237,35 @@ describe('LoginForm 遷到同一套', () => {
     expect((screen.getByLabelText('貼上你的恢復金鑰') as HTMLInputElement).name).toBe('key')
     // 兩個表單、還沒失敗：沒有任何 alert（欄位提示不是 alert）。
     expect(screen.queryAllByRole('alert')).toHaveLength(0)
+  })
+})
+
+describe('巢狀欄位', () => {
+  const Nested = z.object({ p: z.object({ q: z.string().max(3, { error: 'q 最多 3 字' }) }), list: z.array(z.string().max(2, { error: '項目最多 2 字' })) })
+  function NestedFixture() {
+    const { form, visibleErrors, canSubmit } = useForm({ schema: Nested, defaultValues: { p: { q: '' }, list: ['', ''] }, onSubmit: async () => {} })
+    return (
+      <form noValidate>
+        <input {...form.register('p.q')} aria-label="p.q" />
+        <input {...form.register('list.1')} aria-label="list.1" />
+        <span data-testid="error-p.q">{visibleErrors['p.q']}</span>
+        <span data-testid="error-list.1">{visibleErrors['list.1']}</span>
+        <button type="submit" disabled={!canSubmit}>
+          送出
+        </button>
+      </form>
+    )
+  }
+  it('巢狀物件與陣列的即時錯誤：路徑對得上 register、也算進禁用（審查抓到只看頂層）', async () => {
+    render(<NestedFixture />)
+    await type('p.q', '四個字了')
+    await waitFor(() => expect(screen.getByTestId('error-p.q').textContent).toBe('q 最多 3 字'))
+    expect(button().disabled).toBe(true)
+    await type('p.q', '三個字')
+    await waitFor(() => expect(screen.getByTestId('error-p.q').textContent).toBe(''))
+    expect(button().disabled).toBe(false)
+    await type('list.1', '三個字')
+    await waitFor(() => expect(screen.getByTestId('error-list.1').textContent).toBe('項目最多 2 字'))
+    expect(button().disabled).toBe(true)
   })
 })
