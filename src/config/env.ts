@@ -73,6 +73,20 @@ export class ConfigError extends Error {
   override name = 'ConfigError'
 }
 
+/**
+ * 本地後端的資料庫連線字串。規格 `FE-O04`。**只在伺服器端讀**（Route Handlers、`src/server/`），
+ * 沒有 `NEXT_PUBLIC_` 前綴 —— 連線字串進 client bundle 就是外洩。
+ * 缺席回 `null`：`internal` adapter 沒有資料庫時 `src/server/db.ts` 會拋 `ConfigError`，不是連到某個預設值。
+ */
+export function internalDatabaseUrl(): string | null {
+  return read(process.env.INTERNAL_DATABASE_URL)
+}
+
+/** 測試用的另一個庫。**必須跟上面那個不同**；判斷在 `tests/support/test-db.ts`（那裡才是 skip／拒絕的決定點）。 */
+export function internalTestDatabaseUrl(): string | null {
+  return read(process.env.INTERNAL_TEST_DATABASE_URL)
+}
+
 /** 空字串跟沒設定是同一件事 —— 見檔頭。 */
 function read(value: string | undefined): string | null {
   return value ? value : null
