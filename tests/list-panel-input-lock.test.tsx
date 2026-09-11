@@ -66,6 +66,19 @@ describe('面板開著的時候，鍵盤是面板的', () => {
     await key('keyup', 'ArrowRight')
   })
 
+  it('[FE-B01-S18] 面板開啟中，方向鍵的預設行為是面板的（捲動），角色 SHALL NOT 吃掉它', async () => {
+    // 每幀清掉按鍵擋得住「走路」，擋不住這一種：角色的 keydown 還是 `preventDefault()` 了，
+    // 面板裡按 ↓ 什麼都不會捲。
+    await mounted()
+    await ReactThreeTestRenderer.act(async () => panel().openPanel('projects'))
+    const event = new KeyboardEvent('keydown', { code: 'ArrowDown', cancelable: true })
+    await ReactThreeTestRenderer.act(async () => {
+      window.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented, '面板開著，角色還是把方向鍵的預設行為吃掉了').toBe(false)
+    await key('keyup', 'ArrowDown')
+  })
+
   it('[FE-B01-S18] 按著方向鍵的時候面板開了，角色 SHALL 停下來', async () => {
     // 走著走著按 E：`keydown` 早就收了，光擋 `keydown` 擋不住這一種。
     const { renderer, poseRef } = await mounted()
