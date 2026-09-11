@@ -50,8 +50,8 @@ describe('register', () => {
 
   it('[FE-A08-S15] 兩個人同時註冊同一個帳號：恰好一個 200、一個 409，沒有 500', async () => {
     const loginId = fresh('race')
-    // 暱稱也要這一次獨有（資料庫跨重跑累積；第 0 頁本來就有一張「乙」會誤判）；nickname 上限 20，短尾碼就好。
-    const tag = Math.random().toString(36).slice(2, 8)
+    // 暱稱也要這一次獨有（資料庫跨重跑累積；第 0 頁本來就有一張「乙」會誤判）：從已經獨有的 loginId 派生，nickname 上限 20。
+    const tag = loginId.slice(-19)
     const nickA = `甲${tag}`
     const nickB = `乙${tag}`
     const ca = new ContractClient(baseUrl())
