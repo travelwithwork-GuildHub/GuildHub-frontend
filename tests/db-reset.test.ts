@@ -155,6 +155,26 @@ describe('守門不需要資料庫', () => {
     expect(Date.now() - started, '花太久 —— 像是真的去連了').toBeLessThan(500)
   })
 
+  it('[FE-O04-S07] query 帶 host／port／dbname：拒絕，而且零連線（pg 會用它們覆寫 authority）', async () => {
+    let connections = 0
+    const server = net.createServer((socket) => {
+      connections += 1
+      socket.destroy()
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const port = (server.address() as net.AddressInfo).port
+    try {
+      for (const q of ['host=db.example.com', `port=${port}`, 'dbname=other', 'hostaddr=10.0.0.1']) {
+        await expect(reset({ url: `postgresql://u:p@localhost:${port}/x?${q}` }), q).rejects.toThrow(/query 不得帶/)
+      }
+      await new Promise((r) => setTimeout(r, 50))
+      expect(connections).toBe(0)
+      expect(() => testDatabase({ INTERNAL_DATABASE_URL: 'postgresql://u:p@localhost/dev', INTERNAL_TEST_DATABASE_URL: 'postgresql://u:p@localhost/test?host=db.example.com' })).toThrow(/不得帶/)
+    } finally {
+      server.close()
+    }
+  })
+
   it('[FE-O04-S10] 測試庫等於開發庫：拒絕 —— 等價的寫法也算同一個庫', () => {
     const dev = 'postgresql://guildhub:guildhub@localhost:5432/guildhub_frontend'
     for (const test of [

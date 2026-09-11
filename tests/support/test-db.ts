@@ -20,9 +20,22 @@ export function databaseIdentity(url: string): string {
   }
 }
 
+/** query 帶 host／port／dbname 之類會改連線目標的參數：`pg` 會用它們覆寫 authority，identity 就算錯了。一律拒絕。 */
+function assertNoEndpointOverride(url: string, name: string): void {
+  try {
+    const u = new URL(url)
+    const bad = ['host', 'hostaddr', 'port', 'dbname', 'service'].filter((k) => u.searchParams.has(k))
+    if (bad.length > 0) throw new Error(`${name} 的 query 不得帶 ${bad.join('、')} —— pg 會用它們覆寫連線目標。`)
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('不得帶')) throw e
+  }
+}
+
 export function testDatabase(env: Record<string, string | undefined> = process.env): TestDatabase {
   const test = env.INTERNAL_TEST_DATABASE_URL || null
   const dev = env.INTERNAL_DATABASE_URL || null
+  if (test !== null) assertNoEndpointOverride(test, 'INTERNAL_TEST_DATABASE_URL')
+  if (dev !== null) assertNoEndpointOverride(dev, 'INTERNAL_DATABASE_URL')
   if (test !== null && dev !== null && databaseIdentity(test) === databaseIdentity(dev)) {
     throw new Error('INTERNAL_TEST_DATABASE_URL 跟 INTERNAL_DATABASE_URL 是同一個庫 —— 測試會清空它。兩者必須分開。')
   }

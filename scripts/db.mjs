@@ -36,7 +36,14 @@ export class DbScriptError extends Error {
   name = 'DbScriptError'
 }
 
-/** 只接受 loopback。回傳解析過的 URL 物件；不合格就拋，**不建立任何連線**。 */
+/**
+ * query 裡會改變「連到哪裡、哪個庫」的參數。`pg` 真的會用它們覆寫 authority（實測：
+ * `postgresql://u:p@localhost/x?host=db.example.com&port=5433&dbname=y` 解析出 host=db.example.com）——
+ * 只看 hostname 的守門會被繞過（審查抓到的）。一律拒絕，不做「正規化」。
+ */
+export const ENDPOINT_PARAMS = ['host', 'hostaddr', 'port', 'dbname', 'service']
+
+/** 只接受 loopback，而且 query 不得改端點。回傳解析過的 URL 物件；不合格就拋，**不建立任何連線**。 */
 export function assertLoopback(url) {
   let parsed
   try {
@@ -48,6 +55,10 @@ export function assertLoopback(url) {
     throw new DbScriptError(
       `只接受 loopback（localhost／127.0.0.1／::1），拒絕 ${parsed.hostname}。這支腳本會清空資料庫，不對任何非本機的位址動手。`,
     )
+  }
+  const overriding = ENDPOINT_PARAMS.filter((k) => parsed.searchParams.has(k))
+  if (overriding.length > 0) {
+    throw new DbScriptError(`連線字串的 query 不得帶 ${overriding.join('、')} —— pg 會用它們覆寫連線目標，loopback 檢查就形同虛設。`)
   }
   return parsed
 }
@@ -94,8 +105,10 @@ async function userTableCount(client) {
  */
 export async function reset({ url, init = false, dir = SCHEMA_DIR }) {
   assertLoopback(url)
-  // 檔案先驗（標頭、能不能讀），再碰資料庫：驗不過就什麼都沒動。
+  // 檔案**全部先讀進記憶體**（標頭、讀得到），再碰資料庫：任何一個檔案有問題就什麼都沒動、也沒終止任何人的連線。
   const files = await schemaFiles(dir)
+  const contents = []
+  for (const file of files) contents.push(await readFile(file, 'utf8'))
   const client = new pg.Client({ connectionString: url, application_name: APP_NAME })
   await client.connect()
   try {
@@ -117,9 +130,7 @@ export async function reset({ url, init = false, dir = SCHEMA_DIR }) {
     await client.query('begin')
     try {
       await client.query('drop schema public cascade; create schema public;')
-      for (const file of files) {
-        await client.query(await readFile(file, 'utf8'))
-      }
+      for (const sql of contents) await client.query(sql)
       // 帶參數的查詢走 extended protocol，一次只能一句 —— 建表與寫入分開。
       await client.query(`create table ${MARKER} (created_at timestamptz not null default now(), schema_files text[] not null)`)
       await client.query(`insert into ${MARKER} (schema_files) values ($1)`, [files.map((f) => path.basename(f))])
