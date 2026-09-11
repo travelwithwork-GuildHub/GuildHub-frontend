@@ -54,7 +54,9 @@ UI 計算剩餘字數與可不可送出 SHALL 用這些 helper，SHALL NOT 用 `
 ### Requirement: 登入表單的暱稱欄真的拿到那些數字
 
 登入表單的暱稱欄 SHALL 顯示剩餘字數（以 code point 算，來自 `LIMITS.displayName`）；
-暱稱 `violates` 非 `null` 時，送出鈕 SHALL 禁用、SHALL NOT 送出請求；SHALL NOT 用原生 `maxlength` 截斷輸入（20 個 emoji 要打得進去）。
+暱稱**超過上限**（`violates` 是 `'too-long'`）時，送出鈕 SHALL 禁用、SHALL NOT 送出請求；SHALL NOT 用原生 `maxlength` 截斷輸入（20 個 emoji 要打得進去）。
+**太短（含空字串）不禁用**：`FE-A01-S02`（已封存）刻意讓空暱稱按下去之後「畫面說出是長度的問題」—— 兩位審查者兩輪一致，
+不用這一列去推翻它（實作時抓到的衝突；O06 的 Scenario 本來就只寫了超出上限）。
 
 #### Scenario: [FE-O06-S06] 超出上限：送出鈕禁用、沒有請求
 
