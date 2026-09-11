@@ -37,11 +37,11 @@
 
 對應 MODIFIED Requirement〈元件不知道自己連的是誰〉（`FE-O02-S02` 改寫）
 
-- [ ] 4b.1 `src/api/transport.ts`：`internal` → 同源 `/api/...`，拿掉 `AdapterNotImplementedError` 那條路（型別留著給 `FE-O02-S03`）
-- [ ] 4b.2 判準：`FE-O02-S02`（改寫版）；`FE-O02-S01`／`S03` 不變
+- [x] 4b.1 `src/api/transport.ts`：`internal` → 同源 `/api/...`，拿掉 `AdapterNotImplementedError` 那條路（型別留著給 `FE-O02-S03`）
+- [x] 4b.2 判準：`FE-O02-S02`（改寫版）；`FE-O02-S01`／`S03` 不變
 
 ## 5. 收尾
 
 - [x] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠；`CONTRACT_TARGET=internal` 全綠
-- [ ] 5.2 `NEXT_PUBLIC_DATA_ADAPTER=internal` 起 dev，人才看板真的從本地資料庫開出來（截圖 `docs/evidence/fe-o03/`）
+- [x] 5.2 `NEXT_PUBLIC_DATA_ADAPTER=internal` 起 dev，人才看板真的從本地資料庫開出來（截圖 `docs/evidence/fe-o03/`）
 - [ ] 5.3 封存（`archive/fe-o03-internal-backend`，獨立 PR）

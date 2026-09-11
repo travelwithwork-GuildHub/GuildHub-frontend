@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConfigError, dataAdapter } from '@/config/env'
-import { AdapterNotImplementedError, NetworkError, buildRequest, send } from '@/api/transport'
+import { ContractDriftError, NetworkError, buildRequest, send } from '@/api/transport'
 import { ProfileOut } from '@/api/contract/rest'
 
 // 規格：openspec/changes/fe-o02-data-access/specs/data-access/spec.md
@@ -63,27 +63,38 @@ describe('資料存取的傳輸層', () => {
     expect(without.headers.get('content-type')).toBeNull()
   })
 
-  it('[FE-O02-S02] 選 internal 時明顯失敗，而且不送出任何請求', async () => {
+  it('[FE-O02-S02] 選 internal 時，請求打同源的 /api，不帶真後端的主機名；回應仍走同一份契約', async () => {
     process.env.NEXT_PUBLIC_DATA_ADAPTER = 'internal'
-    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    process.env.NEXT_PUBLIC_GUILDHUB_REST = 'http://real-backend.example:8000'
+    const request = buildRequest({ method: 'GET', path: '/api/me' })
+    const url = new URL(request.url)
+    expect(url.pathname).toBe('/api/me')
+    expect(url.host, '內部 adapter 打到了真後端的主機').not.toBe('real-backend.example:8000')
+    expect(url.origin, '同源：jsdom 裡是 location.origin').toBe(window.location.origin)
 
-    await expect(
-      send('getMyProfile', { method: 'GET', path: '/api/me' }, ProfileOut),
-    ).rejects.toBeInstanceOf(AdapterNotImplementedError)
+    // 送出去也是同源；回來的東西一樣過契約（回應少欄位在邊界炸）。
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ id: 'x' }), { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+    await expect(send('getMyProfile', { method: 'GET', path: '/api/me' }, ProfileOut)).rejects.toBeInstanceOf(ContractDriftError)
+    const sent = fetchSpy.mock.calls[0]?.[0] as Request
+    expect(new URL(sent.url).origin).toBe(window.location.origin)
+    expect(new URL(sent.url).pathname).toBe('/api/me')
 
-    // **這一行才是重點。** 只驗「有拋錯」的話，一個「先送出去、失敗了再拋錯」
-    // 的實作也會通過 —— 那會在 internal 模式下偷偷打到真後端。
-    expect(fetchSpy, 'internal 模式下送出了請求').not.toHaveBeenCalled()
+    // 對照：guildhub 打的是設定的主機。
+    process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
+    expect(new URL(buildRequest({ method: 'GET', path: '/api/me' }).url).host).toBe('real-backend.example:8000')
   })
 
-  it('[FE-O02-S02] 錯誤訊息指出操作、adapter，以及哪一個工作項目會補上它', async () => {
+  it('[FE-O02-S02] internal 在沒有 location 的地方（伺服器端）被呼叫：講得出原因的 ConfigError，不是 Invalid URL', () => {
     process.env.NEXT_PUBLIC_DATA_ADAPTER = 'internal'
-    const call = () => send('getMyProfile', { method: 'GET', path: '/api/me' }, ProfileOut)
-
-    await expect(call()).rejects.toThrow(/getMyProfile/)
-    await expect(call()).rejects.toThrow(/internal/)
-    // 沒有這一段的話，看到錯誤的人不知道要等什麼
-    await expect(call()).rejects.toThrow(/FE-O03/)
+    vi.stubGlobal('location', undefined)
+    try {
+      expect(() => buildRequest({ method: 'GET', path: '/api/me' })).toThrow(ConfigError)
+      expect(() => buildRequest({ method: 'GET', path: '/api/me' })).toThrow(/只能在瀏覽器/)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('[FE-O02-S03] 設定值無法辨識時拋錯，而且不退回任何一個 adapter', () => {
