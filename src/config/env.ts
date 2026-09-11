@@ -87,6 +87,18 @@ export function internalTestDatabaseUrl(): string | null {
   return read(process.env.INTERNAL_TEST_DATABASE_URL)
 }
 
+/**
+ * 本地後端 session cookie 的 HMAC secret。規格 `FE-O03`〈session 是簽章的 HttpOnly cookie〉。
+ * 本機（`local`）缺席用固定的開發值（重啟 dev server 之後 cookie 仍有效）；部署出去的版本缺席 → 拋，
+ * `next build` 失敗（下面 `DEPLOY_CONFIG_ITEMS` 只在 `internal` adapter 時驗它）。
+ */
+export function internalSessionSecret(): string {
+  const raw = read(process.env.INTERNAL_SESSION_SECRET)
+  if (raw !== null) return raw
+  if (appEnv() === 'local') return 'dev-only-internal-session-secret'
+  throw new ConfigError('INTERNAL_SESSION_SECRET 沒設，而這不是 local —— 部署出去的 internal 後端不給預設的 secret。')
+}
+
 /** 空字串跟沒設定是同一件事 —— 見檔頭。 */
 function read(value: string | undefined): string | null {
   return value ? value : null
@@ -282,6 +294,12 @@ export type DeployConfigItem =
  */
 export const DEPLOY_CONFIG_ITEMS: readonly DeployConfigItem[] = [
   { name: 'NEXT_PUBLIC_APP_ENV', resolve: appEnv, checkedAtBuild: true },
+  {
+    name: 'INTERNAL_SESSION_SECRET',
+    // 只有 `internal` adapter 有本地後端；`guildhub` 的部署不需要這把，不驗。
+    resolve: () => (dataAdapter() === 'internal' ? internalSessionSecret() : null),
+    checkedAtBuild: true,
+  },
   { name: 'NEXT_PUBLIC_REALTIME_ADAPTER', resolve: realtimeAdapter, checkedAtBuild: true },
   { name: 'NEXT_PUBLIC_GUILDHUB_WS', resolve: wsUrl, checkedAtBuild: true },
   {

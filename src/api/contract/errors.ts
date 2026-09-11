@@ -15,7 +15,13 @@ export const ValidationError = z.object({
   // （`unknown` 雖然包含 undefined，鍵本身仍是必填），而產出的型別是 `input?:`。
   // 少了它，涵蓋率之外的相等斷言會紅在這一條。
   input: z.unknown().optional(),
-  ctx: z.record(z.string(), z.never()).optional(),
+  // ⚠️ 對真後端實錄（2026-09-11，`FE-O03` 的 golden）：`ctx` 是有內容的 ——
+  //   value_error   → {"error": {}}
+  //   uuid_parsing  → {"error": "invalid character: found `n` at 1"}
+  //   enum          → {"expected": "'recruiting', 'active' or 'closed'"}
+  // 原本寫成 `z.record(z.never())`（空物件），真後端的每一個 422 都會解析失敗 —— 這正是契約測試要抓的漂移，
+  // 第一次對真後端錄 golden 就抓到了。
+  ctx: z.record(z.string(), z.unknown()).optional(),
 })
 
 /**
