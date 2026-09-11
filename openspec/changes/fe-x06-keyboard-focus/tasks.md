@@ -50,4 +50,4 @@
 
 - [x] 7.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
 - [x] 7.2 Playwright：`S11`、`S13`，以及 Escape 兩層各一次；截圖進 `docs/evidence/fe-x06/`
-- [ ] 7.3 封存（`archive/fe-x06-keyboard-focus`，獨立 PR）—— 會同步 `list-panel` 與 `talent-directory` 的 MODIFIED
+- [x] 7.3 封存（`archive/fe-x06-keyboard-focus`，獨立 PR）—— 會同步 `list-panel` 與 `talent-directory` 的 MODIFIED
