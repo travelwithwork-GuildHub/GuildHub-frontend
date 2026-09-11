@@ -132,6 +132,8 @@ async function main() {
     code = await new Promise((resolve) => vitest.once('exit', (c) => resolve(c ?? 1)))
   } finally {
     await stop(backend)
+    // uvicorn 收到 SIGTERM 後還要幾百 ms 才真的放掉 port；等它放掉，緊接著再跑一次 wrapper 才不會被自己的 preflight 擋。
+    for (let i = 0; i < 25 && (await portInUse(port)); i += 1) await new Promise((r) => setTimeout(r, 200))
     console.log('[contract-guildhub] 後端已關')
   }
   process.exit(code)
