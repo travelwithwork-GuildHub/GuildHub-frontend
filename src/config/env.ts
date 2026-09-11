@@ -87,6 +87,15 @@ export function internalTestDatabaseUrl(): string | null {
   return read(process.env.INTERNAL_TEST_DATABASE_URL)
 }
 
+/** 即時層替身（`scripts/realtime-stub.ts`）聽的 port，只綁 loopback。規格 `FE-O03`。預設 3102。 */
+export function internalRealtimePort(): number {
+  const raw = read(process.env.INTERNAL_REALTIME_PORT)
+  if (raw === null) return 3102
+  const port = Number(raw)
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new ConfigError(`INTERNAL_REALTIME_PORT 不是合法的 port：${raw}`)
+  return port
+}
+
 /**
  * 本地後端 session cookie 的 HMAC secret。規格 `FE-O03`〈session 是簽章的 HttpOnly cookie〉。
  * 本機（`local`）缺席用固定的開發值（重啟 dev server 之後 cookie 仍有效）；部署出去的版本缺席 → 第一次用到時拋
