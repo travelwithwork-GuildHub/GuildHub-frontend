@@ -5,6 +5,7 @@ import type { RoomDoorOut } from '@/api/contract/rest'
 import { FACING } from '@/world/coords'
 import type { LocalPose } from '@/world/PositionSync'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
+import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import type { InteractableRegistry } from '@/world/interaction/registry'
 import { SpatialInteraction } from '@/world/interaction/SpatialInteraction'
 import { BoardTargets, boardItems } from '@/world/rooms/BoardTargets'
@@ -49,9 +50,12 @@ function Harness({
 }) {
   return (
     <InteractionProvider>
-      <Probe sinkRef={sinkRef} />
-      {poseRef !== undefined && <SpatialInteraction poseRef={poseRef} />}
-      {children}
+      {/* `BoardTargets` 按 E 會開清單面板（`FE-B01`），所以要有那一層 provider。 */}
+      <ListPanelProvider>
+        <Probe sinkRef={sinkRef} />
+        {poseRef !== undefined && <SpatialInteraction poseRef={poseRef} />}
+        {children}
+      </ListPanelProvider>
     </InteractionProvider>
   )
 }
@@ -201,8 +205,10 @@ describe('看板', () => {
       const entry = registry.entries.get(item.id)
       expect(entry?.label).toBe(BOARD_LABELS[kind])
       expect(entry?.x).toBeCloseTo(item.x, 10)
-      // 看板**不接任何 API**，也沒有互動動作。
-      expect(entry?.onInteract).toBeUndefined()
+      // 這裡以前斷言 `onInteract` 是 `undefined`（「看板沒有互動動作」）。
+      // `FE-B01` 之後看板按 E 會開清單面板 —— 那個動作由
+      // `tests/board-panel-wiring.test.tsx` 成對驗（`FE-B01-S01`／`S02`）；
+      // 這一條只守 `FE-W12` 自己的事：穩定的 `id` 與人看得懂的 `label`。
     }
   })
 })

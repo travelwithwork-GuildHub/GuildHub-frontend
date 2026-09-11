@@ -48,8 +48,8 @@
 
 對應 Requirement〈走到看板前按 E，開得起對應的面板〉
 
-- [ ] 6.1 `BoardTargets.tsx` 補 `onInteract`，既有 `id` 與 `label` 不動
-- [ ] 6.2 判準：`S01`、`S02`（**成對** —— 只驗一種的話「兩塊都開案件」會全綠）
+- [x] 6.1 `BoardTargets.tsx` 補 `onInteract`，既有 `id` 與 `label` 不動
+- [x] 6.2 判準：`S01`、`S02`（**成對** —— 只驗一種的話「兩塊都開案件」會全綠）
 - [x] 6.3 面板走 `layer('panel')`
 
 ## 7. Escape 與世界的輸入
@@ -63,6 +63,6 @@
 
 ## 8. 收尾
 
-- [ ] 8.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
-- [ ] 8.2 端到端只打**本機自己起的** dev server，**不連任何團隊共用位址**
+- [x] 8.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
+- [x] 8.2 端到端只打**本機自己起的** dev server，**不連任何團隊共用位址**
 - [ ] 8.3 封存（`archive/fe-b01-list-container`，獨立 PR）

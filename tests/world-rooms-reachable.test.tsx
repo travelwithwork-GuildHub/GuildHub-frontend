@@ -8,6 +8,7 @@ import { staticBoxesFor, WORLD_HALF_EXTENT } from '@/world/layout/geometry'
 import { LAYOUT, SPAWN } from '@/world/layout/guildHallLayout'
 import { cellsOf, reachableFrom } from '@/world/layout/reachability'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
+import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import { SpatialInteraction } from '@/world/interaction/SpatialInteraction'
 import { PHYSICS } from '@/world/physics/world'
 import { BoardTargets, boardItems } from '@/world/rooms/BoardTargets'
@@ -66,10 +67,13 @@ function Harness({
 }): ReactNode {
   return (
     <InteractionProvider>
-      <Spy seen={seen} />
-      <SpatialInteraction poseRef={poseRef} />
-      <ProjectDoors rooms={ROOMS} slots={CORRIDOR_SLOTS} />
-      <BoardTargets />
+      {/* `BoardTargets` 按 E 會開清單面板（`FE-B01`），所以要有那一層 provider。 */}
+      <ListPanelProvider>
+        <Spy seen={seen} />
+        <SpatialInteraction poseRef={poseRef} />
+        <ProjectDoors rooms={ROOMS} slots={CORRIDOR_SLOTS} />
+        <BoardTargets />
+      </ListPanelProvider>
     </InteractionProvider>
   )
 }
