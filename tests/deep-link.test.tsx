@@ -1,9 +1,10 @@
+import { useEffect, type RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { BoardPanel } from '@/list-panel/BoardPanel'
 import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import { PanelUrlSync } from '@/list-panel/PanelUrlSync'
-import { InteractionProvider } from '@/world/interaction/InteractionProvider'
+import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
 import { BoardTargets } from '@/world/rooms/BoardTargets'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
@@ -59,11 +60,22 @@ afterEach(async () => {
   window.history.replaceState(null, '', '/')
 })
 
+/** 世界的輸入鎖：深連結開著面板時，人也不該走得動（`FE-B01-S18` 的鎖沒有人按 E 也要持有）。 */
+function LockProbe({ sinkRef }: { sinkRef: RefObject<RefObject<boolean> | null> }) {
+  const { inputLockRef } = useInteraction()
+  useEffect(() => {
+    sinkRef.current = inputLockRef
+  }, [sinkRef, inputLockRef])
+  return null
+}
+
 function arriveAt(url: string) {
   window.history.replaceState(null, '', url)
+  const lockRef: RefObject<RefObject<boolean> | null> = { current: null }
   render(
     <div data-testid="world-canvas-container" data-focus-anchor="world" tabIndex={-1}>
       <InteractionProvider>
+        <LockProbe sinkRef={lockRef} />
         <ListPanelProvider>
           <PanelUrlSync />
           <BoardTargets />
@@ -72,6 +84,7 @@ function arriveAt(url: string) {
       </InteractionProvider>
     </div>,
   )
+  return { locked: () => lockRef.current?.current ?? null }
 }
 const url = () => `${window.location.pathname}${window.location.search}`
 const panel = () => screen.queryByTestId('list-panel')
@@ -82,8 +95,9 @@ const listCalls = (pathname: string) => server.calls.filter((c) => c.pathname ==
 describe('網址表示開著哪一層，複製它就能還原', () => {
   it('[FE-B09-S01] ?panel=profiles：人才清單開著，已送 GET /api/profiles?page=0', async () => {
     server.replyFor('/api/profiles', 200, [profile(0), profile(1)])
-    arriveAt('/world?panel=profiles')
+    const { locked } = arriveAt('/world?panel=profiles')
     expect(panel()?.dataset.kind, '沒有人按 E，面板要從網址開').toBe('profiles')
+    expect(locked(), '面板從網址開著，世界的輸入鎖沒持有 —— 人在面板底下走').toBe(true)
     await waitFor(() => expect(cards()).toHaveLength(2))
     expect(listCalls('/api/profiles')).toEqual(['?page=0'])
     expect(url()).toBe('/world?panel=profiles')
@@ -152,8 +166,9 @@ describe('網址表示開著哪一層，複製它就能還原', () => {
       expect(url()).toBe('/world?panel=profiles')
     })
     it('panel=bogus：沒有面板的世界，網址 /world', () => {
-      arriveAt('/world?panel=bogus')
+      const { locked } = arriveAt('/world?panel=bogus')
       expect(panel()).toBeNull()
+      expect(locked()).toBe(false)
       expect(url()).toBe('/world')
       expect(server.calls).toEqual([])
     })
