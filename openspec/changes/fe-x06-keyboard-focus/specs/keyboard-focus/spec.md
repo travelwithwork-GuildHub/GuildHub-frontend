@@ -19,15 +19,15 @@ focus trap 與真的 Tab／Escape 在 Playwright 打**本機自己起的** dev s
 ⚠️ **連續看很多個人才的人**：詳情上按一次 Escape 回列表，列表的頁碼與位置還在。
 **按錯了想立刻回世界的人**：從詳情要按兩次。後者多一次按鍵，前者省的是重開面板、翻回原頁。
 
-#### Scenario: [FE-X06-S01] 詳情上按一次 Escape 只關詳情
+#### Scenario: [FE-X06-S01] 兩次 Escape，一次一層
 
 - **WHEN** 人才面板開著且詳情蓋在上面，使用者按一次 Escape
-- **THEN** 詳情 SHALL 不再顯示
-- **AND** 面板 SHALL 仍然開啟，列表 SHALL 仍是離開前的頁碼
+- **THEN** 詳情 SHALL 不再顯示，面板 SHALL 仍然開啟，列表 SHALL 仍是離開前的頁碼
+- **AND** 使用者再按一次 Escape 之後，面板 SHALL 關閉，世界的移動輸入 SHALL 恢復作用
 
-#### Scenario: [FE-X06-S02] 列表上再按一次才關面板
+#### Scenario: [FE-X06-S02] 沒有子層時一次就關面板
 
-- **WHEN** 承上，使用者再按一次 Escape
+- **WHEN** 人才面板開著、沒有詳情，使用者按一次 Escape
 - **THEN** 面板 SHALL 關閉，世界的移動輸入 SHALL 恢復作用
 
 > ⚠️ **`S01` 與 `S02` 要成對。** 只有 `S01` 的話，「Escape 一律只關詳情、永遠關不掉面板」全綠。
@@ -63,14 +63,18 @@ Escape、Tab 與文字輸入 SHALL 不受鎖影響。
 
 #### Scenario: [FE-X06-S06] 鎖著時世界不吃掉按鍵的預設行為
 
-- **WHEN** 鎖被持有，使用者按下移動鍵或 E
-- **THEN** 那個按鍵事件 SHALL NOT 被 `preventDefault`
+- **WHEN** 鎖被持有，焦點在一個方向鍵有預設行為的控制上（例如可捲動的列表），使用者按下方向鍵與 E
+- **THEN** 那些按鍵事件 SHALL NOT 被 `preventDefault`
+
+> 今天 `LocalPlayer` 已經是「鎖著就 return，不 `preventDefault`」。這一條守的是那個順序：
+> 把 `preventDefault` 搬到鎖的判斷前面，或之後加的世界熱鍵順手取消預設行為，這一條要紅。
 
 ### Requirement: 焦點在能輸入文字的控制上時，打字不是走路
 
 焦點位於能接受文字的控制（文字類的 `input`、`textarea`、`contenteditable`）時，
 鎖 SHALL 被持有；焦點離開這類控制、且沒有轉移到另一個這類控制時，那個持有 SHALL 釋放。
-判定 SHALL 在焦點轉移完成後依當時的 `activeElement` 重算，SHALL NOT 在 `focusout` 當下就釋放。
+判定 SHALL 在焦點轉移完成後依當時的 `activeElement` 重算，SHALL NOT 在 `focusout` 當下就釋放
+（從一個輸入框移到另一個，中間不放鎖 —— 那是內部不變量，由 design 與單元測試守，不是這裡的 Scenario）。
 checkbox、radio、button 等不接受文字的控制 SHALL NOT 算在內。
 
 ⚠️ **今天世界裡沒有任何文字輸入框**（狀態文字、聊天、搜尋都還沒做）。這一條用測試用的
@@ -81,11 +85,6 @@ checkbox、radio、button 等不接受文字的控制 SHALL NOT 算在內。
 - **WHEN** 一個文字輸入框取得焦點，使用者按下 W 與 E
 - **THEN** 世界裡的角色 SHALL NOT 移動，互動 SHALL NOT 被觸發
 - **AND** 那兩個按鍵事件 SHALL NOT 被 `preventDefault`
-
-#### Scenario: [FE-X06-S08] 從一個輸入框移到另一個輸入框，中間不放鎖
-
-- **WHEN** 焦點從一個文字輸入框直接移到另一個
-- **THEN** 鎖 SHALL 一直被持有
 
 #### Scenario: [FE-X06-S09] 焦點離開輸入框之後，人走得動
 

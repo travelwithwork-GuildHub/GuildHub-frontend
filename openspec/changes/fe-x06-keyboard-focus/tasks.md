@@ -18,17 +18,17 @@
 對應 Requirement〈焦點在能輸入文字的控制上時，打字不是走路〉
 
 - [ ] 3.1 `<EditableFocusLock />`：`focusin`／`focusout` → microtask 後依 `activeElement` 重算
-- [ ] 3.2 判準：`S07`、`S08`、`S09`、`S10`
-- [ ] 3.3 **突變**：`focusout` 當下就釋放，`S08` 要紅；checkbox 也算，`S09` 的變體要紅
+- [ ] 3.2 判準：`S07`、`S09`、`S10`；內部不變量「輸入框間轉移不放鎖」對釋放函式下 spy
+- [ ] 3.3 **突變**：`focusout` 當下就釋放，不變量的 spy 要紅；checkbox 也算，`S09` 的變體要紅
 
 ## 4. Escape 的層級
 
 對應 Requirement〈Escape 每次只關最上層〉、MODIFIED `FE-B01-S16`、MODIFIED `FE-B04-S14`
 
-- [ ] 4.1 `useEscapeLayer`：層堆疊，只呼叫最上層
+- [ ] 4.1 `useEscapeLayer`：層堆疊，token 式，卸載依 token 移除（不是 pop），只呼叫最上層
 - [ ] 4.2 `ListPanel`（底層）與 overlay（上層）接上；`BoardPanel` 詳情關閉 = `selected = null`
 - [ ] 4.3 判準：`S01`、`S02`（成對）；`FE-B01-S16`、`FE-B04-S14` 的既有判準改寫
-- [ ] 4.4 **突變**：兩層各關各的，`S01` 要紅
+- [ ] 4.4 **突變**：兩層各關各的，`S01` 要紅；卸載改成 `pop()`，`S17` 之後再按 Escape 要紅
 
 ## 5. 焦點邊界與歸還
 
