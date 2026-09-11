@@ -28,13 +28,13 @@
 
 對應 Requirement〈即時層替身照 `protocol.py`，怪癖一併複製〉
 
-- [ ] 4.1 `ws`、`tsx` 依賴；`scripts/realtime-stub.ts`（重用 `src/api/contract/ws.ts`；room token）；`npm run realtime:stub`（`tsx`）
-- [ ] 4.2 `/online` 查詢口，`GET /api/rooms` 接上（design `D5`）
-- [ ] 4.3 判準：`S18`～`S23`（`tests/contract/ws/`；`S17` 用 `withoutStub()`）
-- [ ] 4.4 **突變**：不合法訊息回 `err` → `S20` 紅；靜止送空 `pos` → `S18` 紅；自己的 move 不回自己 → `S19` 紅；rooms 寫死 0 → `S22` 紅
+- [x] 4.1 `ws`、`tsx` 依賴；`scripts/realtime-stub.ts`（重用 `src/api/contract/ws.ts`；room token）；`npm run realtime:stub`（`tsx`）
+- [x] 4.2 `/online` 查詢口，`GET /api/rooms` 接上（design `D5`）
+- [x] 4.3 判準：`S18`～`S23`（`tests/contract/ws/`；`S17` 用 `withoutStub()`）
+- [x] 4.4 **突變**：不合法訊息回 `err` → `S20` 紅；靜止送空 `pos` → `S18` 紅；自己的 move 不回自己 → `S19` 紅；rooms 寫死 0 → `S22` 紅
 
 ## 5. 收尾
 
-- [ ] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠；`CONTRACT_TARGET=internal` 全綠
+- [x] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠；`CONTRACT_TARGET=internal` 全綠
 - [ ] 5.2 `NEXT_PUBLIC_DATA_ADAPTER=internal` 起 dev，人才看板真的從本地資料庫開出來（截圖 `docs/evidence/fe-o03/`）
 - [ ] 5.3 封存（`archive/fe-o03-internal-backend`，獨立 PR）
