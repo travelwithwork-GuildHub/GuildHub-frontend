@@ -205,10 +205,10 @@ describe('看板', () => {
       const entry = registry.entries.get(item.id)
       expect(entry?.label).toBe(BOARD_LABELS[kind])
       expect(entry?.x).toBeCloseTo(item.x, 10)
-      // 這裡以前斷言 `onInteract` 是 `undefined`（「看板沒有互動動作」）。
-      // `FE-B01` 之後看板按 E 會開清單面板 —— 那個動作由
-      // `tests/board-panel-wiring.test.tsx` 成對驗（`FE-B01-S01`／`S02`）；
-      // 這一條只守 `FE-W12` 自己的事：穩定的 `id` 與人看得懂的 `label`。
     }
+    // 穩定鍵。**`id` 進了 main 之後就是別人接線用的名字**（`FE-B01` 的 `BoardTargets`
+    // 用它開面板），改名等於把那條線剪掉而畫面上看不出來。
+    // 按 E 的動作本身由 `tests/board-panel-wiring.test.tsx` 驗（`FE-B01-S01`／`S02`）。
+    expect(boards.map((b) => b.item.id).sort()).toEqual(['board-project', 'board-talent'])
   })
 })
