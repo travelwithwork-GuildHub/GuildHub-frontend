@@ -33,4 +33,4 @@
 ## 5. 收尾
 
 - [x] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
-- [ ] 5.2 封存（`archive/fe-b09-deep-link`，獨立 PR）
+- [x] 5.2 封存（`archive/fe-b09-deep-link`，下一個 PR）
