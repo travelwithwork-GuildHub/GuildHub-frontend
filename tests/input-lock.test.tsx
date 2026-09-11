@@ -209,6 +209,41 @@ describe('焦點在能輸入文字的控制上時，打字不是走路', () => {
     el.remove()
   })
 
+  it('[FE-X06-S09] 輸入框有焦點時卸載 EditableFocusLock：不留下一把永遠沒人放的鎖', async () => {
+    // 審查抓到的：卸載時 release 了，但排好的 microtask／timer 之後還會跑 `recompute` ——
+    // 看到輸入框還有焦點就再拿一把，而元件已經死了，沒有人會放它。玩家從此走不動。
+    const poseRef = { current: { ...AT_TARGET } }
+    const renderer = await ReactThreeTestRenderer.create(
+      <InteractionProvider>
+        <Grab />
+        <EditableFocusLock />
+        <LocalPlayer targetRef={{ current: new Vector3() }} poseRef={poseRef} />
+      </InteractionProvider>,
+    )
+    mountedRenderers.push(renderer)
+    await ReactThreeTestRenderer.act(async () => {
+      for (let i = 0; i < 50; i++) await new Promise((r) => setTimeout(r, 0))
+    })
+    const el = input()
+    el.focus()
+    await settle()
+    expect(ctx().inputLockRef.current).toBe(true)
+    // 再觸發一次焦點事件（排下 microtask 與 timer），然後在它們跑之前卸載那個元件。
+    el.blur()
+    el.focus()
+    await ReactThreeTestRenderer.act(async () => {
+      await renderer.update(
+        <InteractionProvider>
+          <Grab />
+          <LocalPlayer targetRef={{ current: new Vector3() }} poseRef={poseRef} />
+        </InteractionProvider>,
+      )
+    })
+    await settle()
+    expect(ctx().inputLockRef.current, '卸載之後那次重算又拿了一把鎖 —— 永遠沒有人會放它').toBe(false)
+    el.remove()
+  })
+
   it('內部不變量：從一個輸入框直接移到另一個，中間不放鎖', async () => {
     // 不是 Scenario（使用者觀察不到「中間」），是 design D3 的不變量。
     // `focus()` 會同步派送 focusout／focusin；在它回來的那一刻（重算還沒跑）看鎖 ——

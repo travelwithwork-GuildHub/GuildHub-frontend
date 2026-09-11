@@ -31,7 +31,12 @@ export function EditableFocusLock() {
 
   useEffect(() => {
     let release: (() => void) | null = null
+    // ⚠️ **卸載之後排好的重算還是會跑。** 沒有這個旗標，卸載後那次 `recompute` 看到輸入框還有焦點，
+    // 會再拿一把**永遠沒有人釋放**的鎖 —— 玩家從此走不動（審查抓到的）。microtask 取消不了，只能靠旗標。
+    let disposed = false
+    let timer: ReturnType<typeof setTimeout> | null = null
     const recompute = () => {
+      if (disposed) return
       if (isTextEditable(document.activeElement)) {
         release ??= holdInputLock('editable-focus')
       } else {
@@ -41,12 +46,15 @@ export function EditableFocusLock() {
     }
     const schedule = () => {
       queueMicrotask(recompute)
-      setTimeout(recompute, 0)
+      if (timer !== null) clearTimeout(timer)
+      timer = setTimeout(recompute, 0)
     }
     document.addEventListener('focusin', schedule)
     document.addEventListener('focusout', schedule)
     recompute()
     return () => {
+      disposed = true
+      if (timer !== null) clearTimeout(timer)
       document.removeEventListener('focusin', schedule)
       document.removeEventListener('focusout', schedule)
       release?.()
