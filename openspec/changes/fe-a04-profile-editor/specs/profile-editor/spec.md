@@ -26,8 +26,9 @@
 
 ### Requirement: 顯示我的名片，用同一個呈現元件
 
-面板 SHALL 以 `TalentDetail` 呈現目前身分的名片（四欄：名字、技能、每週時數、自介；`null`／`[]` 照 `TalentDetail` 既有的呈現），並有一個「編輯」按鈕。
-別人的名片（人才看板的詳情）SHALL 沒有編輯按鈕。載入失敗 SHALL 用 `EmptyState`（`failure` ＋ retry）。
+面板 SHALL 以 `TalentDetail` 呈現**目前身分**（`IdentityProvider` 的 `signed-in` 那份 `ProfileOut`，同步可得、不另外請求）的名片
+（四欄：名字、技能、每週時數、自介；`null`／`[]` 照 `TalentDetail` 既有的呈現），並有一個「編輯」按鈕。
+別人的名片（人才看板的詳情）SHALL 沒有編輯按鈕。**沒有「載入失敗」這條路**：身分不是 `signed-in` 時入口按鈕本來就不存在（`IdentityBadge` 顯示訪客／問不到）。
 
 #### Scenario: [FE-A04-S03] 我的名片有編輯鈕、別人的沒有
 
@@ -39,8 +40,10 @@
 ### Requirement: 編輯四欄，payload 白名單，悲觀更新
 
 按「編輯」SHALL 在同一個面板原地切成表單，四欄預填目前值（`skills` 以「, 」接、`hours_per_week` 空值顯示空字串）。
-規則（`FE-X05` 的時機）：`display_name` 1–20 字（必填）；`bio` ≤300；`hours_per_week` 空或 0–80 的十進位整數；
-`skills` 送出前 SHALL 正規化：以 `,` 或 `，` 分割、每項 trim、去空、去重（第一個保留原文）、≤10 項、每項 ≤40 字。
+規則（`FE-X05` 的時機）：`display_name` 1–20 字（必填）；`bio` ≤300；`hours_per_week` 空字串 → `null`、否則 SHALL 是 0–80 的十進位整數
+（`<input type="number">` 清空時值是 `""`，schema SHALL 先轉再驗，不然永遠清不掉 —— 審查抓到的）；
+`skills` 的**驗證**每次輸入都對「正規化後的結果」算（純函式：以 `,` 或 `，` 分割、每項 trim、去空、去重不分大小寫且 NFC、第一個保留原文），
+規則 ≤10 項、每項 ≤40 字；**input 裡的字串本身**只在 blur／送出時才被替換成正規化後的形式（打字中不動游標）。
 送出 SHALL 是 `PATCH /api/profiles/me`，body **只有**這四個鍵（SHALL NOT 含 `avatar_id`）；`bio` 空 → `null`、`hours_per_week` 空 → `null`、`skills` 空 → `[]`。
 成功 SHALL：以回應的 `ProfileOut` 更新身分（`adopt`）、回到顯示、顯示的是伺服器回傳的值。失敗 SHALL：留在表單、值不變、`FE-X05` 的 alert；`toUiError` 的文案。
 
@@ -59,10 +62,10 @@
 - **WHEN** 後端回 500
 - **THEN** 表單 SHALL 仍在、四欄的值 SHALL 是剛填的、alert SHALL 出現在送出鈕上方；修正後再送 SHALL 再打一次
 
-#### Scenario: [FE-A04-S07] 不送 avatar_id：picker 中途改的不被覆蓋
+#### Scenario: [FE-A04-S07] 不送 avatar_id：身分在別處被更新過，名片送出不會蓋回去
 
-- **WHEN** 面板開著時 `AvatarPicker` 把 `avatar_id` 從 0 改成 3，然後名片表單送出
-- **THEN** body SHALL 沒有 `avatar_id` 鍵；成功後身分的 `avatar_id` SHALL 仍是 3
+- **WHEN** 面板開著（表單已填好但還沒送）時，身分的 `avatar_id` 被別處從 0 更新成 3 且**後端已寫入**（測試直接走 `saveAvatar(3)` —— 阻斷式面板的 focus trap 下標題列的 picker 本來就碰不到，這條測的是「別處更新」不是使用者操作 picker），然後名片表單送出
+- **THEN** body SHALL 沒有 `avatar_id` 鍵；成功後身分 SHALL 是伺服器回應的那份（唯一 canonical），其 `avatar_id` 是 3
 
 #### Scenario: [FE-A04-S08] 超過本站上限的技能數
 
@@ -71,18 +74,25 @@
 
 ### Requirement: 未儲存就關要確認；送出中不可關；重開從身分初始化
 
-表單有未儲存的修改時按 Escape／「取消」SHALL 先問（確認對話，鍵盤可操作）：確認 → 丟棄、回到顯示；取消 → 留在表單、值不變。
-送出中 SHALL NOT 能關（Escape／取消無效，直到請求結束）。面板每次打開 SHALL 從目前身分初始化，SHALL NOT 沿用上次的草稿。
+「有未儲存的修改」（dirty）SHALL 定義為：**正規化後的 payload 與初始 payload 不同**（不是 RHF 的 `isDirty`、不是原始字串差異 ——
+只改空白、全形逗號、大小寫重複的 skills 正規化後一樣，就不算修改）。
+dirty 時**任何關閉意圖**（Escape、面板殼的關閉鈕、表單的「取消」）SHALL 先問（確認層，鍵盤可操作，Escape 關確認層等於「繼續編輯」）：
+「丟棄」→ 丟棄、回到顯示；「繼續編輯」→ 留在表單、值不變。送出中**任何關閉意圖** SHALL 無效，直到請求結束。
+面板每次打開 SHALL 從目前身分初始化，SHALL NOT 沿用上次的草稿。
 
-#### Scenario: [FE-A04-S09] 有修改按 Escape：先問
+#### Scenario: [FE-A04-S09] 有修改要關：先問；三種關法都一樣
 
 - **WHEN** 改了 `bio` 沒送，按 Escape
-- **THEN** SHALL 出現確認；按「繼續編輯」SHALL 留在表單且 `bio` 不變；按「丟棄」SHALL 回到顯示
+- **THEN** SHALL 出現確認；按「繼續編輯」SHALL 留在表單且 `bio` 不變、確認層消失
+- **WHEN** 再按面板殼的關閉鈕
+- **THEN** 確認 SHALL 再出現；按「丟棄」SHALL 回到顯示、`bio` 顯示的是身分目前的值
+- **WHEN** 只把 `skills` 從 `React, TypeScript` 改成 `React，  typescript`（正規化後相同），按「取消」
+- **THEN** SHALL **不問**，直接回到顯示
 
-#### Scenario: [FE-A04-S10] 送出中關不掉
+#### Scenario: [FE-A04-S10] 送出中關不掉：三種關法都無效
 
-- **WHEN** 送出後請求還沒回來，按 Escape
-- **THEN** 表單 SHALL 仍在；請求回來（成功）之後 SHALL 回到顯示
+- **WHEN** 送出後請求還沒回來，按 Escape、按面板殼的關閉鈕、按「取消」
+- **THEN** 表單 SHALL 仍在、面板 SHALL 仍開著；請求回來（成功）之後 SHALL 回到顯示
 
 #### Scenario: [FE-A04-S11] 重開從身分初始化
 

@@ -20,7 +20,7 @@
 
 - 面板不另開 `/profile` 頁：編輯名片是世界裡的身分操作，跳頁切斷上下文；DOM 負責產品操作。
 - skills 用逗號分隔的一個 input（MVP），不做 chips；正規化在 blur／submit，不在打字中 split（游標與 IME）。skill 本身不能含逗號 —— 明寫的限制。
-- 錯誤呈現不用 `EmptyState`（那是「整塊內容載不到」）：送出失敗用 `FE-X05` 的 alert；**初次載入名片失敗**才用 `EmptyState failure + retry`。
+- 錯誤呈現不用 `EmptyState`（那是「整塊內容載不到」）：送出失敗用 `FE-X05` 的 alert。名片來自 `IdentityProvider` 同步可得，沒有「載入失敗」這條路。
 
 ## ⚠️ 不做什麼
 
@@ -29,3 +29,4 @@
 - **SHALL NOT 做名片的公開／隱藏設定**（`FE-T07`，W13+）。
 - **SHALL NOT 樂觀更新。**
 - **SHALL NOT 做 skills 的 chips／自動完成。**
+- **SHALL NOT 做兩個並行 PATCH 的版本合併**（後端沒有版本欄位，last-write-wins；要的話是後端票）。

@@ -9,7 +9,7 @@
 對應 Requirement〈名字是入口，面板是阻斷式的〉、〈顯示我的名片〉
 
 - [ ] 2.1 抽 `src/panel/PanelShell.tsx`；`ListPanel` 改用它，`FE-B01`／`FE-X06` 判準全綠（獨立一片）
-- [ ] 2.2 `ListPanelProvider` 加 `openProfile`／`profileOpen`；`IdentityBadge` 的名字變按鈕；`src/profile/ProfilePanel.tsx`（顯示：`TalentDetail` ＋ 編輯鈕；載入失敗 `EmptyState`）
+- [ ] 2.2 `src/profile/ProfilePanelProvider.tsx`（自己持鎖）；`IdentityBadge` 的名字變按鈕；`src/profile/ProfilePanel.tsx`（顯示：`TalentDetail` ＋ 編輯鈕）
 - [ ] 2.3 判準：`S01`～`S03`
 - [ ] 2.4 **突變**：不持鎖 → `S01`；焦點不回按鈕 → `S02`；`TalentDetail` 自己長編輯鈕 → `S03`（別人的也有）
 
@@ -25,7 +25,7 @@
 
 對應 Requirement〈未儲存就關要確認；送出中不可關；重開從身分初始化〉
 
-- [ ] 4.1 確認層（Escape 層再疊一層）、送出中鎖關閉、重開初始化
+- [ ] 4.1 dirty = 正規化 payload 差異；確認層（Escape 層再疊一層）攔所有關閉意圖；送出中全部無效；重開初始化
 - [ ] 4.2 判準：`S09`～`S11`
 - [ ] 4.3 **突變**：不確認就關 → `S09`；送出中可關 → `S10`；草稿沿用 → `S11`
 
