@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
 import { listProfiles, listProjects } from '@/api/operations'
 import { opened, reduce, type ListKind, type PagingState } from './paging'
@@ -25,13 +25,42 @@ export interface ListPage<K extends ListKind> {
   retry: () => void
 }
 
-export function useListPage<K extends ListKind>(kind: K): ListPage<K> {
-  const [state, dispatch] = useReducer(reduce<ListItemOf[K]>, kind, opened<ListItemOf[K]>)
+export interface ListPageOptions {
+  /**
+   * 呼叫端要看的頁（網址說的，`FE-B09-S03`）。掛載時是起始頁；之後變了就切過去 ——
+   * 上一頁／下一頁可能回到「同一種清單、不同頁碼」的那一層（審查抓到的）。
+   * 跟已呈現或探測中的頁一樣就不動：`onShownPage` 回報上去再流回來不會把清單重開。
+   */
+  page?: number
+  /** 畫面上呈現的頁次變了（前進成功、起始頁撲空退回第 0 頁）就回報 —— 給網址寫回用（`FE-B09`）。 */
+  onShownPage?: (page: number) => void
+}
+
+export function useListPage<K extends ListKind>(kind: K, { page: wantedPage = 0, onShownPage }: ListPageOptions = {}): ListPage<K> {
+  const [state, dispatch] = useReducer(reduce<ListItemOf[K]>, undefined, () => opened<ListItemOf[K]>(kind, wantedPage))
 
   // 呼叫端換了資料種類：整個重來，舊種類的回應之後靠 identity 擋掉（`S15`）。
+  // 從呼叫端此刻要看的頁開始（latest ref，不進相依：那是「換種類時從第幾頁開始」）。
+  const wantedPageRef = useRef(wantedPage)
   useEffect(() => {
-    dispatch({ type: 'open', kind })
+    wantedPageRef.current = wantedPage
+  })
+  useEffect(() => {
+    dispatch({ type: 'open', kind, page: wantedPageRef.current })
   }, [kind])
+  // 呼叫端要看的頁變了：reducer 自己判斷是不是已經在那一頁。
+  useEffect(() => {
+    dispatch({ type: 'goto', page: wantedPage })
+  }, [wantedPage])
+
+  const shownPage = state.shown?.page
+  const onShownPageRef = useRef(onShownPage)
+  useEffect(() => {
+    onShownPageRef.current = onShownPage
+  })
+  useEffect(() => {
+    if (shownPage !== undefined) onShownPageRef.current?.(shownPage)
+  }, [shownPage])
 
   const { phase } = state
   const { kind: activeKind, page } = state.identity
@@ -63,6 +92,6 @@ export function useListPage<K extends ListKind>(kind: K): ListPage<K> {
   // ⚠️ 換種類的**那一次**繪製：上面那個 effect 還沒跑，`state` 還是舊種類的。
   // 原樣回給呼叫端的話，人才面板會先閃一格案件卡（`S15` 的另一種形狀 ——
   // 不是晚到的回應混進來，是舊的狀態多活了一格）。identity 對不上 prop 就先遮住。
-  const visible = state.identity.kind === kind ? state : opened<ListItemOf[K]>(kind)
+  const visible = state.identity.kind === kind ? state : opened<ListItemOf[K]>(kind, wantedPage)
   return { state: visible, next, retry }
 }

@@ -19,6 +19,7 @@ import { SpatialInteraction } from './interaction/SpatialInteraction'
 import { BoardTargets } from './rooms/BoardTargets'
 import { BoardPanel } from '@/list-panel/BoardPanel'
 import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
+import { PanelUrlSync } from '@/list-panel/PanelUrlSync'
 import { labelAnchorsFor } from './rooms/anchors'
 import { DoorLabelProjector } from './rooms/DoorLabelProjector'
 import { DoorLabels, useLabelNodes } from './rooms/DoorLabels'
@@ -114,6 +115,8 @@ export default function WorldCanvas() {
       <ListPanelProvider>
         {/* 文字輸入框有焦點時打字不是走路（`FE-X06`）。今天世界裡還沒有輸入框 —— 先掛著。 */}
         <EditableFocusLock />
+        {/* 網址 ⇄ 開著哪一層（`FE-B09`）。在 Canvas 外面、provider 裡面：它改的是網址不是路由，世界不重掛。 */}
+        <PanelUrlSync />
         {/* `tabIndex=-1` ＋ `data-focus-anchor`：世界焦點錨（`FE-X06-S13`）。面板關閉後焦點放這裡 ——
             不是 `body`（鍵盤使用者迷航）、不是標題列（跟這次操作無關）。點世界也會聚焦到它。 */}
         <div

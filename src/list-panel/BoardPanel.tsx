@@ -26,6 +26,9 @@ import type { ListKind } from './paging'
 //
 // 人才那一支是真的卡片與詳情（`FE-B04`）：卡片開詳情，詳情蓋在列表上（`overlay`），
 // 列表不卸載 —— 返回時頁碼與捲動位置都還在。案件那一支仍是佔位（`FE-B02`，W6）。
+//
+// 「開著哪一筆詳情」「第幾頁」住在 `ListPanelProvider`，不在這裡（`FE-B09`：網址要能還原它們）。
+// 這裡只留「列表手上那一筆」當詳情的載入中預覽 —— 深連結直達時沒有預覽，詳情自己去載。
 
 const TITLES: Record<ListKind, string> = { projects: '專案看板', profiles: '人才看板' }
 const LABELS = { next: '下一頁', close: '關閉' }
@@ -36,15 +39,17 @@ const LINE = 'block overflow-hidden text-ellipsis whitespace-nowrap'
 function projectLine(item: ProjectOut): ReactNode {
   return <span className={LINE}>{item.title}</span>
 }
-/** 人才那一支：選中的 id 與列表手上的那一筆（詳情的載入中預覽）。 */
+/** 人才那一支：選中的 id 在 provider，列表手上的那一筆（詳情的載入中預覽）在這裡。 */
 function TalentBoard({ onClose }: { onClose: () => void }) {
-  const [selected, setSelected] = useState<{ id: string; preview: ProfileOut } | null>(null)
+  const { selected, selectProfile, page, reportPage } = useListPanel()
+  // 只記最後一張點開的卡：詳情的 id 對得上才當預覽，對不上（深連結、上一頁／下一頁）就沒有預覽。
+  const [preview, setPreview] = useState<ProfileOut | null>(null)
   // 詳情關閉時焦點回到開它的那張卡（`FE-X06-S12`）。`ListPanel` 自己會把焦點放回列表
   //（給沒有處理焦點的呼叫端用），這裡是父層的 effect、跑得比它晚，所以卡片贏。
   const lastOpenedRef = useRef<string | null>(null)
   useEffect(() => {
     if (selected !== null) {
-      lastOpenedRef.current = selected.id
+      lastOpenedRef.current = selected
       return
     }
     const id = lastOpenedRef.current
@@ -57,18 +62,28 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
       kind="profiles"
       title={TITLES.profiles}
       labels={LABELS}
-      renderItem={(item) => <TalentCard profile={item} onOpen={() => setSelected({ id: item.id, preview: item })} />}
+      renderItem={(item) => (
+        <TalentCard
+          profile={item}
+          onOpen={() => {
+            setPreview(item)
+            selectProfile(item.id)
+          }}
+        />
+      )}
       onClose={onClose}
+      page={page}
+      onShownPage={reportPage}
       empty={<EmptyState kind="first-empty" />}
       exhausted={<EmptyState kind="exhausted" />}
       error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
       overlay={
         selected === null ? undefined : (
           <TalentDetail
-            id={selected.id}
-            preview={selected.preview}
+            id={selected}
+            preview={preview?.id === selected ? preview : undefined}
             labels={DETAIL_LABELS}
-            onBack={() => setSelected(null)}
+            onBack={() => selectProfile(null)}
           />
         )
       }
@@ -77,7 +92,7 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
 }
 
 export function BoardPanel() {
-  const { open, closePanel } = useListPanel()
+  const { open, closePanel, page, reportPage } = useListPanel()
   if (open === null) return null
   // 分兩支寫而不是一個 `renderItem: (item: A | B)`：
   // 型別讓「案件面板拿到人才資料」在 typecheck 就紅。
@@ -88,6 +103,8 @@ export function BoardPanel() {
       labels={LABELS}
       renderItem={projectLine}
       onClose={closePanel}
+      page={page}
+      onShownPage={reportPage}
       empty={<EmptyState kind="first-empty" />}
       exhausted={<EmptyState kind="exhausted" />}
       error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}

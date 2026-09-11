@@ -190,3 +190,27 @@ describe('晚到的回應不得覆蓋畫面', () => {
     expect(s.error).toBeNull()
   })
 })
+
+// 規格：openspec/changes/fe-b09-deep-link/specs/deep-link/spec.md（design `D4`）
+//   起始頁撲空 → 退回第 0 頁；`goto`（呼叫端要看的頁）的 no-op 條件。
+describe('起始頁與 goto（`FE-B09`）', () => {
+  it('[FE-B09-S04] 起始頁撲空：退回第 0 頁再問一次，不是「首次無資料」', () => {
+    const s = reduce(opened('projects', 7), resolved(P(7), []))
+    expect(s.identity.page).toBe(0)
+    expect(s.phase).toBe('loading')
+    expect(s.shown, '第 7 頁的空陣列被當成一張空頁畫出來了').toBeNull()
+    // 第 0 頁本來就空 → 才是首次無資料。
+    const t = reduce(s, resolved(P(0), []))
+    expect(t.phase).toBe('ready')
+    expect(t.shown?.items).toEqual([])
+  })
+
+  it('goto：已呈現的頁、探測中的頁都是「已經在那一頁」，不重開', () => {
+    const probing = probingSecond()
+    expect(reduce(probing, { type: 'goto', page: 0 }), '已呈現的頁回流把清單重開了').toBe(probing)
+    expect(reduce(probing, { type: 'goto', page: 1 }), '探測中的頁又被重開一次（同一個請求送兩次）').toBe(probing)
+    const s = reduce(probing, { type: 'goto', page: 3 })
+    expect(s.identity.page).toBe(3)
+    expect(s.shown).toBeNull()
+  })
+})

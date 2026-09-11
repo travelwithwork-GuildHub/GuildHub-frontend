@@ -112,6 +112,39 @@ describe('驅動層：identity 變了就請求', () => {
   })
 })
 
+describe('呼叫端要看的頁（`FE-B09`）', () => {
+  it('掛載時從 `page` 開始；`page` 變了就切過去；已呈現的頁回流不重開', async () => {
+    server.reply(200, many(profile, PAGE_SIZE))
+    server.reply(200, many(profile, PAGE_SIZE))
+    server.reply(200, many(profile, PAGE_SIZE))
+    let wanted = 2
+    const { result, rerender } = renderHook(() => useListPage('profiles', { page: wanted }))
+    await waitFor(() => expect(result.current.state.shown?.page).toBe(2))
+    // 上一頁／下一頁回到「同一種清單、不同頁碼」的那一層：不是掛載，是 `page` 變了。
+    wanted = 0
+    rerender()
+    await waitFor(() => expect(result.current.state.shown?.page).toBe(0))
+    expect(searches()).toEqual(['?page=2', '?page=0'])
+    // 前進探測中，呼叫端要看的頁變成正在探測的那一頁：已經在問了，不能再送一次同樣的請求。
+    act(() => result.current.next())
+    wanted = 1
+    rerender()
+    expect(result.current.state.shown?.page, '探測中被重開：畫面上的第 0 頁被清掉了').toBe(0)
+    await waitFor(() => expect(result.current.state.shown?.page).toBe(1))
+    expect(searches(), '探測中的頁又被重開一次').toEqual(['?page=2', '?page=0', '?page=1'])
+  })
+
+  it('shown 的頁次變了才回報：起始頁撲空退回第 0 頁也算', async () => {
+    server.reply(200, [])
+    server.reply(200, many(profile, 3))
+    const reported: number[] = []
+    const { result } = renderHook(() => useListPage('profiles', { page: 5, onShownPage: (p) => reported.push(p) }))
+    await waitFor(() => expect(result.current.state.phase).toBe('ready'))
+    expect(searches()).toEqual(['?page=5', '?page=0'])
+    expect(reported).toEqual([0])
+  })
+})
+
 describe('中止不是失敗', () => {
   it('StrictMode 掛載兩次：第一次的中止 SHALL NOT 變成錯誤狀態', async () => {
     // ⚠️ identity 沒變、效果被重跑 —— 中止的 rejection 帶著**仍然有效**的 identity，
