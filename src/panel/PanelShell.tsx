@@ -51,7 +51,8 @@ export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestI
     if (stop !== 'stay') stop.focus()
   }
 
-  const overlayOpen = overlay !== undefined && overlay !== null
+  // `overlay={open && <X />}` 的 `false` 也算沒有（審查提醒：不然內容區被 inert 鎖死、還多一個空殼）。
+  const overlayOpen = overlay !== undefined && overlay !== null && overlay !== false
 
   return (
     <section
