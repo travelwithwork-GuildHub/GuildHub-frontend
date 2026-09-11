@@ -57,15 +57,13 @@ afterEach(async () => {
 })
 
 describe('驅動層：identity 變了就請求', () => {
-  it('[FE-B01-S04] 掛載就送 `page=0`，而且只送一次', async () => {
+  it('[FE-B01-S04] 掛載就送 `page=0`，回來的資料進到畫面', async () => {
     server.reply(200, many(project, 3))
     const { result } = renderHook(() => useListPage('projects'))
     await waitFor(() => expect(result.current.state.phase).toBe('ready'))
     expect(result.current.state.shown?.items).toHaveLength(3)
     expect(result.current.state.shown?.items[0]?.title).toBe('案件0')
-    // ⚠️ 掛載時的 `open` 造出一個內容相同的新 identity 物件；
-    // 效果的相依用物件的話，這裡會是兩次。
-    expect(searches(), '同一頁送了兩次 —— 效果的相依是物件而不是純量？').toEqual(['?page=0'])
+    expect(searches()).toEqual(['?page=0'])
   })
 
   it('[FE-B01-S05] 前進送的是 `page=1`', async () => {
