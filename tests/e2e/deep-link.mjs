@@ -103,7 +103,8 @@ try {
     window.__guildhubMark = 'mounted-once'
   })
   const sameCanvas = async (label) => {
-    const connected = await canvas.evaluate((el) => el.isConnected)
+    // 整頁重載之後舊的 handle 連 evaluate 都做不了（執行環境沒了）—— 那也是「不是同一個」。
+    const connected = await canvas.evaluate((el) => el.isConnected).catch(() => false)
     const count = await page.evaluate(() => document.querySelectorAll('canvas').length)
     const mark = await page.evaluate(() => window.__guildhubMark)
     if (connected && count === 1 && mark === 'mounted-once') ok(`[S12] ${label}：Canvas 還是同一個節點（頁面沒重載）`)
