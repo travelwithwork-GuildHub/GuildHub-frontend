@@ -33,6 +33,18 @@ export async function login(input: contract.LoginIn) {
 }
 
 /**
+ * `POST /api/register`：建一張帶帳號密碼的名片，**註冊完直接是登入狀態**（後端寫 session）。規格 `FE-A08`。
+ * 撞名是 409（`session.ts` 的 `registerAccount` 把那一次的 409 轉成 `LoginIdTakenError`）。
+ */
+export async function register(input: contract.RegisterIn) {
+  return send('register', {
+    method: 'POST',
+    path: '/api/register',
+    body: contract.RegisterIn.parse(input),
+  }, contract.ProfileOut)
+}
+
+/**
  * ⚠️ **路徑是 `/api/me`，不是 `/api/profiles/me`。**
  * 後者只有 `PATCH`（見下面那個操作）—— 它的 `GET` 從來不存在，
  * 而這個函式打了它好幾週沒有人發現，因為

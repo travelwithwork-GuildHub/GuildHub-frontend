@@ -66,14 +66,12 @@ export const LoginIn = z.object({
 /**
  * `POST /api/register`。帳號密碼註冊（L3，後端 9/8 裁決）。
  *
- * ⚠️ **這裡有 schema，`operations.ts` 卻沒有對應的操作，而那是刻意的。**
- * 註冊 UI 是 `FE-A01` 明文寫下的 Non-goal（design D1），
- * 而 `openspec/changes/fe-a01-login/design.md` 的 D1 要求它在 `governance/`
- * 裡變成一個工作項目 —— 憑空補一個沒有呼叫端的 `register()` 只會是殭屍程式碼。
+ * 進契約層的時候（`FE-A01` 第一刀）`operations.ts` 刻意沒有對應的操作 —— 註冊 UI 是 `FE-A01` 的 Non-goal，
+ * 憑空補一個沒有呼叫端的 `register()` 只會是殭屍程式碼；它出現在這裡是為了 `drift.ts` 的**涵蓋率斷言**
+ *（後端多一個實體那條斷言會紅）。`FE-A08` 把呼叫端做出來了：`operations.register()` → `session.ts` 的 `registerAccount`。
  *
- * 它出現在契約層的理由是 `drift.ts` 的**涵蓋率斷言**：後端多一個實體時
- * 那條斷言會紅，而修好它的方式就是把實體寫進來。
- * 這正是那條斷言存在的用途 —— 它今天第一次真的擋住了東西。
+ * ⚠️ 真後端只有 `password` 有 Pydantic 長度；`login_id` 3–32 與 `nickname` 1–20 是資料庫的 check（超出是 500），
+ * 所以這裡的長度是**前端送出前**的擋法（`LIMITS` 記著出處）。
  */
 export const RegisterIn = z.object({
   login_id: z.string().min(LIMITS.loginId.min).max(LIMITS.loginId.max),

@@ -19,6 +19,7 @@ import * as contract from '@/api/contract/rest'
 /** 端點 → 它接受的請求 body。**只列有 body 的**；沒列到的端點不收 body。 */
 const REQUEST_SCHEMAS: Record<string, z.ZodType> = {
   'POST /api/login': contract.LoginIn,
+  'POST /api/register': contract.RegisterIn,
   'PATCH /api/profiles/me': contract.ProfileUpdate,
   'POST /api/projects': contract.ProjectCreate,
   'POST /api/projects/{project_id}/form-team': contract.FormTeamIn,
