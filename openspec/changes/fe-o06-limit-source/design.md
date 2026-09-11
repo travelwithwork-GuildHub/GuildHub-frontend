@@ -25,6 +25,11 @@ repo 的 `docs/DECISIONS.md` 原則是沒有真實事故不加閘門。
 今天出處在註解裡，人讀得到、機器讀不到。變成 `Record<keyof typeof LIMITS, { source, checkedOn }>` 之後，
 「哪個數字最久沒對過」可以列出來；`FE-O05` 對真後端跑綠的那一天，`checkedOn` 就該更新。
 
+## D6｜`boundaryValues` 住在 `src/api/contract/`，不在 `tests/`
+
+它是「從 limit 算出邊界值」的純函式，跟 `LIMITS` 同一層；`FE-O05` 的套件只負責「哪個欄位打哪個端點」。
+兩邊審查者都抓到原本兩份規格各自宣稱擁有產生器 —— 現在值在這裡、端點在那裡，可以各自先做。
+
 ## 這一份怎麼驗
 
 - `S01`：純函式（邊界表產生器接受注入的 `LIMITS`）。

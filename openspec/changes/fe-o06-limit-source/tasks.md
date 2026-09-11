@@ -10,7 +10,7 @@
 
 - [ ] 2.1 `limits.ts`：`codePointLength`、`remaining`、`violates`、`LIMIT_SOURCES`
 - [ ] 2.2 `eslint.config.mjs`：契約 schema 的 `.min/.max` 不接數字字面（只掃 `rest.ts`、`ws.ts`）
-- [ ] 2.3 判準：`S01`（邊界表產生器接受注入；產生器本身在 `FE-O05`，這裡先以純函式形狀放 `src/api/contract/boundaries.ts`）、`S02`～`S05`
+- [ ] 2.3 `src/api/contract/boundaries.ts`：`boundaryValues(limit)`（純函式；`FE-O05` 用它對到端點）；判準 `S01`～`S05`
 - [ ] 2.4 **突變**：helper 改 `.length` → `S04` 紅；lint 拿掉 → `S02` 紅；`LIMIT_SOURCES` 少鍵 → `S03` 紅
 
 ## 3. 登入表單

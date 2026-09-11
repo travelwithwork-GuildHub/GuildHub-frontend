@@ -13,13 +13,16 @@
 
 `src/api/contract/limits.ts` 的 `LIMITS` SHALL 是長度與範圍限制的唯一定義。
 `src/api/contract/rest.ts` 與 `ws.ts` 裡 `.min(…)`／`.max(…)` 的引數 SHALL NOT 是數字字面（lint 規則，只掃這兩個檔案）。
-`FE-O05` 的邊界表 SHALL 從 `LIMITS` 產生：改一個上限，邊界表對應的 `accept`／`reject` 值 SHALL 跟著變。
+`src/api/contract/boundaries.ts` 的 `boundaryValues(limit)` SHALL 回 `{ accept: string[], reject: string[] }`：
+`max` 有限時 `accept` 含 `max` 個 CJK 字與 `max` 個 emoji、`reject` 含 `max+1` 個 CJK；`min > 0` 時 `reject` 含 `min-1` 個字；
+`max` 是 `UNBOUNDED` 時 `reject` 不含超長的值。`FE-O05` 的契約套件 SHALL 用它取值、不寫數字。
 每一個 `LIMITS` 的鍵 SHALL 在 `LIMIT_SOURCES` 有一筆 `{ source: string, checkedOn: 'YYYY-MM-DD' }`（`source` 是後端檔案與行，例如 `sql/001_schema.sql:13`）。
 
-#### Scenario: [FE-O06-S01] 改上限，邊界表跟著變
+#### Scenario: [FE-O06-S01] 邊界值從 limit 算，不是寫死
 
-- **WHEN** 以 `bio.max = 200` 的 `LIMITS` 產生邊界表（測試注入，不改檔案）
-- **THEN** `bio` 那一列的 `accept` SHALL 是 200 個字、`reject` SHALL 含 201 個字；用原本的 `LIMITS` 產生則是 300／301
+- **WHEN** `boundaryValues({ min: 0, max: 200 })`、`boundaryValues(LIMITS.bio)`、`boundaryValues({ min: 1, max: UNBOUNDED })`
+- **THEN** 第一個的 `accept` SHALL 含 200 個 CJK 與 200 個 emoji（`.length` 是 400）、`reject` 含 201 個字；第二個是 300／301；
+  第三個的 `reject` SHALL 只有空字串（`min-1`），`accept` SHALL 含一個 10000 字的值
 
 #### Scenario: [FE-O06-S02] 契約 schema 裡的數字字面被 lint 擋下
 
@@ -65,5 +68,5 @@ UI 計算剩餘字數與可不可送出 SHALL 用這些 helper，SHALL NOT 用 `
 
 #### Scenario: [FE-O06-S08] 數字不是寫死的
 
-- **WHEN** 測試以 `LIMITS.displayName.max` 計算輸入長度（不寫 20）
-- **THEN** `S06`／`S07` SHALL 通過；把 `LIMITS.displayName.max` 換成 10 重跑（測試注入），SHALL 仍通過 —— 表單的閾值跟著來源走
+- **WHEN** 另一個測試檔以 module mock（`vi.mock('@/api/contract/limits')`，其餘照原樣、只把 `displayName.max` 換成 10）載入表單
+- **THEN** 輸入 10 個字 SHALL 可送、11 個字 SHALL 禁用 —— 表單裡寫死 20 的話這條紅（審查抓到「S06／S07 在真值仍是 20 時寫死也會過」）
