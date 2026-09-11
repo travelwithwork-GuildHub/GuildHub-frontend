@@ -59,8 +59,8 @@ export interface RecordedCall {
 export interface ContractServer {
   base: string
   calls: RecordedCall[]
-  /** 下一個回應。**沒有設定的話回 500** —— 忘記設定不該看起來像成功。 */
-  reply(status: number, body: unknown): void
+  /** 下一個回應。**沒有設定的話回 500** —— 忘記設定不該看起來像成功。`after` 有給的話，等它 resolve 才回（模擬慢的後端）。 */
+  reply(status: number, body: unknown, options?: { after?: Promise<void> }): void
   /**
    * 只給某個路徑的下一個回應；比 `reply()` 的佇列優先。
    *
@@ -68,14 +68,15 @@ export interface ContractServer {
    * 而「哪一個先到」在被中止的請求上是不確定的：中止得夠早的話它根本不會到，
    * 排給它的那個回應就會被下一個請求拿走（規格 `FE-B01-S15` 的判準踩過）。
    */
-  replyFor(pathname: string, status: number, body: unknown): void
+  replyFor(pathname: string, status: number, body: unknown, options?: { after?: Promise<void> }): void
   close(): Promise<void>
 }
 
 export async function startContractServer(): Promise<ContractServer> {
   const calls: RecordedCall[] = []
-  const queue: Array<{ status: number; body: unknown }> = []
-  const byPath = new Map<string, Array<{ status: number; body: unknown }>>()
+  type Reply = { status: number; body: unknown; after?: Promise<void> }
+  const queue: Reply[] = []
+  const byPath = new Map<string, Reply[]>()
 
   const server = http.createServer((req, res) => {
     let raw = ''
@@ -123,8 +124,10 @@ export async function startContractServer(): Promise<ContractServer> {
         res.end(JSON.stringify({ detail: '測試沒有替這個請求準備回應' }))
         return
       }
-      res.writeHead(next.status, { 'content-type': 'application/json' })
-      res.end(JSON.stringify(next.body))
+      void (next.after ?? Promise.resolve()).then(() => {
+        res.writeHead(next.status, { 'content-type': 'application/json' })
+        res.end(JSON.stringify(next.body))
+      })
     })
   })
 
@@ -136,11 +139,11 @@ export async function startContractServer(): Promise<ContractServer> {
   return {
     base: `http://127.0.0.1:${port}`,
     calls,
-    reply(status, body) {
-      queue.push({ status, body })
+    reply(status, body, options) {
+      queue.push({ status, body, after: options?.after })
     },
-    replyFor(pathname, status, body) {
-      byPath.set(pathname, [...(byPath.get(pathname) ?? []), { status, body }])
+    replyFor(pathname, status, body, options) {
+      byPath.set(pathname, [...(byPath.get(pathname) ?? []), { status, body, after: options?.after }])
     },
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   }
