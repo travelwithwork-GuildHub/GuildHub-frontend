@@ -1,9 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { LoginForm } from '@/app/login/LoginForm'
 import { LIMITS } from '@/api/contract/limits'
 import { startContractServer, type ContractServer } from './support/contract-server'
+
+// `LoginForm` 在 `FE-A08` 之後有 `useRouter()`（帳號密碼成功導向 `/world`）；測試環境沒有 Next 的 app router context —— 只換掉導航。
+// 這裡的判準不走那條路，所以 push 什麼都不做。
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {}, replace: () => {} }) }))
+
 
 // 規格：openspec/changes/fe-o06-limit-source/specs/limit-source/spec.md
 //   Requirement: 登入表單的暱稱欄真的拿到那些數字 —— S06、S07（S08 在 `login-form-limits-injected.test.tsx`：module mock 把上限換成 10）

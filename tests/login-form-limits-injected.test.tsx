@@ -3,6 +3,11 @@ import { render, screen } from '@testing-library/react'
 import { act } from 'react'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
+// `LoginForm` 在 `FE-A08` 之後有 `useRouter()`（帳號密碼成功導向 `/world`）；測試環境沒有 Next 的 app router context —— 只換掉導航。
+// 這裡的判準不走那條路，所以 push 什麼都不做。
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {}, replace: () => {} }) }))
+
+
 // 規格：openspec/changes/fe-o06-limit-source/specs/limit-source/spec.md
 //   Requirement: 登入表單的暱稱欄真的拿到那些數字 —— S08（數字不是寫死的）
 //
