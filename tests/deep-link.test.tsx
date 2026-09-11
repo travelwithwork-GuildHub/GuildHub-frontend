@@ -12,6 +12,7 @@ import { startContractServer, type ContractServer } from './support/contract-ser
 // 規格：openspec/changes/fe-b09-deep-link/specs/deep-link/spec.md
 //   Requirement: 網址表示開著哪一層，複製它就能還原 —— S01～S05、S13
 //   Requirement: 互動寫回網址；上一頁與 Escape 等效 —— S06～S11
+//   Requirement: 網址改變時世界不重掛 —— S12 的 jsdom 探針（**輔**；主判準在 `tests/e2e/deep-link.mjs`）
 //
 // 整棵真的 provider 樹 ＋ `PanelUrlSync`，`window.history` 是 jsdom 真的那一個。
 // 深連結直達 = 先 `replaceState` 成那個網址再掛載（design〈這一份怎麼驗〉）。
@@ -64,6 +65,19 @@ afterEach(async () => {
 })
 
 type World = { registry: InteractableRegistry; lock: RefObject<boolean> }
+/** S12 的探針：跟 Canvas 同一層（provider 底下）的元件，數自己掛載了幾次。 */
+let probeMounts = 0
+let probeUnmounts = 0
+function MountProbe() {
+  useEffect(() => {
+    probeMounts += 1
+    return () => {
+      // 卸載也要記：只數掛載的話，「整棵樹被拔掉、沒再掛回來」也是 1（審查抓到的）。
+      probeUnmounts += 1
+    }
+  }, [])
+  return null
+}
 /** 世界的輸入鎖（深連結開著面板時，人也不該走得動：`FE-B01-S18` 的鎖沒有人按 E 也要持有）與看板的 registry。 */
 function WorldProbe({ sinkRef }: { sinkRef: RefObject<World | null> }) {
   const { registry, inputLockRef } = useInteraction()
@@ -98,6 +112,7 @@ function arriveAt(url: string) {
         <WorldProbe sinkRef={sinkRef} />
         <ListPanelProvider>
           <PanelUrlSync />
+          <MountProbe />
           <BoardTargets />
           <BoardPanel />
         </ListPanelProvider>
@@ -369,5 +384,30 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
     expect(spies.go(), '信了別次掛載的血緣去 back').toBe(0)
     expect(panel()).not.toBeNull()
+  })
+})
+
+describe('網址改變時世界不重掛', () => {
+  it('[FE-B09-S12] 一連串網址變化，provider 那一層只掛一次（jsdom 探針，輔）', async () => {
+    server.replyFor('/api/profiles', 200, [profile(0), profile(1)])
+    server.replyFor(`/api/profiles/${UUID(0)}`, 200, profile(0))
+    probeMounts = 0
+    probeUnmounts = 0
+    const { pressE } = arriveAt('/world')
+    pressE()
+    await waitFor(() => expect(cards()).toHaveLength(2))
+    fireEvent.click(cards()[0] as HTMLElement)
+    await waitFor(() => expect(detail()?.dataset.phase).toBe('ready'))
+    await go(-1)
+    await waitFor(() => expect(detail()).toBeNull())
+    await go(1)
+    await waitFor(() => expect(detail()).not.toBeNull())
+    escape()
+    await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
+    escape()
+    await waitFor(() => expect(url()).toBe('/world'))
+    // 這裡只證明 provider 那一層沒重掛 —— `key={url}` 綁在 Canvas 上這裡照樣是 1。真的 Canvas 在 e2e。
+    expect(probeMounts).toBe(1)
+    expect(probeUnmounts, 'provider 那一層被拔掉了').toBe(0)
   })
 })
