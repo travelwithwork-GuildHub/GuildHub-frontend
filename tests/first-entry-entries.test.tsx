@@ -5,6 +5,7 @@ import nextConfig from '../next.config'
 import { FirstEntryNotice } from '@/app/world/FirstEntryNotice'
 import { RootEntry } from '@/app/RootEntry'
 import { IdentityBadge } from '@/identity/IdentityBadge'
+import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { IdentityProvider } from '@/identity/IdentityProvider'
 import { markFirstEntryDone } from '@/first-entry/seen'
 import { startContractServer, type ContractServer } from './support/contract-server'
@@ -116,7 +117,9 @@ describe('走完流程之後，身分立刻反映在畫面上', () => {
     server.reply(200, PROFILE)
     render(
       <IdentityProvider>
-        <IdentityBadge />
+        <ProfilePanelProvider>
+          <IdentityBadge />
+        </ProfilePanelProvider>
         <FirstEntryNotice />
       </IdentityProvider>,
     )

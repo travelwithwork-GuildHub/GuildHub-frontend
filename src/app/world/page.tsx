@@ -1,6 +1,7 @@
 import { IdentityBadge } from '@/identity/IdentityBadge'
 import { IdentityProvider } from '@/identity/IdentityProvider'
 import { AvatarDraftProvider } from '@/identity/AvatarDraftProvider'
+import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
 import { AvatarPicker } from './AvatarPicker'
 import { FirstEntryNotice } from './FirstEntryNotice'
@@ -18,6 +19,8 @@ export default function WorldPage() {
   return (
     <IdentityProvider>
       <AvatarDraftProvider>
+        {/* 「我的名片」面板的開關（`FE-A04`）：按鈕在標題列、面板在 World 裡 —— provider 要包住兩者。 */}
+        <ProfilePanelProvider>
         <RealtimeGenerationProvider>
         <WorldGate>
           <main className="flex h-dvh flex-col">
@@ -43,6 +46,7 @@ export default function WorldPage() {
           </main>
         </WorldGate>
         </RealtimeGenerationProvider>
+        </ProfilePanelProvider>
       </AvatarDraftProvider>
     </IdentityProvider>
   )

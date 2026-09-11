@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useProfilePanel } from '@/profile/ProfilePanelProvider'
 import { useIdentity } from './IdentityProvider'
 
 // 世界裡「你是誰」的顯示。規格 `FE-A01-S11`／`S12`／`S16`。
@@ -16,6 +17,9 @@ import { useIdentity } from './IdentityProvider'
 //
 // ⚠️ **`unavailable` 不能顯示成訪客。** 後端掛掉時所有人都被靜默登出，
 // 而畫面上跟真的沒登入一模一樣（`S06`）。
+//
+// 已登入的名字是一個 `button`「我的名片」（`FE-A04-S01`）：按下開名片面板；關閉後焦點回這個按鈕（`S02`），
+// 所以開的時候把自己交給 provider。**必須在 `<ProfilePanelProvider>` 底下。**
 
 /** 訪客看得到的入口。`S16`：要辨識得出來，而且到得了輸入暱稱的流程。 */
 function SignInEntry() {
@@ -30,13 +34,20 @@ export function IdentityBadge() {
   // ⚠️ **不自己問後端。** 同一個畫面上的世界連線守衛也要知道身分，
   // 兩邊各問一次的話每次載入都會打兩次 `GET /api/me`。
   const identity = useIdentity()
+  const { openPanel } = useProfilePanel()
 
   switch (identity.state) {
     case 'unknown':
       return <p data-testid="identity">確認身分中⋯</p>
     case 'signed-in':
       // **顯示的是查詢的結果**，不是任何前端保存的值（`S04`／`S11`）
-      return <p data-testid="identity">{identity.profile.display_name}</p>
+      return (
+        <p data-testid="identity">
+          <button type="button" aria-label="我的名片" className="text-accent underline" onClick={(e) => openPanel(e.currentTarget)}>
+            {identity.profile.display_name}
+          </button>
+        </p>
+      )
     case 'guest':
       return (
         <p data-testid="identity">
