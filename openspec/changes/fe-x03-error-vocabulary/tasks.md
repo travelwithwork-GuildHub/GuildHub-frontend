@@ -13,6 +13,8 @@
       （`Record` 讓「少一鍵」在 typecheck 就紅）
 - [x] 2.2 `toUiError(error: unknown): UiError` —— 永遠不拋
 - [x] 2.3 判準：`S01`–`S10`、`S17`（對映表，**`S01`／`S02` 成對**；`S06`／`S07` 掃整段範圍）
+- [x] 2.6 `send()` 把 `fetch` 的 rejection 包成 `NetworkError`（design `D7`）；判準：`S19`、`S20`
+- [x] 2.7 整個分類包 try/catch 兜底（design `D8`）；`S17` 的純物件那一半
 - [x] 2.4 判準：`S11`（不多不少）、`S12`（哨兵不外漏）、`S13`（互不相同）
 - [x] 2.5 **突變**：把 403 併進 401，`S02` 要紅；`message` 改成 `error.message`，`S12` 要紅；
       對 `null` 拋錯，`S10` 要紅；只寫死 418／429，`S07` 要紅
@@ -30,7 +32,7 @@
 
 - [x] 4.1 `src/identity/session.ts` 的 `isUnauthorized`／`isNotFound` 改成看 `kind`
       （`FE-A01` 的判準要照樣全綠 —— 那兩個 helper 是控制流，行為不變）
-- [x] 4.2 判準：`S16`（`HttpError` 的 import 邊界）、`S18`（身分層不含 `.status`）
+- [x] 4.2 判準：`S16`（`HttpError`／`NetworkError` 的 import 邊界 —— **lint 規則**，含改名、整個模組、再匯出；規則自己有負向測試）、`S18`（身分層不含 `.status`）
 - [x] 4.3 **突變**：`session.ts` 改回 import `HttpError` 比 `status`，`S16`／`S18` 要紅
 
 ## 5. 收尾
