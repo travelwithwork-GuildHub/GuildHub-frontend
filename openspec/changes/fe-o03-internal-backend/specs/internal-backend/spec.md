@@ -54,7 +54,9 @@ handler SHALL NOT 自行檢查長度上限 —— 那是資料庫的事，跟真
 登入成功 SHALL `Set-Cookie: session=<id>.<hmac>; HttpOnly; Path=/; SameSite=Lax`（名稱跟真後端 Starlette 的預設一樣），
 `<hmac>` 是以 `INTERNAL_SESSION_SECRET` 對 `<id>` 做 HMAC-SHA256 的 base64url。
 以下 SHALL 一律視為未登入（401）：沒有 cookie、簽章對不上、`<id>` 不是 uuid、`<id>` 指向不存在的名片（資料庫重建過）。
-`INTERNAL_SESSION_SECRET` 缺席時，`next dev` SHALL 用一個固定的開發用值；`next build` SHALL 失敗（`FE-O14` 的閘門形狀）。
+`INTERNAL_SESSION_SECRET` 缺席時，`local` SHALL 用一個固定的開發用值；非 `local` SHALL 在第一次用到時拋 `ConfigError`（該請求 500）。
+**不進 `FE-O14` 的建置閘門**：那份清單是無條件的（`FE-O14-S06`），而 `guildhub` 部署不需要這把 —— 要求它填就是一個「填假的也沒差」的變數（實作時 `FE-O14-S06` 抓到的）。
+非 `local` 的 cookie SHALL 帶 `Secure`。
 
 #### Scenario: [FE-O03-S06] 登入之後帶 cookie 就是那個人
 
