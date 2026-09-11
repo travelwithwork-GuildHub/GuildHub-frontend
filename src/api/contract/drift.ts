@@ -96,7 +96,12 @@ type _RegisterIn = Expect<Equal<Inferred<'RegisterIn'>, Schema<'RegisterIn'>>>
 type _RoomDoorOut = Expect<Equal<Inferred<'RoomDoorOut'>, Schema<'RoomDoorOut'>>>
 type _SeatClaim = Expect<Equal<Inferred<'SeatClaim'>, Schema<'SeatClaim'>>>
 type _SeatOut = Expect<Equal<Inferred<'SeatOut'>, Schema<'SeatOut'>>>
-type _ValidationError = Expect<Equal<Inferred<'ValidationError'>, Schema<'ValidationError'>>>
+// ⚠️ `ctx` 另外比：OpenAPI 只說它是「一個物件」（沒宣告任何屬性），`openapi-typescript` 把那渲染成
+// `Record<string, never>`（空物件）—— 而真後端跑起來 `ctx` 是有內容的（`{"error": {}}`、`{"expected": "…"}`，
+// 2026-09-11 對真後端實錄）。這裡產生器的型別**比實際窄**，Zod 照實際寫成 `Record<string, unknown>`，
+// 其餘欄位仍逐一相等。這是「產的型別也會漂」的一個實例，記在 `GENERATED.md`。
+type _ValidationError = Expect<Equal<Omit<Inferred<'ValidationError'>, 'ctx'>, Omit<Schema<'ValidationError'>, 'ctx'>>>
+type _ValidationErrorCtx = Expect<Equal<Inferred<'ValidationError'>['ctx'], Record<string, unknown> | undefined>>
 
 /**
  * 給測試用的：登錄表涵蓋了哪些實體。

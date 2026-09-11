@@ -1,0 +1,19 @@
+{
+  "_note": "對真後端（FastAPI）實錄，2026-09-11。比的是 status、contentType、loc[0]、type；msg 不逐字比（Pydantic 的英文訊息不是契約）。規格 FE-O05 S12／S16、FE-O03 design D3。",
+  "cases": {
+    "login {}": { "status": 422, "loc0": "body", "type": "value_error" },
+    "login {nickname:null}": { "status": 422, "loc0": "body", "type": "value_error" },
+    "login {nickname:123}": { "status": 422, "loc0": "body", "type": "string_type", "loc": ["body", "nickname"] },
+    "login {resume_token:'not-a-uuid'}": { "status": 422, "loc0": "body", "type": "uuid_parsing", "loc": ["body", "resume_token"] },
+    "login two modes": { "status": 422, "loc0": "body", "type": "value_error" },
+    "login {login_id only}": { "status": 422, "loc0": "body", "type": "value_error" },
+    "login body literal null": { "status": 422, "loc0": "body", "type": "missing" },
+    "login not json": { "status": 422, "loc0": "body", "type": "json_invalid", "loc": ["body", 0] },
+    "login json without content-type": { "status": 422, "loc0": "body", "type": "model_attributes_type" },
+    "profiles page=abc": { "status": 422, "loc0": "query", "type": "int_parsing", "loc": ["query", "page"] },
+    "profiles page=1.5": { "status": 422, "loc0": "query", "type": "int_parsing", "loc": ["query", "page"] },
+    "projects status=bogus": { "status": 422, "loc0": "query", "type": "enum", "loc": ["query", "status"] }
+  },
+  "timestamp": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+  "timestamp_example": "2026-09-11T13:00:33.281950Z"
+}

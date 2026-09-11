@@ -71,3 +71,7 @@ script 裡的版本與這份檔案的紀錄要一起改，然後重產。**
   **沒有任何機器在對它們**。抓得到那種漂移的是 `FE-O05` 對真後端的成對邊界測試（W2）。
 - **錯誤面。** OpenAPI 只宣告 `200`／`201`／`422`，但後端實際會丟
   400／401／403／404／409。產出的型別裡那五個碼完全不存在。
+- **`ValidationError.ctx` 的內容。** OpenAPI 只說它是「一個物件」（沒宣告屬性），產生器渲染成
+  `Record<string, never>`；真後端跑起來是 `{"error": {}}`／`{"error": "invalid character…"}`／
+  `{"expected": "'recruiting', …"}`（2026-09-11 對真後端實錄，`tests/contract/golden/422.json`）。
+  Zod 照實際寫成 `Record<string, unknown>`，`drift.ts` 對這一個欄位另外比。**產的型別也會比實際窄。**
