@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { SECONDARY } from '@/design/controls'
 import { layer } from '@/design/layers'
+import { useEscapeLayer } from '@/world/interaction/escapeLayers'
 import { edgeState, type ListKind } from './paging'
 import { useListPage, type ListItemOf } from './useListPage'
 
@@ -62,14 +63,32 @@ export function ListPanel<K extends ListKind>({
   const hasItems = items.length > 0
   const list = useRef<HTMLUListElement>(null)
 
-  // Escape 只在面板開著的時候有人聽（`S16`）：這個元件不在畫面上，監聽器也不在。
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Escape') onClose()
+  // Escape 走層級（`FE-X06`）：這個面板是底下那一層，overlay（詳情）自己再註冊一層在上面。
+  // 只在面板開著的時候在堆疊裡（`FE-B01-S16`）：這個元件不在畫面上，層也不在。
+  useEscapeLayer(onClose)
+
+  // focus trap（`FE-X06-S11`）：持有鎖的面板，Tab／Shift+Tab 只在面板內循環。
+  // 可聚焦元素每次按鍵現算（列表會翻頁、詳情會蓋上；`inert` 的那一段自然不算）。
+  const section = useRef<HTMLElement>(null)
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLElement>) => {
+    if (e.key !== 'Tab' || section.current === null) return
+    const focusable = Array.from(
+      section.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => el.closest('[inert]') === null)
+    if (focusable.length === 0) return
+    const first = focusable[0] as HTMLElement
+    const last = focusable[focusable.length - 1] as HTMLElement
+    const active = document.activeElement
+    if (e.shiftKey && (active === first || active === section.current || active === list.current)) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault()
+      first.focus()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }
 
   // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——
   // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
@@ -84,6 +103,8 @@ export function ListPanel<K extends ListKind>({
 
   return (
     <section
+      ref={section}
+      onKeyDown={onKeyDown}
       aria-label={title}
       data-testid="list-panel"
       data-kind={kind}

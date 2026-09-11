@@ -5,6 +5,7 @@ import { avatarLook } from '@/design/avatar'
 import { SECONDARY } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
+import { useEscapeLayer } from '@/world/interaction/escapeLayers'
 import { Missing } from './Missing'
 import { useProfileDetail } from './useProfileDetail'
 
@@ -30,6 +31,8 @@ export interface TalentDetailProps {
 
 export function TalentDetail({ id, preview, onBack, labels }: TalentDetailProps) {
   const detail = useProfileDetail(id, preview)
+  // 詳情是蓋在面板上的那一層：Escape 先關它、面板留著（`FE-X06-S01`、`FE-B04-S14`）。
+  useEscapeLayer(onBack)
   const profile = detail.profile
   const look = profile === undefined ? undefined : avatarLook(profile.avatar_id)
 

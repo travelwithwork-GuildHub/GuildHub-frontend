@@ -191,8 +191,8 @@ describe('詳情層的鍵盤不驅動世界，Escape 照今天的全域契約', 
     expect(screen.getByTestId('list-panel')).toBeInTheDocument()
   })
 
-  it('[FE-B04-S14] 詳情開著按 Escape：詳情不再顯示、面板關閉、鎖放開', async () => {
-    // 「鎖放開 → 人走得動」那一半走真的 LocalPlayer，在 `talent-detail-input.test.tsx`。
+  it('[FE-B04-S14] 詳情開著按 Escape：詳情不再顯示、面板仍然開著、鎖還在', async () => {
+    // `FE-X06` 之後的契約：Escape 每次只關最上層。第二下才關面板（`FE-X06-S01`，在 `escape-layers.test.tsx`）。
     server.replyFor(LIST, 200, [profile(0)])
     server.replyFor(detailPath(UUID(0)), 200, profile(0))
     openTalentBoard()
@@ -203,8 +203,9 @@ describe('詳情層的鍵盤不驅動世界，Escape 照今天的全域契約', 
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
     })
     expect(screen.queryByTestId('talent-detail')).toBeNull()
-    expect(screen.queryByTestId('list-panel'), '詳情層的 Escape 沒有照 FE-B01-S16 關面板').toBeNull()
-    expect(lock.ref?.current, '面板關了鎖沒放').toBe(false)
+    expect(screen.getByTestId('list-panel'), '一次 Escape 連面板一起關了 —— 兩層各關各的').toBeInTheDocument()
+    expect(cards(), '列表沒留住').toHaveLength(1)
+    expect(lock.ref?.current, '面板還開著，鎖卻放了').toBe(true)
   })
 })
 
@@ -228,8 +229,9 @@ describe('返回列表時，頁碼與捲動位置都還在', () => {
     expect(cards(), '返回之後回到第一頁了').toHaveLength(3)
     expect(cards()[0]?.dataset.profileId).toBe(UUID(PAGE_SIZE))
     expect(calls().filter((c) => c.startsWith(`${LIST}?`)).length, '返回時重打了列表').toBe(listCallsBefore)
-    // 焦點也要還給列表 —— 不還的話鍵盤使用者的下一個 Tab 跑去標題列（真瀏覽器的 e2e 抓到的）。
-    expect(document.activeElement, '返回之後焦點掉到 body 了').toBe(screen.getByRole('list'))
+    // 焦點也要有地方去 —— 不還的話鍵盤使用者的下一個 Tab 跑去標題列（真瀏覽器的 e2e 抓到的）。
+    // `FE-X06-S12`：回到開它的那張卡（`escape-layers.test.tsx` 的 S12 也驗）。
+    expect(document.activeElement, '返回之後焦點掉到 body 了').toBe(first)
   })
 
   it('[FE-B04-S12] 捲動位置還在，列表在 DOM 裡而且不是 display:none', async () => {
