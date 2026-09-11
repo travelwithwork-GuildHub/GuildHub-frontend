@@ -1,9 +1,7 @@
-import { readFile } from 'node:fs/promises'
-import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ValidationError } from '@/api/contract/errors'
 import { ProfileOut } from '@/api/contract/rest'
 import { ContractClient, baseUrl } from '../client'
+import { checkGolden } from '../golden'
 
 // 規格：openspec/changes/fe-o03-internal-backend/specs/internal-backend/spec.md
 //   Requirement: 每個 handler 走同一條管線，錯誤形狀複製真後端 —— S03
@@ -11,31 +9,16 @@ import { ContractClient, baseUrl } from '../client'
 //   Requirement: 登入有三種模式，剛好給一組 —— S09～S12
 //
 // 同一組對 internal 與 guildhub 各跑一次；這個檔案不知道自己在打誰。
-// 422 的形狀對 `golden/422.json`（對真後端實錄）比：status、loc[0]、type。
+// 422 的形狀對 `golden/422.json`（對真後端實錄）比：status、content-type、整個 detail 的 type／loc。
 
-type Golden = { cases: Record<string, { status: number; loc0: string; type: string; loc?: Array<string | number> }> }
-const golden = JSON.parse(await readFile(path.join(__dirname, '..', 'golden', '422.json'), 'utf8')) as Golden
 const ZERO = '00000000-0000-4000-8000-000000000000'
 /** `db/schema/100_test_account.sql`：seed 第一張名片的帳號。 */
 const TEST_ACCOUNT = { login_id: 'seed-account', password: 'guild1234', display_name: '鐵砧公會長' }
 
-function expectGolden(name: string, r: { status: number; json: unknown }) {
-  const g = golden.cases[name]
-  if (g === undefined) throw new Error(`golden 沒有 ${name}`)
-  expect(r.status, name).toBe(g.status)
-  const detail = (r.json as { detail: unknown[] }).detail
-  expect(Array.isArray(detail), `${name}：detail 要是陣列`).toBe(true)
-  const first = detail[0] as Record<string, unknown>
-  expect(ValidationError.safeParse(first).success, `${name}：${JSON.stringify(first)}`).toBe(true)
-  expect((first.loc as unknown[])[0], name).toBe(g.loc0)
-  expect(first.type, name).toBe(g.type)
-  if (g.loc) expect(first.loc, name).toEqual(g.loc)
-}
-
 describe('login', () => {
   it('[FE-O03-S03] 驗證失敗的形狀：三種模式一種都沒給', async () => {
     const c = new ContractClient(baseUrl())
-    expectGolden('login {}', await c.raw('POST', '/api/login', { body: {} }))
+    checkGolden('login {}', await c.raw('POST', '/api/login', { body: {} }))
   })
 
   it('[FE-O03-S09] 三種模式各一次', async () => {
@@ -59,8 +42,8 @@ describe('login', () => {
 
   it('[FE-O03-S10] 給兩組是 422，給半組也是 422', async () => {
     const c = new ContractClient(baseUrl())
-    expectGolden('login two modes', await c.raw('POST', '/api/login', { body: { nickname: '甲', resume_token: ZERO } }))
-    expectGolden('login {login_id only}', await c.raw('POST', '/api/login', { body: { login_id: 'x' } }))
+    checkGolden('login two modes', await c.raw('POST', '/api/login', { body: { nickname: '甲', resume_token: ZERO } }))
+    checkGolden('login {login_id only}', await c.raw('POST', '/api/login', { body: { login_id: 'x' } }))
   })
 
   it('[FE-O03-S11] 帳號不存在與密碼錯誤是同一句話、同一個 body', async () => {

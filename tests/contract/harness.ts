@@ -8,6 +8,7 @@
 
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { createHmac } from 'node:crypto'
+import { rmSync } from 'node:fs'
 import { access } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import net from 'node:net'
@@ -15,6 +16,7 @@ import path from 'node:path'
 import type { TestProject } from 'vitest/node'
 import { reset } from '../../scripts/db.mjs'
 import { testDatabase } from '../support/test-db'
+import { RECORDING_DIR, assembleRecordings } from './golden'
 import { assertLoopbackBase, resolveTarget } from './target'
 
 const ROOT = path.resolve(__dirname, '..', '..')
@@ -129,9 +131,11 @@ export default async function setup(project: TestProject): Promise<() => Promise
   const record = process.env.CONTRACT_RECORD === '1'
   if (record && target !== 'guildhub') throw new Error('CONTRACT_RECORD=1 只能對 guildhub 錄 —— golden 是真後端的形狀，不是替身的。')
   project.provide('contractRecord', record)
+  if (record) rmSync(RECORDING_DIR, { recursive: true, force: true })
   const recorded = async () => {
     if (!record) return
-    console.log('\n[contract] 已錄製 golden（tests/contract/golden/422.json），這一次不算通過 —— 再不帶 CONTRACT_RECORD 跑一次 compare。')
+    const n = assembleRecordings()
+    console.log(`\n[contract] 已錄製 ${n} 條 golden（tests/contract/golden/422.json，整組換掉），這一次不算通過 —— 再不帶 CONTRACT_RECORD 跑一次 compare。`)
     process.exitCode = 1
   }
 

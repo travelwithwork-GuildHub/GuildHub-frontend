@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ProfileOut } from '@/api/contract/rest'
 import { ContractClient, baseUrl } from '../client'
-import { checkGolden, timestampPattern } from '../golden'
+import { checkGolden, recording, timestampPattern } from '../golden'
 
 // 規格：openspec/changes/fe-o05-contract-tests/specs/contract-tests/spec.md
 //   Requirement: 形狀與型別：兩邊一字不差 —— S10（在 profiles.contract.ts）、S11、S12、S16
@@ -26,7 +26,8 @@ describe('驗證失敗的形狀', () => {
     const minus = await c.raw('GET', '/api/profiles?page=-1')
     const zero = await c.raw('GET', '/api/profiles?page=0')
     checkGolden('profiles page=-1', minus)
-    expect(minus.json).toEqual(zero.json)
+    // 錄製時不斷言（record 模式只錄形狀）—— 這一行是 compare 模式的義務。
+    if (!recording()) expect(minus.json).toEqual(zero.json)
   })
 
   it('[FE-O05-S12] 資料庫擋的長度是 500 text/plain（golden），兩邊一樣', async () => {

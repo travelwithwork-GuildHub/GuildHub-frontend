@@ -1,10 +1,8 @@
-import { readFile } from 'node:fs/promises'
-import path from 'node:path'
 import pg from 'pg'
 import { describe, expect, it } from 'vitest'
-import { ValidationError } from '@/api/contract/errors'
 import { ProfileOut, ProjectOut, RoomDoorOut } from '@/api/contract/rest'
 import { ContractClient, baseUrl, databaseUrl, unimplemented } from '../client'
+import { checkGolden } from '../golden'
 
 // 規格：openspec/changes/fe-o03-internal-backend/specs/internal-backend/spec.md
 //   Requirement: 每個 handler 走同一條管線，錯誤形狀複製真後端 —— S01、S04、S05
@@ -12,8 +10,6 @@ import { ContractClient, baseUrl, databaseUrl, unimplemented } from '../client'
 //
 // ⚠️ 名片筆數會被別的案例的 login 加多，所以 S15 不寫死 32／28：用資料庫算出總數再推每一頁該有幾筆。
 
-type Golden = { cases: Record<string, { status: number; loc0: string; type: string; loc?: Array<string | number> }> }
-const golden = JSON.parse(await readFile(path.join(__dirname, '..', 'golden', '422.json'), 'utf8')) as Golden
 const ZERO = '00000000-0000-4000-8000-000000000000'
 
 async function sql<T extends Record<string, unknown>>(text: string, params: unknown[] = []): Promise<T[]> {
@@ -82,11 +78,7 @@ describe('不存在與不假裝存在', () => {
     await c.login('打奇怪 id 的人')
     const compact = await c.raw('GET', '/api/profiles/00000000000040008000000000000000')
     expect(compact.status, '32 位無連字號應該被當成合法 uuid → 404').toBe(404)
-    const bad = await c.raw('GET', '/api/profiles/not-a-uuid')
-    expect(bad.status).toBe(422)
-    const first = (bad.json as { detail: Array<Record<string, unknown>> }).detail[0] as Record<string, unknown>
-    expect(first.type).toBe('uuid_parsing')
-    expect(first.loc).toEqual(['path', 'profile_id'])
+    checkGolden('profiles path not-a-uuid', await c.raw('GET', '/api/profiles/not-a-uuid'))
   })
 })
 
@@ -123,13 +115,7 @@ describe('清單', () => {
       ['profiles page=abc', 'abc'],
       ['profiles page=1.5', '1.5'],
     ] as const) {
-      const r = await c.raw('GET', `/api/profiles?page=${q}`)
-      const g = golden.cases[name] as { status: number; type: string; loc?: unknown[] }
-      expect(r.status, name).toBe(g.status)
-      const first = (r.json as { detail: Array<Record<string, unknown>> }).detail[0] as Record<string, unknown>
-      expect(ValidationError.safeParse(first).success, JSON.stringify(first)).toBe(true)
-      expect(first.type, name).toBe(g.type)
-      expect(first.loc, name).toEqual(g.loc)
+      checkGolden(name, await c.raw('GET', `/api/profiles?page=${q}`))
     }
   })
 
@@ -153,12 +139,7 @@ describe('清單', () => {
     const active = await c.raw('GET', '/api/projects?status=active')
     expect((active.json as Array<{ status: string }>).every((x) => x.status === 'active')).toBe(true)
     expect((active.json as unknown[]).length).toBeGreaterThan(0)
-    const bogus = await c.raw('GET', '/api/projects?status=bogus')
-    const g = golden.cases['projects status=bogus'] as { status: number; type: string; loc?: unknown[] }
-    expect(bogus.status).toBe(g.status)
-    const first = (bogus.json as { detail: Array<Record<string, unknown>> }).detail[0] as Record<string, unknown>
-    expect(first.type).toBe(g.type)
-    expect(first.loc).toEqual(g.loc)
+    checkGolden('projects status=bogus', await c.raw('GET', '/api/projects?status=bogus'))
   })
 
   it('[FE-O03-S17] 走廊的門：seed 的兩間 active 專案；沒有人在房間裡 → online_count 全是 0（替身不在也 200、1 秒內）', async () => {
