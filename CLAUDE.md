@@ -52,6 +52,22 @@ Claude Code 進入此 Repository 後：
    環境變數決定連本地後端還是真後端 —— 散在各處的話，之後銜接是重寫不是切換。
 4. 確認規格在 PR 上談定了沒有 —— **沒有就不要寫產品程式碼**。
 5. 除非使用者指定其他語言，對人類使用繁體中文。
+6. **看得見的東西都要過 `ui-ux-pro-max`。** 動到 `src/**/*.tsx` 的版面、
+   `src/app/globals.css`、`src/design/` 之前，先叫用 `ui-ux-pro-max` 這個 skill
+   （來源 `nextlevelbuilder/ui-ux-pro-max-skill`；`.claude/settings.json` 會替信任
+   這個資料夾的人裝好 —— 沒裝就先裝，不要跳過）：
+
+   - 新頁面或整體視覺方向 → `--design-system`
+   - 單一問題（對比、焦點、表單、間距、動態）→ 一個明確的 `--domain`
+   - 實作細節 → `--stack nextjs`；交付前跑它的 pre-delivery checklist
+
+   **為什麼**：到 W2 為止 DOM 那一半的畫面只做到「看得出來能操作」的下限
+   （`FE-X13`，那一列是使用者看到截圖後補的，原話「登入畫面也太醜了」）。
+   功能對了、判準全綠、畫面仍然沒有人想用 —— 這一條是補那個缺口的。
+
+   **它給的是建議，不是規格。** 跟 `openspec/specs/` 衝突時規格贏；
+   要改視覺規則就開 `spec/` PR，不要把它的輸出當成可以繞過第 4 步的理由。
+   它產出的 `design-system/` 檔案**不進版控** —— 那會是第三套規格文件。
 
 規格的形狀與生命週期由 **OpenSpec CLI** 管（`/opsx:propose`、`/opsx:apply`、
 `/opsx:archive`）。`AGENTS.md` 只管 git / PR / CI 那一半。
