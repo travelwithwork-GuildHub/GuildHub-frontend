@@ -213,6 +213,9 @@ recruiting → active → closed
 - **高頻資料不進 React。** position / rotation / 動畫相位**不得**寫入 React state
   或 Zustand，只能放 ref、Three object transform、Rapier rigid body。
   違反這條不會有錯誤訊息，只會變慢。
+- **觸控裝置是 DOM-only**（`FE-X08` 的決定，2026-09-12）：主要輸入是觸控（`pointer: coarse`）就不載 3D，
+  直接給看板／名片／收件匣／登入的 DOM 版，並明說完整的空間體驗在電腦上。不做虛擬搖桿、不做點地移動；
+  翻案的條件寫在 `docs/WBS.md` 那一列。
 - **Camera 固定。** Orthographic、Elevated、固定角度與距離、平滑跟隨。
   **不提供玩家自由旋轉**（FE-W04）。
 - **移動是 2D gameplay logic**（FE-W02）。3D rendering + 2D 邏輯。

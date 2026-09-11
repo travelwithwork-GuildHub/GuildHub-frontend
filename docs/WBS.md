@@ -73,8 +73,18 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | 項目 | 狀態 | 依據 |
 |---|---|---|
 | FE-A01 | 已封存 | `fe-a01-login` |
+| FE-A04 | 已封存 | `fe-a04-profile-editor` |
+| FE-A05 | 已封存 | `fe-a05-avatar` |
+| FE-A08 | 已封存 | `fe-a08-account-login` |
+| FE-B01 | 已封存 | `fe-b01-list-container` |
+| FE-B04 | 已封存 | `fe-b04-talent-directory` |
+| FE-B09 | 已封存 | `fe-b09-deep-link` |
 | FE-O01 | 已封存 | `fe-o01-contract` |
 | FE-O02 | 已封存 | `fe-o02-data-access` |
+| FE-O03 | 已封存 | `fe-o03-internal-backend` |
+| FE-O04 | 已封存 | `fe-o04-disposable-db` |
+| FE-O05 | 已封存 | `fe-o05-contract-tests` |
+| FE-O06 | 已封存 | `fe-o06-limit-source` |
 | FE-O09 | 已封存 | `fe-o09-env` |
 | FE-O11 | 已封存 | `fe-o11-coverage`、`fe-o11-evidence` |
 | FE-O14 | 已封存 | `fe-o14-drop-preview-notice`、`fe-o14-preview-deploy` |
@@ -97,12 +107,22 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-W10 | 已封存 | `fe-w10-environment-components` |
 | FE-W11 | 已封存 | `fe-w11-guild-hall` |
 | FE-W12 | 已封存 | `fe-w12-interactive-objects` |
+| FE-W19 | 已封存 | `fe-w19-avatar-appearance` |
 | FE-X01 | 已封存 | `fe-x01-appshell` |
+| FE-X03 | 已封存 | `fe-x03-error-vocabulary` |
+| FE-X04 | 已封存 | `fe-x04-empty-states` |
+| FE-X05 | 已封存 | `fe-x05-form-conventions` |
+| FE-X06 | 已封存 | `fe-x06-keyboard-focus` |
+| FE-X13 | 已封存 | `fe-x13-control-affordance` |
 | BE-G01 | 已完成 | 標記 `Done` |
 | BE-G02 | 已完成 | 標記 `Done` |
 | FE-O10 | 已完成 | 標記 `Done` |
+| FE-X08 | 已完成 | 標記 `Done` |
 | FE-A06 | 規格已合併 | `fe-a06-first-entry` |
+| FE-K01 | 規格已合併 | `fe-k01-inbox` |
 | FE-R04 | 規格已合併 | `fe-r04-background-tab` |
+| FE-R10 | 規格已合併 | `fe-r10-presence` |
+| FE-T06 | 規格已合併 | `fe-t06-output-safety` |
 | FE-O18 | 常態 | — |
 | BE-G04 | 待裁決 | — |
 | BE-G25 | 待裁決 | — |
@@ -122,6 +142,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G24 | 等外部 | — |
 | BE-G26 | 等外部 | — |
 | BE-G27 | 等外部 | — |
+| BE-G32 | 等外部 | — |
 | BE-G07 | 已取消 | — |
 | BE-G08 | 已取消 | — |
 | BE-G15 | 已取消 | — |
@@ -129,9 +150,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G18 | 已取消 | — |
 | BE-G19 | 已取消 | — |
 
-共 171 項：未開始 115、已封存 26、等外部 16、已取消 6、已完成 3、待裁決 2、規格已合併 2、常態 1
+共 174 項：未開始 97、已封存 42、等外部 17、已取消 6、規格已合併 5、已完成 4、待裁決 2、常態 1
 
-來源指紋 `5e30b015af52003f`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `cdb91d0f3663afa2`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -785,12 +806,12 @@ bash .github/scripts/wbs-page.sh --open
 | | | `projects.title` / `body`、`skills` 的數量與長度**後端完全沒有上限** —— 前端自己訂並寫進規格 | W2 | 2 | | |
 | FE-X06 | 鍵盤與焦點 | **WASD 與輸入框會打架。** Modal、Escape、focus trap、螢幕閱讀器與 3D 輸入的焦點治理 | W2 | 5 | | Alarm｜晚做要改每一個面板 |
 | FE-X07 | 無障礙 | DOM 面板的 aria、對比、鍵盤路徑。**3D 世界不承諾無障礙，但產品核心流程必須能純 DOM 完成** | W5 | 5 | | |
-| FE-X08 | 裝置與降級 | 手機上 3D + WASD 不成立。決定：DOM-only 模式／虛擬搖桿／點地移動。**必須有結論** | W2 | 3 | | Alarm｜這是產品範圍決定，不是實作細節 |
-| | | 實作選定的方案 | W13–W16 | 8 | | Pending｜等上面的決定 |
+| FE-X08 | 裝置與降級 | 手機上 3D + WASD 不成立。**決定（2026-09-12）：DOM-only 模式**，不做虛擬搖桿、不做點地移動。理由：3D 的價值是「看見 → 靠近 → 旁聽」那條鏈，手機上面板一開就佔滿螢幕，鏈先天不成立；搖桿與點地都是把桌面的移動搬到更差的介面上，還把 `FE-X09` 的 iOS／效能問題整包提前到現在；產品核心流程本來就要能純 DOM 完成（`FE-X07`），看板／名片／收件匣／登入／深連結都在了。邊界（實作是 `FE-X14`，規格要照這個寫）：(1) 判定看**主要輸入是觸控**（`matchMedia('(pointer: coarse)')`），不看 UA、不看寬度；(2) DOM-only 下不掛 R3F／Rapier、不開世界 WS、沒有 presence，明說「完整的空間體驗在電腦上」；(3) iPad 等觸控平板一律 DOM-only；(4) 桌面小視窗**不**切模式（避免 WebGL context 反覆銷毀），3D 上蓋一層「放大視窗」的提示、已開的面板照常可用；(5) 判定錯了要有「試試完整空間」／「回到精簡模式」兩個入口並記住選擇；(6) 翻案條件：公開活動那條鏈在電腦上被證明成立、`FE-X09` 的 iOS 降級成熟、有專屬的行動版佈局與人力 —— 三者都有才重開 B／C 的比較，不預設選哪個 | W2 | 3 | | Done｜產品決定，對不到 change；codex gpt-5.6-sol 與 Gemini 3.1 Pro 各自獨立給出同一個結論（A）；governance PR 記錄。決定的內容寫在本列，`CONTEXT.md`〈已知的邊界與限制〉同步一句 |
 | FE-X09 | 相容矩陣 | WebGL2 偵測與友善提示、整合顯卡降級、**context lost**、`prefers-reduced-motion`、背景分頁節流、Safari / iOS | W5 | 5 | | |
 | FE-X10 | 降級模式 | REST 活著但 WS 掛了／WS 活著但 DB 掛了／3D 掛了 —— 每一種的產品行為 | W5 | 4 | | |
 | FE-X11 | 送出節流 | chat / status / 表單的前端節流。**後端沒有 rate limit**（BE-G16），這只擋得住守規矩的人 —— 要做，但不要當成防護 | W3 | 3 | | |
 | FE-X12 | i18n | 文案抽出、語言切換、日期時間與時區格式化 | W13–W16 | 6 | | |
+| FE-X14 | 行動版 DOM-only 模式 | `FE-X08` 決定的實作（原本是它的第二列；拆成自己的 ID 是因為決定已 `Done`、實作還沒開始，兩件事不該共用一個狀態）：`pointer: coarse` 判定、不進世界的 DOM 殼（看板／名片／收件匣／登入／深連結）、桌面小視窗的提示遮罩、「試試完整空間」／「回到精簡模式」兩個入口與記憶、`[Mobile]` 的線上狀態呈現（電腦版看得到但走不過去）。邊界照 `FE-X08` 那一列 | W13–W16 | 8 | | |
 
 ---
 
