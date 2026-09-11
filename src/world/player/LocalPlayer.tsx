@@ -16,6 +16,7 @@ import { advanceRenderMotion, createRenderMotion } from './renderMotion'
 import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/world/physics/world'
 import { staticBoxesFor } from '@/world/layout/geometry'
 import { LAYOUT, SPAWN } from '@/world/layout/guildHallLayout'
+import { useInputLockRef } from '@/world/interaction/InteractionProvider'
 
 // 本地玩家。
 //
@@ -51,6 +52,8 @@ export function LocalPlayer({ targetRef, poseRef, av }: LocalPlayerProps) {
   /** 子部位查一次就快取。查不到的話動畫會靜默停止 —— 見 partsRef 的初始化。 */
   const partsRef = useRef<Partial<Record<ChibiPart, Object3D>>>({})
   const pressed = useRef<Set<string>>(new Set())
+  // 面板開著的時候鍵盤是面板的（規格 `FE-B01-S17`／`S18`）。**是 ref** —— 每幀讀，不重繪。
+  const inputLockRef = useInputLockRef()
   const facing = useRef<Facing>(FACING.down)
   const phase = useRef(0)
   const animState = useRef<AnimationState>('idle')
@@ -96,6 +99,9 @@ export function LocalPlayer({ targetRef, poseRef, av }: LocalPlayerProps) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      // 鎖著就不收：面板裡按方向鍵是要捲面板，不是要走路（`S18`）。
+      // **也不 `preventDefault`** —— 那個預設行為現在是面板的。
+      if (inputLockRef.current) return
       if (MOVEMENT_KEYS.has(e.code)) {
         pressed.current.add(e.code)
         e.preventDefault()
@@ -135,12 +141,15 @@ export function LocalPlayer({ targetRef, poseRef, av }: LocalPlayerProps) {
       window.removeEventListener('pagehide', release)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [])
+  }, [inputLockRef])
 
   useFrame((_, dt) => {
     const root = rootRef.current
     if (!root) return
 
+    // 按著方向鍵的時候面板開了：`keyup` 會落在鎖著的期間被正常刪掉，
+    // 但在那之前角色不該繼續走 —— 所以鎖著的每一幀都把按鍵清掉。
+    if (inputLockRef.current) pressed.current.clear()
     const dir = directionFromKeys(pressed.current)
 
     // 期望位移由 world-player 算，**最終位置由 character controller 解算** ——
