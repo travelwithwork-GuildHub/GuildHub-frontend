@@ -33,26 +33,52 @@ async function freePort(): Promise<number> {
 }
 
 /**
- * ready 的證據是 **`next start` 自己的 stdout 說它在這個 port 上 Ready**，不是「這個 port 有東西回 HTTP」——
- * 後者分不出是我們起的還是別人搶到 port 的程序（審查抓到的 TOCTOU）。它若因 EADDRINUSE 退出，這裡會拿到退出而不是借用。
+ * ready 的證據是 **`next start` 自己的輸出**，不是「這個 port 有東西回 HTTP」—— 後者分不出是我們起的還是
+ * 別人搶到 port 的程序（審查抓到的 TOCTOU）。它若因 EADDRINUSE 退出，這裡會拿到退出而不是借用。
+ *
+ * Next 的啟動輸出是分行的（`- Local: http://127.0.0.1:PORT` 一行、`✓ Ready in Xms` 另一行），而且兩者哪個進 stdout
+ * 哪個進 stderr 隨版本變 —— 所以這裡合併兩個 stream、在累積的輸出裡找**兩段各自出現**：`Local:` 那一行含我們的 port、
+ * 以及 `Ready in`。這證明的是「這個子程序宣稱自己在這個 port 上 ready」，不是別的。
+ * 監聯在 resolve／reject 時都拆掉，不留在 child 上整個套件期間亂叫。
  */
 function waitUntilReady(child: ChildProcess, port: number, ms: number, log: () => string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`next start 在 ${ms} ms 內沒有印出 Ready（port ${port}）\n${log()}`)), ms)
+    const localLine = new RegExp(`Local:\\s+https?://[^\\s]*:${port}(?:\\s|$)`)
+    const cleanup = () => {
+      clearTimeout(timer)
+      child.stdout?.off('data', check)
+      child.stderr?.off('data', check)
+      child.off('exit', onExit)
+    }
+    const timer = setTimeout(() => {
+      cleanup()
+      reject(new Error(`next start 在 ${ms} ms 內沒有印出 Ready（port ${port}）\n${log()}`))
+    }, ms)
     const check = () => {
       const out = log()
-      if (/Ready in/.test(out) && new RegExp(`:${port}\\b`).test(out)) {
-        clearTimeout(timer)
+      if (/Ready in/.test(out) && localLine.test(out)) {
+        cleanup()
         resolve()
       }
     }
+    const onExit = (code: number | null) => {
+      cleanup()
+      reject(new Error(`next start 在 ready 之前就退出了（code ${code}）—— port ${port} 被搶走了？\n${log()}`))
+    }
     child.stdout?.on('data', check)
     child.stderr?.on('data', check)
-    child.once('exit', (code) => {
-      clearTimeout(timer)
-      reject(new Error(`next start 在 ready 之前就退出了（code ${code}）—— port ${port} 被搶走了？\n${log()}`))
-    })
+    child.once('exit', onExit)
   })
+}
+
+/** 這個 process group 還有人活著？（group leader 退了、孫子還在也算活著 —— 只看 `exitCode` 會漏。） */
+function groupAlive(pgid: number): boolean {
+  try {
+    process.kill(-pgid, 0)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** 誰在聽這個 port？回 pid 清單（`lsof` 不在就回 null，不假裝驗過）。 */
@@ -67,24 +93,27 @@ async function listenersOf(port: number): Promise<number[] | null> {
   }
 }
 
-/** 關掉整個 process group：`npx next start` 的 Next 是孫子，只 kill `npx` 會留孤兒咬著 port（審查兩位都抓到）。 */
-function stop(child: ChildProcess): Promise<void> {
-  return new Promise((resolve) => {
-    if (child.exitCode !== null) return resolve()
-    child.once('exit', () => resolve())
-    const signal = (sig: NodeJS.Signals) => {
-      try {
-        if (child.pid !== undefined) process.kill(-child.pid, sig)
-        else child.kill(sig)
-      } catch {
-        child.kill(sig)
-      }
+/**
+ * 關掉整個 process group：`npx next start` 的 Next 是孫子，只 kill `npx` 會留孤兒咬著 port（審查兩位都抓到）。
+ * 「關好了」看的是 **group 裡沒人了**，不是 leader 退了（leader 先走、孫子還在的話 group 還活著）。
+ */
+async function stop(child: ChildProcess): Promise<void> {
+  const pgid = child.pid
+  if (pgid === undefined) return
+  const signal = (sig: NodeJS.Signals) => {
+    try {
+      process.kill(-pgid, sig)
+    } catch {
+      /* group 已經沒人 */
     }
-    signal('SIGTERM')
-    setTimeout(() => {
-      if (child.exitCode === null) signal('SIGKILL')
-    }, 3_000).unref()
-  })
+  }
+  signal('SIGTERM')
+  const deadline = Date.now() + 3_000
+  while (groupAlive(pgid) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100))
+  if (groupAlive(pgid)) {
+    signal('SIGKILL')
+    while (groupAlive(pgid)) await new Promise((r) => setTimeout(r, 50))
+  }
 }
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
@@ -107,10 +136,12 @@ export default async function setup(project: TestProject): Promise<() => Promise
     const port = Number(new URL(base).port || 80)
     const pids = await listenersOf(port)
     if (pids !== null) {
-      const { stdout } = await execFileAsync('ps', ['-o', 'pgid=', '-p', pids.join(',')]).catch(() => ({ stdout: '' }))
-      const pgids = stdout.split('\n').map((x) => Number(x.trim())).filter(Boolean)
-      if (pids.length === 0 || !pgids.every((g) => g === pgid)) {
-        throw new Error(`port ${port} 上聽的不是 wrapper 起的那一組（pgid ${pgid}；聽的是 ${pgids.join(',') || '沒人'}）—— 不借用別人的後端。`)
+      if (pids.length === 0) throw new Error(`port ${port} 上沒有人在聽 —— wrapper 起的後端不在了。`)
+      // `ps` 失敗就失敗，不吞成空清單（空清單的 every 是 true —— 審查抓到的放行通道）。
+      const { stdout } = await execFileAsync('ps', ['-o', 'pgid=', '-p', pids.join(',')])
+      const pgids = stdout.split('\n').map((x) => x.trim()).filter(Boolean).map(Number)
+      if (pgids.length !== pids.length || !pgids.every((g) => Number.isInteger(g) && g === pgid)) {
+        throw new Error(`port ${port} 上聽的不是 wrapper 起的那一組（pgid ${pgid}；聽的是 ${pgids.join(',') || '解析不到'}）—— 不借用別人的後端。`)
       }
     }
     project.provide('contractBaseUrl', base)

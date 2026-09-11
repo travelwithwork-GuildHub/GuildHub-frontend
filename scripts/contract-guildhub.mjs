@@ -76,22 +76,34 @@ async function waitFor401(base, ms) {
  * 關掉**整個 process group**：`bash -c … | bash -s` → `exec uvicorn` 是孫子，只 kill 兒子會留下一個孤兒 uvicorn
  * 繼續聽 8000（實測留過一個）。所以 spawn 時 `detached: true` 讓它自成一組，這裡對 `-pid` 送訊號。
  */
-function stop(child) {
-  return new Promise((resolve) => {
-    if (child.exitCode !== null) return resolve()
-    child.once('exit', () => resolve())
-    const signal = (sig) => {
-      try {
-        process.kill(-child.pid, sig)
-      } catch {
-        child.kill(sig)
-      }
+function groupAlive(pgid) {
+  try {
+    process.kill(-pgid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 關到 **group 裡沒人**（leader 先退、孫子還在的話 group 還活著）；等到 port 真的釋放才算關好。 */
+async function stop(child, port) {
+  const pgid = child.pid
+  const signal = (sig) => {
+    try {
+      process.kill(-pgid, sig)
+    } catch {
+      /* 沒人了 */
     }
-    signal('SIGTERM')
-    setTimeout(() => {
-      if (child.exitCode === null) signal('SIGKILL')
-    }, 3_000).unref()
-  })
+  }
+  signal('SIGTERM')
+  const deadline = Date.now() + 3_000
+  while (groupAlive(pgid) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100))
+  if (groupAlive(pgid)) {
+    signal('SIGKILL')
+    while (groupAlive(pgid)) await new Promise((r) => setTimeout(r, 50))
+  }
+  // uvicorn 收到 SIGTERM 後還要幾百 ms 才真的放掉 port；等它放掉，緊接著再跑一次 wrapper 才不會被自己的 preflight 擋。
+  for (let i = 0; i < 25 && (await portInUse(port)); i += 1) await new Promise((r) => setTimeout(r, 200))
 }
 
 async function main() {
@@ -125,8 +137,16 @@ async function main() {
   // Ctrl-C／被工作管理員砍：一樣要把後端那一組收掉，不然留一個孤兒 uvicorn 咬著 8000（審查抓到的）。
   const onSignal = (sig) => {
     console.log(`[contract-guildhub] 收到 ${sig}，收拾中`)
-    if (vitest && vitest.exitCode === null) vitest.kill('SIGTERM')
-    stop(backend).then(() => process.exit(130))
+    // vitest 也是一組（worker 是它的子程序）：detached 起的，對 -pid 送。
+    if (vitest && vitest.exitCode === null) {
+      try {
+        process.kill(-vitest.pid, 'SIGTERM')
+      } catch {
+        vitest.kill('SIGTERM')
+      }
+    }
+    // stop 會等到 group 沒人、port 釋放才回來 —— 訊號路徑跟正常路徑一樣乾淨（審查抓到 exit 太早）。
+    stop(backend, port).then(() => process.exit(130))
   }
   process.once('SIGINT', onSignal)
   process.once('SIGTERM', onSignal)
@@ -145,14 +165,13 @@ async function main() {
         CONTRACT_GUILDHUB_PGID: String(backend.pid),
       },
       stdio: 'inherit',
+      detached: true,
     })
     code = await new Promise((resolve) => vitest.once('exit', (c) => resolve(c ?? 1)))
   } finally {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
-    await stop(backend)
-    // uvicorn 收到 SIGTERM 後還要幾百 ms 才真的放掉 port；等它放掉，緊接著再跑一次 wrapper 才不會被自己的 preflight 擋。
-    for (let i = 0; i < 25 && (await portInUse(port)); i += 1) await new Promise((r) => setTimeout(r, 200))
+    await stop(backend, port)
     console.log('[contract-guildhub] 後端已關')
   }
   process.exit(code)

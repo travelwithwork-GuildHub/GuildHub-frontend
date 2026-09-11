@@ -23,8 +23,8 @@ async function contractFiles(dir = CONTRACT_DIR): Promise<string[]> {
   }
   return out
 }
-/** 任何形式的模組引用：import／export from／dynamic import／require，單雙引號都算。 */
-const MODULE_REFS = /(?:from\s*|import\s*\(\s*|require\s*\(\s*)(['"])([^'"]+)\1/g
+/** 任何形式的模組引用：`import x from`／`export … from`／裸的 side-effect `import '…'`／dynamic `import()`／`require()`，單雙引號都算。 */
+const MODULE_REFS = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|\bimport\s+)(['"])([^'"]+)\1/g
 function referencedModules(src: string): string[] {
   return [...src.matchAll(MODULE_REFS)].map((m) => m[2] ?? '')
 }
@@ -57,6 +57,8 @@ describe('目標', () => {
       'import x from "@/server/db"',
       "const m = await import('../../src/app/api/login/route')",
       "const { db } = require('../../../src/server/db')",
+      "import '@/server/db'",
+      'import "../../src/app/api/login/route"',
     ]
     for (const sample of samples) {
       const refs = referencedModules(sample)
