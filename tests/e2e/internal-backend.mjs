@@ -71,11 +71,24 @@ try {
   await page.screenshot({ path: path.join(OUT, 'talent-board-from-local-db.png') })
 
   // 翻頁：第 1 頁也是本地資料（seed 28 張 + 測試登入的幾張）。
+  // 第 1 頁該有幾張，用同源的 API 自己算（不寫死：每次登入都多一張）；等 page=1 的回應真的到了、卡片換掉了再數。
+  const total = await page.evaluate(async () => {
+    let n = 0
+    for (let p = 0; p < 10; p += 1) {
+      const items = await (await fetch(`/api/profiles?page=${p}`, { credentials: 'include' })).json()
+      n += items.length
+      if (items.length < 20) break
+    }
+    return n
+  })
+  const firstOfPage0 = names[0]
+  const page1Response = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/profiles' && new URL(r.url()).search === '?page=1')
   await page.click('button:has-text("下一頁")')
-  await page.waitForTimeout(800)
+  await page1Response
+  await page.waitForFunction((first) => document.querySelector('[data-testid="talent-card"]')?.textContent !== first, firstOfPage0)
   const page1 = await page.$$eval('[data-testid="talent-card"]', (els) => els.length)
-  if (page1 > 0 && page1 <= 20) ok(`第 1 頁 ${page1} 張`)
-  else bad('第 1 頁不對', String(page1))
+  if (page1 === total - 20) ok(`第 1 頁 ${page1} 張（資料庫共 ${total} 張）`)
+  else bad('第 1 頁的張數不對', `${page1} ≠ ${total - 20}`)
   await page.screenshot({ path: path.join(OUT, 'talent-board-page-1.png') })
   await context.close()
 } catch (e) {

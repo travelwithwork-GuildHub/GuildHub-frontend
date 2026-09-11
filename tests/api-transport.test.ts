@@ -86,6 +86,17 @@ describe('資料存取的傳輸層', () => {
     expect(new URL(buildRequest({ method: 'GET', path: '/api/me' }).url).host).toBe('real-backend.example:8000')
   })
 
+  it('[FE-O02-S02] internal 在沒有 location 的地方（伺服器端）被呼叫：講得出原因的 ConfigError，不是 Invalid URL', () => {
+    process.env.NEXT_PUBLIC_DATA_ADAPTER = 'internal'
+    vi.stubGlobal('location', undefined)
+    try {
+      expect(() => buildRequest({ method: 'GET', path: '/api/me' })).toThrow(ConfigError)
+      expect(() => buildRequest({ method: 'GET', path: '/api/me' })).toThrow(/只能在瀏覽器/)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('[FE-O02-S03] 設定值無法辨識時拋錯，而且不退回任何一個 adapter', () => {
     process.env.NEXT_PUBLIC_DATA_ADAPTER = 'intenral'
 

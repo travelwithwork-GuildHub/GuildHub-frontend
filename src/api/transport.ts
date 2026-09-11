@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { REST_CREDENTIALS, dataAdapter, restBase } from '@/config/env'
+import { ConfigError, REST_CREDENTIALS, dataAdapter, restBase } from '@/config/env'
 import type { paths } from './contract/schema'
 import { ErrorEnvelope } from './contract/errors'
 
@@ -238,8 +238,13 @@ export function buildRequest(spec: RequestSpec): Request {
 function baseFor(adapter: ReturnType<typeof dataAdapter>): string {
   if (adapter !== 'internal') return restBase()
   // 同源。用 `location.origin` 組成絕對網址：Node 的 `Request` 不接受相對網址（jsdom 裡是 Node 的 `Request`），
-  // 而瀏覽器裡 `location.origin` 就是這個頁面的來源 —— 兩邊同一個寫法。
-  return typeof location === 'undefined' ? '' : location.origin
+  // 而瀏覽器裡 `location.origin` 就是這個頁面的來源。
+  // ⚠️ 伺服器端（SSR／Server Component）沒有 `location`：這一層今天**只在瀏覽器**被呼叫（`CLAUDE.md`：身分的查詢在瀏覽器端
+  // 發生，因為要帶 cookie）。走到這裡就是有人在伺服器端呼叫 operation —— 給一個講得出原因的錯，不是 `Invalid URL`（審查抓到的）。
+  if (typeof location === 'undefined') {
+    throw new ConfigError('internal adapter 只能在瀏覽器裡呼叫（同源 /api 需要 location.origin）；伺服器端請直接用 src/server/ 的函式，不要繞一趟 HTTP。')
+  }
+  return location.origin
 }
 
 /**
