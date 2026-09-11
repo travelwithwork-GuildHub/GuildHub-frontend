@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
 import { listProfiles, listProjects } from '@/api/operations'
 import { opened, reduce, type ListKind, type PagingState } from './paging'
@@ -25,13 +25,35 @@ export interface ListPage<K extends ListKind> {
   retry: () => void
 }
 
-export function useListPage<K extends ListKind>(kind: K): ListPage<K> {
-  const [state, dispatch] = useReducer(reduce<ListItemOf[K]>, kind, opened<ListItemOf[K]>)
+export interface ListPageOptions {
+  /** 起始頁（`FE-B09-S03`）。**只在掛載與換種類時讀**：之後的頁碼由狀態機自己走。 */
+  initialPage?: number
+  /** 畫面上呈現的頁次變了（前進成功、起始頁撲空退回第 0 頁）就回報 —— 給網址寫回用（`FE-B09`）。 */
+  onShownPage?: (page: number) => void
+}
+
+export function useListPage<K extends ListKind>(kind: K, { initialPage = 0, onShownPage }: ListPageOptions = {}): ListPage<K> {
+  const [state, dispatch] = useReducer(reduce<ListItemOf[K]>, undefined, () => opened<ListItemOf[K]>(kind, initialPage))
 
   // 呼叫端換了資料種類：整個重來，舊種類的回應之後靠 identity 擋掉（`S15`）。
+  // `initialPage` 刻意不在相依裡：它是「開的時候從第幾頁開始」，不是「現在要看第幾頁」——
+  // 放進去的話，回報上去的頁碼再流回來就會把清單重開一次。
+  const initialPageRef = useRef(initialPage)
   useEffect(() => {
-    dispatch({ type: 'open', kind })
+    initialPageRef.current = initialPage
+  })
+  useEffect(() => {
+    dispatch({ type: 'open', kind, page: initialPageRef.current })
   }, [kind])
+
+  const shownPage = state.shown?.page
+  const onShownPageRef = useRef(onShownPage)
+  useEffect(() => {
+    onShownPageRef.current = onShownPage
+  })
+  useEffect(() => {
+    if (shownPage !== undefined) onShownPageRef.current?.(shownPage)
+  }, [shownPage])
 
   const { phase } = state
   const { kind: activeKind, page } = state.identity
@@ -63,6 +85,6 @@ export function useListPage<K extends ListKind>(kind: K): ListPage<K> {
   // ⚠️ 換種類的**那一次**繪製：上面那個 effect 還沒跑，`state` 還是舊種類的。
   // 原樣回給呼叫端的話，人才面板會先閃一格案件卡（`S15` 的另一種形狀 ——
   // 不是晚到的回應混進來，是舊的狀態多活了一格）。identity 對不上 prop 就先遮住。
-  const visible = state.identity.kind === kind ? state : opened<ListItemOf[K]>(kind)
+  const visible = state.identity.kind === kind ? state : opened<ListItemOf[K]>(kind, initialPage)
   return { state: visible, next, retry }
 }

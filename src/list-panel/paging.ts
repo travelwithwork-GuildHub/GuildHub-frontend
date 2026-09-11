@@ -53,20 +53,21 @@ export interface PagingState<T> {
 }
 
 export type PagingEvent<T> =
-  | { type: 'open'; kind: ListKind }
+  | { type: 'open'; kind: ListKind; page?: number }
   | { type: 'next' }
   | { type: 'retry' }
   | { type: 'resolved'; identity: RequestIdentity; items: readonly T[] }
   | { type: 'failed'; identity: RequestIdentity; error: unknown }
 
-export function opened<T>(kind: ListKind): PagingState<T> {
-  return { identity: { kind, page: 0 }, phase: 'loading', shown: null, next: 'maybe', error: null }
+/** `page` 是起始頁（深連結帶進來的，`FE-B09-S03`）；沒給就從第 0 頁開始。 */
+export function opened<T>(kind: ListKind, page = 0): PagingState<T> {
+  return { identity: { kind, page }, phase: 'loading', shown: null, next: 'maybe', error: null }
 }
 
 export function reduce<T>(state: PagingState<T>, event: PagingEvent<T>): PagingState<T> {
   switch (event.type) {
     case 'open':
-      return opened(event.kind)
+      return opened(event.kind, event.page)
 
     case 'next':
       // 沒有已呈現的頁就沒有東西可以「前進」；確定沒有下一頁就不再請求（`S07`）；
@@ -92,6 +93,12 @@ export function reduce<T>(state: PagingState<T>, event: PagingEvent<T>): PagingS
     case 'resolved': {
       if (!sameIdentity(event.identity, state.identity)) return state
       const { items } = event
+      // 起始頁就撲空（深連結帶的頁碼已經不存在，`FE-B09-S04`）：退回第 0 頁再問一次。
+      // 沒有「原頁」可以留 —— 下面 `S09` 的規則是給「從滿頁前進」用的（前提是 `shown !== null`）。
+      // 畫成「首次無資料」的話，使用者會以為整個系統沒資料或連結壞了。
+      if (items.length === 0 && state.shown === null && state.identity.page > 0) {
+        return { ...state, identity: { ...state.identity, page: 0 }, phase: 'loading', error: null }
+      }
       if (items.length > 0 || state.shown === null) {
         // 不滿一頁就是到底（`S07`）；正好一頁只代表**可能**還有（`S08`）。
         // 首次就是空陣列也走這裡：`shown` 成為一張空頁，那是「首次無資料」。
