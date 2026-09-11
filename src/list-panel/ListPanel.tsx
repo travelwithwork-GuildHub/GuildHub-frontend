@@ -27,8 +27,14 @@ export interface ListPanelProps<K extends ListKind> {
   empty?: ReactNode
   /** 翻到底時顯示的節點。 */
   exhausted?: ReactNode
-  /** 請求失敗時顯示的節點；拿到「重試同一頁」的動作（`S11`）。 */
-  error?: (retry: () => void) => ReactNode
+  /**
+   * 請求失敗時顯示的節點；拿到「重試同一頁」的動作（`S11`）與**原始的失敗**。
+   *
+   * ⚠️ **這裡不翻譯。** 容器是通用的狀態機，把 `FE-X03` 的語彙塞進來會讓之後每一個
+   * 消費者都被迫接受同一套翻譯。`cause` 原樣往外傳，知道自己打哪支 API 的呼叫端
+   * 自己 `toUiError(cause)`（`FE-X04` design `D3`）。
+   */
+  error?: (slot: { retry: () => void; cause: unknown }) => ReactNode
   onClose: () => void
 }
 
@@ -91,7 +97,7 @@ export function ListPanel<K extends ListKind>({
       </ul>
 
       <footer data-testid="list-panel-edge" className="flex flex-col gap-2">
-        {edge === 'error' && error?.(retry)}
+        {edge === 'error' && error?.({ retry, cause: state.error })}
         {edge === 'first-empty' && empty}
         {edge === 'exhausted' && exhausted}
         {edge === null && state.shown !== null && (
