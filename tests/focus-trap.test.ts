@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextTabStop, tabbablesIn } from '@/list-panel/focusTrap'
+import { nextTabStop, tabbablesIn } from '@/panel/focusTrap'
 
 // 規格：openspec/changes/fe-x06-keyboard-focus/specs/keyboard-focus/spec.md
 //   Requirement: 焦點有邊界 —— S11 的計算那一半（jsdom 不實作 Tab，真的 Tab 在 Playwright）。

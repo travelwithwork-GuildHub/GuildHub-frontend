@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { SECONDARY } from '@/design/controls'
-import { layer } from '@/design/layers'
-import { useEscapeLayer } from '@/world/interaction/escapeLayers'
-import { nextTabStop } from './focusTrap'
+import { PanelShell } from '@/panel/PanelShell'
 import { edgeState, type ListKind } from './paging'
 import { useListPage, type ListItemOf } from './useListPage'
 
@@ -18,6 +16,9 @@ import { useListPage, type ListItemOf } from './useListPage'
 //
 // ⚠️ **資料種類只是輸入。** 端點是誰、卡片長什麼樣，這裡都不知道：
 // 前者在 `useListPage`，後者是呼叫端的 `renderItem`。
+//
+// 殼（section、Escape 層、focus trap、關閉鈕、overlay 的 `inert`）是 `src/panel/PanelShell`（`FE-A04` design `D1` 抽出去的）；
+// 這裡只剩清單：列表、翻頁、邊界狀態、焦點進列表。
 
 export interface ListPanelProps<K extends ListKind> {
   kind: K
@@ -69,14 +70,6 @@ export function ListPanel<K extends ListKind>({
   const hasItems = items.length > 0
   const list = useRef<HTMLUListElement>(null)
 
-  // Escape 走層級（`FE-X06`）：這個面板是底下那一層，overlay（詳情）自己再註冊一層在上面。
-  // 只在面板開著的時候在堆疊裡（`FE-B01-S16`）：這個元件不在畫面上，層也不在。
-  // 帶自己的元素：overlay 在這個 section 裡面，就算跟它同一個 commit 掛載（深連結直達詳情）也在它上面。
-  const section = useRef<HTMLElement>(null)
-  useEscapeLayer(onClose, section)
-
-  // focus trap（`FE-X06-S11`）：持有鎖的面板，Tab／Shift+Tab 只在面板內循環。
-  // 誰算「瀏覽器會 Tab 到」在 `focusTrap.ts`（每次按鍵現算：列表會翻頁、詳情會蓋上）。
   // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——
   // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
   // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，
@@ -86,78 +79,51 @@ export function ListPanel<K extends ListKind>({
   useEffect(() => {
     if (!overlayOpen) list.current?.focus()
   }, [overlayOpen])
-  const onKeyDown = (e: ReactKeyboardEvent<HTMLElement>) => {
-    if (e.key !== 'Tab' || section.current === null) return
-    const stop = nextTabStop(section.current, document.activeElement, e.shiftKey)
-    if (stop === null) return
-    e.preventDefault()
-    if (stop !== 'stay') stop.focus()
-  }
 
   return (
-    <section
-      ref={section}
-      onKeyDown={onKeyDown}
-      aria-label={title}
-      data-testid="list-panel"
-      data-kind={kind}
-      // 堆疊層級走 `design/layers`，散在各處的 z-index 會互相打架。
-      style={{ zIndex: layer('panel') }}
-      className="bg-surface-raised border-control-edge text-ink absolute top-gutter right-gutter bottom-gutter flex w-[min(26rem,calc(100vw-2rem))] flex-col gap-gutter rounded border p-gutter"
+    <PanelShell
+      title={title}
+      closeLabel={labels.close}
+      testId="list-panel"
+      bodyTestId="list-panel-list"
+      overlayTestId="list-panel-overlay"
+      data={{ 'data-kind': kind }}
+      overlay={overlay}
+      onCloseRequest={onClose}
     >
-      {/* 覆蓋層：絕對定位蓋住整個面板內側。列表區在底下照樣活著。 */}
-      {overlay !== undefined && overlay !== null && (
-        <div data-testid="list-panel-overlay" className="bg-surface-raised absolute inset-0 z-10 p-gutter">
-          {overlay}
-        </div>
-      )}
-      <div
-        data-testid="list-panel-list"
-        // `inert`：不可聚焦、不可點。jsdom 認得屬性但不實作行為 —— 判準只驗屬性，行為在真瀏覽器。
-        inert={overlay !== undefined && overlay !== null}
-        className="flex min-h-0 flex-1 flex-col gap-gutter"
+      <ul
+        ref={list}
+        tabIndex={-1}
+        aria-busy={state.phase === 'loading'}
+        className={
+          hasItems
+            ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto'
+            : 'h-0 flex-none overflow-hidden'
+        }
       >
-        <header className="flex items-center justify-between gap-gutter">
-          <h2 className="text-title">{title}</h2>
-          <button type="button" className={SECONDARY} onClick={onClose}>
-            {labels.close}
+        {items.map((item) => (
+          <li key={item.id}>{renderItem(item)}</li>
+        ))}
+      </ul>
+
+      <footer
+        data-testid="list-panel-edge"
+        className={hasItems ? 'flex flex-col gap-2' : 'flex flex-1 flex-col gap-2'}
+      >
+        {edge === 'error' && error?.({ retry, cause: state.error })}
+        {edge === 'first-empty' && empty}
+        {edge === 'exhausted' && exhausted}
+        {edge === null && state.shown !== null && (
+          <button
+            type="button"
+            className={SECONDARY}
+            disabled={state.phase === 'loading'}
+            onClick={next}
+          >
+            {labels.next}
           </button>
-        </header>
-
-        <ul
-          ref={list}
-          tabIndex={-1}
-          aria-busy={state.phase === 'loading'}
-          className={
-            hasItems
-              ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto'
-              : 'h-0 flex-none overflow-hidden'
-          }
-        >
-          {items.map((item) => (
-            <li key={item.id}>{renderItem(item)}</li>
-          ))}
-        </ul>
-
-        <footer
-          data-testid="list-panel-edge"
-          className={hasItems ? 'flex flex-col gap-2' : 'flex flex-1 flex-col gap-2'}
-        >
-          {edge === 'error' && error?.({ retry, cause: state.error })}
-          {edge === 'first-empty' && empty}
-          {edge === 'exhausted' && exhausted}
-          {edge === null && state.shown !== null && (
-            <button
-              type="button"
-              className={SECONDARY}
-              disabled={state.phase === 'loading'}
-              onClick={next}
-            >
-              {labels.next}
-            </button>
-          )}
-        </footer>
-      </div>
-    </section>
+        )}
+      </footer>
+    </PanelShell>
   )
 }
