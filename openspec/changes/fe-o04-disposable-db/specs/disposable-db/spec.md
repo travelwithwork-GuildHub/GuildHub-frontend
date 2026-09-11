@@ -39,7 +39,7 @@
 #### Scenario: [FE-O04-S03] reset 之後是乾淨的、有 seed 的
 
 - **WHEN** 先塞一筆自己的名片，再 `db:reset`
-- **THEN** 那筆 SHALL 不在；`profiles` SHALL 是 32 筆、`projects` 28 筆（seed 的數字，記在 `db/schema/README.md` 的表裡；複本改了 `S01` 會先紅，數字跟著改）；`1xx_*.sql` SHALL NOT 新增名片（測試帳號是把 seed 的第一張名片加上帳號密碼）
+- **THEN** 那筆 SHALL 不在；`profiles` SHALL 是 28 筆、`projects` 24 筆、`seats` 4、`messages` 4（**實測**：seed 檔的 values 有 32／28 列，但 4＋4 個 id 重複，`on conflict do nothing` 吃掉；數字記在 `db/schema/README.md`；複本改了 `S01` 會先紅，數字跟著改）；`1xx_*.sql` SHALL NOT 新增名片（測試帳號是把 seed 的第一張名片加上帳號密碼）
 
 #### Scenario: [FE-O04-S04] reset 是冪等的，而且別的連線開著也做得完
 
