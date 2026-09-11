@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, inject } from 'vitest'
 import { ValidationError } from '@/api/contract/errors'
@@ -54,28 +55,36 @@ export function recording(): boolean {
   return inject('contractRecord')
 }
 
-const safeName = (name: string) => name.replace(/[^\w.-]+/g, '_')
+/** 一條一檔的檔名：可讀的前綴 ＋ 名稱的雜湊 —— 不同名稱不會撞同一個檔（`safeName` 不是一對一，審查抓到的）。 */
+const fileNameFor = (name: string) => `${name.replace(/[^\w.-]+/g, '_').slice(0, 60)}.${createHash('sha1').update(name).digest('hex').slice(0, 8)}.json`
 
 /** 對 golden 比（或錄）。 */
 export function checkGolden(name: string, r: RawResponse): void {
   const observed = normalize(r)
   if (recording()) {
     mkdirSync(RECORDING_DIR, { recursive: true })
-    writeFileSync(path.join(RECORDING_DIR, `${safeName(name)}.json`), JSON.stringify({ name, observed }))
+    writeFileSync(path.join(RECORDING_DIR, fileNameFor(name)), JSON.stringify({ name, observed }))
     return
   }
   const g = loadGolden().cases[name]
   if (g === undefined) throw new Error(`golden 沒有「${name}」—— 先用 CONTRACT_RECORD=1 對 guildhub 錄一次。`)
-  expect(observed.status, `${name}：status`).toBe(g.status)
-  expect(observed.contentType, `${name}：content-type`).toBe(g.contentType)
-  if (g.detail !== undefined) {
+  // 有 detail 的每一項要先過契約的 schema；然後**整個正規化後的形狀**相等 —— golden 沒有 detail 而回應多出來，一樣紅（審查抓到的）。
+  if (observed.detail !== undefined) {
     const detail = (r.json as { detail: unknown[] }).detail
     for (const item of detail) expect(ValidationError.safeParse(item).success, `${name}：${JSON.stringify(item)}`).toBe(true)
-    expect(observed.detail, `${name}：detail 的 type／loc（整個陣列）`).toEqual(g.detail)
   }
+  expect(observed, `${name}：形狀（status／content-type／整個 detail）`).toEqual(g)
 }
 
-/** teardown（harness）用：把 `.recording/` 組回 `422.json`，整個 `cases` 換掉；沒有錄到任何東西就不動檔案。 */
+/** golden 檔的 metadata 是程式內的常數：重錄**完全不讀舊檔**，舊檔壞掉也修得回來。 */
+const NOTE =
+  '對真後端（FastAPI）實錄；`CONTRACT_RECORD=1 npm run test:contract:guildhub` 重錄（錄製那一次 exit 非 0，整組換掉）。' +
+  '比 status、contentType、整個 detail 的 type／loc；msg 不比（Pydantic 的英文訊息不是契約）。規格 FE-O05 S12／S16。'
+/** 時間字串：Pydantic 微秒非 0 時 6 位＋Z，為 0 時省略小數（實錄 2026-09-11：`2026-09-11T13:00:33.281950Z`）。 */
+const TIMESTAMP = '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{6})?Z$'
+const TIMESTAMP_EXAMPLE = '2026-09-11T13:00:33.281950Z'
+
+/** teardown（harness）用：把 `.recording/` 組回 `422.json`，整個 `cases` 換掉；寫到暫存檔再 rename（中斷不留半份）；沒有錄到任何東西就不動檔案。 */
 export function assembleRecordings(): number {
   if (!existsSync(RECORDING_DIR)) return 0
   const files = readdirSync(RECORDING_DIR).filter((f) => f.endsWith('.json'))
@@ -83,16 +92,13 @@ export function assembleRecordings(): number {
   const cases: Record<string, GoldenCase> = {}
   for (const f of files.sort()) {
     const { name, observed } = JSON.parse(readFileSync(path.join(RECORDING_DIR, f), 'utf8')) as { name: string; observed: GoldenCase }
+    if (name in cases) throw new Error(`錄到兩條同名的 golden：「${name}」`)
     cases[name] = observed
   }
-  const previous = existsSync(GOLDEN_FILE) ? loadGolden() : null
-  const next: GoldenFile = {
-    _note: previous?._note ?? '對真後端（FastAPI）實錄；`CONTRACT_RECORD=1 npm run test:contract:guildhub` 重錄（錄製那一次 exit 非 0）。比 status、contentType、整個 detail 的 type／loc；msg 不比。規格 FE-O05 S12／S16。',
-    cases,
-    timestamp: previous?.timestamp ?? '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{6})?Z$',
-    timestamp_example: previous?.timestamp_example ?? '',
-  }
-  writeFileSync(GOLDEN_FILE, `${JSON.stringify(next, null, 2)}\n`)
+  const next: GoldenFile = { _note: NOTE, cases, timestamp: TIMESTAMP, timestamp_example: TIMESTAMP_EXAMPLE }
+  const tmp = `${GOLDEN_FILE}.tmp`
+  writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`)
+  renameSync(tmp, GOLDEN_FILE)
   rmSync(RECORDING_DIR, { recursive: true, force: true })
   return files.length
 }

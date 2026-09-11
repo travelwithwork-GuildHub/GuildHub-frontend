@@ -20,21 +20,30 @@ describe('成對邊界', () => {
     it(`[FE-O05-S07][FE-O05-S08] ${label}`, async () => {
       const client = new ContractClient(baseUrl())
       if (via.login) await client.login('邊界')
-      // 先放一個已知的合法值，拒絕之後要能證明沒有部分寫入。
-      const before = await client.raw('PATCH', via.path, { body: { [via.key]: via.baseValue } })
-      expect(before.status).toBe(200)
+      // PATCH：先放一個已知的合法值，拒絕之後要能證明沒有部分寫入。POST：拒絕不該產生資源，拒絕前後清單長度不變。
+      const readBack = async () => {
+        const r = await client.raw('GET', via.read.path)
+        expect(r.status).toBe(200)
+        const parsed = via.parse(r.json)
+        return via.method === 'PATCH' ? (parsed as Record<string, unknown>)[via.read.key as string] : (parsed as unknown[]).length
+      }
+      if (via.method === 'PATCH') {
+        const before = await client.raw('PATCH', via.path, { body: { [via.key]: via.baseValue } })
+        expect(before.status).toBe(200)
+      }
+      const baseline = await readBack()
       const r = await client.raw(via.method, via.path, { body: { [via.key]: c.value } })
       if (c.expect === 'accept') {
-        expect(r.status, r.text.slice(0, 120)).toBe(200)
-        expect((ProfileOut.parse(r.json) as Record<string, unknown>)[via.key], '回來的值不是送出去的那一個（被截斷？）').toBe(c.value)
+        expect([200, 201], r.text.slice(0, 120)).toContain(r.status)
+        const parsed = via.parse(r.json)
+        if (via.method === 'PATCH') expect((parsed as Record<string, unknown>)[via.key], '回來的值不是送出去的那一個（被截斷？）').toBe(c.value)
       } else {
         expect(r.status).toBe(c.expectReject)
         if (c.expectReject === 500) {
           expect(r.contentType).toMatch(/^text\/plain/)
           expect(r.text).toBe('Internal Server Error')
         }
-        const after = await client.raw('GET', '/api/me')
-        expect((ProfileOut.parse(after.json) as Record<string, unknown>)[via.key], '拒絕之後有部分寫入').toBe(via.baseValue)
+        expect(await readBack(), via.method === 'PATCH' ? '拒絕之後有部分寫入' : '拒絕之後多了一筆').toEqual(baseline)
       }
     })
   }

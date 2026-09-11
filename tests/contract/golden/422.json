@@ -1,5 +1,5 @@
 {
-  "_note": "對真後端（FastAPI）實錄，2026-09-11；`CONTRACT_RECORD=1 npm run test:contract:guildhub` 重錄（錄製那一次 exit 非 0）。比的是 status、contentType、loc[0]、type、loc；msg 不逐字比（Pydantic 的英文訊息不是契約）。規格 FE-O05 S12／S16、FE-O03 design D3。",
+  "_note": "對真後端（FastAPI）實錄；`CONTRACT_RECORD=1 npm run test:contract:guildhub` 重錄（錄製那一次 exit 非 0，整組換掉）。比 status、contentType、整個 detail 的 type／loc；msg 不比（Pydantic 的英文訊息不是契約）。規格 FE-O05 S12／S16。",
   "cases": {
     "login {}": {
       "status": 422,
