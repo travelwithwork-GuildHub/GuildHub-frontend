@@ -208,7 +208,8 @@ const RAW_ANCHOR_HREF_MSG = OUTPUT_SAFETY_MSG('原生 <a> 的 href 只能是字�
 const RAW_ANCHOR_HREF = [
   {
     selector:
-      "JSXOpeningElement[name.name='a'] > JSXAttribute[name.name='href'] > JSXExpressionContainer > :not(Literal[value.type='string'], TemplateLiteral[expressions.length=0])",
+      // `Literal.value` 是原始值、沒有 `.type` —— 要分「字串字面」只能看 `raw`（以引號開頭）；審查抓到 `[value.type='string']` 永遠不匹配、會誤擋 `href={'/world'}`。
+      "JSXOpeningElement[name.name='a'] > JSXAttribute[name.name='href'] > JSXExpressionContainer > :not(Literal[raw=/^[\"']/], TemplateLiteral[expressions.length=0])",
     message: RAW_ANCHOR_HREF_MSG,
   },
   { selector: "JSXOpeningElement[name.name='a'] > JSXAttribute[name.name='href'][value=null]", message: RAW_ANCHOR_HREF_MSG },

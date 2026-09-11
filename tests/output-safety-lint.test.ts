@@ -17,6 +17,17 @@ async function t06(filePath: string, jsx: string) {
 }
 const FILE = 'src/x.tsx'
 
+/**
+ * 關掉會在裸 `href` 上炸掉的那條第三方規則（`@next/next/no-html-link-for-pages` 讀 null 的 value），其餘照 repo 的設定：
+ * 這樣才驗得到我們的 `[value=null]` selector 真的在（審查抓到原本的寫法是恆真）。
+ */
+async function withoutNextAnchorRule(jsx: string) {
+  const eslintNoCrash = new ESLint({ cwd: ROOT, overrideConfig: [{ rules: { '@next/next/no-html-link-for-pages': 'off' } }] })
+  const code = `declare const safe: string\nexport function X() { return ${jsx} }\nvoid safe\n`
+  const [result] = await eslintNoCrash.lintText(code, { filePath: FILE })
+  return result?.messages.filter((m) => m.ruleId === 'no-restricted-syntax' && /FE-T06/.test(m.message)) ?? []
+}
+
 describe('危險面在 lint 就被擋下', () => {
   it('[FE-T06-S01] dangerouslySetInnerHTML 三種形狀都被擋；data-html 不算', async () => {
     for (const bad of [
@@ -48,15 +59,11 @@ describe('危險面在 lint 就被擋下', () => {
     ]) {
       expect((await t06(FILE, bad)).length, `${bad} 沒被擋`).toBeGreaterThan(0)
     }
-    // 裸的 `<a href />`：Next 自己的 `@next/next/no-html-link-for-pages` 在這個形狀上會炸（讀 null 的 value），lint 整個失敗 ——
-    // 一樣進不了 CI。我們的 selector（`[value=null]`）也在，Next 修好那條之後這裡會變成正常的報錯。
-    await expect(
-      t06(FILE, '<a href />').then((m) => {
-        if (m.length === 0) throw new Error('裸的 <a href /> 沒被擋')
-      }),
-      '裸的 <a href /> 沒被擋',
-    ).rejects.toThrow()
-    for (const good of ['<a href="/world" />', '<a href={`/world`} />', '<Link href={`/profiles/${id}`} />', '<img src={logo} alt="" />']) {
+    // 裸的 `<a href />`：Next 自己的 `@next/next/no-html-link-for-pages` 在這個形狀上會炸（讀 null 的 value），整份設定下 lint 會整個失敗
+    //（一樣進不了 CI）。這裡把那條關掉再 lint：證明的是我們的 `[value=null]` selector 真的在（審查抓到原本的寫法是恆真）。
+    expect((await withoutNextAnchorRule('<a href />')).length, '裸的 <a href /> 沒被擋').toBeGreaterThan(0)
+    expect(await withoutNextAnchorRule('<a href="/world" />')).toEqual([])
+    for (const good of ['<a href="/world" />', "<a href={'/world'} />", '<a href={`/world`} />', '<Link href={`/profiles/${id}`} />', '<img src={logo} alt="" />']) {
       expect(await t06(FILE, good), `${good} 被誤擋`).toEqual([])
     }
   }, 90_000)
