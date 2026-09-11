@@ -50,6 +50,10 @@ export function ListPanel<K extends ListKind>({
 }: ListPanelProps<K>) {
   const { state, next, retry } = useListPage(kind)
   const edge = edgeState(state)
+  const items = state.shown?.items ?? []
+  // 沒有項目時列表不佔空間，狀態節點（首次無資料、權限阻擋⋯⋯）從上面開始，
+  // 不是躲在一個空白大框的底下。列表仍然在（`aria-busy` 與 `role="list"` 的判準要找得到它）。
+  const hasItems = items.length > 0
   const list = useRef<HTMLUListElement>(null)
 
   // Escape 只在面板開著的時候有人聽（`S16`）：這個元件不在畫面上，監聽器也不在。
@@ -89,14 +93,21 @@ export function ListPanel<K extends ListKind>({
         ref={list}
         tabIndex={-1}
         aria-busy={state.phase === 'loading'}
-        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+        className={
+          hasItems
+            ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto'
+            : 'h-0 flex-none overflow-hidden'
+        }
       >
-        {(state.shown?.items ?? []).map((item) => (
+        {items.map((item) => (
           <li key={item.id}>{renderItem(item)}</li>
         ))}
       </ul>
 
-      <footer data-testid="list-panel-edge" className="flex flex-col gap-2">
+      <footer
+        data-testid="list-panel-edge"
+        className={hasItems ? 'flex flex-col gap-2' : 'flex flex-1 flex-col gap-2'}
+      >
         {edge === 'error' && error?.({ retry, cause: state.error })}
         {edge === 'first-empty' && empty}
         {edge === 'exhausted' && exhausted}

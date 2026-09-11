@@ -103,8 +103,14 @@ try {
     hits.projects += 1
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROJECTS) })
   })
+  // 人才端點：預設回清單；`guest` 切成 true 之後回 401（訪客的情況，`FE-X04-S04`）。
+  let guest = false
   await page.route('**/api/profiles?*', async (route) => {
     hits.profiles += 1
+    if (guest) {
+      await route.fulfill({ status: 401, contentType: 'application/json', body: '{"detail":"未登入"}' })
+      return
+    }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROFILES) })
   })
   await page.route('**/api/rooms', (route) =>
@@ -178,6 +184,25 @@ try {
     else bad('[S02] 面板開了但不是人才、或混進了案件', `data-kind=${kind}，內容：${text?.slice(0, 80)}`)
   }
   await page.screenshot({ path: path.join(OUT, 'talent-board-open.png') })
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  // ── FE-X04 S04：訪客按 E 看到的是「要登入」，不是空白 ─────────────
+  guest = true
+  await page.keyboard.press('KeyE')
+  const blocked = await page
+    .waitForSelector('[data-testid="empty-state"]', { timeout: 5_000 })
+    .catch(() => null)
+  if (blocked === null) {
+    bad('[X04-S04] 401 之後面板裡沒有任何空狀態節點', '訪客看到的是一片空白 —— BoardPanel 的 error 插槽接上了嗎？')
+  } else {
+    const kind = await blocked.getAttribute('data-empty-state')
+    const said = (await blocked.textContent())?.trim()
+    if (kind === 'permission-blocked' && said && !said.includes('未登入'))
+      ok(`[X04-S04] 401 → 權限阻擋：「${said}」（後端的 detail 沒有漏出來）`)
+    else bad('[X04-S04] 401 沒有畫成權限阻擋', `data-empty-state=${kind}，內容：${said}`)
+  }
+  await page.screenshot({ path: path.join(OUT, 'talent-board-guest-401.png') })
   await page.keyboard.press('Escape')
   await context.close()
 } catch (e) {
