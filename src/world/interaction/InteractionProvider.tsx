@@ -57,6 +57,12 @@ export function useInteraction(): InteractionValue {
 }
 
 export function InteractionProvider({ children }: { children: ReactNode }) {
+  // ⚠️ **不得巢狀。** 巢狀的形狀是唯一會**靜默**壞掉的接線錯誤：面板寫外層的鎖、
+  // 角色讀內層的鎖，症狀是「面板開著人還在走」，而且沒有任何東西會拋錯。
+  // 這個 repo 沒有任何合法的巢狀用法，所以在這裡直接炸（`FE-B01` tasks 第 7 節）。
+  if (useContext(InteractionContext) !== null) {
+    throw new Error('<InteractionProvider> 不得巢狀：面板與角色會各自拿到不同的鎖。')
+  }
   // 註冊表建立一次就不換掉 —— 用 `useState` 的 lazy initializer 而不是
   // `useRef`，理由跟 `RemoteWorld` 一樣：`react-hooks/refs` 擋掉
   // 在 render 期間讀 ref，而那條規則是對的。

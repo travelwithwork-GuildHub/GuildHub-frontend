@@ -56,6 +56,21 @@ const key = (type: 'keydown' | 'keyup', code: string) =>
     window.dispatchEvent(new KeyboardEvent(type, { code }))
   })
 
+describe('鎖只能有一把', () => {
+  it('巢狀的 <InteractionProvider> SHALL 拋錯 —— 那是唯一會靜默壞掉的接線', async () => {
+    // 面板寫外層的鎖、角色讀內層的鎖：面板開著人還在走，而且沒有任何東西會報錯。
+    await expect(
+      ReactThreeTestRenderer.create(
+        <InteractionProvider>
+          <InteractionProvider>
+            <group />
+          </InteractionProvider>
+        </InteractionProvider>,
+      ),
+    ).rejects.toThrow(/巢狀/)
+  })
+})
+
 describe('面板開著的時候，鍵盤是面板的', () => {
   it('[FE-B01-S18] 面板開啟中按方向鍵，角色 SHALL NOT 移動', async () => {
     const { renderer, poseRef } = await mounted()
