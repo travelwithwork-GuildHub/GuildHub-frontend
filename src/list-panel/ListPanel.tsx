@@ -44,7 +44,7 @@ export function ListPanel<K extends ListKind>({
 }: ListPanelProps<K>) {
   const { state, next, retry } = useListPage(kind)
   const edge = edgeState(state)
-  const root = useRef<HTMLElement>(null)
+  const list = useRef<HTMLUListElement>(null)
 
   // Escape 只在面板開著的時候有人聽（`S16`）：這個元件不在畫面上，監聽器也不在。
   useEffect(() => {
@@ -55,16 +55,16 @@ export function ListPanel<K extends ListKind>({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  // 焦點進面板：之後的方向鍵捲的是面板。**這不是 `S18` 的防禦** —— 那把鎖在
-  // `InteractionProvider.inputLock`，就算焦點被別的東西搶走，人也不會走。
+  // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——
+  // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
+  // **這不是 `S18` 的防禦** —— 那把鎖在 `InteractionProvider.inputLockRef`，
+  // 就算焦點被別的東西搶走，人也不會走。
   useEffect(() => {
-    root.current?.focus()
+    list.current?.focus()
   }, [])
 
   return (
     <section
-      ref={root}
-      tabIndex={-1}
       aria-label={title}
       data-testid="list-panel"
       data-kind={kind}
@@ -79,7 +79,12 @@ export function ListPanel<K extends ListKind>({
         </button>
       </header>
 
-      <ul aria-busy={state.phase === 'loading'} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <ul
+        ref={list}
+        tabIndex={-1}
+        aria-busy={state.phase === 'loading'}
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+      >
         {(state.shown?.items ?? []).map((item) => (
           <li key={item.id}>{renderItem(item)}</li>
         ))}

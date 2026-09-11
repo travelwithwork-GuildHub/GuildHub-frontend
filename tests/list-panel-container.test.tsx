@@ -122,6 +122,29 @@ describe('只做狀態，不做文案', () => {
     expect(screen.queryByTestId('slot-error')).toBeNull()
   })
 
+  it('[FE-B01-S12] 續頁失敗：舊卡片還在、錯誤節點出現、「下一頁」消失、retry 問的是同一頁', async () => {
+    // 首次失敗那條只證明「沒有快取時」的行為。這一條是狀態機保留 `shown` 的理由：
+    // 蓋掉列表的話，使用者會看到剛剛還在的 20 張卡片消失。
+    server.reply(200, ITEMS.projects(PAGE_SIZE))
+    server.reply(500, { detail: '壞了' })
+    server.reply(200, ITEMS.projects(2))
+    mount('projects', {
+      error: (retry) => (
+        <button type="button" data-testid="slot-error" onClick={retry}>
+          呼叫端的重試
+        </button>
+      ),
+    })
+    await waitFor(() => expect(cards()).toBe(PAGE_SIZE))
+    fireEvent.click(screen.getByRole('button', { name: LABELS.next }))
+    await waitFor(() => expect(screen.getByTestId('slot-error')).toBeInTheDocument())
+    expect(cards(), '續頁失敗把原本那一頁清掉了').toBe(PAGE_SIZE)
+    expect(screen.queryByRole('button', { name: LABELS.next })).toBeNull()
+    fireEvent.click(screen.getByTestId('slot-error'))
+    await waitFor(() => expect(cards()).toBe(2))
+    expect(server.calls.map((c) => c.search)).toEqual(['?page=0', '?page=1', '?page=1'])
+  })
+
   it.each([
     ['首次無資料', () => server.reply(200, [])],
     ['翻到底', () => server.reply(200, ITEMS.projects(4))],

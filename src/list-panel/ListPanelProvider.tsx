@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useInteraction } from '@/world/interaction/InteractionProvider'
 import type { ListKind } from './paging'
 
@@ -45,6 +45,9 @@ export function ListPanelProvider({ children }: { children: ReactNode }) {
     inputLockRef.current = false
     setOpen(null)
   }, [inputLockRef])
+
+  // 這一層開著的時候被卸載（例如路由切走）：鎖是共用的，不還的話世界回來時人走不動。
+  useEffect(() => () => void (inputLockRef.current = false), [inputLockRef])
 
   const value = useMemo(() => ({ open, openPanel, closePanel }), [open, openPanel, closePanel])
   return <ListPanelContext.Provider value={value}>{children}</ListPanelContext.Provider>
