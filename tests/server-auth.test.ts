@@ -118,3 +118,23 @@ describe('register 的資料層：只認 profiles_login_id_key', () => {
     vi.doUnmock('@/server/db')
   })
 })
+
+describe('register 的資料層：不先查再寫', () => {
+  it('insertAccount 只發一道 SQL，而且是 insert（先 select 再 insert 在單機永遠對、兩個人同時註冊才會露出來 —— S15 在併發下不保證抓到，這裡守形狀）', async () => {
+    vi.resetModules()
+    const queries: string[] = []
+    vi.doMock('@/server/db', () => ({
+      db: () => ({
+        query: async (sql: string) => {
+          queries.push(sql)
+          return { rows: [{ id: 'x' }], rowCount: 1 }
+        },
+      }),
+    }))
+    const { insertAccount } = await import('@/server/profiles')
+    await insertAccount('11111111-0000-4000-8000-000000000001', '甲', 'alice', 'scrypt$x$y')
+    expect(queries).toHaveLength(1)
+    expect(queries[0]?.trim().toLowerCase().startsWith('insert into profiles')).toBe(true)
+    vi.doUnmock('@/server/db')
+  })
+})
