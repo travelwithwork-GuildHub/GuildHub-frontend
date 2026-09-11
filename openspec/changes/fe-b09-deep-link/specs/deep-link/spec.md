@@ -14,10 +14,11 @@
 
 `/world` 的 query SHALL 表示三件事：開著哪一種清單（`panel=profiles`）、開著哪一筆詳情
 （`profile=<id>`）、清單在第幾頁（0-based 的 `page=N`，第 0 頁 SHALL 省略）。
-載入帶這些參數的網址 SHALL 還原同一層：清單、詳情（以 `id` 請求 `GET /api/profiles/{id}`，沒有預覽）、頁碼。
+載入帶這些參數的網址 SHALL 還原同一層：清單、詳情（以 `id` 請求 `GET /api/profiles/{id}`）、頁碼。
+案件清單（`panel=projects`）照同一個形狀。
 
-深連結直達時角色 SHALL 在出生點，面板直接開著；**不**把角色傳送到看板前。
-關掉面板之後，再開仍 SHALL 走到看板前按 E。
+深連結直達時面板直接開著，不受看板互動距離限制；角色在哪裡、關掉之後怎麼再開，
+這一列**不改變**既有規則（不傳送角色；再開仍是走到看板前按 E —— `FE-W06`／`FE-B01` 的判準守著）。
 
 ⚠️ 今天面板狀態全在記憶體：重新整理之後面板關、詳情沒了、翻頁回第 0 頁。
 `FE-B04` 為「連續看很多個人才」做了返回不丟頁碼 —— 那個人一重新整理就掉回第 0 頁。
@@ -31,6 +32,11 @@
 
 - **WHEN** 載入 `/world?panel=profiles&profile=<id>`
 - **THEN** 人才面板 SHALL 開著且詳情蓋在上面，並已送出 `GET /api/profiles/<id>`
+
+#### Scenario: [FE-B09-S13] `?panel=projects` 開著案件清單
+
+- **WHEN** 載入 `/world?panel=projects`
+- **THEN** 案件清單面板 SHALL 開著，並已送出 `GET /api/projects?page=0`
 
 #### Scenario: [FE-B09-S03] `page=N` 還原第 N 頁
 
@@ -48,10 +54,11 @@
 
 #### Scenario: [FE-B09-S05] 不合法的參數回到 canonical，不出錯
 
-- **WHEN** 載入 `page=-1`、`page=abc`、`panel=bogus`、以及沒有 `panel` 的 `profile=<id>` 各一次
+- **WHEN** 載入 `/world?panel=profiles&page=-1`、`/world?panel=profiles&page=abc`、`/world?panel=bogus`、
+  以及 `/world?profile=<id>`（沒有 `panel`）各一次
 - **THEN** 每一次 SHALL 都是可操作的畫面：前兩者是人才清單第 0 頁、`panel=bogus` 是沒有面板的世界、
-  單獨的 `profile` 視為 `panel=profiles`
-- **AND** 網址 SHALL 被改成對應的 canonical 形式
+  單獨的 `profile` 視為 `panel=profiles` 開著那一筆詳情
+- **AND** 網址 SHALL 被改成對應的 canonical 形式（`/world?panel=profiles`、同、`/world`、`/world?panel=profiles&profile=<id>`）
 
 ### Requirement: 互動寫回網址；上一頁與 Escape 等效
 
@@ -84,11 +91,12 @@ Escape 關一層時網址 SHALL 跟著少一層。
 - **THEN** 網址 SHALL 帶 `page=1`
 - **AND** 瀏覽紀錄 SHALL 不變
 
-#### Scenario: [FE-B09-S09] 上一頁關最上層
+#### Scenario: [FE-B09-S09] 上一頁關最上層，下一頁依序重開
 
 - **WHEN** 詳情開著（網址帶 `profile`），使用者按瀏覽器的上一頁
 - **THEN** 詳情 SHALL 不再顯示，清單 SHALL 仍開著，網址 SHALL 不再帶 `profile`
 - **AND** 再按一次上一頁，面板 SHALL 關閉，網址 SHALL 是 `/world`
+- **AND** 按兩次下一頁之後，清單與詳情 SHALL 依序重新開著
 
 #### Scenario: [FE-B09-S10] Escape 關一層，網址跟著少一層
 
@@ -100,7 +108,8 @@ Escape 關一層時網址 SHALL 跟著少一層。
 
 - **WHEN** 直接載入 `/world?panel=profiles&profile=<id>`（本站沒有上一層紀錄），使用者按 Escape
 - **THEN** 詳情 SHALL 不再顯示，網址 SHALL 是 `/world?panel=profiles`
-- **AND** 瀏覽紀錄 SHALL 沒有多也沒有少（是替換，不是後退）
+
+> jsdom 裡只有一層紀錄時 `history.back()` 是 no-op —— 用 back 實作的話網址會停在帶 `profile` 的那一個，這條紅。
 
 ### Requirement: 網址改變時世界不重掛
 
@@ -108,7 +117,11 @@ Escape 關一層時網址 SHALL 跟著少一層。
 
 ⚠️ **這是這一列最可能做錯、而且畫面上看不出來的地方**：畫面一樣、WebGL context 已經重建。
 
-#### Scenario: [FE-B09-S12] 一連串網址變化，世界只掛一次
+#### Scenario: [FE-B09-S12] 一連串網址變化，Canvas 是同一個 DOM 節點
 
-- **WHEN** 從 `/world` 依序開清單、開詳情、上一頁、下一頁、Escape 兩次
-- **THEN** 世界那棵子樹的掛載次數 SHALL 是 1，Canvas 的 DOM 節點 SHALL 是同一個
+- **WHEN** 在真瀏覽器裡從 `/world` 依序開清單、開詳情、上一頁、下一頁、Escape 兩次
+- **THEN** 一開始抓住的那個 `canvas` 元素 SHALL 仍然連在 DOM 上，且仍是頁面上唯一的 `canvas`
+
+> 這條的主要判準是 Playwright 的**節點同一性**（抓 element handle，不是 locator）。
+> jsdom 掛不了 WebGL，那裡只能用一個探針證明「provider 那一層沒重掛」—— 探針數到 1 證明不了 Canvas，
+> `key={url}` 綁在 Canvas 上探針照樣是 1（審查指出）。

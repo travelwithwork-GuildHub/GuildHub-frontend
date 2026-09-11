@@ -12,24 +12,31 @@ Next.js App Router 明文支援原生的 `history.pushState`／`replaceState` �
 ## D2｜一個元件負責兩個方向：`<PanelUrlSync />`
 
 ```
-網址 → 狀態：掛載時、popstate 時，解析 query → openPanel／selected／page
+網址 → 狀態：掛載時、popstate 時，解析 query（canonical 化） → openPanel／selected／page
 狀態 → 網址：狀態改變時，算出 canonical query；跟目前網址一樣就不動（迴圈的終止條件）
 ```
 
-push 或 replace 由「層數有沒有變」決定：層數變多 → push；層數不變（翻頁、canonicalize）→ replace；
-層數變少 → 如果是上一頁觸發的（popstate 進來的）不動，如果是 Escape 觸發的且本站有上一層 → `history.back()`，
-沒有上一層（深連結直達）→ replace。
+層數變多（開清單、開詳情）→ `pushState`；層數不變（翻頁、canonicalize）→ `replaceState`；
+層數變少 → **不寫網址**，改成「退」：本站有上一層就 `history.back()`（popstate 會把網址變成上一層，
+解析出來跟狀態一樣，終止），沒有就 `replaceState` 成上一層的網址。
 
-「本站有沒有上一層」：我們自己 push 的時候在 `history.state` 上放一個標記 `{ guildhub: depth }`；
-popstate／掛載時讀它。深連結直達的 `history.state` 是 `null` → 沒有上一層。
+**「本站有沒有上一層」用 `history.state` 上的血緣判斷，而且要保留 Next 放在裡面的東西。**
+Next.js App Router 把自己的路由狀態放在 `history.state`，整個覆蓋掉會讓上一頁離開 `/world` 時 router 崩潰
+（審查抓到的）。所以每次 push／replace 都是 `{ ...history.state, guildhubPanel: { session, depth } }`：
+`session` 是這次掛載隨機產生的識別，`depth` 是層數。Escape 只在「目前 entry 的 `guildhubPanel.session`
+等於這次的 session 且 `depth > 0`」時 `back()`；深連結直達（`state` 裡沒有）、或先去了別的路由再回來
+（`session` 不同）都走 replace。
 
-## D3｜Escape 從「直接改狀態」變成「改網址」
+## D3｜Escape 照舊**同步**改狀態；退網址的事交給 `PanelUrlSync`
 
-`FE-X06` 的 `useEscapeLayer(onEscape)` 不動；`ListPanel` 與 `TalentDetail` 的 `onEscape` 改成呼叫
-`PanelUrlSync` 給的 `back()`：有上一層 → `history.back()`（popstate 會把狀態關一層）；沒有 → replace 上一層的網址再套用。
-這樣 Escape 與瀏覽器上一頁**走同一條路**，不會漂。
+`FE-X06-S01` 是同步斷言「按一次 Escape 詳情不再顯示」。`history.back()` 觸發的 popstate 是非同步的 ——
+讓 Escape 等 popstate 才關 UI 會撞上那條已封存的判準（兩位審查者都指出）。
 
-**代價**：Escape 的效果從同步變成經過 popstate（非同步一個 tick）。判準用 `waitFor`。
+所以 Escape 不動：`useEscapeLayer` 的 `onEscape` 照舊同步 `setSelected(null)`／`closePanel()`。
+`PanelUrlSync` 看到「狀態少了一層、網址還在深層」才依 D2 退網址；之後 popstate 進來時網址已經跟狀態一致，
+「一樣就不動」終止。退網址期間掛一個 `pendingBack` 旗標，避免狀態→網址那一支在 popstate 之前又把短網址 push 回去。
+
+**代價**：Escape 之後網址晚一個 tick 才變 —— 判準對網址用 `waitFor`，對畫面照舊同步斷言。
 
 ## D4｜翻頁狀態機多一條：起始頁撲空 → 退回第 0 頁
 
@@ -51,11 +58,12 @@ popstate／掛載時讀它。深連結直達的 `history.state` 是 `null` → �
 
 `<id>` 只做形狀檢查（uuid），存不存在由 `GET /api/profiles/{id}` 的 404 → `FE-X04` 載入失敗處理。
 
-## D6｜Canvas 不重掛的判準
+## D6｜Canvas 不重掛的判準：Playwright 的節點同一性是主判準
 
-jsdom 掛不了 WebGL，`WorldCanvas` 會退成 `WebGLUnavailable`。判準掛的是**同一棵樹裡的一個探針**
-（在 `ListPanelProvider` 底下、`PanelUrlSync` 旁邊，計數自己的掛載次數）—— 網址變化若讓那一層重掛，探針會數到 2。
-真的 Canvas 在 Playwright 用 `canvas` 的 DOM 節點同一性驗。
+jsdom 掛不了 WebGL，`WorldCanvas` 會退成 `WebGLUnavailable`。jsdom 裡的探針（在 `ListPanelProvider` 底下
+計數自己的掛載次數）只證明「那一層沒重掛」—— `key={url}` 綁在 Canvas 上探針照樣是 1（審查指出）。
+所以 `S12` 的主判準是 Playwright：一開始抓住 `canvas` 的 element handle（不是 locator，locator 會重新解析到新節點），
+走完一串網址變化之後它仍 `isConnected`、且頁面上只有一個 `canvas`。探針只是快的輔助。
 
 ## 待答問題
 
@@ -66,7 +74,8 @@ jsdom 掛不了 WebGL，`WorldCanvas` 會退成 `WebGLUnavailable`。判準掛�
 ## 這一份怎麼驗
 
 - `S01`–`S11`：jsdom，整棵真的 provider 樹 ＋ `PanelUrlSync`，`window.history` 是真的（jsdom 實作 pushState／popstate）。
-- `S12`：探針計數（jsdom）＋ Playwright 的 `canvas` 節點同一性。
+- `S12`：Playwright 的 `canvas` 節點同一性（主）＋ jsdom 探針（輔）。
+- `S13`：`panel=projects`。
 - 深連結直達：測試先 `history.replaceState(null, '', url)` 再掛載。
 - **不連任何團隊共用的位址。**
 - 驗收不是全綠：push 改 replace → `S06`／`S07` 紅；翻頁 push → `S08` 紅；Escape 不改網址 → `S10` 紅；
