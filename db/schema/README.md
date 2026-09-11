@@ -5,7 +5,7 @@
 | 檔案 | 來源 | 規則 |
 |---|---|---|
 | `001_schema.sql` | 後端 repo `sql/001_schema.sql` | **逐字複本。不得改任何一個字元。** 後端改了就重新複製。`tests/db-schema-copy.test.ts` 在後端 repo 在本機時逐位元組比對 |
-| `002_seed.sql` | 後端 repo `sql/002_seed.sql` | 同上。今天 seed 有 **32** 張名片、**28** 個專案、seats 與 messages 若干（`tests/db-reset.test.ts` 用這兩個數字；複本改了那條會先紅，數字跟著改） |
+| `002_seed.sql` | 後端 repo `sql/002_seed.sql` | 同上。今天 seed 套完是 **28** 張名片、**24** 個專案、**4** 個座位、**4** 封信（values 有 32／28 列，但 4＋4 個 id 重複，`on conflict do nothing` 吃掉 —— 實測）；`tests/db-reset.test.ts` 用這些數字，複本改了 `S01` 會先紅，數字跟著改 |
 | `1xx_*.sql` | 前端自己 | **前端自己加的，後端沒有** —— 第一行必須是 `-- 前端自己加的，後端沒有：` 開頭的註解。W6+ 先長在這裡的表、可登入的測試帳號都放這裡。之後交給後端時整個檔案搬過去 |
 
 ## 指令
