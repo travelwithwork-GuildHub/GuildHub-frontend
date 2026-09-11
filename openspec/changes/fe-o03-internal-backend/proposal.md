@@ -29,6 +29,12 @@ W6–W12 的產品能力真後端沒有對應端點；`CLAUDE.md` 的答案是�
 - **WS 替身是獨立程序**：Next 的 Route Handler 在 `next dev` 下開 WebSocket 不可靠。真後端本來就是另一個 port，這樣反而更像。
 - **422 的 detail 形狀先拿真後端的 golden cases**（缺欄、顯式 null、型別錯、login 給兩組）再寫 mapper，不假設 Zod 的 `path/code/message` 自然等價（design `D3`）。
 
+## 這一列也改 `FE-O02` 的一條 Scenario
+
+`FE-O02-S02` 原本是「選 internal 時每個操作明顯失敗、不送任何請求」—— 那是本地後端還不存在時的佈局。
+現在改寫成「選 internal 時請求打同源的 `/api/...`」（MODIFIED，ID 不改）。實作 5.2 時發現：沒有這條，
+`NEXT_PUBLIC_DATA_ADAPTER=internal` 的 dev server 上人才看板永遠開不出來，因為 transport 在第一行就拋錯。
+
 ## ⚠️ 不做什麼
 
 - **SHALL NOT 做 create／form-team／close／enter／seats／messages。** 那些是 W6+ 各能力的 handler；本地版今天沒有那些路由（Next 回它自己的 404）。
