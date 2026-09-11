@@ -1,6 +1,12 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach } from 'vitest'
+
+// `waitFor` 預設 1 秒。走真的 HTTP（`contract-server`）連續三個往返的判準，在整套測試
+// 並行跑、機器忙的時候會超過它 —— 而那個紅跟被測的東西一點關係也沒有（實測：
+// `FE-X04-S08` 單獨跑綠、全套跑偶爾紅在 1.4 秒）。5 秒對「真的壞了」的紅燈沒有差別，
+// 對假的紅燈是關鍵。
+configure({ asyncUtilTimeout: 5_000 })
 
 // **沒有這一行，每個測試都會看到前一個測試留下的 DOM。**
 // Testing Library 的自動 cleanup 只在 `globals: true` 時才會註冊，
