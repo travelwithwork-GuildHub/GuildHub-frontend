@@ -5,7 +5,7 @@ import { SECONDARY } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { useEscapeLayer } from '@/world/interaction/escapeLayers'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { TalentFacts } from './TalentFacts'
 import { useProfileDetail } from './useProfileDetail'
 
@@ -28,9 +28,11 @@ export interface TalentDetailProps {
   preview: ProfileOut | undefined
   onBack: () => void
   labels: { back: string }
+  /** 名片上的動作（例如「寄信給他」，`FE-K01`）：由呼叫端決定，這裡只給位置 —— 詳情本身不知道「我能對這個人做什麼」。 */
+  actions?: ReactNode
 }
 
-export function TalentDetail({ id, preview, onBack, labels }: TalentDetailProps) {
+export function TalentDetail({ id, preview, onBack, labels, actions }: TalentDetailProps) {
   const detail = useProfileDetail(id, preview)
   // 焦點進詳情（`FE-X06-S11`）：開它的那張卡在 `inert` 的列表區裡 —— 焦點留在那裡的話，
   // Tab 的 keydown 不會派送（inert 的元素收不到事件），面板的 focus trap 接不到，焦點就跑出去了。
@@ -67,6 +69,7 @@ export function TalentDetail({ id, preview, onBack, labels }: TalentDetailProps)
       )}
 
       {profile !== undefined && <TalentFacts profile={profile} leading={back} />}
+      {profile !== undefined && actions}
     </article>
   )
 }

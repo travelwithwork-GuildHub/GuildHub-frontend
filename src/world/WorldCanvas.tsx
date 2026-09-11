@@ -18,6 +18,7 @@ import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
 import { BoardTargets } from './rooms/BoardTargets'
 import { BoardPanel } from '@/list-panel/BoardPanel'
+import { InboxPanel } from '@/inbox/InboxPanel'
 import { ProfilePanel } from '@/profile/ProfilePanel'
 import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import { PanelUrlSync } from '@/list-panel/PanelUrlSync'
@@ -172,6 +173,8 @@ export default function WorldCanvas() {
           <BoardPanel />
           {/* 「我的名片」面板（`FE-A04`）：開關在標題列的按鈕，面板在這裡 —— 同一個定位基準、同一把鎖的 provider 底下。 */}
           <ProfilePanel />
+          {/* 收件匣面板（`FE-K01`）：同一個位置、同一把鎖的 provider 底下；開關與資料在 page.tsx 的 InboxPanelProvider。 */}
+          <InboxPanel />
           {/* 規格 FE-W12-S02／S03／S04／S05：走廊的門「為什麼不在那裡」。
               **一切正常時它什麼都不顯示** —— 見下面那條禁令。 */}
           {/* 規格 `FE-W12-S09`：名稱與在線數**常態可見**。

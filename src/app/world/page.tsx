@@ -1,6 +1,8 @@
 import { IdentityBadge } from '@/identity/IdentityBadge'
 import { IdentityProvider } from '@/identity/IdentityProvider'
 import { AvatarDraftProvider } from '@/identity/AvatarDraftProvider'
+import { InboxButton } from '@/inbox/InboxButton'
+import { InboxPanelProvider } from '@/inbox/InboxPanelProvider'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
 import { AvatarPicker } from './AvatarPicker'
@@ -21,6 +23,8 @@ export default function WorldPage() {
       <AvatarDraftProvider>
         {/* 「我的名片」面板的開關（`FE-A04`）：按鈕在標題列、面板在 World 裡 —— provider 要包住兩者。 */}
         <ProfilePanelProvider>
+        {/* 收件匣（`FE-K01`）：按鈕在標題列、面板在 World 裡、資料在 provider —— 同樣要包住兩者。 */}
+        <InboxPanelProvider>
         <RealtimeGenerationProvider>
         <WorldGate>
           <main className="flex h-dvh flex-col">
@@ -32,6 +36,8 @@ export default function WorldPage() {
             <div className="p-gutter relative flex shrink-0 items-center gap-gutter">
               <h1 className="text-title">GuildHub</h1>
               <IdentityBadge />
+              {/* 收件匣入口（`FE-K01`）：只在已登入時出現。 */}
+              <InboxButton />
               {/* ⚠️ **入口一直都在**（規格 `FE-A05-S11`）。它在標題列裡，
                   也就是 `<Canvas>` 的兄弟 —— 所以天生不會被 3D 畫面蓋住。 */}
               <AvatarPicker />
@@ -46,6 +52,7 @@ export default function WorldPage() {
           </main>
         </WorldGate>
         </RealtimeGenerationProvider>
+        </InboxPanelProvider>
         </ProfilePanelProvider>
       </AvatarDraftProvider>
     </IdentityProvider>
