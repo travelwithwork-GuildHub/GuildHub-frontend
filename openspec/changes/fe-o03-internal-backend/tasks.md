@@ -33,6 +33,13 @@
 - [x] 4.3 判準：`S18`～`S23`（`tests/contract/ws/`；`S17` 用 `withoutStub()`）
 - [x] 4.4 **突變**：不合法訊息回 `err` → `S20` 紅；靜止送空 `pos` → `S18` 紅；自己的 move 不回自己 → `S19` 紅；rooms 寫死 0 → `S22` 紅
 
+## 4b. transport 在 internal 下打同源的 Route Handlers
+
+對應 MODIFIED Requirement〈元件不知道自己連的是誰〉（`FE-O02-S02` 改寫）
+
+- [ ] 4b.1 `src/api/transport.ts`：`internal` → 同源 `/api/...`，拿掉 `AdapterNotImplementedError` 那條路（型別留著給 `FE-O02-S03`）
+- [ ] 4b.2 判準：`FE-O02-S02`（改寫版）；`FE-O02-S01`／`S03` 不變
+
 ## 5. 收尾
 
 - [x] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠；`CONTRACT_TARGET=internal` 全綠
