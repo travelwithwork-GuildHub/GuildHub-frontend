@@ -129,6 +129,7 @@ describe('呼叫端要看的頁（`FE-B09`）', () => {
     act(() => result.current.next())
     wanted = 1
     rerender()
+    expect(result.current.state.shown?.page, '探測中被重開：畫面上的第 0 頁被清掉了').toBe(0)
     await waitFor(() => expect(result.current.state.shown?.page).toBe(1))
     expect(searches(), '探測中的頁又被重開一次').toEqual(['?page=2', '?page=0', '?page=1'])
   })
