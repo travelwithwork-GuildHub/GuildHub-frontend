@@ -32,19 +32,19 @@
 
 ### Requirement: 一個指令回到乾淨狀態
 
-`npm run db:reset` SHALL 依序：`drop schema public cascade`、`create schema public`、執行 `db/schema/` 底下**全部** `.sql`（依檔名排序）、
-寫入可拋棄標記（見下一條）。執行兩次的結果 SHALL 相同。`npm run db:seed` SHALL 只執行 `002_seed.sql`，可重複執行（seed 本身是 `on conflict do nothing`）。
+`npm run db:reset` SHALL 依序：終止這個資料庫上**其他**連線（`pg_terminate_backend`；開著的 GUI client 或背景的 dev server 會讓 drop 卡住）、
+`drop schema public cascade`、`create schema public`、執行 `db/schema/` 底下**全部** `.sql`（依檔名排序）、寫入可拋棄標記（見下一條）。執行兩次的結果 SHALL 相同。`npm run db:seed` SHALL 只執行 `002_seed.sql`，可重複執行（seed 本身是 `on conflict do nothing`）。
 兩個指令 SHALL 只接受 loopback 位址（`localhost`、`127.0.0.1`、`::1`）；其他 host SHALL 直接失敗、不連線。
 
 #### Scenario: [FE-O04-S03] reset 之後是乾淨的、有 seed 的
 
 - **WHEN** 先塞一筆自己的名片，再 `db:reset`
-- **THEN** 那筆 SHALL 不在；`profiles` 的筆數 SHALL 等於複本 seed 檔裡 `insert into profiles` 的列數（今天是 32，**測試從檔案數，不寫死**）加上 `1xx_*.sql` 加的；`projects`、`seats`、`messages` 同
+- **THEN** 那筆 SHALL 不在；`profiles` SHALL 是 32 筆、`projects` 28 筆（seed 的數字，記在 `db/schema/README.md` 的表裡；複本改了 `S01` 會先紅，數字跟著改）；`1xx_*.sql` SHALL NOT 新增名片（測試帳號是把 seed 的第一張名片加上帳號密碼）
 
-#### Scenario: [FE-O04-S04] reset 是冪等的
+#### Scenario: [FE-O04-S04] reset 是冪等的，而且別的連線開著也做得完
 
-- **WHEN** 連續 `db:reset` 兩次
-- **THEN** 第二次 SHALL 成功，表的集合與每張表的筆數 SHALL 與第一次相同
+- **WHEN** 另開一條連線對 `profiles` 下 `select … for update` 且不 commit，然後連續 `db:reset` 兩次
+- **THEN** 兩次 SHALL 都在 10 秒內成功（那條連線被終止），表的集合與每張表的筆數 SHALL 相同
 
 #### Scenario: [FE-O04-S05] seed 可重複
 

@@ -35,7 +35,8 @@ seed 檔裡沒有 `\` 開頭的 psql 指令（實測過），所以可以。
 ## 待答問題
 
 1. **Homebrew 的 Postgres 版本。** 這台是 `postgresql@17`？`gen_random_uuid()` 在 13+ 內建，沒問題；記在 README。
-2. **`1xx` 的第一個檔案是什麼。** `FE-O03` 需要一個可登入的測試帳號（seed 沒有 `login_id`）：`100_test_account.sql`。
+2. **`1xx` 的第一個檔案是什麼。** `FE-O03` 需要一個可登入的測試帳號（seed 沒有 `login_id`）：`100_test_account.sql`，
+   內容是 `update profiles set login_id = …, password_hash = … where id = '11111111-…-000000000001'` —— **不新增名片**，分頁的筆數不變（審查抓到的）。
 
 ## 這一份怎麼驗
 
