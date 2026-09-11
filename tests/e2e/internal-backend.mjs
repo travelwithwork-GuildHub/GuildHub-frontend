@@ -72,15 +72,13 @@ try {
 
   // 翻頁：第 1 頁也是本地資料（seed 28 張 + 測試登入的幾張）。
   // 第 1 頁該有幾張，用同源的 API 自己算（不寫死：每次登入都多一張）；等 page=1 的回應真的到了、卡片換掉了再數。
-  const total = await page.evaluate(async () => {
-    let n = 0
-    for (let p = 0; p < 10; p += 1) {
-      const items = await (await fetch(`/api/profiles?page=${p}`, { credentials: 'include' })).json()
-      n += items.length
-      if (items.length < 20) break
-    }
-    return n
-  })
+  // 用 Playwright 的 request context（帶著這個瀏覽器的 cookie）翻頁算總數；不在頁面裡另外 fetch。
+  let total = 0
+  for (let p = 0; p < 10; p += 1) {
+    const items = await (await context.request.get(`${FRONTEND}/api/profiles?page=${p}`)).json()
+    total += items.length
+    if (items.length < 20) break
+  }
   const firstOfPage0 = names[0]
   const page1Response = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/profiles' && new URL(r.url()).search === '?page=1')
   await page.click('button:has-text("下一頁")')
