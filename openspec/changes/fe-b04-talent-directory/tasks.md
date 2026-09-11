@@ -2,7 +2,7 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-b04-talent-directory`）
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-b04-talent-directory`）
 
 ## 2. 人才卡（`src/talent/TalentCard.tsx`）
 
@@ -16,11 +16,11 @@
 
 對應 Requirement〈詳情在同一個面板裡，內容一律來自 `GET /api/profiles/{id}`〉
 
-- [ ] 3.1 `useProfileDetail(id, preview)`：identity = `id`，中止前一個，`aborted` 不進狀態
-- [ ] 3.2 `<TalentDetail>`：載入中標記看 `phase`；失敗用 `EmptyState kind="failure"`；`<time dateTime>`
-- [ ] 3.3 `ListPanel` 多 `overlay` 插槽（design `D1`）；列表區 `inert`
-- [ ] 3.4 判準：`S06`、`S07`、`S08`、`S15`（500 與 401 成對）、`S09`、`S10`、`S16`
-- [ ] 3.5 **突變**：詳情用預覽不打 id → `S06` 紅；identity 檢查拿掉 → `S09` 紅；失敗仍標 ready → `S08` 紅
+- [x] 3.1 `useProfileDetail(id, preview)`：identity = `id`，中止前一個，`aborted` 不進狀態
+- [x] 3.2 `<TalentDetail>`：載入中標記看 `phase`；失敗用 `EmptyState kind="failure"`；`<time dateTime>`
+- [x] 3.3 `ListPanel` 多 `overlay` 插槽（design `D1`）；列表區 `inert`
+- [x] 3.4 判準：`S06`、`S07`、`S08`、`S15`（500 與 401 成對）、`S09`、`S10`、`S16`
+- [x] 3.5 **突變**：詳情用預覽不打 id → `S06` 紅；identity 檢查拿掉 → `S09` 紅；失敗仍標 ready → `S08` 紅
 
 ## 4. 接上人才看板
 

@@ -74,10 +74,16 @@ export async function listProfiles(options: { page?: number; signal?: AbortSigna
   )
 }
 
-export async function getProfile(profileId: string) {
+/** 一張名片。`signal` 給詳情面板中止用（`FE-B04-S09`：換人時前一個請求要中止）。 */
+export async function getProfile(profileId: string, options: { signal?: AbortSignal } = {}) {
   return send(
     'getProfile',
-    { method: 'GET', path: '/api/profiles/{profile_id}', params: { profile_id: profileId } },
+    {
+      method: 'GET',
+      path: '/api/profiles/{profile_id}',
+      params: { profile_id: profileId },
+      signal: options.signal,
+    },
     contract.ProfileOut,
   )
 }
