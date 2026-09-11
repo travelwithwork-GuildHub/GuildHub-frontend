@@ -36,13 +36,15 @@ Pydantic 的 `loc`／`type`／`msg` 跟 Zod 的 `path`／`code`／`message` 不�
 
 ## D5｜`rooms` 的 `online_count`：替身開一個 loopback 的 HTTP 查詢口
 
-REST handler 跟 WS 替身是兩個程序。替身在 `/online?scene=room:<id>` 回一個整數；handler 打它（loopback、100 ms timeout），
-連不上就 0。真後端是同一個程序的函式呼叫 —— 這裡的差別是拓撲，可觀察的形狀相同。
+REST handler 跟 WS 替身是兩個程序。替身在 `GET /online?scene=<scene>` 回 `{"count": n}`；handler 打它（loopback、100 ms timeout），
+連不上或逾時就 0。真後端是同一個程序的函式呼叫 —— 這裡的差別是拓撲，可觀察的形狀相同。
+判準要能讓人**真的在房間裡**：替身接受 `room:<uuid>` 的條件是 `token = HMAC(secret, scene)`，今天只有測試會算它；
+`FE-W16` 把 `enter` 端點接上之後就是同一把（`S22`、`S23`，審查抓到「不做 `/online` 也全綠」）。
 
-## D6｜WS 替身重用 `src/api/contract/ws.ts`
+## D6｜WS 替身是 `.ts`，重用 `src/api/contract/ws.ts`
 
-替身是 `.mjs`，契約是 `.ts`。用 `tsx`／Node 24 的 `--experimental-strip-types` 直接 import？Node 24 的 strip-types 對 `.ts` 只去型別，
-Zod 是純 JS —— 可以。替身用 `node --experimental-strip-types scripts/realtime-stub.ts` 起。**不複製一份 schema 進 `.mjs`**。
+Node 24 預設就會去掉 `.ts` 的型別（type stripping），`ws.ts` 只用相對路徑 import（`./limits`）、Zod 是純 JS ——
+`node scripts/realtime-stub.ts` 直接跑。**不複製一份 schema**；替身裡不得出現 `z.object`。
 
 ## 待答問題
 
@@ -53,7 +55,7 @@ Zod 是純 JS —— 可以。替身用 `node --experimental-strip-types scripts
 
 - `S01`～`S17`：`tests/contract/`（`FE-O05` 的 harness 第一版跟骨架同一個 PR）：`CONTRACT_TARGET=internal`，
   harness 起 `next start`（隨機 port）、`db:reset` 測試庫、cookie jar、raw request。
-- `S18`～`S21`：`tests/contract/ws/`，harness 起 `realtime-stub`（隨機 port）。
+- `S18`～`S23`：`tests/contract/ws/`，harness 起 `realtime-stub`（隨機 port）；`S17` 在替身**沒起**的情況下跑（harness 提供 `withoutStub()`）。
 - **不連任何團隊共用的位址。**
 - 驗收不是全綠：handler 自己擋長度回 422 → `S02` 紅；cookie 不驗簽 → `S07` 紅；login 允許兩組 → `S10` 紅；
   過期專案沒過濾 → `S16` 紅；替身收到不合法訊息回 `err` → `S20` 紅；靜止時送空 `pos` → `S18` 紅。

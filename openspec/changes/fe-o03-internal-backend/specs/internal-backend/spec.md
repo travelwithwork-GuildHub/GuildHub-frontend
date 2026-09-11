@@ -12,7 +12,8 @@ WS 判準打**本機自己起的** `realtime-stub`。**不連任何團隊共用�
 
 ### Requirement: 每個 handler 走同一條管線，錯誤形狀複製真後端
 
-所有 `/api/*` 的 Route Handler SHALL 經由同一個 `handle()` 包裝：讀 session → 以 Zod 解析 body／query → 呼叫操作 → 對映回應。
+所有**有實作的** `/api/*` method handler（每個 route 檔匯出的 `GET`／`POST`／`PATCH`）SHALL 經由同一個 `handle()` 包裝
+（沒有匯出的 method 由 Next 回 405，那不經過 `handle()`，`S05`）：讀 session → 以 Zod 解析 body／query → 呼叫操作 → 對映回應。
 錯誤對映 SHALL 是：
 - 未登入 → `401`、`Content-Type: application/json`、body `{"detail":"未登入"}`（`POST /api/login` 除外）
 - 資源不存在 → `404 {"detail":"<中文>"}`（名片：`名片不存在`；專案：`專案不存在`）
@@ -124,7 +125,7 @@ body 是 `{}` → 不更新、回目前的名片；成功 SHALL 更新 `updated_
 翻過尾頁回 `[]`（不是 404）；回應 SHALL NOT 含 total、has_more 或任何 header 形式的總數。
 `GET /api/projects?status=recruiting&page=N` 同形；`status` 預設 `recruiting`，不是三個值之一 → `422`；**過期的（`expires_at <= now()`）不出現**。
 `GET /api/rooms` SHALL 回 `status = 'active'` 的專案（`order by updated_at desc`，最多 12 筆）的 `{project_id, title, online_count}`；
-`online_count` 來自即時層替身（替身沒在跑時是 0）。
+`online_count` SHALL 是向替身的 `GET /online?scene=room:<id>` 查到的整數（loopback、100 ms timeout）；替身連不上或逾時 → 0，回應仍是 200。
 
 #### Scenario: [FE-O03-S15] 分頁：20 筆、0-based、尾頁後是空陣列
 
@@ -136,16 +137,23 @@ body 是 `{}` → 不更新、回目前的名片；成功 SHALL 更新 `updated_
 - **WHEN** 有一筆 `expires_at` 在過去的 recruiting 專案；打 `GET /api/projects`、`?status=active`、`?status=bogus`
 - **THEN** 第一次 SHALL 只有未過期的 recruiting；第二次 SHALL 是 active 的；第三次 SHALL 是 `422`
 
-#### Scenario: [FE-O03-S17] 走廊的門
+#### Scenario: [FE-O03-S17] 走廊的門：替身不在也開得出來
 
-- **WHEN** seed 之後 `GET /api/rooms`
-- **THEN** SHALL 是 seed 裡兩間 active 專案的 `{project_id, title, online_count}`，`online_count` 是整數
+- **WHEN** 替身**沒在跑**，seed 之後 `GET /api/rooms`
+- **THEN** SHALL 是 `200`、seed 裡兩間 active 專案的 `{project_id, title, online_count}`，`online_count` 都是 0，回應時間 SHALL 少於 1 秒（不是等到 timeout 才放棄）
+
+#### Scenario: [FE-O03-S22] 走廊的門：人數來自替身
+
+- **WHEN** 替身在跑；兩條連線進 `room:<seed 第一間 active 專案的 id>`（用替身的測試 token，見替身那條 Requirement），`GET /api/rooms`；一條斷線後再 `GET`
+- **THEN** 第一次那間的 `online_count` SHALL 是 2、另一間 0；第二次 SHALL 是 1
 
 ### Requirement: 即時層替身照 `protocol.py`，怪癖一併複製
 
-`scripts/realtime-stub.mjs` SHALL 在 `INTERNAL_REALTIME_PORT`（預設 3102）只綁 loopback，路徑 `/ws?scene=lobby`。
+`scripts/realtime-stub.ts`（Node 24 原生執行 `.ts`，重用 `src/api/contract/ws.ts`）SHALL 在 `INTERNAL_REALTIME_PORT`（預設 3102）只綁 loopback，
+路徑 `/ws?scene=<scene>`，另有 `GET /online?scene=<scene>` 回 `{"count": <整數>}`（給 `GET /api/rooms` 用）。
 握手時 SHALL 讀同一個簽章 cookie 決定 `name`／`av`（沒有或無效 → `訪客`／`0`，**不拒絕**，跟真後端一樣）；
-`scene` 不是 `lobby` 也不是 `room:<uuid>` → close `1008`，**不送 `err`**。
+`scene` 是 `lobby` → 接受；`scene` 是 `room:<uuid>` → 要 `token` 查詢參數等於 `HMAC(INTERNAL_SESSION_SECRET, "room:<uuid>")` 才接受
+（真後端的 room token 由 `enter` 端點簽發，`FE-W16`（W4）接上；今天只有測試會算這個 token）；其他 → close `1008`，**不送 `err`**。
 連上後 SHALL 依序送 `hello`（`hz: 10`）與 `snapshot`；別人進出送 `presence`；
 `move` SHALL 以 10 Hz 合併成 `pos` 廣播給**所有人（含自己）**；`status` SHALL 廣播 `{t:"status", id, text}`；`chat` SHALL 廣播 `{t:"chat", id, name, body}`。
 以下 SHALL **靜默丟棄**（不回 `err`、不斷線）：`t` 未知、`move` 的 `x`／`y` 不是整數、`status` 的 `text` 超過 12 個 code point、非 JSON。
@@ -169,5 +177,10 @@ body 是 `{}` → 不更新、回目前的名片；成功 SHALL 更新 `updated_
 
 #### Scenario: [FE-O03-S21] 握手失敗不給 err
 
-- **WHEN** 連 `/ws?scene=bogus`
-- **THEN** 連線 SHALL 被以 `1008` 關閉，關閉之前 SHALL 沒有收到任何訊息
+- **WHEN** 連 `/ws?scene=bogus`，以及 `/ws?scene=room:<uuid>` 不帶 `token`
+- **THEN** 兩條連線 SHALL 都被以 `1008` 關閉，關閉之前 SHALL 沒有收到任何訊息
+
+#### Scenario: [FE-O03-S23] `/online` 數的是活著的連線
+
+- **WHEN** 兩條連線進 `lobby`，`GET /online?scene=lobby`；一條斷線，100 ms 後再查；查 `?scene=room:<沒人的 uuid>`
+- **THEN** SHALL 分別是 `{"count":2}`、`{"count":1}`、`{"count":0}`

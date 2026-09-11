@@ -17,7 +17,7 @@ W6–W12 的產品能力真後端沒有對應端點；`CLAUDE.md` 的答案是�
 - **session**：HttpOnly cookie，內容是 HMAC 簽章的 profile id（secret `INTERNAL_SESSION_SECRET`）；篡改、指向不存在名片 → 視為未登入。
 - **W2 的操作**：`POST /api/login`（三模式）、`GET /api/me`、`PATCH /api/profiles/me`、`GET /api/profiles?page=`、`GET /api/profiles/{id}`、
   `GET /api/projects?status=&page=`、`GET /api/projects/{id}`、`GET /api/rooms`。
-- **即時層替身**：獨立程序 `scripts/realtime-stub.mjs`（`ws` 套件，另一個 port），訊息形狀**重用 `src/api/contract/ws.ts`**，
+- **即時層替身**：獨立程序 `scripts/realtime-stub.ts`（Node 24 原生跑 `.ts`；`ws` 套件，另一個 port），訊息形狀**重用 `src/api/contract/ws.ts`**，
   怪癖照 `protocol.py`：靜止不送 `pos`、不合協定的訊息靜默丟棄、狀態文字超過 12 字靜默丟棄、自己的 `move` 廣播回自己、握手失敗 close 1008 不給 `err`。
 
 ## ⚠️ 討論談定的取捨
@@ -35,4 +35,5 @@ W6–W12 的產品能力真後端沒有對應端點；`CLAUDE.md` 的答案是�
 - **SHALL NOT 做 `register`。**
 - **SHALL NOT 讓 Route Handler 比真後端「好用」**：不擋長度（讓 DB 500）、不給 total、不回 `has_more`。
 - **SHALL NOT 在 WS 替身裡做房間 token 驗證以外的權限**（`scene=room:{id}` 的 token 在 `FE-W16`，W4）。
-- **SHALL NOT 做契約測試的 harness**（`FE-O05`）—— 但這一列的每個 handler 都以那個 harness 的形狀寫判準，harness 的第一版跟骨架同一個 PR 進來。
+- **SHALL NOT 做契約測試的 harness**（`tests/contract/harness.ts`、`client.ts`、`vitest.contract.mts`、wrapper 都是 `FE-O05` 的，**而且要先做**）。
+  這一列只加 `tests/contract/rest/*.contract.ts` 與 `tests/contract/ws/*.contract.ts` 裡**自己端點的案例**。順序：`FE-O04` → `FE-O05` 的 harness 片 → 這一列 → `FE-O05` 的邊界／golden／CI 片。
