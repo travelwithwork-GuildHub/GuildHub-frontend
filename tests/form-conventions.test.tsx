@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { z } from 'zod'
@@ -8,6 +8,11 @@ import { LoginForm } from '@/app/login/LoginForm'
 import { VOCABULARY } from '@/errors/uiError'
 import { startContractServer, type ContractServer } from './support/contract-server'
 import { send } from '@/api/transport'
+
+// `LoginForm` 在 `FE-A08` 之後有 `useRouter()`（帳號密碼成功導向 `/world`）；測試環境沒有 Next 的 app router context —— 只換掉導航。
+// 這裡的判準不走那條路，所以 push 什麼都不做。
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {}, replace: () => {} }) }))
+
 
 // 規格：openspec/changes/fe-x05-form-conventions/specs/form-conventions/spec.md
 //   Requirement: 驗證時機是全站規則 —— S01、S02、S03、S04、S14
