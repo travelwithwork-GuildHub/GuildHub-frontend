@@ -53,6 +53,11 @@
 送出失敗 SHALL 保留全部輸入、SHALL NOT 關閉或重設表單、錯誤 SHALL 以 `toUiError(cause).message` 顯示在送出鈕**上方**、`role="alert"`、
 `tabIndex=-1` 且**焦點 SHALL 移到它**（長表單按了底部的鈕、錯誤出現在看不到的地方 —— 螢幕閱讀器與鍵盤使用者要知道發生了什麼）；
 再按送出就是重試。表單 SHALL NOT 自動重送。
+呼叫端 MAY 以 `describeError(cause)` 為**前端自己定義的領域錯誤**（如 `NicknameLengthError`、`RecoveryKeyRejectedError`）提供文案：
+回字串就用它、回 `null` 就退回 `toUiError(cause).message`；那個字串 SHALL 是前端寫的字，SHALL NOT 是後端的 `detail` 或例外的原始訊息
+（`FE-X03` 的邊界不變 —— 它擋的是後端字串與 schema 語彙，不是前端自己寫給使用者的話）。
+欄位錯誤（`visibleErrors`）SHALL 以 `aria-invalid` ＋ `aria-describedby` 關聯到欄位、SHALL NOT 各自加 `role="alert"`：
+一個表單同一時刻 SHALL 只有送出鈕上方那一個 `role="alert"`。
 
 #### Scenario: [FE-X05-S05] 連按兩次只送一次
 
