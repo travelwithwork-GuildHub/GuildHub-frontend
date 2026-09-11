@@ -48,8 +48,9 @@ export interface FormApi<TInput extends FieldValues, TOutput extends FieldValues
   onSubmit: (event?: React.BaseSyntheticEvent) => Promise<void>
 }
 
-type LeafError = { type?: string; message?: string; types?: Record<string, unknown> }
-const isLeaf = (node: object): node is LeafError => 'type' in node || 'message' in node || 'types' in node
+type LeafError = { type: string; message?: string; types?: Record<string, unknown> }
+/** RHF 的 `FieldError.type` 一定是字串；巢狀欄位剛好叫 `type`／`message` 的話，它的值是物件 —— 用型別分，不用 key 有沒有（審查抓到的）。 */
+const isLeaf = (node: object): node is LeafError => typeof (node as { type?: unknown }).type === 'string'
 
 /** RHF 的 `FieldErrors` 是巢狀的（`profile.nickname`、`skills.0`）；攤平成 RHF 的 path，跟 `register()` 的名字對得起來。 */
 function leaves(node: unknown, prefix: string, out: Array<[string, LeafError]>) {
@@ -120,18 +121,19 @@ export function useForm<TSchema extends z.ZodType<FieldValues, FieldValues>>({
         inFlightRef.current = false
         setBusy(false)
       }
-      return form.handleSubmit(
-        async (values) => {
+      // 解鎖放在包住整個 handleSubmit 的 finally：resolver 自己炸（schema 裡的 refine 拋錯之類）也不能讓表單永遠 busy（審查抓到的）。
+      return form
+        .handleSubmit(async (values) => {
           try {
             await onSubmit(values as z.output<TSchema>)
           } catch (cause) {
             setSubmitError(describeError?.(cause) ?? toUiError(cause).message)
-          } finally {
-            release()
           }
-        },
-        () => release(),
-      )(event)
+        })(event)
+        .catch((cause: unknown) => {
+          setSubmitError(toUiError(cause).message)
+        })
+        .finally(release)
     },
     [form, onSubmit, describeError],
   )

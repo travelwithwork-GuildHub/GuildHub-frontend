@@ -230,6 +230,33 @@ describe('送出中、失敗、重試', () => {
   })
 })
 
+describe('resolver 自己炸', () => {
+  const Exploding = z.object({ a: z.string().refine(() => {
+    throw new Error('refine boom')
+  }) })
+  function ExplodingFixture() {
+    const { form, busy, submitError, onSubmit } = useForm({ schema: Exploding, defaultValues: { a: '' }, onSubmit: async () => {} })
+    return (
+      <form onSubmit={onSubmit} noValidate>
+        <input {...form.register('a')} aria-label="a" />
+        <SubmitError message={submitError} />
+        <button type="submit" disabled={busy}>
+          {busy ? '送出中' : '送出'}
+        </button>
+      </form>
+    )
+  }
+  it('schema 的 refine 拋錯：表單不會永遠 busy，alert 說「預期之外」（審查抓到 release 只在 callback 裡）', async () => {
+    render(<ExplodingFixture />)
+    await act(async () => {
+      button().form?.requestSubmit()
+    })
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(VOCABULARY.unexpected))
+    expect(button().disabled).toBe(false)
+    expect(button().textContent).toBe('送出')
+  })
+})
+
 describe('LoginForm 遷到同一套', () => {
   it('[FE-X05-S13] 暱稱欄由 RHF 註冊：input 有 name="nickname"；金鑰欄也有 name', () => {
     render(<LoginForm />)
@@ -256,6 +283,33 @@ describe('巢狀欄位', () => {
       </form>
     )
   }
+  const Reserved = z.object({ user: z.object({ type: z.string().max(2, { error: 'type 最多 2 字' }), message: z.string().max(2, { error: 'message 最多 2 字' }) }) })
+  function ReservedFixture() {
+    const { form, visibleErrors, canSubmit } = useForm({ schema: Reserved, defaultValues: { user: { type: '', message: '' } }, onSubmit: async () => {} })
+    return (
+      <form noValidate>
+        <input {...form.register('user.type')} aria-label="user.type" />
+        <input {...form.register('user.message')} aria-label="user.message" />
+        <span data-testid="error-user.type">{visibleErrors['user.type']}</span>
+        <span data-testid="error-user.message">{visibleErrors['user.message']}</span>
+        <button type="submit" disabled={!canSubmit}>
+          送出
+        </button>
+      </form>
+    )
+  }
+  it('巢狀欄位剛好叫 type／message：不被當成 FieldError 本身（兩位審查者都抓到）', async () => {
+    render(<ReservedFixture />)
+    await type('user.type', '三個字')
+    await waitFor(() => expect(screen.getByTestId('error-user.type').textContent).toBe('type 最多 2 字'))
+    expect(button().disabled).toBe(true)
+    await type('user.type', '')
+    await type('user.message', '三個字')
+    await waitFor(() => expect(screen.getByTestId('error-user.message').textContent).toBe('message 最多 2 字'))
+    expect(screen.getByTestId('error-user.type').textContent).toBe('')
+    expect(button().disabled).toBe(true)
+  })
+
   it('巢狀物件與陣列的即時錯誤：路徑對得上 register、也算進禁用（審查抓到只看頂層）', async () => {
     render(<NestedFixture />)
     await type('p.q', '四個字了')
