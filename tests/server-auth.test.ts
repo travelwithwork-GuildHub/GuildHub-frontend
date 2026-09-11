@@ -87,3 +87,34 @@ describe('session cookie', () => {
     expect(sessionIdFrom('session=')).toBeNull()
   })
 })
+
+// 規格：openspec/changes/fe-a08-account-login/specs/account-login/spec.md
+//   Requirement: 本地後端與契約測試補上 register 與密碼登入 —— S16（別的 unique 違反不是 409）
+describe('register 的資料層：只認 profiles_login_id_key', () => {
+  const pgError = (constraint: string) => Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505', constraint })
+
+  it('[FE-A08-S16] login_id 的 unique → null（409 的來源）；別的 constraint 的 23505 → 原樣拋（500）', async () => {
+    const { isLoginIdTaken } = await import('@/server/profiles')
+    expect(isLoginIdTaken(pgError('profiles_login_id_key'))).toBe(true)
+    expect(isLoginIdTaken(pgError('profiles_pkey')), '主鍵撞到也說成「帳號有人用了」').toBe(false)
+    expect(isLoginIdTaken(Object.assign(new Error('check'), { code: '23514', constraint: 'profiles_login_id_key' })), '不是 23505 也算').toBe(false)
+    expect(isLoginIdTaken(null)).toBe(false)
+  })
+
+  it('[FE-A08-S16] insertAccount：注入 pg 錯誤 —— login_id 撞名回 null，別的 23505 拋出去', async () => {
+    vi.resetModules()
+    let thrown: unknown = pgError('profiles_login_id_key')
+    vi.doMock('@/server/db', () => ({
+      db: () => ({
+        query: async () => {
+          throw thrown
+        },
+      }),
+    }))
+    const { insertAccount } = await import('@/server/profiles')
+    await expect(insertAccount('11111111-0000-4000-8000-000000000001', '甲', 'alice', 'scrypt$x$y')).resolves.toBeNull()
+    thrown = pgError('profiles_pkey')
+    await expect(insertAccount('11111111-0000-4000-8000-000000000001', '甲', 'alice', 'scrypt$x$y')).rejects.toMatchObject({ code: '23505', constraint: 'profiles_pkey' })
+    vi.doUnmock('@/server/db')
+  })
+})

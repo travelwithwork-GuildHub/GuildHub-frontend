@@ -175,6 +175,46 @@
           ]
         }
       ]
+    },
+    "register {}": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "login_id"
+          ]
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "password"
+          ]
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "nickname"
+          ]
+        }
+      ]
+    },
+    "register short password": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "string_too_short",
+          "loc": [
+            "body",
+            "password"
+          ]
+        }
+      ]
     }
   },
   "timestamp": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{6})?Z$",

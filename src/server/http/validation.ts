@@ -56,12 +56,27 @@ export function toValidationErrors(issues: readonly z.core.$ZodIssue[], where: W
     const at = fieldValue(input, issue.path)
     switch (issue.code) {
       case 'invalid_type':
+        // 必填欄位沒給：Pydantic 是 `missing`（實錄 `register {}`），不是型別錯。
+        if (at === undefined && issue.input === undefined) return { type: 'missing', loc, msg: 'Field required', input: at }
         return { type: `${issue.expected}_type`, loc, msg: `Input should be a valid ${issue.expected}`, input: at }
       case 'invalid_format':
         if (issue.format === 'uuid') return { type: 'uuid_parsing', loc, msg: 'Input should be a valid UUID', input: at, ctx: { error: 'invalid format' } }
         return { type: `${issue.format}_parsing`, loc, msg: issue.message, input: at }
       case 'invalid_value':
         return { type: 'enum', loc, msg: `Input should be ${issue.values.map((v) => `'${String(v)}'`).join(', ')}`, input: at, ctx: { expected: issue.values.map((v) => `'${String(v)}'`).join(', ') } }
+      case 'too_small':
+        // Pydantic 的 `Field(min_length=8)`（`RegisterIn.password`；實錄 `string_too_short`，ctx 帶 `min_length`）。
+        // 其他 origin（number 的 `ge`／`gt`）今天沒有端點用到，留 default。
+        if (issue.origin === 'string') {
+          return {
+            type: 'string_too_short',
+            loc,
+            msg: `String should have at least ${issue.minimum} character${issue.minimum === 1 ? '' : 's'}`,
+            input: at,
+            ctx: { min_length: issue.minimum },
+          }
+        }
+        return { type: issue.code, loc, msg: issue.message, input: at }
       case 'custom':
         // model_validator：錯在整個 body，不在某個欄位（實錄 `loc: ["body"]`）。
         return { type: 'value_error', loc: [where], msg: `Value error, ${issue.message}`, input, ctx: { error: {} } }
