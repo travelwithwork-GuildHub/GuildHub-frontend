@@ -165,7 +165,9 @@ function ThreadView({ inbox, withId, openedFrom, returnFocusRef }: { inbox: Inbo
                 {mine ? INBOX_LABELS.me : typeof name === 'string' ? name : shortId(withId)} ·{' '}
                 <time dateTime={m.created_at}>{new Date(m.created_at).toLocaleString('zh-TW')}</time>
               </p>
-              <p className="whitespace-pre-wrap">{m.body}</p>
+              <p data-testid="inbox-message-body" className="whitespace-pre-wrap">
+                {m.body}
+              </p>
             </li>
           )
         })}
