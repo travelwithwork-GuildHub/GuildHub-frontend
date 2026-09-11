@@ -101,7 +101,7 @@ describe('登入頁有帳號密碼的入口，匿名路仍是主路', () => {
     [
       '暱稱表單',
       async () => {
-        const form = screen.getByRole('button', { name: '進入世界' }).form as HTMLFormElement
+        const form = (screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement).form as HTMLFormElement
         await type(within(form).getByLabelText('在世界裡顯示的名字'), '阿福')
         return form
       },
@@ -109,7 +109,7 @@ describe('登入頁有帳號密碼的入口，匿名路仍是主路', () => {
     [
       '金鑰表單',
       async () => {
-        const form = screen.getByRole('button', { name: '用金鑰回來' }).form as HTMLFormElement
+        const form = (screen.getByRole('button', { name: '用金鑰回來' }) as HTMLButtonElement).form as HTMLFormElement
         await type(within(form).getByLabelText('貼上你的恢復金鑰'), ME.id)
         return form
       },
