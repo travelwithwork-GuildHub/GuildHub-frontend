@@ -14,8 +14,10 @@
 // reset 之前先終止這個庫上的其他連線：開著的 GUI client 或背景的 dev server 會讓 `drop schema` 卡住（審查抓到的）。
 //
 // ⚠️ **drop → schema → seed → 標記在同一個交易裡**（Postgres 的 DDL 是交易的）：任何一個 `.sql` 中途失敗就整個回滾，
-// 不會留下一個清空了一半、又沒有標記、之後誰都不能 reset 的庫（審查抓到的）。交易開頭拿 advisory lock，
-// 兩個 reset 同時跑時第二個等第一個 commit；被 `pg_terminate_backend` 請走的那個會失敗，但資料是完整的。
+// 不會留下一個清空了一半、又沒有標記、之後誰都不能 reset 的庫（審查抓到的）。
+// 兩個 reset 同時跑：`drop schema` 的鎖讓第二個等第一個 commit，然後自己再做一次 —— 兩個都成功。
+// 所以終止其他連線時**不終止另一個 reset**（用 `application_name` 認），不然兩個會互相請走。
+// 試過 advisory lock：拿掉判準不紅，它是多餘的。
 //
 // 整個 `.sql` 檔當一個 multi-statement query 送（`pg` 的簡單查詢協定）；seed 檔裡沒有 psql 的 `\` 指令（實測過）。
 
@@ -27,8 +29,8 @@ import pg from 'pg'
 const SCHEMA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'db', 'schema')
 const MARKER = '_guildhub_disposable'
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
-/** advisory lock 的鍵：任意常數，只要兩個 reset 用同一個。 */
-const RESET_LOCK = 7_04_2026
+/** 這支腳本的連線都掛這個名字：終止其他連線時認得出彼此。 */
+const APP_NAME = 'guildhub-db-script'
 
 export class DbScriptError extends Error {
   name = 'DbScriptError'
@@ -94,7 +96,7 @@ export async function reset({ url, init = false, dir = SCHEMA_DIR }) {
   assertLoopback(url)
   // 檔案先驗（標頭、能不能讀），再碰資料庫：驗不過就什麼都沒動。
   const files = await schemaFiles(dir)
-  const client = new pg.Client({ connectionString: url })
+  const client = new pg.Client({ connectionString: url, application_name: APP_NAME })
   await client.connect()
   try {
     if (init) {
@@ -109,11 +111,11 @@ export async function reset({ url, init = false, dir = SCHEMA_DIR }) {
     }
     // 其他連線先請走：drop schema 會等它們的鎖。
     await client.query(
-      'select pg_terminate_backend(pid) from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid()',
+      'select pg_terminate_backend(pid) from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and application_name <> $1',
+      [APP_NAME],
     )
     await client.query('begin')
     try {
-      await client.query('select pg_advisory_xact_lock($1)', [RESET_LOCK])
       await client.query('drop schema public cascade; create schema public;')
       for (const file of files) {
         await client.query(await readFile(file, 'utf8'))
@@ -135,7 +137,7 @@ export async function reset({ url, init = false, dir = SCHEMA_DIR }) {
 /** 只套 seed（可重複執行：seed 本身是 on conflict do nothing）。寫進去之前一樣先看標記 —— 設錯的環境變數不該污染別的庫。 */
 export async function seed({ url }) {
   assertLoopback(url)
-  const client = new pg.Client({ connectionString: url })
+  const client = new pg.Client({ connectionString: url, application_name: APP_NAME })
   await client.connect()
   try {
     await requireMarker(client, 'seed ')

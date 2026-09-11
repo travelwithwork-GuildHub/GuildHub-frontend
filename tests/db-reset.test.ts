@@ -123,10 +123,10 @@ describe.skipIf(url === null)('reset／seed（需要 INTERNAL_TEST_DATABASE_URL�
     expect(await counts(client)).toEqual(before)
   })
 
-  it('[FE-O04-S04] 兩個 reset 同時跑：至少一個成功，結束時庫是完整的', async () => {
+  it('[FE-O04-S04] 兩個 reset 同時跑：兩個都成功（不互相請走），結束時庫是完整的', async () => {
     await reconnect()
     const results = await Promise.allSettled([reset({ url: url ?? '' }), reset({ url: url ?? '' })])
-    expect(results.some((r) => r.status === 'fulfilled')).toBe(true)
+    expect(results.map((r) => r.status), results.map((r) => (r.status === 'rejected' ? String(r.reason) : 'ok')).join(' | ')).toEqual(['fulfilled', 'fulfilled'])
     await reconnect()
     expect(await tables(client)).toContain('_guildhub_disposable')
     expect(await counts(client)).toEqual(SEEDED)
