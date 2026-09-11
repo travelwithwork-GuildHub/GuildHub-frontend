@@ -125,11 +125,12 @@ describe('呼叫端要看的頁（`FE-B09`）', () => {
     rerender()
     await waitFor(() => expect(result.current.state.shown?.page).toBe(0))
     expect(searches()).toEqual(['?page=2', '?page=0'])
-    // 前進探測中：已呈現的頁碼（0）流回來不能把探測打斷。
+    // 前進探測中，呼叫端要看的頁變成正在探測的那一頁：已經在問了，不能再送一次同樣的請求。
     act(() => result.current.next())
+    wanted = 1
     rerender()
     await waitFor(() => expect(result.current.state.shown?.page).toBe(1))
-    expect(searches(), '回流的頁碼把探測重開了').toEqual(['?page=2', '?page=0', '?page=1'])
+    expect(searches(), '探測中的頁又被重開一次').toEqual(['?page=2', '?page=0', '?page=1'])
   })
 
   it('shown 的頁次變了才回報：起始頁撲空退回第 0 頁也算', async () => {
