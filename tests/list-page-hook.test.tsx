@@ -160,4 +160,26 @@ describe('換一種資料', () => {
     // 中止案件的請求會 reject —— 那不是這個面板的錯誤。
     expect(phases, '中止前一個請求被當成了失敗').not.toContain('error')
   })
+
+  it('[FE-B01-S15] 案件已經在畫面上才改開人才：SHALL NOT 有任何一格繪製把案件交給人才面板', async () => {
+    // ⚠️ 上一條從「案件還在 loading」開始，抓不到這個：重設是在 effect 裡 dispatch 的，
+    // 而 effect 在繪製**之後**才跑 —— 換種類的那一格，hook 回的還是案件的 `shown`。
+    // 症狀是人才面板先閃一下案件卡。這一條記下每一格「prop 是哪種、回的是什麼」。
+    server.replyFor('/api/projects', 200, many(project, 3))
+    server.replyFor('/api/profiles', 200, many(profile, 2))
+    const frames: Array<{ kind: string; items: ReadonlyArray<Record<string, unknown>> }> = []
+    const { result, rerender } = renderHook(
+      (kind: 'projects' | 'profiles') => {
+        const page = useListPage(kind)
+        frames.push({ kind, items: (page.state.shown?.items ?? []) as ReadonlyArray<Record<string, unknown>> })
+        return page
+      },
+      { initialProps: 'projects' as 'projects' | 'profiles' },
+    )
+    await waitFor(() => expect(result.current.state.shown?.items).toHaveLength(3))
+    rerender('profiles')
+    await waitFor(() => expect(result.current.state.shown?.items).toHaveLength(2))
+    const leaked = frames.filter((f) => f.kind === 'profiles' && f.items.some((i) => 'title' in i))
+    expect(leaked, 'prop 已經是人才、回的卻還是案件 —— 舊種類的狀態多活了一格').toEqual([])
+  })
 })

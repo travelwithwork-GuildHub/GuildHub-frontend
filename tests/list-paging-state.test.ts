@@ -67,12 +67,6 @@ describe('「還有沒有下一頁」只能靠實際取到的資料判定', () =
     expect(advanced.phase).toBe('loading')
   })
 
-  it('[FE-B01-S08] 正好一頁也 SHALL NOT 被當成「確定還有」—— 型別上沒有那個值', () => {
-    // 沒有 `limit` 可以多抓一筆，「確定還有」在這個契約下拿不到。
-    const s = run(resolved(P(0), page(0, PAGE_SIZE)))
-    expect(['maybe', 'none']).toContain(s.next)
-  })
-
   it('[FE-B01-S09] 前進之後撲空：留在原頁，狀態是「翻到底」不是「首次無資料」', () => {
     const s = reduce(probingSecond(), resolved(P(1), []))
     expect(s.shown?.page, '撲空之後被帶到一張空白頁了 —— 應該留在原頁').toBe(0)

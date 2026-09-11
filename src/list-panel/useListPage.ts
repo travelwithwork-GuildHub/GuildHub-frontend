@@ -60,5 +60,9 @@ export function useListPage<K extends ListKind>(kind: K): ListPage<K> {
 
   const next = useCallback(() => dispatch({ type: 'next' }), [])
   const retry = useCallback(() => dispatch({ type: 'retry' }), [])
-  return { state, next, retry }
+  // ⚠️ 換種類的**那一次**繪製：上面那個 effect 還沒跑，`state` 還是舊種類的。
+  // 原樣回給呼叫端的話，人才面板會先閃一格案件卡（`S15` 的另一種形狀 ——
+  // 不是晚到的回應混進來，是舊的狀態多活了一格）。identity 對不上 prop 就先遮住。
+  const visible = state.identity.kind === kind ? state : opened<ListItemOf[K]>(kind)
+  return { state: visible, next, retry }
 }
