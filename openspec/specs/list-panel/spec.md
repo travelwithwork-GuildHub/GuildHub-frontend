@@ -189,8 +189,9 @@ request identity SHALL 包含所有會改變結果集合的輸入；
 
 ### Requirement: Escape 關閉面板，並把世界的輸入還回去
 
-面板開啟時按 Escape，面板 SHALL 關閉，
-且世界的移動輸入 SHALL 恢復作用。
+面板開啟且**沒有可關閉的子層**時按 Escape，面板 SHALL 關閉，
+且世界的移動輸入 SHALL 恢復作用。有子層（例如詳情）時，Escape 由全域的層級規則處理
+（`FE-X06`：每次只關最上層），面板本身 SHALL NOT 在同一次按鍵裡跟著關閉。
 
 面板未開啟時按 Escape，SHALL NOT 產生任何與面板有關的副作用。
 
@@ -201,8 +202,11 @@ request identity SHALL 包含所有會改變結果集合的輸入；
 
 #### Scenario: [FE-B01-S16] Escape 關閉面板
 
-- **WHEN** 面板開啟中，使用者按下 Escape
+- **WHEN** 面板開啟中且沒有子層，使用者按下 Escape
 - **THEN** 面板 SHALL 關閉
+
+> 原文的 WHEN 是「面板開啟中，使用者按下 Escape」。`FE-X06` 把 Escape 定成「每次只關最上層」
+> 之後，有子層時第一下不關面板 —— 所以 WHEN 收窄成「沒有子層」。ID 不變。
 
 #### Scenario: [FE-B01-S17] 關閉之後，人走得動
 
