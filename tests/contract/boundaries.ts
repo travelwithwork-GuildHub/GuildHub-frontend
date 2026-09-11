@@ -39,10 +39,10 @@ export const BOUNDARY_CASES = {
     via: { method: 'PATCH', path: '/api/profiles/me', key: 'bio', baseValue: '原本', parse: (j) => ProfileOut.parse(j), read: { path: '/api/me', key: 'bio' }, login: true },
     expectReject: 500,
   },
-  messageBody: { pending: 'FE-J01 站內信（W8）：POST /api/messages；DB check → 500' },
+  messageBody: { pending: 'FE-K01 做了 POST /api/messages（DB check → 500），但 body 還要 recipient_id（另一張名片）—— 這張表的 POST 還不支援額外欄位；長度由 tests/contract/rest/messages.contract.ts S15 直接驗 2001 → 500' },
   seatIndex: { pending: 'FE-W16 座位（W4）：POST /api/projects/{id}/seats；DB check → 500、超過 seat_count → 400（seats.py）' },
-  password: { pending: 'FE-A02 帳號註冊（BE-G28）：POST /api/register；Pydantic min_length → 422' },
-  loginId: { pending: 'FE-A02 帳號註冊（BE-G28）：POST /api/register；DB check → 500' },
+  password: { pending: 'FE-A08 做了 POST /api/register（Pydantic min_length → 422），但 body 還要 login_id 與 nickname —— 這張表的 POST 還不支援額外欄位；由 register.contract.ts 的 golden 驗' },
+  loginId: { pending: 'FE-A08 做了 POST /api/register（DB check → 500），但 body 還要 password 與 nickname —— 這張表的 POST 還不支援額外欄位' },
   statusText: { pending: 'WS 的 12 字上限在 tests/contract/ws/lobby.contract.ts（S20：12 個 emoji 收、13 個丟），不走 REST 這張表' },
   facing: { pending: 'WS 的 move.f 0～3：不合法的 f 靜默丟棄，屬 WS 契約（S20 的形狀），不走 REST 這張表' },
   // 後端沒有上限的欄位：`min: 1` 是**前端**的規則（`FE-X05`），後端 `text not null` 收空字串 —— 對後端跑「min-1 拒絕」會是假的紅。

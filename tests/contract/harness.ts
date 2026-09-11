@@ -260,7 +260,8 @@ export default async function setup(project: TestProject): Promise<() => Promise
   })
   // 本地版 W2 刻意沒做的端點（`FE-O03-S05`）：測試對這些要求 Next 自己的 404／405、不是本地版假造的 detail。
   // 這是目標的**能力**，不是目標的名字 —— 測試檔仍然不知道自己在打誰。
-  project.provide('contractUnimplemented', ['POST /api/projects', 'GET /api/messages', 'POST /api/messages', 'GET /api/projects/{id}/seats'])
+  // `FE-K01` 把 messages 做出來了，從這張表拿掉。
+  project.provide('contractUnimplemented', ['POST /api/projects', 'GET /api/projects/{id}/seats'])
   return async () => {
     await stop(child)
     await stop(stub)

@@ -120,6 +120,52 @@
         }
       ]
     },
+    "messages {}": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "recipient_id"
+          ]
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "body"
+          ]
+        }
+      ]
+    },
+    "messages bad recipient": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "uuid_parsing",
+          "loc": [
+            "body",
+            "recipient_id"
+          ]
+        }
+      ]
+    },
+    "messages page=abc": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "int_parsing",
+          "loc": [
+            "query",
+            "page"
+          ]
+        }
+      ]
+    },
     "profiles page=-1": {
       "status": 200,
       "contentType": "application/json"
