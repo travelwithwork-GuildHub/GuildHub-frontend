@@ -103,7 +103,7 @@ W2 端點到得了的欄位：`displayName`（`POST /api/login` 的 `nickname`�
 #### Scenario: [FE-O05-S12] golden 形狀對得上，而且錄製那一次不算驗收
 
 - **WHEN** `CONTRACT_RECORD=1` 對 `guildhub` 錄一次（寫 `tests/contract/golden/422.json`），再**不帶** `CONTRACT_RECORD` 對 `guildhub` 與 `internal` 各跑一次
-- **THEN** 錄製那一次 SHALL 回報「已錄製，不算通過」（exit code 非 0 或明確標記），之後兩次 SHALL 逐項相同；
+- **THEN** 錄製那一次 SHALL 以**非 0 的 exit code** 結束並印「已錄製，不算通過」，之後兩次 SHALL 逐項相同；
   compare 模式下 golden 檔 SHALL 是唯讀（跑完 `git diff` 沒有變化）
 
 #### Scenario: [FE-O05-S16] body 的三種壞法與負頁碼
