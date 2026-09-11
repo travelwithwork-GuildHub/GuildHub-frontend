@@ -73,11 +73,13 @@ describe('messages', () => {
     checkGolden('messages page=abc', await a.c.raw('GET', '/api/messages?page=abc'))
     const tooLong = await send(a.c, b.me.id, '字'.repeat(2001))
     expect(tooLong.status, '2001 字：Pydantic 沒有長度，是資料庫 check').toBe(500)
-    // 分頁參數：省略、-1 都等於 0；翻過尾頁是 []。
-    await send(a.c, b.me.id, '一封')
+    // 分頁參數：省略、-1 都等於 0；翻過尾頁是 []。三個 GET 都要是 200（不然 `list` 都是 [] 會恆真 —— 審查抓到的）。
+    expect((await send(a.c, b.me.id, '一封')).status).toBe(201)
     const p0 = await page(a.c, 0)
     const omitted = await page(a.c, null)
     const negative = await page(a.c, -1)
+    for (const r of [p0, omitted, negative]) expect(r.status, r.raw.text.slice(0, 120)).toBe(200)
+    expect(p0.list.some((m) => m.body === '一封')).toBe(true)
     expect(omitted.list).toEqual(p0.list)
     expect(negative.list).toEqual(p0.list)
     const far = await page(a.c, 5)

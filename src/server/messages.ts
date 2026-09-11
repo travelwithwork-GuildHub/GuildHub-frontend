@@ -30,6 +30,9 @@ export async function listMessages(me: string, page: number): Promise<MessageRow
   return r.rows
 }
 
+/** `messages.recipient_id` 的 FK —— Postgres 對欄位上的 `references` 取的名字（`001_schema.sql:66`）。 */
+export const RECIPIENT_FK = 'messages_recipient_id_fkey'
+
 export type InsertMessageResult = { ok: true; row: MessageRow } | { ok: false; reason: 'self-send' | 'no-recipient' }
 
 /**
@@ -46,7 +49,8 @@ export async function insertMessage(me: string, recipientId: string, body: strin
   } catch (error) {
     const e = error as { code?: unknown; constraint?: unknown }
     if (e.code === '23514' && String(e.constraint ?? '').includes('no_self_send')) return { ok: false, reason: 'self-send' }
-    if (e.code === '23503') return { ok: false, reason: 'no-recipient' }
+    // 只認收件人那條 FK：sender 的 FK（session 指向已刪的名片）或日後別的 FK 是別的事，照 `FE-O03` 回 500（審查抓到的）。
+    if (e.code === '23503' && e.constraint === RECIPIENT_FK) return { ok: false, reason: 'no-recipient' }
     throw error
   }
 }
