@@ -41,4 +41,4 @@
 
 - [x] 6.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
 - [x] 6.2 真瀏覽器：`tests/e2e/board-panel.mjs` 人才那一段多點一張卡、看詳情、返回；截圖進 `docs/evidence/fe-b04/`
-- [ ] 6.3 封存（`archive/fe-b04-talent-directory`，獨立 PR）
+- [x] 6.3 封存（`archive/fe-b04-talent-directory`，獨立 PR）
