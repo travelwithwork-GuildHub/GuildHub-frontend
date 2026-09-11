@@ -35,4 +35,4 @@
 
 - [x] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
 - [x] 5.2 真瀏覽器看一次訪客按 E（`tests/e2e/board-panel.mjs` 加一段攔 401）
-- [ ] 5.3 封存（`archive/fe-x04-empty-states`，獨立 PR）
+- [x] 5.3 封存（`archive/fe-x04-empty-states`，獨立 PR）
