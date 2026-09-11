@@ -108,7 +108,7 @@ describe('只做狀態，不做文案', () => {
     server.reply(500, { detail: '壞了' })
     server.reply(200, ITEMS.projects(2))
     mount('projects', {
-      error: (retry) => (
+      error: ({ retry }) => (
         <button type="button" data-testid="slot-error" onClick={retry}>
           呼叫端的重試
         </button>
@@ -129,7 +129,7 @@ describe('只做狀態，不做文案', () => {
     server.reply(500, { detail: '壞了' })
     server.reply(200, ITEMS.projects(2))
     mount('projects', {
-      error: (retry) => (
+      error: ({ retry }) => (
         <button type="button" data-testid="slot-error" onClick={retry}>
           呼叫端的重試
         </button>
