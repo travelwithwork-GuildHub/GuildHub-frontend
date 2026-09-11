@@ -59,6 +59,7 @@ afterEach(async () => {
   delete process.env.NEXT_PUBLIC_DATA_ADAPTER
   cleanup()
   await server.close()
+  vi.restoreAllMocks()
   window.history.replaceState(null, '', '/')
 })
 
@@ -72,9 +73,24 @@ function WorldProbe({ sinkRef }: { sinkRef: RefObject<World | null> }) {
   return null
 }
 
+/**
+ * 「紀錄多一層／不變／退」用 spy 看 `history` 被怎麼呼叫，**不看 `history.length`**：jsdom 的 history 是整個
+ * 測試檔共用的，push 會截掉前面測試留下的 forward entries，length 的增量會隨測試順序變（審查抓到的）。
+ */
+type HistorySpies = { push: () => number; replace: () => number; go: () => number }
+
 function arriveAt(url: string) {
   // 保留測試預先放進 `history.state` 的東西（Next 的、上一次掛載的）。
   window.history.replaceState(window.history.state, '', url)
+  const push = vi.spyOn(window.history, 'pushState')
+  const replace = vi.spyOn(window.history, 'replaceState')
+  const goSpy = vi.spyOn(window.history, 'go')
+  const back = vi.spyOn(window.history, 'back')
+  const spies: HistorySpies = {
+    push: () => push.mock.calls.length,
+    replace: () => replace.mock.calls.length,
+    go: () => goSpy.mock.calls.length + back.mock.calls.length,
+  }
   const sinkRef: RefObject<World | null> = { current: null }
   render(
     <div data-testid="world-canvas-container" data-focus-anchor="world" tabIndex={-1}>
@@ -94,7 +110,7 @@ function arriveAt(url: string) {
       sinkRef.current?.registry.entries.get(id ?? '')?.onInteract?.()
     })
   }
-  return { locked: () => sinkRef.current?.lock.current ?? null, pressE }
+  return { locked: () => sinkRef.current?.lock.current ?? null, pressE, spies }
 }
 const escape = () =>
   act(() => {
@@ -211,43 +227,45 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
     server.replyFor('/api/profiles', 200, TWO)
     server.replyFor(`/api/profiles/${UUID(0)}`, 200, profile(0))
     const world = arriveAt('/world')
-    const base = window.history.length
     world.pressE()
     await waitFor(() => expect(cards()).toHaveLength(2))
     fireEvent.click(cards()[0] as HTMLElement)
     await waitFor(() => expect(detail()?.dataset.phase).toBe('ready'))
-    return { ...world, base }
+    return world
   }
 
   it('[FE-B09-S06] 按 E 開清單：網址多 panel，紀錄多一層；Next 放在 history.state 的東西還在', async () => {
     server.replyFor('/api/profiles', 200, TWO)
-    const { pressE } = arriveAt('/world')
+    const { pressE, spies } = arriveAt('/world')
     // Next App Router 把自己的路由狀態放在 `history.state`：整個蓋掉的話，上一頁離開 /world 時 router 會崩。
     window.history.replaceState({ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: ['', {}] }, '', '/world')
-    const base = window.history.length
+    const replacedBefore = spies.replace()
     pressE()
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
-    expect(window.history.length, '開清單沒有新增一層紀錄 —— 上一頁會直接離開世界').toBe(base + 1)
+    expect(spies.push(), '開清單沒有新增一層紀錄 —— 上一頁會直接離開世界').toBe(1)
+    expect(spies.replace()).toBe(replacedBefore)
     expect((window.history.state as Record<string, unknown>).__NA, 'push 的時候把 Next 的 history.state 蓋掉了').toBe(true)
     expect((window.history.state as Record<string, unknown>).__PRIVATE_NEXTJS_INTERNALS_TREE).toEqual(['', {}])
   })
 
   it('[FE-B09-S07] 點卡開詳情：網址多 profile，紀錄再多一層', async () => {
-    const { base } = await openListThenDetail()
+    const { spies } = await openListThenDetail()
     expect(url()).toBe(`/world?panel=profiles&profile=${UUID(0)}`)
-    expect(window.history.length).toBe(base + 2)
+    expect(spies.push()).toBe(2)
+    expect(spies.replace(), '開清單／開詳情不該 replace').toBe(0)
   })
 
   it('[FE-B09-S08] 翻頁改網址、不加紀錄', async () => {
     server.replyFor('/api/profiles', 200, Array.from({ length: 20 }, (_, i) => profile(i)))
     server.replyFor('/api/profiles', 200, [profile(20)])
-    const { pressE } = arriveAt('/world')
+    const { pressE, spies } = arriveAt('/world')
     pressE()
     await waitFor(() => expect(cards()).toHaveLength(20))
-    const before = window.history.length
+    expect(spies.push()).toBe(1)
     fireEvent.click(screen.getByRole('button', { name: '下一頁' }))
     await waitFor(() => expect(url()).toBe('/world?panel=profiles&page=1'))
-    expect(window.history.length, '翻頁 push 了一層 —— 上一頁會變成「上一頁的清單」而不是關面板').toBe(before)
+    expect(spies.push(), '翻頁 push 了一層 —— 上一頁會變成「上一頁的清單」而不是關面板').toBe(1)
+    expect(spies.replace()).toBe(1)
   })
 
   it('[FE-B09-S09] 上一頁關最上層，下一頁依序重開', async () => {
@@ -271,7 +289,7 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
   })
 
   it('[FE-B09-S10] Escape 關一層，網址跟著少一層；紀錄是退，不是再堆', async () => {
-    const { base, locked } = await openListThenDetail()
+    const { locked, spies } = await openListThenDetail()
     escape()
     expect(detail(), 'Escape 要同步關詳情（FE-X06-S01）').toBeNull()
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
@@ -280,8 +298,10 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
     expect(panel()).toBeNull()
     await waitFor(() => expect(url()).toBe('/world'))
     expect(locked()).toBe(false)
-    // 退回去之後紀錄長度不變（jsdom 的 length 算的是整條，退了之後前面那兩層還在，可以再前進）。
-    expect(window.history.length).toBe(base + 2)
+    // 是退（go／back），不是 replace 也不是再 push：退了之後前面那兩層還在，可以再前進。
+    expect(spies.go()).toBe(2)
+    expect(spies.push()).toBe(2)
+    expect(spies.replace(), 'Escape 用 replace 改網址 —— 上一頁會再回到已經關掉的那一層').toBe(0)
     await go(1)
     await waitFor(() => expect(panel()).not.toBeNull())
   })
@@ -305,17 +325,37 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
   it('[FE-B09-S11] 深連結直達，Escape 不離站', async () => {
     server.replyFor('/api/profiles', 200, TWO)
     server.replyFor(`/api/profiles/${UUID(0)}`, 200, profile(0))
-    arriveAt(`/world?panel=profiles&profile=${UUID(0)}`)
-    const base = window.history.length
+    const { spies } = arriveAt(`/world?panel=profiles&profile=${UUID(0)}`)
     await waitFor(() => expect(detail()?.dataset.phase).toBe('ready'))
     escape()
     expect(detail()).toBeNull()
     expect(panel(), '一下 Escape 把面板連詳情一起關了 —— 同一個 commit 掛載時詳情比面板先註冊').not.toBeNull()
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
-    expect(window.history.length, '直達之後 Escape 用了 back —— jsdom 只有一層時 back 是 no-op，網址會停在 profile').toBe(base)
+    expect(spies.go(), '直達之後 Escape 用了 back —— 本站沒有上一層，會退出本站').toBe(0)
     escape()
     await waitFor(() => expect(url()).toBe('/world'))
-    expect(window.history.length).toBe(base)
+    expect(spies.go()).toBe(0)
+    expect(spies.push()).toBe(0)
+  })
+
+  it('[FE-B09-S05] 上一頁落在別人寫的、不 canonical 的 entry 上：狀態不變，網址 canonicalize', async () => {
+    server.replyFor('/api/profiles', 200, TWO)
+    // 先塞一個不 canonical 的 entry 在「後面」：從 /world push 一個帶 page=-1 的清單網址，再退回 /world 掛載。
+    window.history.replaceState(null, '', '/world')
+    window.history.pushState(null, '', '/world?panel=profiles&page=-1')
+    await go(-1)
+    const { pressE, spies } = arriveAt('/world')
+    pressE()
+    await waitFor(() => expect(cards()).toHaveLength(2))
+    // 按 E 的 push 截掉了那個 entry；改用 replace 把目前 entry 弄成不 canonical 再 pop 回來看。
+    window.history.replaceState(window.history.state, '', '/world?panel=profiles&page=-1')
+    window.history.pushState(window.history.state, '', '/world?panel=profiles&page=-1&x=1')
+    const replacedBefore = spies.replace()
+    await go(-1)
+    await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
+    expect(spies.replace()).toBe(replacedBefore + 1)
+    expect(panel()).not.toBeNull()
+    expect(cards(), 'canonicalize 把清單重開了').toHaveLength(2)
   })
 
   it('[FE-B09-S11] 帶著別次掛載的血緣回來（先去別的路由再回來）：Escape 一樣不離站', async () => {
@@ -323,12 +363,11 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
     server.replyFor(`/api/profiles/${UUID(0)}`, 200, profile(0))
     // 上一次掛載留下的標記說「往回有兩層是我 push 的」—— 那是上一次的紀錄，這一次的 back 會退到哪裡沒有人知道。
     window.history.replaceState({ guildhubPanel: { session: 'previous-mount', pushed: 2 } }, '', `/world?panel=profiles&profile=${UUID(0)}`)
-    arriveAt(`/world?panel=profiles&profile=${UUID(0)}`)
-    const base = window.history.length
+    const { spies } = arriveAt(`/world?panel=profiles&profile=${UUID(0)}`)
     await waitFor(() => expect(detail()?.dataset.phase).toBe('ready'))
     escape()
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
-    expect(window.history.length, '信了別次掛載的血緣去 back').toBe(base)
+    expect(spies.go(), '信了別次掛載的血緣去 back').toBe(0)
     expect(panel()).not.toBeNull()
   })
 })

@@ -106,9 +106,13 @@ export function PanelUrlSync(): null {
         reconcileRef.current()
         return
       }
-      // 上一頁／下一頁：網址說的跟狀態一樣就不動；不一樣就套上（狀態變了 → 上面那支再比一次 → 一樣 → 停）。
+      // 上一頁／下一頁：網址說的跟狀態一樣就只做 canonicalize（落在別人寫的、不 canonical 的 entry 上 ——
+      // 審查抓到的）；不一樣就套上（狀態變了 → 上面那支再比一次 → 一樣 → 停）。
       const parsed = parsePanelUrl(window.location.search)
-      if (serializePanelUrl(parsed) === latestRef.current.search) return
+      if (serializePanelUrl(parsed) === latestRef.current.search) {
+        reconcileRef.current()
+        return
+      }
       restore(parsed)
     }
     window.addEventListener('popstate', onPopState)
