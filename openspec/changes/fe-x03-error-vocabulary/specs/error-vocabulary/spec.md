@@ -68,8 +68,18 @@
 
 #### Scenario: [FE-X03-S08] 連線層的失敗是「連不上」
 
-- **WHEN** 輸入是 `fetch` 在拿到回應之前的 rejection（一個 `TypeError`）
+- **WHEN** 輸入是資料層對「`fetch` 在拿到回應之前失敗」的表示（`NetworkError`）
 - **THEN** `kind` SHALL 是「連不上」那一種
+
+> `fetch` 自己 reject 的是一個 `TypeError`，而**程式自己的 bug 也是 `TypeError`**
+>（`Cannot read properties of undefined`）。用 `instanceof TypeError` 分的話，
+> 每一個屬性讀取錯誤都會被說成「檢查一下網路」。所以資料層在**唯一呼叫 `fetch` 的地方**
+> 把 rejection 包成一個專屬的型別，翻譯器只認那個型別（`S19` 守反面）。
+
+#### Scenario: [FE-X03-S19] 程式自己的 `TypeError` 不是「連不上」
+
+- **WHEN** 輸入是一個訊息為 `Cannot read properties of undefined` 的 `TypeError`
+- **THEN** `kind` SHALL 是「預期之外」那一種
 
 #### Scenario: [FE-X03-S09] 契約漂移是「收到的資料不對」
 
@@ -80,6 +90,7 @@
 
 - **WHEN** 輸入是 `name` 為 `AbortError` 的 `DOMException`
 - **THEN** `kind` SHALL 是「已取消」那一種
+- **AND** 一個 `name` 為 `AbortError` 的**純物件** SHALL 是「預期之外」，不是「已取消」
 
 > 中止是呼叫端自己做的事（換頁、卸載）。落到「預期之外」的話，
 > 每一次正常的取消都會在畫面上變成一個錯誤。
@@ -94,6 +105,14 @@
 
 > 純物件 `{ status: 401 }` **不是** 401：形狀像不代表是 `HttpError`。
 > 依鴨子型別分類的話，任何帶 `status` 的東西都會被說成 HTTP 錯誤。
+
+#### Scenario: [FE-X03-S20] 不在 400–599 的 status 是「預期之外」
+
+- **WHEN** 輸入是 status 為 200、399、600 或 `NaN` 的 `HttpError`
+- **THEN** `kind` SHALL 是「預期之外」那一種
+
+> 規格只定義 4xx 與 5xx。`>= 500` 這種寫法會把 600 與 `Infinity` 說成伺服器出了問題，
+> `default` 分支會把 200 說成「請求沒有被接受」。
 
 ### Requirement: 使用者看到的那一句話來自唯一一份語彙表，而且是安全的
 
@@ -148,7 +167,7 @@ SHALL NOT 多也 SHALL NOT 少。
 
 ### Requirement: 翻譯入口只有一個
 
-`HttpError` SHALL 只被兩種地方引用：建立它的 `src/api/`，與翻譯它的這個模組。
+`HttpError` 與 `NetworkError` SHALL 只被兩種地方引用：建立它們的 `src/api/`，與翻譯它們的這個模組。
 `src/` 裡其他任何地方要知道「這個失敗是哪一種」，SHALL 透過 `UiError.kind`，
 SHALL NOT 自己讀 `HttpError.status`。
 
@@ -162,8 +181,11 @@ SHALL NOT 自己讀 `HttpError.status`。
 
 #### Scenario: [FE-X03-S16] `HttpError` 的引用邊界
 
-- **WHEN** 掃描 `src/` 每一個檔案的 import
-- **THEN** 引用 `HttpError` 的檔案 SHALL 只在 `src/api/` 與這個模組底下
+- **WHEN** `src/api/` 與這個模組以外的檔案從資料層 import `HttpError`（含改名、整個模組一起 import、再匯出）
+- **THEN** lint SHALL 擋下它
+
+> 字串掃描擋不住 `import { HttpError as H }` 與 `import * as t`，所以這一條是 lint 規則，
+> 而 lint 規則自己要有負向測試（`tests/no-fetch-rule.test.ts` 的形狀）。
 
 #### Scenario: [FE-X03-S18] 身分層依 `kind` 分辨訪客與失效的金鑰，行為不變
 
