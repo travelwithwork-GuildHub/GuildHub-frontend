@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { PAGE_SIZE } from '@/api/contract/limits'
 import type { ProfileOut } from '@/api/contract/rest'
 import { avatarLook } from '@/design/avatar'
@@ -9,6 +9,7 @@ import { BoardPanel } from '@/list-panel/BoardPanel'
 import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import { TalentCard } from '@/talent/TalentCard'
 import { TalentDetail } from '@/talent/TalentDetail'
+import { useProfileDetail } from '@/talent/useProfileDetail'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
 import type { InteractableRegistry } from '@/world/interaction/registry'
 import { BoardTargets, boardItems } from '@/world/rooms/BoardTargets'
@@ -206,24 +207,32 @@ describe('詳情在同一個面板裡，內容一律來自 GET /api/profiles/{id
     expect(within(detail()).getByTestId('empty-state').dataset.emptyState).toBe('permission-blocked')
   })
 
-  it('[FE-B04-S09] 先開 A 再開 B，A 晚到：畫面是 B', async () => {
-    // A 的詳情端點不給回應（server 會回 500，但那個 500 帶的是 A 的 identity —— 也不得提交）；
-    // B 立刻回。順序：點 A → 返回 → 點 B → B 到 → 之後 A 的 rejection 才到。
-    server.replyFor(LIST, 200, many(2))
+  it('[FE-B04-S09] 同一個詳情從 A 換成 B（A 還沒回來）：畫面是 B，沒有閃過 A 的資料或錯誤', async () => {
+    // ⚠️ **誠實地說，這一條驗到的是「換 id 時中止前一個」與「換 id 那一格就遮住舊狀態」。**
+    // 中止讓 A 的回應根本不會進狀態，所以 `s.id === captured` 那一道比對在這裡驗不到 ——
+    // 它是第二道防線（`FE-B01` 的驅動層判準也是同一個形狀）。
+    // 從畫面走的話 A 會先卸載再掛 B，連換 id 都不會發生；這裡直接對 hook 換 id。
     server.replyFor(detailPath(UUID(1)), 200, profile(1, { bio: 'B 的自介' }))
-    openTalentBoard()
-    await waitFor(() => expect(cards()).toHaveLength(2))
-    fireEvent.click(cards()[0] as HTMLElement)
-    expect(detail().dataset.profileId).toBe(UUID(0))
-    fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
-    fireEvent.click(cards()[1] as HTMLElement)
-    await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
-    expect(detail().dataset.profileId).toBe(UUID(1))
-    expect(screen.getByTestId('talent-bio').textContent).toBe('B 的自介')
-    // 等 A 那一條有機會回來，再確認畫面沒被改掉。
+    const frames: Array<{ id: string; phase: string; name: string | undefined }> = []
+    const { result, rerender } = renderHook(
+      (id: string) => {
+        const d = useProfileDetail(id, id === UUID(0) ? profile(0) : profile(1))
+        frames.push({ id, phase: d.phase, name: d.profile?.display_name })
+        return d
+      },
+      { initialProps: UUID(0) },
+    )
+    expect(result.current.phase).toBe('loading')
+    rerender(UUID(1))
+    // 換 id 的那一格：回的就要是 B 的（預覽），不是 A 的。
+    expect(result.current.profile?.display_name).toBe('人才1')
+    await waitFor(() => expect(result.current.phase).toBe('ready'))
+    expect(result.current.profile?.bio).toBe('B 的自介')
     await new Promise((r) => setTimeout(r, 50))
-    expect(detail().dataset.profileId, 'A 晚到的回應蓋掉了 B').toBe(UUID(1))
-    expect(detail().dataset.phase).toBe('ready')
+    expect(result.current.profile?.id, 'A 的東西蓋掉了 B').toBe(UUID(1))
+    const leaked = frames.filter((f) => f.id === UUID(1) && (f.name === '人才0' || f.phase === 'error'))
+    expect(leaked, 'prop 已經是 B、回的卻是 A 的資料或 A 的錯誤').toEqual([])
+    // A 的請求要嘛沒上線、要嘛上線了被中止：server 對 A 只會回 500（沒準備回應），那個 500 不得變成錯誤。
   })
 
   it('[FE-B04-S10] 詳情的欄位與缺值：技能、time[dateTime]、null 是「未提供」不是 0', async () => {

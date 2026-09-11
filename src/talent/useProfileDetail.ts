@@ -35,7 +35,8 @@ export function useProfileDetail(id: string, preview: ProfileOut | undefined): P
 
   // `id` 換了：整個重來，**在繪製期間**就換（React 的「記住上一次繪製的資訊」模式），
   // 不等 effect —— 換 `id` 的那一格才不會把舊人的資料交給畫面（`useListPage` 換種類踩過的坑）。
-  // 舊 `id` 的回應之後靠 identity 擋掉（`S09`）。
+  // 舊 `id` 的回應有兩道防線：effect 清理時**中止**它；沒中止到的（`S09`）靠 `s.id === captured` 擋。
+  // 拿掉任一道另一道接得住，兩道都拿掉才紅 —— 判準是這樣驗的。
   if (state.id !== id) {
     setState({ id, phase: 'loading', fetched: undefined, error: null, attempt: 0 })
   }
@@ -61,7 +62,7 @@ export function useProfileDetail(id: string, preview: ProfileOut | undefined): P
     setState((s) => (s.phase === 'error' ? { ...s, phase: 'loading', error: null, attempt: s.attempt + 1 } : s))
   }, [])
 
-  if (state.id !== id) return { phase: 'loading', profile: preview, error: null, retry }
+  // 上面那個繪製期間的 setState 讓 React 立刻用新狀態重繪，所以走到這裡時 `state.id === id` 一定成立。
   return {
     phase: state.phase,
     profile: state.phase === 'ready' ? state.fetched : preview,
