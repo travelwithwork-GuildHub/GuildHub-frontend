@@ -2,24 +2,24 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-x06-keyboard-focus`）
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-x06-keyboard-focus`）
 
 ## 2. 可合成的鎖（`InteractionProvider`）
 
 對應 Requirement〈世界命令有一把可合成的鎖〉
 
-- [ ] 2.1 `holdInputLock(reason) → release`，token 式，釋放冪等；`inputLockRef` 變推導值
-- [ ] 2.2 `ListPanelProvider` 改用 hold／release；`SpatialInteraction` 的 E 看鎖
-- [ ] 2.3 判準：`S03`、`S04`、`S05`、`S06`
-- [ ] 2.4 **突變**：鎖改回單一 boolean，`S03` 要紅；E 不看鎖，`S05` 要紅
+- [x] 2.1 `holdInputLock(reason) → release`，token 式，釋放冪等；`inputLockRef` 變推導值
+- [x] 2.2 `ListPanelProvider` 改用 hold／release；`SpatialInteraction` 的 E 看鎖
+- [x] 2.3 判準：`S03`、`S04`、`S05`、`S06`
+- [x] 2.4 **突變**：鎖改回單一 boolean，`S03` 要紅；E 不看鎖，`S05` 要紅
 
 ## 3. 文字輸入焦點
 
 對應 Requirement〈焦點在能輸入文字的控制上時，打字不是走路〉
 
-- [ ] 3.1 `<EditableFocusLock />`：`focusin`／`focusout` → microtask 後依 `activeElement` 重算
-- [ ] 3.2 判準：`S07`、`S09`、`S10`；內部不變量「輸入框間轉移不放鎖」對釋放函式下 spy
-- [ ] 3.3 **突變**：`focusout` 當下就釋放，不變量的 spy 要紅；checkbox 也算，`S09` 的變體要紅
+- [x] 3.1 `<EditableFocusLock />`：`focusin`／`focusout` → microtask 後依 `activeElement` 重算
+- [x] 3.2 判準：`S07`、`S09`、`S10`；內部不變量「輸入框間轉移不放鎖」對釋放函式下 spy
+- [x] 3.3 **突變**：`focusout` 當下就釋放，不變量的 spy 要紅；checkbox 也算，`S09` 的變體要紅
 
 ## 4. Escape 的層級
 
