@@ -35,6 +35,11 @@ export interface ListPanelProps<K extends ListKind> {
    * 自己 `toUiError(cause)`（`FE-X04` design `D3`）。
    */
   error?: (slot: { retry: () => void; cause: unknown }) => ReactNode
+  /**
+   * 蓋在列表上的東西（例如一筆的詳情，`FE-B04`）。有它的時候列表**不卸載、不 `display: none`**，
+   * 只標成 `inert` —— 頁碼與捲動位置才留得住（`FE-B04-S11`／`S12`／`S16`）。
+   */
+  overlay?: ReactNode
   onClose: () => void
 }
 
@@ -46,6 +51,7 @@ export function ListPanel<K extends ListKind>({
   empty,
   exhausted,
   error,
+  overlay,
   onClose,
 }: ListPanelProps<K>) {
   const { state, next, retry } = useListPage(kind)
@@ -82,46 +88,59 @@ export function ListPanel<K extends ListKind>({
       style={{ zIndex: layer('panel') }}
       className="bg-surface-raised border-control-edge text-ink absolute top-gutter right-gutter bottom-gutter flex w-[min(26rem,calc(100vw-2rem))] flex-col gap-gutter rounded border p-gutter"
     >
-      <header className="flex items-center justify-between gap-gutter">
-        <h2 className="text-title">{title}</h2>
-        <button type="button" className={SECONDARY} onClick={onClose}>
-          {labels.close}
-        </button>
-      </header>
-
-      <ul
-        ref={list}
-        tabIndex={-1}
-        aria-busy={state.phase === 'loading'}
-        className={
-          hasItems
-            ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto'
-            : 'h-0 flex-none overflow-hidden'
-        }
+      {/* 覆蓋層：絕對定位蓋住整個面板內側。列表區在底下照樣活著。 */}
+      {overlay !== undefined && overlay !== null && (
+        <div data-testid="list-panel-overlay" className="bg-surface-raised absolute inset-0 z-10 p-gutter">
+          {overlay}
+        </div>
+      )}
+      <div
+        data-testid="list-panel-list"
+        // `inert`：不可聚焦、不可點。jsdom 認得屬性但不實作行為 —— 判準只驗屬性，行為在真瀏覽器。
+        inert={overlay !== undefined && overlay !== null}
+        className="flex min-h-0 flex-1 flex-col gap-gutter"
       >
-        {items.map((item) => (
-          <li key={item.id}>{renderItem(item)}</li>
-        ))}
-      </ul>
-
-      <footer
-        data-testid="list-panel-edge"
-        className={hasItems ? 'flex flex-col gap-2' : 'flex flex-1 flex-col gap-2'}
-      >
-        {edge === 'error' && error?.({ retry, cause: state.error })}
-        {edge === 'first-empty' && empty}
-        {edge === 'exhausted' && exhausted}
-        {edge === null && state.shown !== null && (
-          <button
-            type="button"
-            className={SECONDARY}
-            disabled={state.phase === 'loading'}
-            onClick={next}
-          >
-            {labels.next}
+        <header className="flex items-center justify-between gap-gutter">
+          <h2 className="text-title">{title}</h2>
+          <button type="button" className={SECONDARY} onClick={onClose}>
+            {labels.close}
           </button>
-        )}
-      </footer>
+        </header>
+
+        <ul
+          ref={list}
+          tabIndex={-1}
+          aria-busy={state.phase === 'loading'}
+          className={
+            hasItems
+              ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto'
+              : 'h-0 flex-none overflow-hidden'
+          }
+        >
+          {items.map((item) => (
+            <li key={item.id}>{renderItem(item)}</li>
+          ))}
+        </ul>
+
+        <footer
+          data-testid="list-panel-edge"
+          className={hasItems ? 'flex flex-col gap-2' : 'flex flex-1 flex-col gap-2'}
+        >
+          {edge === 'error' && error?.({ retry, cause: state.error })}
+          {edge === 'first-empty' && empty}
+          {edge === 'exhausted' && exhausted}
+          {edge === null && state.shown !== null && (
+            <button
+              type="button"
+              className={SECONDARY}
+              disabled={state.phase === 'loading'}
+              onClick={next}
+            >
+              {labels.next}
+            </button>
+          )}
+        </footer>
+      </div>
     </section>
   )
 }
