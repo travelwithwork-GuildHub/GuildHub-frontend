@@ -42,7 +42,10 @@ adapter 由 `NEXT_PUBLIC_DATA_ADAPTER` 決定，值是 `guildhub`（真後端，
 >
 > **端到端的 cookie 只有瀏覽器驗得到**（`FE-O08` 切換演練，W5）。
 
-#### Scenario: [FE-O02-S02] 設定選 internal 時，請求打同源的 Route Handlers
+#### Scenario: [FE-O02-S02] 設定選 internal 時，每個操作明顯失敗
+
+> ⚠️ **標題是舊的、內容是新的。** OpenSpec 的 MODIFIED 要求 Scenario 標題與主 spec 逐字相同（標題是穩定鍵），
+> 所以「明顯失敗」四個字留著；這條現在的義務是下面寫的：**打同源的 Route Handlers**。
 
 - **WHEN** `NEXT_PUBLIC_DATA_ADAPTER` 是 `internal`
 - **AND** 呼叫任何一個 domain operation
