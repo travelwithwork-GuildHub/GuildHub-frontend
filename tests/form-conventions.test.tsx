@@ -4,6 +4,7 @@ import { act } from 'react'
 import { z } from 'zod'
 import { SubmitError } from '@/forms/SubmitError'
 import { useForm } from '@/forms/useForm'
+import { LoginForm } from '@/app/login/LoginForm'
 import { VOCABULARY } from '@/errors/uiError'
 import { startContractServer, type ContractServer } from './support/contract-server'
 import { send } from '@/api/transport'
@@ -11,7 +12,7 @@ import { send } from '@/api/transport'
 // 規格：openspec/changes/fe-x05-form-conventions/specs/form-conventions/spec.md
 //   Requirement: 驗證時機是全站規則 —— S01、S02、S03、S04、S14
 //   Requirement: 送出中、失敗、重試 —— S05、S06、S07（＋ `describeError` 的兩個分支、一個表單一個 alert）
-//   Requirement: `LoginForm` 遷到同一套，行為不變 —— S13 在下一個 PR（`--login`）
+//   Requirement: `LoginForm` 遷到同一套，行為不變 —— S13（全綠那一半是 `tests/login-form*.test.tsx` 自己）
 //
 // 受測的是 `useForm` 封裝（真的 react-hook-form ＋ Zod）。Fixture 表單：兩個必填（a、b）、一個下限 3（c）、一個上限 20（d）、一個 number（n）。
 // 送出走真的 transport 到 `contract-server`（本機自己起的 HTTP server）—— 數的是後端收到幾個請求。**不連任何外部服務。**
@@ -253,5 +254,72 @@ describe('resolver 自己炸', () => {
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(VOCABULARY.unexpected))
     expect(button().disabled).toBe(false)
     expect(button().textContent).toBe('送出')
+  })
+})
+
+describe('LoginForm 遷到同一套', () => {
+  it('[FE-X05-S13] 暱稱欄由 RHF 註冊：input 有 name="nickname"；金鑰欄也有 name', () => {
+    render(<LoginForm />)
+    expect((screen.getByLabelText('在世界裡顯示的名字') as HTMLInputElement).name).toBe('nickname')
+    expect((screen.getByLabelText('貼上你的恢復金鑰') as HTMLInputElement).name).toBe('key')
+    // 兩個表單、還沒失敗：沒有任何 alert（欄位提示不是 alert）。
+    expect(screen.queryAllByRole('alert')).toHaveLength(0)
+  })
+})
+
+describe('巢狀欄位', () => {
+  const Nested = z.object({ p: z.object({ q: z.string().max(3, { error: 'q 最多 3 字' }) }), list: z.array(z.string().max(2, { error: '項目最多 2 字' })) })
+  function NestedFixture() {
+    const { form, visibleErrors, canSubmit } = useForm({ schema: Nested, defaultValues: { p: { q: '' }, list: ['', ''] }, onSubmit: async () => {} })
+    return (
+      <form noValidate>
+        <input {...form.register('p.q')} aria-label="p.q" />
+        <input {...form.register('list.1')} aria-label="list.1" />
+        <span data-testid="error-p.q">{visibleErrors['p.q']}</span>
+        <span data-testid="error-list.1">{visibleErrors['list.1']}</span>
+        <button type="submit" disabled={!canSubmit}>
+          送出
+        </button>
+      </form>
+    )
+  }
+  const Reserved = z.object({ user: z.object({ type: z.string().max(2, { error: 'type 最多 2 字' }), message: z.string().max(2, { error: 'message 最多 2 字' }) }) })
+  function ReservedFixture() {
+    const { form, visibleErrors, canSubmit } = useForm({ schema: Reserved, defaultValues: { user: { type: '', message: '' } }, onSubmit: async () => {} })
+    return (
+      <form noValidate>
+        <input {...form.register('user.type')} aria-label="user.type" />
+        <input {...form.register('user.message')} aria-label="user.message" />
+        <span data-testid="error-user.type">{visibleErrors['user.type']}</span>
+        <span data-testid="error-user.message">{visibleErrors['user.message']}</span>
+        <button type="submit" disabled={!canSubmit}>
+          送出
+        </button>
+      </form>
+    )
+  }
+  it('巢狀欄位剛好叫 type／message：不被當成 FieldError 本身（兩位審查者都抓到）', async () => {
+    render(<ReservedFixture />)
+    await type('user.type', '三個字')
+    await waitFor(() => expect(screen.getByTestId('error-user.type').textContent).toBe('type 最多 2 字'))
+    expect(button().disabled).toBe(true)
+    await type('user.type', '')
+    await type('user.message', '三個字')
+    await waitFor(() => expect(screen.getByTestId('error-user.message').textContent).toBe('message 最多 2 字'))
+    expect(screen.getByTestId('error-user.type').textContent).toBe('')
+    expect(button().disabled).toBe(true)
+  })
+
+  it('巢狀物件與陣列的即時錯誤：路徑對得上 register、也算進禁用（審查抓到只看頂層）', async () => {
+    render(<NestedFixture />)
+    await type('p.q', '四個字了')
+    await waitFor(() => expect(screen.getByTestId('error-p.q').textContent).toBe('q 最多 3 字'))
+    expect(button().disabled).toBe(true)
+    await type('p.q', '三個字')
+    await waitFor(() => expect(screen.getByTestId('error-p.q').textContent).toBe(''))
+    expect(button().disabled).toBe(false)
+    await type('list.1', '三個字')
+    await waitFor(() => expect(screen.getByTestId('error-list.1').textContent).toBe('項目最多 2 字'))
+    expect(button().disabled).toBe(true)
   })
 })
