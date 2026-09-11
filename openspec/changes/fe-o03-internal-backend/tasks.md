@@ -19,10 +19,10 @@
 
 對應 Requirement〈我的名片：讀與部分更新〉、〈人才與案件清單：分頁形狀複製真後端〉
 
-- [ ] 3.1 `PATCH /api/profiles/me`、`GET /api/profiles`、`GET /api/profiles/[id]`
-- [ ] 3.2 `GET /api/projects`、`GET /api/projects/[id]`、`GET /api/rooms`
-- [ ] 3.3 判準：`S01`（其餘四支）、`S02`、`S04`、`S05`、`S13`～`S17`
-- [ ] 3.4 **突變**：handler 擋長度回 422 → `S02` 紅；分頁回 total → `S15` 紅；過期不過濾 → `S16` 紅
+- [x] 3.1 `PATCH /api/profiles/me`、`GET /api/profiles`、`GET /api/profiles/[id]`
+- [x] 3.2 `GET /api/projects`、`GET /api/projects/[id]`、`GET /api/rooms`
+- [x] 3.3 判準：`S01`（其餘四支）、`S02`、`S04`、`S05`、`S13`～`S17`
+- [x] 3.4 **突變**：handler 擋長度回 422 → `S02` 紅；分頁回 total → `S15` 紅；過期不過濾 → `S16` 紅
 
 ## 4. 即時層替身
 
@@ -44,4 +44,4 @@
 
 - [x] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠；`CONTRACT_TARGET=internal` 全綠
 - [x] 5.2 `NEXT_PUBLIC_DATA_ADAPTER=internal` 起 dev，人才看板真的從本地資料庫開出來（截圖 `docs/evidence/fe-o03/`）
-- [ ] 5.3 封存（`archive/fe-o03-internal-backend`，獨立 PR）
+- [x] 5.3 封存（`archive/fe-o03-internal-backend`，下一個 PR）
