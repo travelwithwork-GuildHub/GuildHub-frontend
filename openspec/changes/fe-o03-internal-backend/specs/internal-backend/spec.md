@@ -149,7 +149,7 @@ body 是 `{}` → 不更新、回目前的名片；成功 SHALL 更新 `updated_
 
 ### Requirement: 即時層替身照 `protocol.py`，怪癖一併複製
 
-`scripts/realtime-stub.ts`（Node 24 原生執行 `.ts`，重用 `src/api/contract/ws.ts`）SHALL 在 `INTERNAL_REALTIME_PORT`（預設 3102）只綁 loopback，
+`scripts/realtime-stub.ts`（以 `tsx` 執行 —— Node 原生的 type stripping 要求相對 import 帶副檔名，而 `ws.ts` 的 `./limits` 沒有；重用 `src/api/contract/ws.ts`）SHALL 在 `INTERNAL_REALTIME_PORT`（預設 3102）只綁 loopback，
 路徑 `/ws?scene=<scene>`，另有 `GET /online?scene=<scene>` 回 `{"count": <整數>}`（給 `GET /api/rooms` 用）。
 握手時 SHALL 讀同一個簽章 cookie 決定 `name`／`av`（沒有或無效 → `訪客`／`0`，**不拒絕**，跟真後端一樣）；
 `scene` 是 `lobby` → 接受；`scene` 是 `room:<uuid>` → 要 `token` 查詢參數等於 `HMAC(INTERNAL_SESSION_SECRET, "room:<uuid>")` 才接受

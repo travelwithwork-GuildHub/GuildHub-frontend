@@ -28,7 +28,7 @@
 
 對應 Requirement〈即時層替身照 `protocol.py`，怪癖一併複製〉
 
-- [ ] 4.1 `ws` 依賴；`scripts/realtime-stub.ts`（重用 `src/api/contract/ws.ts`；room token）；`npm run realtime:stub`
+- [ ] 4.1 `ws`、`tsx` 依賴；`scripts/realtime-stub.ts`（重用 `src/api/contract/ws.ts`；room token）；`npm run realtime:stub`（`tsx`）
 - [ ] 4.2 `/online` 查詢口，`GET /api/rooms` 接上（design `D5`）
 - [ ] 4.3 判準：`S18`～`S23`（`tests/contract/ws/`；`S17` 用 `withoutStub()`）
 - [ ] 4.4 **突變**：不合法訊息回 `err` → `S20` 紅；靜止送空 `pos` → `S18` 紅；自己的 move 不回自己 → `S19` 紅；rooms 寫死 0 → `S22` 紅

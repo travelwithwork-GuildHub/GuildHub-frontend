@@ -17,7 +17,7 @@ W6–W12 的產品能力真後端沒有對應端點；`CLAUDE.md` 的答案是�
 - **session**：HttpOnly cookie，內容是 HMAC 簽章的 profile id（secret `INTERNAL_SESSION_SECRET`）；篡改、指向不存在名片 → 視為未登入。
 - **W2 的操作**：`POST /api/login`（三模式）、`GET /api/me`、`PATCH /api/profiles/me`、`GET /api/profiles?page=`、`GET /api/profiles/{id}`、
   `GET /api/projects?status=&page=`、`GET /api/projects/{id}`、`GET /api/rooms`。
-- **即時層替身**：獨立程序 `scripts/realtime-stub.ts`（Node 24 原生跑 `.ts`；`ws` 套件，另一個 port），訊息形狀**重用 `src/api/contract/ws.ts`**，
+- **即時層替身**：獨立程序 `scripts/realtime-stub.ts`（`tsx` 跑 `.ts`；`ws` 套件，另一個 port），訊息形狀**重用 `src/api/contract/ws.ts`**，
   怪癖照 `protocol.py`：靜止不送 `pos`、不合協定的訊息靜默丟棄、狀態文字超過 12 字靜默丟棄、自己的 `move` 廣播回自己、握手失敗 close 1008 不給 `err`。
 
 ## ⚠️ 討論談定的取捨
