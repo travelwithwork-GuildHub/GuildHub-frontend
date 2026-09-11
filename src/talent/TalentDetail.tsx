@@ -32,12 +32,13 @@ export interface TalentDetailProps {
 
 export function TalentDetail({ id, preview, onBack, labels }: TalentDetailProps) {
   const detail = useProfileDetail(id, preview)
-  // 詳情是蓋在面板上的那一層：Escape 先關它、面板留著（`FE-X06-S01`、`FE-B04-S14`）。
-  useEscapeLayer(onBack)
   // 焦點進詳情（`FE-X06-S11`）：開它的那張卡在 `inert` 的列表區裡 —— 焦點留在那裡的話，
   // Tab 的 keydown 不會派送（inert 的元素收不到事件），面板的 focus trap 接不到，焦點就跑出去了。
   // 真瀏覽器的 e2e 抓到的。
   const root = useRef<HTMLElement>(null)
+  // 詳情是蓋在面板上的那一層：Escape 先關它、面板留著（`FE-X06-S01`、`FE-B04-S14`）。
+  // 帶自己的元素：跟面板同一個 commit 掛載時（深連結直達）也還是在面板上面。
+  useEscapeLayer(onBack, root)
   useEffect(() => {
     root.current?.focus()
   }, [])
