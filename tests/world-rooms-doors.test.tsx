@@ -5,6 +5,7 @@ import type { RoomDoorOut } from '@/api/contract/rest'
 import { FACING } from '@/world/coords'
 import type { LocalPose } from '@/world/PositionSync'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
+import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import type { InteractableRegistry } from '@/world/interaction/registry'
 import { SpatialInteraction } from '@/world/interaction/SpatialInteraction'
 import { BoardTargets, boardItems } from '@/world/rooms/BoardTargets'
@@ -49,9 +50,12 @@ function Harness({
 }) {
   return (
     <InteractionProvider>
-      <Probe sinkRef={sinkRef} />
-      {poseRef !== undefined && <SpatialInteraction poseRef={poseRef} />}
-      {children}
+      {/* `BoardTargets` 按 E 會開清單面板（`FE-B01`），所以要有那一層 provider。 */}
+      <ListPanelProvider>
+        <Probe sinkRef={sinkRef} />
+        {poseRef !== undefined && <SpatialInteraction poseRef={poseRef} />}
+        {children}
+      </ListPanelProvider>
     </InteractionProvider>
   )
 }
@@ -201,8 +205,10 @@ describe('看板', () => {
       const entry = registry.entries.get(item.id)
       expect(entry?.label).toBe(BOARD_LABELS[kind])
       expect(entry?.x).toBeCloseTo(item.x, 10)
-      // 看板**不接任何 API**，也沒有互動動作。
-      expect(entry?.onInteract).toBeUndefined()
     }
+    // 穩定鍵。**`id` 進了 main 之後就是別人接線用的名字**（`FE-B01` 的 `BoardTargets`
+    // 用它開面板），改名等於把那條線剪掉而畫面上看不出來。
+    // 按 E 的動作本身由 `tests/board-panel-wiring.test.tsx` 驗（`FE-B01-S01`／`S02`）。
+    expect(boards.map((b) => b.item.id).sort()).toEqual(['board-project', 'board-talent'])
   })
 })

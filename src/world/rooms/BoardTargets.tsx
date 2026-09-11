@@ -1,11 +1,14 @@
 'use client'
 
+import { useMemo } from 'react'
 import { LAYOUT } from '../layout/guildHallLayout'
 import type { LayoutItem } from '../layout/types'
 import { Interactable } from '../interaction/Interactable'
+import { useListPanel } from '@/list-panel/ListPanelProvider'
+import type { ListKind } from '@/list-panel/paging'
 import { BOARD_LABELS, type BoardKind } from './labels'
 
-// 兩塊看板的互動登記。規格 `FE-W12-S14`。
+// 兩塊看板的互動登記。規格 `FE-W12-S14`；按 E 開面板是 `FE-B01-S01`／`S02`。
 //
 // ⚠️⚠️ **為什麼不寫在 `GuildHall` 裡面。**
 // `spatial-interaction` 的文件示範的是「把 `<Interactable>` 放進渲染那個東西的
@@ -16,9 +19,19 @@ import { BOARD_LABELS, type BoardKind } from './labels'
 //
 // ⚠️ **座標仍然只有一份** —— 這裡走 `LAYOUT`，不自己寫座標。
 //
-// ⚠️ **看板不接任何 API。** 板上的卡片數不反映資料：卡片上沒有字，
-// 「四張卡代表四個專案」在畫面上讀不出來。它們在這一項只做一件事 ——
-// 從「一塊死掉的幾何體」變成「空間裡認得出來的地標」。
+// ⚠️ **看板本身不接任何 API。** 板上的卡片數不反映資料：卡片上沒有字，
+// 「四張卡代表四個專案」在畫面上讀不出來。按 E 開的是 DOM 面板（`FE-B01`），
+// 看板在 3D 裡仍然只是「空間裡認得出來的地標」—— 那個缺口寫在
+// `fe-b01-list-container/design.md` 的 `D5`，要新開一列才補得上。
+
+/**
+ * 哪一塊看板開哪一種清單。**兩塊要成對驗**（`FE-B01-S01`／`S02`）——
+ * 只驗一種的話，「兩塊都開案件」全綠，而畫面上兩邊都是合法的卡片。
+ */
+export const BOARD_LIST_KIND: Record<BoardKind, ListKind> = {
+  projectBoard: 'projects',
+  talentBoard: 'profiles',
+}
 
 /** 這個配置項是不是一塊看板。**看 `kind` 不是 `id`** —— 改名字就靜默失效。 */
 function boardKindOf(item: LayoutItem): BoardKind | null {
@@ -35,6 +48,15 @@ export function boardItems(): { item: LayoutItem; kind: BoardKind }[] {
 }
 
 export function BoardTargets() {
+  const { openPanel } = useListPanel()
+  // 每塊看板一個穩定的 callback：`Interactable` 換 callback 會重新註冊。
+  const open = useMemo(
+    () => ({
+      projectBoard: () => openPanel(BOARD_LIST_KIND.projectBoard),
+      talentBoard: () => openPanel(BOARD_LIST_KIND.talentBoard),
+    }),
+    [openPanel],
+  )
   return (
     <>
       {boardItems().map(({ item, kind }) => (
@@ -44,6 +66,7 @@ export function BoardTargets() {
           x={item.x}
           z={item.z}
           label={BOARD_LABELS[kind]}
+          onInteract={open[kind]}
         />
       ))}
     </>

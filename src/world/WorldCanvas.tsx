@@ -16,6 +16,8 @@ import { InteractionProvider } from './interaction/InteractionProvider'
 import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
 import { BoardTargets } from './rooms/BoardTargets'
+import { BoardPanel } from '@/list-panel/BoardPanel'
+import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import { labelAnchorsFor } from './rooms/anchors'
 import { DoorLabelProjector } from './rooms/DoorLabelProjector'
 import { DoorLabels, useLabelNodes } from './rooms/DoorLabels'
@@ -105,64 +107,71 @@ export default function WorldCanvas() {
     // 提示是 DOM（`CONTEXT.md`：3D 負責空間，DOM 負責產品操作），
     // 而算出目標的那一半在 Canvas 裡面 —— 兩邊要看到同一份狀態。
     <InteractionProvider>
-      <div data-testid="world-canvas-container" className="relative h-full w-full">
-        <Canvas
-          shadows
-          // 規格 FE-W01-S02：DPR 上限 2。不設限的話 3x 螢幕會用九倍的像素
-          // 去畫同一個畫面。`2` 不是量出來的最佳值 —— 真正的數字等 FE-O12，
-          // 而那時要改的是 Requirement，不是這一行。
-          dpr={[1, 2]}
-          onCreated={() => setReady(true)}
-        >
-          {/* 相機由 FE-W05 提供。FE-W01 當時那個 perspective 相機是暫時的 ——
-              CONTEXT.md 訂的是固定的 Orthographic Elevated 相機。 */}
-          <WorldCamera targetRef={cameraTarget} />
-          <ambientLight intensity={0.6} />
-          <directionalLight
-            position={[5, 8, 3]}
-            intensity={1.6}
-            castShadow
-            shadow-mapSize={[1024, 1024]}
-          />
-          <Suspense fallback={null}>
-            <WorldShell />
-            <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} />
-            {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
-                WorldCanvas 不知道即時層的存在，也不該知道。 */}
-            <RemoteWorld poseRef={localPose} generation={generation} />
-            {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
-                提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
-                那是 FE-W12（W3）。 */}
-            {/* 走廊上依 `GET /api/rooms` 生成的門（`FE-W12-S01`）。 */}
-            <ProjectDoors rooms={rooms.doors} slots={CORRIDOR_SLOTS} />
-            {/* 兩塊看板接上互動系統（`FE-W12-S14`）。**它們不接任何 API。** */}
-            <BoardTargets />
-            {/* 把標籤釘在門上（`FE-W12-S10`）。**它渲染 null** ——
-                標籤本身是 Canvas 外面的 DOM。 */}
-            <DoorLabelProjector anchors={anchors} nodesRef={labelNodesRef} />
-            <SpatialInteraction poseRef={localPose} />
-          </Suspense>
-        </Canvas>
+      {/* 看板開出來的面板（`FE-B01`）：開的動作在 Canvas 裡（看板的 `onInteract`），
+          面板在 Canvas 外面 —— 同樣要包住兩者。**要在 `InteractionProvider` 裡面**：
+          面板開著時要鎖世界的移動輸入，那把鎖在互動層。 */}
+      <ListPanelProvider>
+        <div data-testid="world-canvas-container" className="relative h-full w-full">
+          <Canvas
+            shadows
+            // 規格 FE-W01-S02：DPR 上限 2。不設限的話 3x 螢幕會用九倍的像素
+            // 去畫同一個畫面。`2` 不是量出來的最佳值 —— 真正的數字等 FE-O12，
+            // 而那時要改的是 Requirement，不是這一行。
+            dpr={[1, 2]}
+            onCreated={() => setReady(true)}
+          >
+            {/* 相機由 FE-W05 提供。FE-W01 當時那個 perspective 相機是暫時的 ——
+                CONTEXT.md 訂的是固定的 Orthographic Elevated 相機。 */}
+            <WorldCamera targetRef={cameraTarget} />
+            <ambientLight intensity={0.6} />
+            <directionalLight
+              position={[5, 8, 3]}
+              intensity={1.6}
+              castShadow
+              shadow-mapSize={[1024, 1024]}
+            />
+            <Suspense fallback={null}>
+              <WorldShell />
+              <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} />
+              {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
+                  WorldCanvas 不知道即時層的存在，也不該知道。 */}
+              <RemoteWorld poseRef={localPose} generation={generation} />
+              {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
+                  提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
+                  那是 FE-W12（W3）。 */}
+              {/* 走廊上依 `GET /api/rooms` 生成的門（`FE-W12-S01`）。 */}
+              <ProjectDoors rooms={rooms.doors} slots={CORRIDOR_SLOTS} />
+              {/* 兩塊看板接上互動系統（`FE-W12-S14`）；按 E 開清單面板（`FE-B01-S01`／`S02`）。 */}
+              <BoardTargets />
+              {/* 把標籤釘在門上（`FE-W12-S10`）。**它渲染 null** ——
+                  標籤本身是 Canvas 外面的 DOM。 */}
+              <DoorLabelProjector anchors={anchors} nodesRef={labelNodesRef} />
+              <SpatialInteraction poseRef={localPose} />
+            </Suspense>
+          </Canvas>
 
-        {/* 規格 FE-W01-S05：ready 之後等待狀態消失 */}
-        {!ready && <LoadingOverlay />}
-        {/* 規格 FE-W06-S13：提示在 Canvas **外面** */}
-        <InteractionPrompt />
-        {/* 規格 FE-W12-S02／S03／S04／S05：走廊的門「為什麼不在那裡」。
-            **一切正常時它什麼都不顯示** —— 見下面那條禁令。 */}
-        {/* 規格 `FE-W12-S09`：名稱與在線數**常態可見**。
-            `CONTEXT.md` 那條鏈的第一環是「看見」—— 只在走到門前才顯示的話，
-            那已經是第二環「靠近」了。 */}
-        <DoorLabels anchors={anchors} nodesRef={labelNodesRef} />
-        <RoomsNotice view={rooms} />
-        {/* ⚠️ 規格 FE-O14-S11／S12：這裡刻意什麼都沒有。
-            以前這裡有一段「目前是單人預覽，看不到其他人」——
-            拿掉是產品決定（這個網址對外的用途是展示世界，而那段字是
-            畫面上唯一的文字，會先於世界本身被讀到）。
-            **MUST NOT 加回任何描述即時層狀態的常駐說明。**
-            「有位址但連不上」怎麼呈現是 FE-R12（W5），那個可以做 ——
-            唯一的限制是不得借用「單人預覽」這種「一切正常」的措辭。 */}
-      </div>
+          {/* 規格 FE-W01-S05：ready 之後等待狀態消失 */}
+          {!ready && <LoadingOverlay />}
+          {/* 規格 FE-W06-S13：提示在 Canvas **外面** */}
+          <InteractionPrompt />
+          {/* 看板開出來的清單面板（`FE-B01`）。DOM，`layer('panel')`。 */}
+          <BoardPanel />
+          {/* 規格 FE-W12-S02／S03／S04／S05：走廊的門「為什麼不在那裡」。
+              **一切正常時它什麼都不顯示** —— 見下面那條禁令。 */}
+          {/* 規格 `FE-W12-S09`：名稱與在線數**常態可見**。
+              `CONTEXT.md` 那條鏈的第一環是「看見」—— 只在走到門前才顯示的話，
+              那已經是第二環「靠近」了。 */}
+          <DoorLabels anchors={anchors} nodesRef={labelNodesRef} />
+          <RoomsNotice view={rooms} />
+          {/* ⚠️ 規格 FE-O14-S11／S12：這裡刻意什麼都沒有。
+              以前這裡有一段「目前是單人預覽，看不到其他人」——
+              拿掉是產品決定（這個網址對外的用途是展示世界，而那段字是
+              畫面上唯一的文字，會先於世界本身被讀到）。
+              **MUST NOT 加回任何描述即時層狀態的常駐說明。**
+              「有位址但連不上」怎麼呈現是 FE-R12（W5），那個可以做 ——
+              唯一的限制是不得借用「單人預覽」這種「一切正常」的措辭。 */}
+        </div>
+      </ListPanelProvider>
     </InteractionProvider>
   )
 }
