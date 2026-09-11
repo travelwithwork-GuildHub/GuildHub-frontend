@@ -23,8 +23,9 @@
 
 資料存取 SHALL 走 domain operations；呼叫端 MUST NOT 知道背後是哪一個 adapter。
 
-adapter 由 `NEXT_PUBLIC_DATA_ADAPTER` 決定，值是 `guildhub`（真後端）
-或 `internal`（我們自己的 Route Handlers）。
+adapter 由 `NEXT_PUBLIC_DATA_ADAPTER` 決定，值是 `guildhub`（真後端，請求打 `NEXT_PUBLIC_GUILDHUB_REST`）
+或 `internal`（我們自己的 Route Handlers，請求打**同源**的 `/api/...`，不帶主機名）。
+兩個 adapter 走**同一份** operation 與契約；差別只在 `transport` 組出來的網址。
 
 > ⚠️ **刻意不叫 `local`。** `NEXT_PUBLIC_APP_ENV` 已經有一個 `local`，
 > 意思是「跑在開發者的機器上，連 localhost:8000 的**真後端**」——
@@ -53,13 +54,16 @@ adapter 由 `NEXT_PUBLIC_DATA_ADAPTER` 決定，值是 `guildhub`（真後端）
 
 #### Scenario: [FE-O02-S02] 設定選 internal 時，每個操作明顯失敗
 
+> ⚠️ **標題是舊的、內容是新的。** OpenSpec 的 MODIFIED 要求 Scenario 標題與主 spec 逐字相同（標題是穩定鍵），
+> 所以「明顯失敗」四個字留著；這條現在的義務是下面寫的：**打同源的 Route Handlers**。
+
 - **WHEN** `NEXT_PUBLIC_DATA_ADAPTER` 是 `internal`
 - **AND** 呼叫任何一個 domain operation
-- **THEN** 它 MUST 拋錯，而且**不得送出任何網路請求**
-- **AND** 錯誤訊息 MUST 指出是哪一個操作、哪一個 adapter，以及哪一個工作項目會補上它
+- **THEN** 送出的請求 URL SHALL 是同源的 `/api/...`（不含 `NEXT_PUBLIC_GUILDHUB_REST` 的主機名）
+- **AND** 回應 SHALL 經過同一份契約解析（`FE-O02-S05`～`S07` 對兩個 adapter 都成立）
 
-> `internal` 的後端是 `FE-O03`（W2）。**這個選項今天就要存在** ——
-> 沒有第二條路的話，切換邏輯是一段永遠只走一邊的程式碼。
+> 這條原本寫「每個操作明顯失敗、不得送出任何網路請求」—— 那是 `FE-O03` 還沒做的時候，讓切換邏輯不是一段只走一邊的程式碼。
+> `FE-O03` 之後 `internal` 是真的後端。ID 不改：判準對回來的是「選 internal 會怎樣」這件事。
 
 #### Scenario: [FE-O02-S03] 設定值無法辨識時，明顯失敗
 
