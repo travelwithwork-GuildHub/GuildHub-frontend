@@ -218,7 +218,10 @@ describe('返回列表時，頁碼與捲動位置都還在', () => {
     fireEvent.click(screen.getByRole('button', { name: '下一頁' }))
     await waitFor(() => expect(cards()).toHaveLength(3))
     const listCallsBefore = calls().filter((c) => c.startsWith(`${LIST}?`)).length
-    fireEvent.click(cards()[0] as HTMLElement)
+    // 鍵盤使用者的路：焦點先到卡片上再啟動（`fireEvent.click` 不會動 activeElement，要自己 focus）。
+    const first = cards()[0] as HTMLElement
+    first.focus()
+    fireEvent.click(first)
     await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
     fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
     expect(screen.queryByTestId('talent-detail')).toBeNull()
