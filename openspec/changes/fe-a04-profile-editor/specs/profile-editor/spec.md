@@ -26,14 +26,15 @@
 
 ### Requirement: 顯示我的名片，用同一個呈現元件
 
-面板 SHALL 以 `TalentDetail` 呈現**目前身分**（`IdentityProvider` 的 `signed-in` 那份 `ProfileOut`，同步可得、不另外請求）的名片
-（四欄：名字、技能、每週時數、自介；`null`／`[]` 照 `TalentDetail` 既有的呈現），並有一個「編輯」按鈕。
+面板 SHALL 以 `TalentFacts`（從 `TalentDetail` 抽出來的純呈現部分：名字、頭像色、四欄的 `<dl>`；`TalentDetail` 自己也改用它 ——
+`TalentDetail` 本身會打 `GET /api/profiles/{id}`，不是純呈現）呈現**目前身分**（`IdentityProvider` 的 `signed-in` 那份 `ProfileOut`，同步可得、不另外請求）的名片
+（四欄：名字、技能、每週時數、自介；`null`／`[]` 照既有的呈現），並有一個「編輯」按鈕。
 別人的名片（人才看板的詳情）SHALL 沒有編輯按鈕。**沒有「載入失敗」這條路**：身分不是 `signed-in` 時入口按鈕本來就不存在（`IdentityBadge` 顯示訪客／問不到）。
 
 #### Scenario: [FE-A04-S03] 我的名片有編輯鈕、別人的沒有
 
 - **WHEN** 開面板
-- **THEN** SHALL 看到 `TalentDetail` 呈現自己的名字，且有「編輯」按鈕
+- **THEN** SHALL 看到 `TalentFacts`（`data-testid="talent-facts"`）呈現自己的名字，且有「編輯」按鈕；SHALL 沒有 `GET /api/profiles/{id}` 的請求
 - **WHEN** 在人才看板開別人的詳情
 - **THEN** SHALL 沒有「編輯」按鈕
 

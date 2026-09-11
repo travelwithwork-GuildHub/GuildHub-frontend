@@ -20,6 +20,10 @@
 
 `TalentDetail` 不知道「是不是我」；面板知道（它就是「我的」）。別人的名片走 `BoardPanel`，那裡沒有編輯鈕。**不在 `TalentDetail` 加 `editable` prop。**
 
+**修正（實作時發現）**：`TalentDetail` 不是純呈現 —— 它 `useProfileDetail(id)` 打 `GET /api/profiles/{id}`（`FE-B04`「內容一律來自那支 API」），
+還有 Escape 層、返回鈕、焦點。名片面板要的是「同步可得、不另外請求」，所以把它的呈現部分抽成 `src/talent/TalentFacts.tsx`（名字、頭像色、四欄 `<dl>`），
+`TalentDetail` 改用它（`FE-B04` 判準不動）；名片面板用 `TalentFacts`。「同一個呈現元件」的意思沒變，只是那個元件叫 `TalentFacts`。
+
 ## D2b｜PATCH 的回應是唯一 canonical
 
 成功後 `adopt(response)` —— 不是把 input 拼進舊身分。`S07` 的「別處更新的 avatar 不被蓋回去」成立的前提是**後端已寫入**那次更新，
