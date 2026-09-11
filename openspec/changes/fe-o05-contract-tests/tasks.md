@@ -12,23 +12,23 @@
 - [x] 2.2 `scripts/contract-guildhub.mjs`（design `D3`）；`package.json` 的 `test:contract:internal`／`test:contract:guildhub`
 - [x] 2.3 判準：`S01`～`S06`（`S03` 在這一片對 guildhub 驗；internal 那一輪等 `FE-O03` 的 login／me 進來）
 - [x] 2.4 **突變**：jar 拿掉 → `S03` 紅；loopback 檢查拿掉 → `S04` 紅；借用既有 8000 → `S05` 紅
-- [ ] 2.5 **這一片先合併，再做 `FE-O03`**
+- [x] 2.5 **這一片先合併，再做 `FE-O03`**
 
 ## 3. 邊界、形狀、golden
 
 對應 Requirement〈成對邊界從 `limits.ts` 產生〉、〈形狀與型別：兩邊一字不差〉
 
-- [ ] 3.1 `tests/contract/boundaries.ts`（欄位 → 端點；值用 `FE-O06` 的 `boundaryValues`，含 pending）
-- [ ] 3.2 對 guildhub 錄 `golden/422.json` 與時間字串 regex（`CONTRACT_RECORD=1`，錄製那一次 exit 非 0）
-- [ ] 3.3 判準：`S07`～`S12`、`S16`（`internal` 與 `guildhub` 各跑一次，兩邊的輸出貼進 PR）
-- [ ] 3.4 **突變**：`S09`（`bio.max` 改 200）；邊界表寫死數字 → `FE-O06-S01` 紅
+- [x] 3.1 `tests/contract/boundaries.ts`（欄位 → 端點；值用 `FE-O06` 的 `boundaryValues`，含 pending）
+- [x] 3.2 對 guildhub 錄 `golden/422.json` 與時間字串 regex（`CONTRACT_RECORD=1`，錄製那一次 exit 非 0）
+- [x] 3.3 判準：`S07`～`S12`、`S16`（`internal` 與 `guildhub` 各跑一次，兩邊的輸出貼進 PR）
+- [x] 3.4 **突變**：`S09`（`bio.max` 改 200）；邊界表寫死數字 → `FE-O06-S01` 紅
 
 ## 4. WS
 
 對應 Requirement〈WS 契約對兩邊各跑一次〉
 
-- [ ] 4.1 `tests/contract/ws/*.contract.ts`；harness 起替身（internal）／wrapper 給 `CONTRACT_WS_URL`（guildhub）
-- [ ] 4.2 判準：`S13`、`S14`（兩邊各跑一次）
+- [x] 4.1 `tests/contract/ws/*.contract.ts`；harness 起替身（internal）／wrapper 給 `CONTRACT_WS_URL`（guildhub）
+- [x] 4.2 判準：`S13`、`S14`（兩邊各跑一次）
 
 ## 5. CI
 
