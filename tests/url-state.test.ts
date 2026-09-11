@@ -19,6 +19,7 @@ describe('parsePanelUrl：解析出來的一定是 canonical 的', () => {
     ['?panel=profiles&page=-1', { panel: 'profiles', profile: null, page: 0 }],
     ['?panel=profiles&page=abc', { panel: 'profiles', profile: null, page: 0 }],
     ['?panel=profiles&page=1.5', { panel: 'profiles', profile: null, page: 0 }],
+    ['?panel=profiles&page=99999999999999999999', { panel: 'profiles', profile: null, page: 0 }],
     ['?panel=profiles&profile=not-a-uuid', { panel: 'profiles', profile: null, page: 0 }],
     ['?panel=bogus', CLOSED],
     ['?panel=bogus&page=3', CLOSED],
@@ -30,7 +31,7 @@ describe('parsePanelUrl：解析出來的一定是 canonical 的', () => {
   })
 
   it('[FE-B09-S05] 解析 → 序列化 → 解析是定點（canonical 才有終止條件）', () => {
-    for (const search of ['?panel=profiles&page=0', `?profile=${ID}`, '?panel=bogus', `?panel=projects&profile=${ID}`, '?panel=profiles&page=-1']) {
+    for (const search of ['?panel=profiles&page=0', `?profile=${ID}`, '?panel=bogus', `?panel=projects&profile=${ID}`, '?panel=profiles&page=-1', '?panel=profiles&page=99999999999999999999']) {
       const once = serializePanelUrl(parsePanelUrl(search))
       expect(serializePanelUrl(parsePanelUrl(once)), search).toBe(once)
     }

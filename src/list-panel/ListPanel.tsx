@@ -43,8 +43,8 @@ export interface ListPanelProps<K extends ListKind> {
    */
   overlay?: ReactNode
   onClose: () => void
-  /** 起始頁與頁次回報（`FE-B09`）：見 `useListPage` 的 `ListPageOptions`。 */
-  initialPage?: number
+  /** 要看的頁與頁次回報（`FE-B09`）：見 `useListPage` 的 `ListPageOptions`。 */
+  page?: number
   onShownPage?: (page: number) => void
 }
 
@@ -58,10 +58,10 @@ export function ListPanel<K extends ListKind>({
   error,
   overlay,
   onClose,
-  initialPage,
+  page,
   onShownPage,
 }: ListPanelProps<K>) {
-  const { state, next, retry } = useListPage(kind, { initialPage, onShownPage })
+  const { state, next, retry } = useListPage(kind, { page, onShownPage })
   const edge = edgeState(state)
   const items = state.shown?.items ?? []
   // 沒有項目時列表不佔空間，狀態節點（首次無資料、權限阻擋⋯⋯）從上面開始，

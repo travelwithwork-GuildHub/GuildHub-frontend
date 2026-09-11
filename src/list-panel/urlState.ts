@@ -26,8 +26,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function parsePage(raw: string | null): number {
   // `-1`、`abc`、`1.5`、`1e2` 都不是頁碼：只收十進位非負整數的寫法。
+  // 超過安全整數的也不是（審查抓到的）：`Number('9'.repeat(20))` 序列化回去不是同一串，canonical 就不是定點。
   if (raw === null || !/^\d+$/.test(raw)) return 0
-  return Number(raw)
+  const page = Number(raw)
+  return Number.isSafeInteger(page) ? page : 0
 }
 
 /** `search` 是 `window.location.search` 那種形狀（可帶或不帶 `?`）。 */

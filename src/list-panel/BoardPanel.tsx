@@ -72,7 +72,7 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
         />
       )}
       onClose={onClose}
-      initialPage={page}
+      page={page}
       onShownPage={reportPage}
       empty={<EmptyState kind="first-empty" />}
       exhausted={<EmptyState kind="exhausted" />}
@@ -103,7 +103,7 @@ export function BoardPanel() {
       labels={LABELS}
       renderItem={projectLine}
       onClose={closePanel}
-      initialPage={page}
+      page={page}
       onShownPage={reportPage}
       empty={<EmptyState kind="first-empty" />}
       exhausted={<EmptyState kind="exhausted" />}

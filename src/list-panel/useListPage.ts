@@ -26,25 +26,32 @@ export interface ListPage<K extends ListKind> {
 }
 
 export interface ListPageOptions {
-  /** 起始頁（`FE-B09-S03`）。**只在掛載與換種類時讀**：之後的頁碼由狀態機自己走。 */
-  initialPage?: number
+  /**
+   * 呼叫端要看的頁（網址說的，`FE-B09-S03`）。掛載時是起始頁；之後變了就切過去 ——
+   * 上一頁／下一頁可能回到「同一種清單、不同頁碼」的那一層（審查抓到的）。
+   * 跟已呈現或探測中的頁一樣就不動：`onShownPage` 回報上去再流回來不會把清單重開。
+   */
+  page?: number
   /** 畫面上呈現的頁次變了（前進成功、起始頁撲空退回第 0 頁）就回報 —— 給網址寫回用（`FE-B09`）。 */
   onShownPage?: (page: number) => void
 }
 
-export function useListPage<K extends ListKind>(kind: K, { initialPage = 0, onShownPage }: ListPageOptions = {}): ListPage<K> {
-  const [state, dispatch] = useReducer(reduce<ListItemOf[K]>, undefined, () => opened<ListItemOf[K]>(kind, initialPage))
+export function useListPage<K extends ListKind>(kind: K, { page: wantedPage = 0, onShownPage }: ListPageOptions = {}): ListPage<K> {
+  const [state, dispatch] = useReducer(reduce<ListItemOf[K]>, undefined, () => opened<ListItemOf[K]>(kind, wantedPage))
 
   // 呼叫端換了資料種類：整個重來，舊種類的回應之後靠 identity 擋掉（`S15`）。
-  // `initialPage` 刻意不在相依裡：它是「開的時候從第幾頁開始」，不是「現在要看第幾頁」——
-  // 放進去的話，回報上去的頁碼再流回來就會把清單重開一次。
-  const initialPageRef = useRef(initialPage)
+  // 從呼叫端此刻要看的頁開始（latest ref，不進相依：那是「換種類時從第幾頁開始」）。
+  const wantedPageRef = useRef(wantedPage)
   useEffect(() => {
-    initialPageRef.current = initialPage
+    wantedPageRef.current = wantedPage
   })
   useEffect(() => {
-    dispatch({ type: 'open', kind, page: initialPageRef.current })
+    dispatch({ type: 'open', kind, page: wantedPageRef.current })
   }, [kind])
+  // 呼叫端要看的頁變了：reducer 自己判斷是不是已經在那一頁。
+  useEffect(() => {
+    dispatch({ type: 'goto', page: wantedPage })
+  }, [wantedPage])
 
   const shownPage = state.shown?.page
   const onShownPageRef = useRef(onShownPage)
@@ -85,6 +92,6 @@ export function useListPage<K extends ListKind>(kind: K, { initialPage = 0, onSh
   // ⚠️ 換種類的**那一次**繪製：上面那個 effect 還沒跑，`state` 還是舊種類的。
   // 原樣回給呼叫端的話，人才面板會先閃一格案件卡（`S15` 的另一種形狀 ——
   // 不是晚到的回應混進來，是舊的狀態多活了一格）。identity 對不上 prop 就先遮住。
-  const visible = state.identity.kind === kind ? state : opened<ListItemOf[K]>(kind, initialPage)
+  const visible = state.identity.kind === kind ? state : opened<ListItemOf[K]>(kind, wantedPage)
   return { state: visible, next, retry }
 }

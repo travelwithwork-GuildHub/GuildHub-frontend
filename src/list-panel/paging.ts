@@ -54,6 +54,8 @@ export interface PagingState<T> {
 
 export type PagingEvent<T> =
   | { type: 'open'; kind: ListKind; page?: number }
+  /** 呼叫端要看第 `page` 頁（網址說的，`FE-B09`）。已經在那一頁、或正在探測那一頁就不動。 */
+  | { type: 'goto'; page: number }
   | { type: 'next' }
   | { type: 'retry' }
   | { type: 'resolved'; identity: RequestIdentity; items: readonly T[] }
@@ -68,6 +70,13 @@ export function reduce<T>(state: PagingState<T>, event: PagingEvent<T>): PagingS
   switch (event.type) {
     case 'open':
       return opened(event.kind, event.page)
+
+    case 'goto':
+      // 跟「用那個網址重新載入」同一個結果：從那一頁重開（起始頁撲空的規則照樣適用）。
+      // ⚠️ 兩個都要比：探測中（`identity.page`）與已呈現（`shown.page`）都算「已經是那一頁」——
+      // 只比 `shown` 的話，前進探測期間呼叫端把已呈現的頁碼回流進來會把探測打斷重開。
+      if (event.page === state.identity.page || event.page === state.shown?.page) return state
+      return opened(state.identity.kind, event.page)
 
     case 'next':
       // 沒有已呈現的頁就沒有東西可以「前進」；確定沒有下一頁就不再請求（`S07`）；
