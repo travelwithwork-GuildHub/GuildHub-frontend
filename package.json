@@ -16,7 +16,9 @@
     "contract:generate": "npx -y openapi-typescript@7.13.0 http://localhost:8000/openapi.json -o src/api/contract/schema.d.ts",
     "test:integration": "vitest run --config vitest.integration.mts",
     "db:reset": "node scripts/db.mjs reset",
-    "db:seed": "node scripts/db.mjs seed"
+    "db:seed": "node scripts/db.mjs seed",
+    "test:contract:internal": "CONTRACT_TARGET=internal vitest run --config vitest.contract.mts",
+    "test:contract:guildhub": "node scripts/contract-guildhub.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "9.7.0",

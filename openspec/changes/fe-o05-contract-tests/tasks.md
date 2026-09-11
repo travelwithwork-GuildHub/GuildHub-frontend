@@ -2,16 +2,16 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-o05-contract-tests`）；`FE-O04` 已實作
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-o05-contract-tests`）；`FE-O04` 已實作
 
 ## 2. harness、client、目標守門
 
 對應 Requirement〈唯一一份，兩個目標各跑一次，都走真 HTTP〉、〈目標必須是自己起的、可拋棄的〉
 
-- [ ] 2.1 `vitest.contract.mts`、`tests/contract/harness.ts`（internal：reset → `next start` → port）、`tests/contract/client.ts`（jar、raw）
-- [ ] 2.2 `scripts/contract-guildhub.mjs`（design `D3`）；`package.json` 的 `test:contract:internal`／`test:contract:guildhub`
-- [ ] 2.3 判準：`S01`～`S06`（`S03` 在這一片對 guildhub 驗；internal 那一輪等 `FE-O03` 的 login／me 進來）
-- [ ] 2.4 **突變**：jar 拿掉 → `S03` 紅；loopback 檢查拿掉 → `S04` 紅；借用既有 8000 → `S05` 紅
+- [x] 2.1 `vitest.contract.mts`、`tests/contract/harness.ts`（internal：reset → `next start` → port）、`tests/contract/client.ts`（jar、raw）
+- [x] 2.2 `scripts/contract-guildhub.mjs`（design `D3`）；`package.json` 的 `test:contract:internal`／`test:contract:guildhub`
+- [x] 2.3 判準：`S01`～`S06`（`S03` 在這一片對 guildhub 驗；internal 那一輪等 `FE-O03` 的 login／me 進來）
+- [x] 2.4 **突變**：jar 拿掉 → `S03` 紅；loopback 檢查拿掉 → `S04` 紅；借用既有 8000 → `S05` 紅
 - [ ] 2.5 **這一片先合併，再做 `FE-O03`**
 
 ## 3. 邊界、形狀、golden
