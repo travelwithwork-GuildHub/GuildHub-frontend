@@ -1,7 +1,17 @@
 # list-panel Specification
 
 ## Purpose
-TBD - created by archiving change fe-b01-list-container. Update Purpose after archive.
+兩塊看板按 E 開出來的那個清單面板：案件與人才共用的一份版型、列表與翻頁。
+
+這份 capability 的重點在**契約缺什麼，前端就不能假裝知道什麼**。
+後端只收 0-based 的 `page`，沒有 `total`、沒有 `has_more`、沒有 `limit` ——
+「還有沒有下一頁」在請求它之前資訊上無從判斷。所以三態要分得開：
+**確定有／確定沒有／不確定**。把「正好 20 筆」畫成「確定還有」、把網路失敗畫成
+「已無更多」，都是用一個看起來正常的畫面去掩蓋一個沒有的資訊。
+
+它只做狀態，不做文案：首次無資料、翻到底、錯誤的字句歸 `FE-X04` 與 `FE-X03`
+（都標著「唯一一份」）。它也交代不了「3D 憑什麼存在」—— 做完之後看板唯一的
+affordance 就是走過去按 E；那個缺口在 `docs/WBS.md` 的 `FE-W20`。
 
 ## Requirements
 
