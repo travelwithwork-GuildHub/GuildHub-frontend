@@ -114,7 +114,14 @@ export default function WorldCanvas() {
       <ListPanelProvider>
         {/* 文字輸入框有焦點時打字不是走路（`FE-X06`）。今天世界裡還沒有輸入框 —— 先掛著。 */}
         <EditableFocusLock />
-        <div data-testid="world-canvas-container" className="relative h-full w-full">
+        {/* `tabIndex=-1` ＋ `data-focus-anchor`：世界焦點錨（`FE-X06-S13`）。面板關閉後焦點放這裡 ——
+            不是 `body`（鍵盤使用者迷航）、不是標題列（跟這次操作無關）。點世界也會聚焦到它。 */}
+        <div
+          data-testid="world-canvas-container"
+          data-focus-anchor="world"
+          tabIndex={-1}
+          className="relative h-full w-full outline-none"
+        >
           <Canvas
             shadows
             // 規格 FE-W01-S02：DPR 上限 2。不設限的話 3x 螢幕會用九倍的像素

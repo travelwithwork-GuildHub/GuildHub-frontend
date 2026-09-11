@@ -171,6 +171,17 @@ describe('只做狀態，不做文案', () => {
   })
 })
 
+describe('焦點進列表', () => {
+  it('掛載時焦點在列表上（方向鍵捲的是它）', async () => {
+    // 這條沒有 Scenario ID：它守的是一個實作決定（`FE-B01` design 待答問題 1 之後定的），
+    // 而它壞掉時 `FE-X06-S17` 才會紅 —— 在 FE-X06 的一次改寫裡它被誤刪過，S17 抓到的。
+    server.reply(200, ITEMS.projects(1))
+    mount('projects')
+    await waitFor(() => expect(cards()).toBe(1))
+    expect(document.activeElement, '掛載時焦點沒進列表').toBe(screen.getByRole('list'))
+  })
+})
+
 describe('Escape 關閉面板', () => {
   it('[FE-B01-S16] 面板開著時按 Escape → onClose；按別的鍵不會', async () => {
     server.reply(200, ITEMS.projects(1))

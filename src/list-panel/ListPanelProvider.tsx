@@ -49,6 +49,9 @@ export function ListPanelProvider({ children }: { children: ReactNode }) {
     releaseRef.current?.()
     releaseRef.current = null
     setOpen(null)
+    // 面板是按 E 開的，沒有 DOM 的開啟控制可以回去：焦點放到世界焦點錨（`FE-X06-S13`），
+    // 不留在 `body`、不跑去標題列。錨是什麼元素不是這裡決定的 —— 用語意標記找。
+    document.querySelector<HTMLElement>('[data-focus-anchor="world"]')?.focus()
   }, [])
 
   // 這一層開著的時候被卸載（例如路由切走）：不還的話世界回來時人走不動。

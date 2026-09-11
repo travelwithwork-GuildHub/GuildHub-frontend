@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { SECONDARY } from '@/design/controls'
 import { layer } from '@/design/layers'
+import { useEscapeLayer } from '@/world/interaction/escapeLayers'
+import { nextTabStop } from './focusTrap'
 import { edgeState, type ListKind } from './paging'
 import { useListPage, type ListItemOf } from './useListPage'
 
@@ -62,28 +64,34 @@ export function ListPanel<K extends ListKind>({
   const hasItems = items.length > 0
   const list = useRef<HTMLUListElement>(null)
 
-  // Escape 只在面板開著的時候有人聽（`S16`）：這個元件不在畫面上，監聽器也不在。
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Escape 走層級（`FE-X06`）：這個面板是底下那一層，overlay（詳情）自己再註冊一層在上面。
+  // 只在面板開著的時候在堆疊裡（`FE-B01-S16`）：這個元件不在畫面上，層也不在。
+  useEscapeLayer(onClose)
 
+  // focus trap（`FE-X06-S11`）：持有鎖的面板，Tab／Shift+Tab 只在面板內循環。
+  // 誰算「瀏覽器會 Tab 到」在 `focusTrap.ts`（每次按鍵現算：列表會翻頁、詳情會蓋上）。
+  const section = useRef<HTMLElement>(null)
   // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——
   // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
-  // **這不是 `S18` 的防禦** —— 那把鎖在 `InteractionProvider.inputLockRef`，
-  // 就算焦點被別的東西搶走，人也不會走。
   // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，
-  // 下一個 Tab 跑去標題列 —— 真瀏覽器的 e2e 抓到的（Space 那一輪之後 Enter 那一輪 Tab 不到卡）。
+  // 下一個 Tab 跑去標題列 —— 真瀏覽器的 e2e 抓到的。呼叫端可以再覆蓋（`BoardPanel` 把焦點放回那張卡）。
+  // **這不是 `FE-B01-S18` 的防禦** —— 那把鎖在 `InteractionProvider`，就算焦點被搶走，人也不會走。
   const overlayOpen = overlay !== undefined && overlay !== null
   useEffect(() => {
     if (!overlayOpen) list.current?.focus()
   }, [overlayOpen])
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLElement>) => {
+    if (e.key !== 'Tab' || section.current === null) return
+    const stop = nextTabStop(section.current, document.activeElement, e.shiftKey)
+    if (stop === null) return
+    e.preventDefault()
+    if (stop !== 'stay') stop.focus()
+  }
 
   return (
     <section
+      ref={section}
+      onKeyDown={onKeyDown}
       aria-label={title}
       data-testid="list-panel"
       data-kind={kind}

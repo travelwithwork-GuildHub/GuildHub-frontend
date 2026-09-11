@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
@@ -39,6 +39,19 @@ function projectLine(item: ProjectOut): ReactNode {
 /** 人才那一支：選中的 id 與列表手上的那一筆（詳情的載入中預覽）。 */
 function TalentBoard({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<{ id: string; preview: ProfileOut } | null>(null)
+  // 詳情關閉時焦點回到開它的那張卡（`FE-X06-S12`）。`ListPanel` 自己會把焦點放回列表
+  //（給沒有處理焦點的呼叫端用），這裡是父層的 effect、跑得比它晚，所以卡片贏。
+  const lastOpenedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (selected !== null) {
+      lastOpenedRef.current = selected.id
+      return
+    }
+    const id = lastOpenedRef.current
+    if (id === null) return
+    lastOpenedRef.current = null
+    document.querySelector<HTMLElement>(`[data-testid="talent-card"][data-profile-id="${id}"]`)?.focus()
+  }, [selected])
   return (
     <ListPanel
       kind="profiles"
