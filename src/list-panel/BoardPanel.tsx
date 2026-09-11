@@ -1,9 +1,11 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
+import { TalentCard } from '@/talent/TalentCard'
+import { TalentDetail } from '@/talent/TalentDetail'
 import { ListPanel } from './ListPanel'
 import { useListPanel } from './ListPanelProvider'
 import type { ListKind } from './paging'
@@ -22,20 +24,43 @@ import type { ListKind } from './paging'
 // `FE-X04-S12` 的 lint 規則看的是插槽裡直接寫的元素；抽成變數是它擋不住的那一種寫法，
 // 這個檔案是第一個呼叫端，不該自己先示範繞過。
 //
-// ⚠️ **卡片上放哪些欄位不是這一列決定的**（`design.md` 待答問題 2）。
-// 下面只印一個認得出來的名字，讓「開的是案件還是人才」在畫面上讀得出來。
-// 案件卡是 `FE-B02`（W6）、人才卡是 `FE-B04`（W2）的事。
+// 人才那一支是真的卡片與詳情（`FE-B04`）：卡片開詳情，詳情蓋在列表上（`overlay`），
+// 列表不卸載 —— 返回時頁碼與捲動位置都還在。案件那一支仍是佔位（`FE-B02`，W6）。
 
 const TITLES: Record<ListKind, string> = { projects: '專案看板', profiles: '人才看板' }
 const LABELS = { next: '下一頁', close: '關閉' }
+const DETAIL_LABELS = { back: '返回' }
 
 const LINE = 'block overflow-hidden text-ellipsis whitespace-nowrap'
 
 function projectLine(item: ProjectOut): ReactNode {
   return <span className={LINE}>{item.title}</span>
 }
-function profileLine(item: ProfileOut): ReactNode {
-  return <span className={LINE}>{item.display_name}</span>
+/** 人才那一支：選中的 id 與列表手上的那一筆（詳情的載入中預覽）。 */
+function TalentBoard({ onClose }: { onClose: () => void }) {
+  const [selected, setSelected] = useState<{ id: string; preview: ProfileOut } | null>(null)
+  return (
+    <ListPanel
+      kind="profiles"
+      title={TITLES.profiles}
+      labels={LABELS}
+      renderItem={(item) => <TalentCard profile={item} onOpen={() => setSelected({ id: item.id, preview: item })} />}
+      onClose={onClose}
+      empty={<EmptyState kind="first-empty" />}
+      exhausted={<EmptyState kind="exhausted" />}
+      error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
+      overlay={
+        selected === null ? undefined : (
+          <TalentDetail
+            id={selected.id}
+            preview={selected.preview}
+            labels={DETAIL_LABELS}
+            onBack={() => setSelected(null)}
+          />
+        )
+      }
+    />
+  )
 }
 
 export function BoardPanel() {
@@ -55,15 +80,6 @@ export function BoardPanel() {
       error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
     />
   ) : (
-    <ListPanel
-      kind="profiles"
-      title={TITLES.profiles}
-      labels={LABELS}
-      renderItem={profileLine}
-      onClose={closePanel}
-      empty={<EmptyState kind="first-empty" />}
-      exhausted={<EmptyState kind="exhausted" />}
-      error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
-    />
+    <TalentBoard onClose={closePanel} />
   )
 }

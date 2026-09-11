@@ -75,9 +75,12 @@ export function ListPanel<K extends ListKind>({
   // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
   // **這不是 `S18` 的防禦** —— 那把鎖在 `InteractionProvider.inputLockRef`，
   // 就算焦點被別的東西搶走，人也不會走。
+  // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，
+  // 下一個 Tab 跑去標題列 —— 真瀏覽器的 e2e 抓到的（Space 那一輪之後 Enter 那一輪 Tab 不到卡）。
+  const overlayOpen = overlay !== undefined && overlay !== null
   useEffect(() => {
-    list.current?.focus()
-  }, [])
+    if (!overlayOpen) list.current?.focus()
+  }, [overlayOpen])
 
   return (
     <section
