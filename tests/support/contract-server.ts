@@ -61,12 +61,21 @@ export interface ContractServer {
   calls: RecordedCall[]
   /** 下一個回應。**沒有設定的話回 500** —— 忘記設定不該看起來像成功。 */
   reply(status: number, body: unknown): void
+  /**
+   * 只給某個路徑的下一個回應；比 `reply()` 的佇列優先。
+   *
+   * ⚠️ **兩個不同端點的請求交錯時要用這個。** `reply()` 是先到先拿 ——
+   * 而「哪一個先到」在被中止的請求上是不確定的：中止得夠早的話它根本不會到，
+   * 排給它的那個回應就會被下一個請求拿走（規格 `FE-B01-S15` 的判準踩過）。
+   */
+  replyFor(pathname: string, status: number, body: unknown): void
   close(): Promise<void>
 }
 
 export async function startContractServer(): Promise<ContractServer> {
   const calls: RecordedCall[] = []
   const queue: Array<{ status: number; body: unknown }> = []
+  const byPath = new Map<string, Array<{ status: number; body: unknown }>>()
 
   const server = http.createServer((req, res) => {
     let raw = ''
@@ -106,7 +115,7 @@ export async function startContractServer(): Promise<ContractServer> {
         return
       }
 
-      const next = queue.shift()
+      const next = byPath.get(pathname)?.shift() ?? queue.shift()
       if (next === undefined) {
         // 忘記 `reply()` 的話回 500 —— 回 200 空物件的話，
         // 一條忘了設定回應的測試會靠「契約允許」意外地通過
@@ -129,6 +138,9 @@ export async function startContractServer(): Promise<ContractServer> {
     calls,
     reply(status, body) {
       queue.push({ status, body })
+    },
+    replyFor(pathname, status, body) {
+      byPath.set(pathname, [...(byPath.get(pathname) ?? []), { status, body }])
     },
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   }
