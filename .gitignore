@@ -32,3 +32,4 @@ next-env.d.ts
 # 而別人 clone 之後會拿到一個指向別人專案的連結。
 .vercel
 .env*
+tests/contract/golden/.recording/

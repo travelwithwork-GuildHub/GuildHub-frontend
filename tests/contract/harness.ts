@@ -8,6 +8,7 @@
 
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { createHmac } from 'node:crypto'
+import { rmSync } from 'node:fs'
 import { access } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import net from 'node:net'
@@ -15,6 +16,7 @@ import path from 'node:path'
 import type { TestProject } from 'vitest/node'
 import { reset } from '../../scripts/db.mjs'
 import { testDatabase } from '../support/test-db'
+import { RECORDING_DIR, assembleRecordings } from './golden'
 import { assertLoopbackBase, resolveTarget } from './target'
 
 const ROOT = path.resolve(__dirname, '..', '..')
@@ -125,6 +127,17 @@ async function stop(child: ChildProcess): Promise<void> {
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const target = resolveTarget(process.env.CONTRACT_TARGET)
+  // 錄製 golden：只對 guildhub 有意義（golden 是真後端的形狀）；錄製那一次**不算通過**（teardown exit 非 0）。
+  const record = process.env.CONTRACT_RECORD === '1'
+  if (record && target !== 'guildhub') throw new Error('CONTRACT_RECORD=1 只能對 guildhub 錄 —— golden 是真後端的形狀，不是替身的。')
+  project.provide('contractRecord', record)
+  if (record) rmSync(RECORDING_DIR, { recursive: true, force: true })
+  const recorded = async () => {
+    if (!record) return
+    const n = assembleRecordings()
+    console.log(`\n[contract] 已錄製 ${n} 條 golden（tests/contract/golden/422.json，整組換掉），這一次不算通過 —— 再不帶 CONTRACT_RECORD 跑一次 compare。`)
+    process.exitCode = 1
+  }
 
   if (target === 'guildhub') {
     const base = assertLoopbackBase(process.env.CONTRACT_BASE_URL, 'CONTRACT_BASE_URL')
@@ -160,7 +173,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
     // 真後端沒有 `/online`，room token 由 `enter` 簽發（W4）：這兩個能力在這一輪不存在。
     project.provide('contractOnlineUrl', null)
     project.provide('contractRoomToken', null)
-    return async () => {}
+    return recorded
   }
 
   // ── internal ──
@@ -251,6 +264,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
   return async () => {
     await stop(child)
     await stop(stub)
+    await recorded()
   }
 }
 

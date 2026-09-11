@@ -1,19 +1,182 @@
 {
-  "_note": "對真後端（FastAPI）實錄，2026-09-11。比的是 status、contentType、loc[0]、type；msg 不逐字比（Pydantic 的英文訊息不是契約）。規格 FE-O05 S12／S16、FE-O03 design D3。",
+  "_note": "對真後端（FastAPI）實錄；`CONTRACT_RECORD=1 npm run test:contract:guildhub` 重錄（錄製那一次 exit 非 0，整組換掉）。比 status、contentType、整個 detail 的 type／loc；msg 不比（Pydantic 的英文訊息不是契約）。規格 FE-O05 S12／S16。",
   "cases": {
-    "login {}": { "status": 422, "loc0": "body", "type": "value_error" },
-    "login {nickname:null}": { "status": 422, "loc0": "body", "type": "value_error" },
-    "login {nickname:123}": { "status": 422, "loc0": "body", "type": "string_type", "loc": ["body", "nickname"] },
-    "login {resume_token:'not-a-uuid'}": { "status": 422, "loc0": "body", "type": "uuid_parsing", "loc": ["body", "resume_token"] },
-    "login two modes": { "status": 422, "loc0": "body", "type": "value_error" },
-    "login {login_id only}": { "status": 422, "loc0": "body", "type": "value_error" },
-    "login body literal null": { "status": 422, "loc0": "body", "type": "missing" },
-    "login not json": { "status": 422, "loc0": "body", "type": "json_invalid", "loc": ["body", 0] },
-    "login json without content-type": { "status": 422, "loc0": "body", "type": "model_attributes_type" },
-    "profiles page=abc": { "status": 422, "loc0": "query", "type": "int_parsing", "loc": ["query", "page"] },
-    "profiles page=1.5": { "status": 422, "loc0": "query", "type": "int_parsing", "loc": ["query", "page"] },
-    "projects status=bogus": { "status": 422, "loc0": "query", "type": "enum", "loc": ["query", "status"] }
+    "login {}": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "value_error",
+          "loc": [
+            "body"
+          ]
+        }
+      ]
+    },
+    "login body literal null": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "missing",
+          "loc": [
+            "body"
+          ]
+        }
+      ]
+    },
+    "login json without content-type": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "model_attributes_type",
+          "loc": [
+            "body"
+          ]
+        }
+      ]
+    },
+    "login {login_id only}": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "value_error",
+          "loc": [
+            "body"
+          ]
+        }
+      ]
+    },
+    "login {nickname:123}": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "string_type",
+          "loc": [
+            "body",
+            "nickname"
+          ]
+        }
+      ]
+    },
+    "login nickname 21 chars": {
+      "status": 500,
+      "contentType": "text/plain"
+    },
+    "login nickname empty": {
+      "status": 500,
+      "contentType": "text/plain"
+    },
+    "login {nickname:null}": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "value_error",
+          "loc": [
+            "body"
+          ]
+        }
+      ]
+    },
+    "login not json": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "json_invalid",
+          "loc": [
+            "body",
+            0
+          ]
+        }
+      ]
+    },
+    "login {resume_token:'not-a-uuid'}": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "uuid_parsing",
+          "loc": [
+            "body",
+            "resume_token"
+          ]
+        }
+      ]
+    },
+    "login two modes": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "value_error",
+          "loc": [
+            "body"
+          ]
+        }
+      ]
+    },
+    "profiles page=-1": {
+      "status": 200,
+      "contentType": "application/json"
+    },
+    "profiles page=1.5": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "int_parsing",
+          "loc": [
+            "query",
+            "page"
+          ]
+        }
+      ]
+    },
+    "profiles page=abc": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "int_parsing",
+          "loc": [
+            "query",
+            "page"
+          ]
+        }
+      ]
+    },
+    "profiles path not-a-uuid": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "uuid_parsing",
+          "loc": [
+            "path",
+            "profile_id"
+          ]
+        }
+      ]
+    },
+    "projects status=bogus": {
+      "status": 422,
+      "contentType": "application/json",
+      "detail": [
+        {
+          "type": "enum",
+          "loc": [
+            "query",
+            "status"
+          ]
+        }
+      ]
+    }
   },
-  "timestamp": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+  "timestamp": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{6})?Z$",
   "timestamp_example": "2026-09-11T13:00:33.281950Z"
 }
