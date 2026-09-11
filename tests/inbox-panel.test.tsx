@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { act, useEffect, type RefObject } from 'react'
 import type { MessageOut } from '@/api/contract/rest'
@@ -21,9 +21,11 @@ import { startContractServer, type ContractServer } from './support/contract-ser
 // 整棵樹跟真實頁面同一個形狀：`IdentityProvider（真的，contract-server 給 /api/me）> InboxPanelProvider > [ header(InboxButton), InteractionProvider > ListPanelProvider > BoardPanel + InboxPanel ]`。
 // 所有請求走真的 `src/api/` 到本機自己起的 HTTP server。**不連任何外部服務。**
 
-// 每條判準都是好幾個真的 HTTP 往返（登入、第 0 頁、名字、寄信、重取）＋ 面板開關的 effect；CI 機器忙的時候 5 秒不夠（第一次 CI：S01 在 5015ms 被砍，
-// 第二次綠）。15 秒對真的紅燈沒差，對假的紅燈是關鍵（同 `vitest.setup.ts` 對 `asyncUtilTimeout` 的理由）。
-vi.setConfig({ testTimeout: 15_000 })
+// 每條判準都是好幾個真的 HTTP 往返（登入、第 0 頁、名字、寄信、重取）＋ 面板開關的 effect；CI 機器忙的時候 5 秒不夠
+//（兩次 CI：S01 在 5015ms／5187ms 被砍，重跑綠）。15 秒對真的紅燈沒差，對假的紅燈是關鍵（同 `vitest.setup.ts` 對 `asyncUtilTimeout` 的理由）。
+// ⚠️ 用 describe 的 options，不用在模組層設定 testTimeout —— 那個呼叫對這個檔案沒生效（第二次 CI 就是證據）；
+// 這個寫法實測過：塞一個 6 秒的 sleep 進 S01 會過。
+const SLOW = { timeout: 15_000 }
 
 let server: ContractServer
 const ME = '11111111-1111-1111-1111-111111111111'
@@ -146,7 +148,7 @@ async function openTalent(id: string, name: string) {
   await waitFor(() => expect(screen.getByTestId('talent-detail').getAttribute('data-phase')).toBe('ready'))
 }
 
-describe('收件匣是阻斷式面板', () => {
+describe('收件匣是阻斷式面板', SLOW, () => {
   it('[FE-K01-S01] 按收件匣開面板：鎖、焦點、第 0 頁；Escape 關、焦點回按鈕；重開再取第 0 頁', async () => {
     const button = await mount()
     expect(locked()).toBe(false)
@@ -187,7 +189,7 @@ describe('收件匣是阻斷式面板', () => {
   })
 })
 
-describe('清單是對話', () => {
+describe('清單是對話', SLOW, () => {
   it('[FE-K01-S04] 名字、摘要、時間；解析失敗顯示縮短 id 不擋、各打一次；重開再試失敗的、成功的不再打', async () => {
     const button = await mount()
     const long = 'A 說了一句很長很長很長很長很長很長很長很長很長很長很長很長很長很長很長很長很長很長很長很長很長的話'
@@ -303,7 +305,7 @@ describe('清單是對話', () => {
   })
 })
 
-describe('對話詳情與寄信', () => {
+describe('對話詳情與寄信', SLOW, () => {
   it('[FE-K01-S07] 進對話、返回焦點回那一列；從人才詳情進來沒寄就返回：清單沒有那一列、焦點回標題；沒有載入更多', async () => {
     const button = await mount()
     // 剛好一頁（還沒翻到底）：清單有「載入更多」、對話裡沒有。
