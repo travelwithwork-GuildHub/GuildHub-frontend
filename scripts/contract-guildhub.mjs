@@ -121,16 +121,35 @@ async function main() {
   })
   const base = `http://127.0.0.1:${port}`
   let code = 1
+  let vitest = null
+  // Ctrl-C／被工作管理員砍：一樣要把後端那一組收掉，不然留一個孤兒 uvicorn 咬著 8000（審查抓到的）。
+  const onSignal = (sig) => {
+    console.log(`[contract-guildhub] 收到 ${sig}，收拾中`)
+    if (vitest && vitest.exitCode === null) vitest.kill('SIGTERM')
+    stop(backend).then(() => process.exit(130))
+  }
+  process.once('SIGINT', onSignal)
+  process.once('SIGTERM', onSignal)
   try {
     await waitFor401(base, 60_000)
+    if (backend.exitCode !== null) throw new WrapperError(`真後端在 ready 之前就退出了（code ${backend.exitCode}）。`)
     console.log(`[contract-guildhub] ready，跑契約套件`)
-    const vitest = spawn('npx', ['vitest', 'run', '--config', 'vitest.contract.mts', ...process.argv.slice(2)], {
+    vitest = spawn('npx', ['vitest', 'run', '--config', 'vitest.contract.mts', ...process.argv.slice(2)], {
       cwd: ROOT,
-      env: { ...process.env, CONTRACT_TARGET: 'guildhub', CONTRACT_BASE_URL: base, CONTRACT_WS_URL: `ws://127.0.0.1:${port}/ws` },
+      env: {
+        ...process.env,
+        CONTRACT_TARGET: 'guildhub',
+        CONTRACT_BASE_URL: base,
+        CONTRACT_WS_URL: `ws://127.0.0.1:${port}/ws`,
+        // harness 用它確認「port 上聽的就是我起的那一組」（detached → pgid 等於 pid）。
+        CONTRACT_GUILDHUB_PGID: String(backend.pid),
+      },
       stdio: 'inherit',
     })
     code = await new Promise((resolve) => vitest.once('exit', (c) => resolve(c ?? 1)))
   } finally {
+    process.off('SIGINT', onSignal)
+    process.off('SIGTERM', onSignal)
     await stop(backend)
     // uvicorn 收到 SIGTERM 後還要幾百 ms 才真的放掉 port；等它放掉，緊接著再跑一次 wrapper 才不會被自己的 preflight 擋。
     for (let i = 0; i < 25 && (await portInUse(port)); i += 1) await new Promise((r) => setTimeout(r, 200))

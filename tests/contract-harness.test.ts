@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
@@ -19,9 +19,14 @@ async function contractFiles(dir = CONTRACT_DIR): Promise<string[]> {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name)
     if (e.isDirectory()) out.push(...(await contractFiles(p)))
-    else if (e.name.endsWith('.contract.ts')) out.push(p)
+    else if (e.name.endsWith('.ts')) out.push(p)
   }
   return out
+}
+/** 任何形式的模組引用：import／export from／dynamic import／require，單雙引號都算。 */
+const MODULE_REFS = /(?:from\s*|import\s*\(\s*|require\s*\(\s*)(['"])([^'"]+)\1/g
+function referencedModules(src: string): string[] {
+  return [...src.matchAll(MODULE_REFS)].map((m) => m[2] ?? '')
 }
 
 describe('目標', () => {
@@ -32,14 +37,32 @@ describe('目標', () => {
     expect(resolveTarget('guildhub')).toBe('guildhub')
   })
 
-  it('[FE-O05-S02] 測試檔裡沒有目標分支、沒有 import Route Handler 或 src/server', async () => {
+  it('[FE-O05-S02] 測試檔裡沒有目標分支；tests/contract 底下任何檔案都不引用 Route Handler 或 src/server（任何 import 形式）', async () => {
     const files = await contractFiles()
-    expect(files.length, '沒有任何 .contract.ts —— 掃了個空').toBeGreaterThan(0)
-    for (const f of files) {
+    const contractTests = files.filter((f) => f.endsWith('.contract.ts'))
+    expect(contractTests.length, '沒有任何 .contract.ts —— 掃了個空').toBeGreaterThan(0)
+    for (const f of contractTests) {
       const src = await readFile(f, 'utf8')
       expect(src, `${path.relative(CONTRACT_DIR, f)} 讀了 CONTRACT_TARGET`).not.toMatch(/CONTRACT_TARGET/)
-      expect(src, `${path.relative(CONTRACT_DIR, f)} import 了 Route Handler`).not.toMatch(/from '@\/app\/api\//)
-      expect(src, `${path.relative(CONTRACT_DIR, f)} import 了 src/server`).not.toMatch(/from '@\/server\//)
+    }
+    // helper 也算：透過 client.ts 間接 import handler 一樣是繞過（審查抓到的）。
+    for (const f of files) {
+      const refs = referencedModules(await readFile(f, 'utf8'))
+      const bad = refs.filter((r) => /(^|\/)app\/api(\/|$)/.test(r) || /(^|\/)server(\/|$)/.test(r.replace(/^@\//, 'src/')))
+      expect(bad, `${path.relative(CONTRACT_DIR, f)} 引用了 ${bad.join(', ')}`).toEqual([])
+    }
+    // 掃描器本身不是恆真：這幾種寫法都要被抓到。
+    const samples = [
+      "import { GET } from '@/app/api/me/route'",
+      'import x from "@/server/db"',
+      "const m = await import('../../src/app/api/login/route')",
+      "const { db } = require('../../../src/server/db')",
+    ]
+    for (const sample of samples) {
+      const refs = referencedModules(sample)
+      expect(refs.length, sample).toBe(1)
+      const bad = refs.filter((r) => /(^|\/)app\/api(\/|$)/.test(r) || /(^|\/)server(\/|$)/.test(r.replace(/^@\//, 'src/')))
+      expect(bad, `掃描器漏了：${sample}`).toHaveLength(1)
     }
   })
 
@@ -54,14 +77,21 @@ describe('目標', () => {
 describe('guildhub 的 wrapper', () => {
   const testUrl = 'postgresql://guildhub:guildhub@localhost:5432/guildhub_frontend_test'
 
-  it('[FE-O05-S05] port 已經有人在聽：拒絕借用', async () => {
+  it('[FE-O05-S05] port 已經有人在聽：拒絕借用（用假的後端目錄，不需要真的 repo）', async () => {
+    const fakeBackend = await mkdtemp(path.join(os.tmpdir(), 'fake-backend-'))
+    await writeFile(path.join(fakeBackend, 'run.sh'), '#!/usr/bin/env bash\necho fake\n')
     const server = net.createServer()
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
     const port = (server.address() as net.AddressInfo).port
     try {
-      await expect(preflight({ backendDir: path.resolve(__dirname, '..', '..', 'GuildHub-backend'), port, testUrl })).rejects.toThrow(/不接受既有的後端/)
+      await expect(preflight({ backendDir: fakeBackend, port, testUrl })).rejects.toThrow(/不接受既有的後端/)
+      // 對照：同一個假目錄、沒人聽的 port → preflight 過（證明紅的是 port 那一條）。
+      server.close()
+      await new Promise<void>((r) => server.once('close', () => r()))
+      await expect(preflight({ backendDir: fakeBackend, port, testUrl })).resolves.toEqual({ runSh: path.join(fakeBackend, 'run.sh') })
     } finally {
       server.close()
+      await rm(fakeBackend, { recursive: true })
     }
   })
 
