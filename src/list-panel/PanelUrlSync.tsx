@@ -62,8 +62,6 @@ export function PanelUrlSync(): null {
   useEffect(() => {
     latestRef.current = { search, depth }
   })
-  /** popstate 之後等 `restore` 落地的那一格：狀態還沒變成網址說的樣子之前，不寫網址。 */
-  const expectRef = useRef<string | null>(null)
   const pendingBackRef = useRef(false)
 
   // 狀態 → 網址。用 ref 讀最新狀態：popstate 的處理也要呼叫它。
@@ -72,10 +70,6 @@ export function PanelUrlSync(): null {
     reconcileRef.current = () => {
       const { search, depth } = latestRef.current
       if (pendingBackRef.current) return
-      if (expectRef.current !== null) {
-        if (expectRef.current !== search) return
-        expectRef.current = null
-      }
       const current = window.location.search
       if (current === search) return
       const ours = lineageOf(window.history.state)
@@ -112,10 +106,9 @@ export function PanelUrlSync(): null {
         reconcileRef.current()
         return
       }
+      // 上一頁／下一頁：網址說的跟狀態一樣就不動；不一樣就套上（狀態變了 → 上面那支再比一次 → 一樣 → 停）。
       const parsed = parsePanelUrl(window.location.search)
-      const next = serializePanelUrl(parsed)
-      if (next === latestRef.current.search) return
-      expectRef.current = next
+      if (serializePanelUrl(parsed) === latestRef.current.search) return
       restore(parsed)
     }
     window.addEventListener('popstate', onPopState)

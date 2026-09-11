@@ -73,7 +73,8 @@ function WorldProbe({ sinkRef }: { sinkRef: RefObject<World | null> }) {
 }
 
 function arriveAt(url: string) {
-  window.history.replaceState(null, '', url)
+  // 保留測試預先放進 `history.state` 的東西（Next 的、上一次掛載的）。
+  window.history.replaceState(window.history.state, '', url)
   const sinkRef: RefObject<World | null> = { current: null }
   render(
     <div data-testid="world-canvas-container" data-focus-anchor="world" tabIndex={-1}>
@@ -218,13 +219,17 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
     return { ...world, base }
   }
 
-  it('[FE-B09-S06] 按 E 開清單：網址多 panel，紀錄多一層', async () => {
+  it('[FE-B09-S06] 按 E 開清單：網址多 panel，紀錄多一層；Next 放在 history.state 的東西還在', async () => {
     server.replyFor('/api/profiles', 200, TWO)
     const { pressE } = arriveAt('/world')
+    // Next App Router 把自己的路由狀態放在 `history.state`：整個蓋掉的話，上一頁離開 /world 時 router 會崩。
+    window.history.replaceState({ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: ['', {}] }, '', '/world')
     const base = window.history.length
     pressE()
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
     expect(window.history.length, '開清單沒有新增一層紀錄 —— 上一頁會直接離開世界').toBe(base + 1)
+    expect((window.history.state as Record<string, unknown>).__NA, 'push 的時候把 Next 的 history.state 蓋掉了').toBe(true)
+    expect((window.history.state as Record<string, unknown>).__PRIVATE_NEXTJS_INTERNALS_TREE).toEqual(['', {}])
   })
 
   it('[FE-B09-S07] 點卡開詳情：網址多 profile，紀錄再多一層', async () => {
@@ -281,7 +286,7 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
     await waitFor(() => expect(panel()).not.toBeNull())
   })
 
-  it('[FE-B09-S10] 兩下 Escape 連按：第二下在第一下的 popstate 之前，最後還是 /world', async () => {
+  it('[FE-B09-S10] 兩下 Escape 連按：第二下在第一下的 popstate 之前，最後還是 /world，而且沒退過頭', async () => {
     await openListThenDetail()
     escape()
     escape()
@@ -291,6 +296,10 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(url()).toBe('/world')
     expect(panel()).toBeNull()
+    // 沒有退過頭：前面那一層（清單）還在，前進一次就是它。退的期間第二下 Escape 若又算了一次 delta 就會 go(-2)。
+    await go(1)
+    await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
+    expect(panel()).not.toBeNull()
   })
 
   it('[FE-B09-S11] 深連結直達，Escape 不離站', async () => {
@@ -307,5 +316,19 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
     escape()
     await waitFor(() => expect(url()).toBe('/world'))
     expect(window.history.length).toBe(base)
+  })
+
+  it('[FE-B09-S11] 帶著別次掛載的血緣回來（先去別的路由再回來）：Escape 一樣不離站', async () => {
+    server.replyFor('/api/profiles', 200, TWO)
+    server.replyFor(`/api/profiles/${UUID(0)}`, 200, profile(0))
+    // 上一次掛載留下的標記說「往回有兩層是我 push 的」—— 那是上一次的紀錄，這一次的 back 會退到哪裡沒有人知道。
+    window.history.replaceState({ guildhubPanel: { session: 'previous-mount', pushed: 2 } }, '', `/world?panel=profiles&profile=${UUID(0)}`)
+    arriveAt(`/world?panel=profiles&profile=${UUID(0)}`)
+    const base = window.history.length
+    await waitFor(() => expect(detail()?.dataset.phase).toBe('ready'))
+    escape()
+    await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
+    expect(window.history.length, '信了別次掛載的血緣去 back').toBe(base)
+    expect(panel()).not.toBeNull()
   })
 })
