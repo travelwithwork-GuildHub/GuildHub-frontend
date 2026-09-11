@@ -248,9 +248,10 @@ describe('每一塊看板的面板三個插槽都接上了', () => {
     await waitFor(() => expect(cards()).toBe(3))
     const node = screen.getByTestId('empty-state')
     expect(node.dataset.emptyState, '不滿一頁沒有畫成翻到底').toBe('exhausted')
-    // 在項目**之後**。
-    const list = screen.getByRole('list')
-    expect(list.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // 在**最後一個項目**之後（審查指出只跟 `<ul>` 比不夠緊）。
+    const last = screen.getAllByRole('listitem').at(-1)
+    if (last === undefined) throw new Error('沒有項目')
+    expect(last.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 
@@ -258,18 +259,22 @@ describe('三個插槽裡直接寫的節點只能是 EmptyState（lint）', () =
   const ROOT = path.resolve(import.meta.dirname, '..')
   const LINT_TIMEOUT = 60_000
   const HEAD = "import { ListPanel } from '@/list-panel/ListPanel'\nimport { EmptyState } from '@/empty-state/EmptyState'\n"
-  async function slotHits(code: string) {
+  async function lint(code: string) {
     const eslint = new ESLint({ cwd: ROOT })
     const [result] = await eslint.lintText(HEAD + code, { filePath: 'src/world/rooms/Sneaky.tsx' })
     if (!result) throw new Error('ESLint 沒有回傳結果')
-    return result.messages.filter((m) => m.message.includes('只能放 <EmptyState>'))
+    return result.messages
   }
+  const slotHits = async (code: string) => (await lint(code)).filter((m) => m.message.includes('只能放 <EmptyState>'))
 
   it.each([
     ['empty 放 <p>', 'export const A = () => <ListPanel empty={<p>沒有資料</p>} />\n'],
     ['exhausted 放 <span>', 'export const A = () => <ListPanel exhausted={<span>已無更多</span>} />\n'],
     ['error 放 arrow 回 <div>', 'export const A = () => <ListPanel error={({ retry }) => <div onClick={retry}>重試</div>} />\n'],
     ['empty 放 fragment', 'export const A = () => <ListPanel empty={<>沒有</>} />\n'],
+    // 有大括號的函式本體 —— 加一對大括號與 return 不該是規格允許的規避方式（審查抓到的）。
+    ['error 放大括號本體 return <div>', 'export const A = () => <ListPanel error={({ retry }) => { return <div onClick={retry}>重試</div> }} />\n'],
+    ['error 放 function 本體 return fragment', 'export const A = () => <ListPanel error={function (s) { return <>{String(s)}</> }} />\n'],
   ])('[FE-X04-S12] %s → lint 紅', async (_label, code) => {
     expect((await slotHits(code)).length).toBeGreaterThan(0)
   }, LINT_TIMEOUT)
@@ -280,6 +285,12 @@ describe('三個插槽裡直接寫的節點只能是 EmptyState（lint）', () =
       'export const A = () => <ListPanel empty={<EmptyState kind="first-empty" />} error={({ retry, cause }) => <EmptyState kind="failure" error={cause} retry={retry} action={<a href="/login">去</a>} />} />\n'
     expect((await slotHits(bad)).length).toBeGreaterThan(0)
     // `<EmptyState action={<a/>}>` 裡面的 `<a>` 是合法的 —— 規則只看插槽最外層那個元素。
-    expect(await slotHits(good)).toHaveLength(0)
+    // ⚠️ 看的是**整段 lint 的結果**，不只是這條規則的訊息：只過濾自己的訊息會把
+    // 「這段程式碼其實被別條規則擋了」算成綠（審查指出）。
+    expect((await lint(good)).filter((m) => m.severity === 2)).toEqual([])
+    // 有大括號的本體 return EmptyState 也過。
+    const goodBlock =
+      'export const A = () => <ListPanel error={({ retry, cause }) => { return <EmptyState kind="failure" error={cause} retry={retry} /> }} />\n'
+    expect((await lint(goodBlock)).filter((m) => m.severity === 2)).toEqual([])
   }, LINT_TIMEOUT)
 })

@@ -162,14 +162,20 @@ const LIST_PANEL_SLOTS = ['empty', 'exhausted', 'error']
 const SLOT_MSG =
   'ListPanel 的 empty／exhausted／error 插槽只能放 <EmptyState>（src/empty-state）—— 空狀態的字句與版型只有一份。見 FE-X04 的規格。'
 const SLOT_ATTR = `JSXOpeningElement[name.name='ListPanel'] > JSXAttribute[name.name=/^(${LIST_PANEL_SLOTS.join('|')})$/] > JSXExpressionContainer`
-// 看的是插槽裡**最外層**那個元素：`empty={<X/>}` 的 X、`error={(s) => <X/>}` 的 X。
+// 看的是插槽裡**最外層**那個元素：`empty={<X/>}` 的 X、`error={(s) => <X/>}` 的 X、
+// `error={(s) => { return <X/> }}` 的 X（有大括號的函式本體 —— 審查抓到的漏洞：
+// 加一對大括號與 `return` 不該是規格允許的規避方式）。
 // 只看最外層是刻意的 —— `<EmptyState action={<Link/>}>` 裡面的 `<Link>` 是合法的。
-const SLOT_RULES = [
-  `${SLOT_ATTR} > JSXElement > JSXOpeningElement[name.name!='EmptyState']`,
-  `${SLOT_ATTR} > ArrowFunctionExpression > JSXElement > JSXOpeningElement[name.name!='EmptyState']`,
-  `${SLOT_ATTR} > JSXFragment`,
-  `${SLOT_ATTR} > ArrowFunctionExpression > JSXFragment`,
-].map((selector) => ({ selector, message: SLOT_MSG }))
+const SLOT_ROOTS = [
+  `${SLOT_ATTR}`,
+  `${SLOT_ATTR} > ArrowFunctionExpression`,
+  `${SLOT_ATTR} > ArrowFunctionExpression > BlockStatement > ReturnStatement`,
+  `${SLOT_ATTR} > FunctionExpression > BlockStatement > ReturnStatement`,
+]
+const SLOT_RULES = SLOT_ROOTS.flatMap((root) => [
+  `${root} > JSXElement > JSXOpeningElement[name.name!='EmptyState']`,
+  `${root} > JSXFragment`,
+]).map((selector) => ({ selector, message: SLOT_MSG }))
 
 const config = [
   { ignores: ['.next/**', 'node_modules/**'] },
