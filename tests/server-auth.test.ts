@@ -35,6 +35,20 @@ describe('密碼比對', () => {
     expect(missing, `帳號不存在 ${missing.toFixed(1)}ms vs 密碼錯 ${wrong.toFixed(1)}ms —— 短路了，回應時間會送出帳號存在性`).toBeGreaterThan(wrong * 0.5)
   })
 
+  it('壞掉的雜湊一律 false、不拋、而且一樣貴（`scrypt$$` 那種會變成 keylen 0 的尤其）', async () => {
+    const { hashPassword, verifyPassword } = await import('@/server/passwords')
+    const real = await hashPassword('guild1234')
+    // 注意 JS 的 `replace` 把替換字串裡的 `$$` 當成一個 `$` —— 要多一個 `$` 得用函式（第一版就踩到，樣本跟原字串一樣）。
+    const broken = ['scrypt$$', 'scrypt$abc$', '', 'bcrypt$x$y', 'scrypt$not base64!$also not', 'scrypt$QUJD$QUJD', real.replace('scrypt$', () => 'scrypt$$'), `${real}$`]
+    expect(broken[6]?.split('$').length).toBe(4)
+    for (const h of broken) {
+      await expect(verifyPassword('guild1234', h), h).resolves.toBe(false)
+    }
+    const brokenTime = await median(5, () => verifyPassword('guild1234', 'scrypt$$'))
+    const wrong = await median(5, () => verifyPassword('wrong-pass', real))
+    expect(brokenTime, `格式壞掉 ${brokenTime.toFixed(1)}ms vs 密碼錯 ${wrong.toFixed(1)}ms —— 短路了`).toBeGreaterThan(wrong * 0.5)
+  })
+
   it('雜湊格式跟真後端一樣：scrypt$<salt b64>$<digest b64>，digest 64 bytes', async () => {
     const { hashPassword } = await import('@/server/passwords')
     const h = await hashPassword('x')
@@ -65,7 +79,9 @@ describe('session cookie', () => {
     const [, mac] = (signed ?? '').split('.')
     expect(sessionIdFrom(`other=1; ${value}`)).toBe(id)
     expect(sessionIdFrom(`session=22222222-0000-4000-8000-000000000002.${mac}`), '換了 id 簽章不動').toBeNull()
-    expect(sessionIdFrom(`session=${id}.${mac?.slice(0, -1)}A`)).toBeNull()
+    // 尾字換成一個**一定不同**的字元（原字是 A 的話換 B —— 固定換 A 有機會沒真的篡改，審查抓到的）。
+    const last = mac?.slice(-1) ?? ''
+    expect(sessionIdFrom(`session=${id}.${mac?.slice(0, -1)}${last === 'A' ? 'B' : 'A'}`)).toBeNull()
     expect(sessionIdFrom(`session=not-a-uuid.${mac}`)).toBeNull()
     expect(sessionIdFrom(null)).toBeNull()
     expect(sessionIdFrom('session=')).toBeNull()

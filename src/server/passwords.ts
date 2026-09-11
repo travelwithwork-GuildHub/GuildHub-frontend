@@ -25,22 +25,34 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export const DUMMY_HASH = 'scrypt$XmyFipg0dPtu08F8BuFD8w==$TowsA6gO2E1ARAUFW0FO6rcI6huWXKAHUSMGrpbnwXMaX9pB0f+h4Wxx9TDVqDlidXgecn4yNLhslusZ/oTLXA=='
 
-/** 帳號不存在（`stored` 是 null）與密碼錯回同一個 false，**而且花一樣的時間** —— 呼叫端回同一句話。 */
-export async function verifyPassword(password: string, stored: string | null): Promise<boolean> {
-  if (!stored) {
-    await verifyPassword(password, DUMMY_HASH)
-    return false
-  }
+const SALT_BYTES = 16
+const B64 = /^[A-Za-z0-9+/]+={0,2}$/
+
+/** 嚴格解析 `scrypt$<salt>$<digest>`：salt 16 bytes、digest 64 bytes、canonical base64。不合格回 null。 */
+function parseStored(stored: string): { salt: Buffer; expected: Buffer } | null {
   const parts = stored.split('$')
-  if (parts.length !== 3 || parts[0] !== 'scrypt') return false
-  let salt: Buffer
-  let expected: Buffer
-  try {
-    salt = Buffer.from(parts[1] ?? '', 'base64')
-    expected = Buffer.from(parts[2] ?? '', 'base64')
-  } catch {
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return null
+  const [, saltB64 = '', digestB64 = ''] = parts
+  if (!B64.test(saltB64) || !B64.test(digestB64)) return null
+  const salt = Buffer.from(saltB64, 'base64')
+  const expected = Buffer.from(digestB64, 'base64')
+  // `Buffer.from(x, 'base64')` 對很多非法輸入不拋、給空 Buffer：`scrypt$$` 會變成 keylen 0、兩個空 Buffer 相等 → 認證繞過（審查抓到的）。
+  if (salt.length !== SALT_BYTES || expected.length !== KEYLEN) return null
+  if (salt.toString('base64') !== saltB64 || expected.toString('base64') !== digestB64) return null
+  return { salt, expected }
+}
+
+/**
+ * 帳號不存在（`stored` 是 null）、雜湊格式壞掉、密碼錯：**全部**回 false、**全部**花一次 scrypt 的時間、**永不拋**。
+ * 任何一條路短路，回應時間就把「有沒有這個帳號」送出去（審查抓到的：`!stored` 之外的格式檢查也會短路）。
+ */
+export async function verifyPassword(password: string, stored: string | null): Promise<boolean> {
+  const parsed = stored ? parseStored(stored) : null
+  if (parsed === null) {
+    const dummy = parseStored(DUMMY_HASH) as { salt: Buffer; expected: Buffer }
+    await scryptAsync(password, dummy.salt, KEYLEN, { N, r: R, p: P })
     return false
   }
-  const actual = await scryptAsync(password, salt, expected.length, { N, r: R, p: P })
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
+  const actual = await scryptAsync(password, parsed.salt, KEYLEN, { N, r: R, p: P })
+  return timingSafeEqual(actual, parsed.expected)
 }
