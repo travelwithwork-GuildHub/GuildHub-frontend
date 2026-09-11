@@ -38,4 +38,4 @@
 ## 5. 收尾
 
 - [x] 5.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
-- [ ] 5.2 封存（`archive/fe-x03-error-vocabulary`，獨立 PR）
+- [x] 5.2 封存（`archive/fe-x03-error-vocabulary`，獨立 PR）
