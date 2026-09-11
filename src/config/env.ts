@@ -89,8 +89,8 @@ export function internalTestDatabaseUrl(): string | null {
 
 /**
  * 本地後端 session cookie 的 HMAC secret。規格 `FE-O03`〈session 是簽章的 HttpOnly cookie〉。
- * 本機（`local`）缺席用固定的開發值（重啟 dev server 之後 cookie 仍有效）；部署出去的版本缺席 → 拋，
- * `next build` 失敗（下面 `DEPLOY_CONFIG_ITEMS` 只在 `internal` adapter 時驗它）。
+ * 本機（`local`）缺席用固定的開發值（重啟 dev server 之後 cookie 仍有效）；部署出去的版本缺席 → 第一次用到時拋
+ * `ConfigError`（不進 `FE-O14` 的建置閘門，理由見下面 `DEPLOY_CONFIG_ITEMS` 那一項）。
  */
 export function internalSessionSecret(): string {
   const raw = read(process.env.INTERNAL_SESSION_SECRET)
@@ -296,9 +296,14 @@ export const DEPLOY_CONFIG_ITEMS: readonly DeployConfigItem[] = [
   { name: 'NEXT_PUBLIC_APP_ENV', resolve: appEnv, checkedAtBuild: true },
   {
     name: 'INTERNAL_SESSION_SECRET',
-    // 只有 `internal` adapter 有本地後端；`guildhub` 的部署不需要這把，不驗。
-    resolve: () => (dataAdapter() === 'internal' ? internalSessionSecret() : null),
-    checkedAtBuild: true,
+    resolve: internalSessionSecret,
+    checkedAtBuild: false,
+    // 這份清單的項目是**無條件**的（`FE-O14-S06`：每一個必驗項目缺席都要失敗）。而這把 secret 只有
+    // `internal` adapter 的本地後端用；`guildhub` 的部署被要求它，就是一個「填假的也沒差」的變數 ——
+    // 這個 repo 明文拒絕那種變數（上面 `NEXT_PUBLIC_GUILDHUB_REST` 的理由）。
+    // 所以不進建置閘門：非 local 缺席時，`internalSessionSecret()` 在**第一次被用到**時拋 `ConfigError`
+    // （那一個請求是 500，伺服器 log 有訊息）。今天沒有任何 internal 的部署，本地後端只在本機跑。
+    skipReason: '只有 internal adapter 用；清單是無條件的，不該要求 guildhub 部署填一把沒用的 secret',
   },
   { name: 'NEXT_PUBLIC_REALTIME_ADAPTER', resolve: realtimeAdapter, checkedAtBuild: true },
   { name: 'NEXT_PUBLIC_GUILDHUB_WS', resolve: wsUrl, checkedAtBuild: true },

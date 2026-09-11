@@ -32,8 +32,10 @@ export const POST = handle({ auth: 'none', body: LoginBody }, async ({ body }) =
   let row
   if (body.login_id != null && body.password != null) {
     const cred = await credentialsOf(body.login_id)
-    // 帳號不存在與密碼錯誤回同一個碼、同一句話（不送出帳號存在性）。
-    if (cred === null || !(await verifyPassword(body.password, cred.password_hash))) throw new HttpError(403, '帳號或密碼錯誤')
+    // 帳號不存在與密碼錯誤回同一個碼、同一句話（不送出帳號存在性）——
+    // **而且兩條路都跑一次 scrypt**：帳號不存在就對一個固定的假雜湊比，不然回應時間就把「有沒有這個帳號」送出去了（審查抓到的）。
+    const ok = await verifyPassword(body.password, cred?.password_hash ?? null)
+    if (cred === null || !ok) throw new HttpError(403, '帳號或密碼錯誤')
     row = await profileById(cred.id)
   } else if (body.resume_token != null) {
     row = await profileById(body.resume_token)

@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { internalSessionSecret } from '@/config/env'
+import { appEnv, internalSessionSecret } from '@/config/env'
 
 // 本地後端的 session cookie。規格 `FE-O03`〈session 是簽章的 HttpOnly cookie〉。
 //
@@ -17,9 +17,10 @@ function mac(id: string): string {
   return createHmac('sha256', internalSessionSecret()).update(id).digest('base64url')
 }
 
-/** 登入成功要送的 `Set-Cookie` 值。 */
+/** 登入成功要送的 `Set-Cookie` 值。非 local 加 `Secure`：部署出去的 cookie 不走明文（審查抓到的）。 */
 export function sessionCookie(id: string): string {
-  return `${SESSION_COOKIE}=${id}.${mac(id)}; Path=/; HttpOnly; SameSite=Lax`
+  const secure = appEnv() === 'local' ? '' : '; Secure'
+  return `${SESSION_COOKIE}=${id}.${mac(id)}; Path=/; HttpOnly; SameSite=Lax${secure}`
 }
 
 /** 從 `Cookie` header 取出、驗簽。沒有、壞掉、簽章對不上、不是 uuid → `null`（呼叫端當未登入）。 */

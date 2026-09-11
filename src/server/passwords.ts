@@ -18,9 +18,19 @@ export async function hashPassword(password: string): Promise<string> {
   return `scrypt$${salt.toString('base64')}$${digest.toString('base64')}`
 }
 
-/** 帳號不存在（`stored` 是 null）與密碼錯回同一個 false —— 呼叫端回同一句話。 */
+/**
+ * 帳號不存在時拿來比的假雜湊（`hashPassword('not-a-real-password')` 的一次輸出）。
+ * `verifyPassword(pw, null)` 會對它跑一次 scrypt，讓「帳號不存在」跟「密碼錯」一樣貴 ——
+ * 不然回應時間就把「有沒有這個帳號」送出去了（審查抓到的 timing side channel）。
+ */
+export const DUMMY_HASH = 'scrypt$XmyFipg0dPtu08F8BuFD8w==$TowsA6gO2E1ARAUFW0FO6rcI6huWXKAHUSMGrpbnwXMaX9pB0f+h4Wxx9TDVqDlidXgecn4yNLhslusZ/oTLXA=='
+
+/** 帳號不存在（`stored` 是 null）與密碼錯回同一個 false，**而且花一樣的時間** —— 呼叫端回同一句話。 */
 export async function verifyPassword(password: string, stored: string | null): Promise<boolean> {
-  if (!stored) return false
+  if (!stored) {
+    await verifyPassword(password, DUMMY_HASH)
+    return false
+  }
   const parts = stored.split('$')
   if (parts.length !== 3 || parts[0] !== 'scrypt') return false
   let salt: Buffer
