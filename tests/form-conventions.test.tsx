@@ -194,7 +194,8 @@ describe('送出中、失敗、重試', () => {
     const alert = await screen.findByRole('alert')
     expect(input('d').value).toBe('保留我')
     expect(alert.compareDocumentPosition(button()) & Node.DOCUMENT_POSITION_FOLLOWING, 'alert 要在送出鈕之前').toBeTruthy()
-    expect(document.activeElement).toBe(alert)
+    // 焦點在 effect 裡給：全套跑、機器忙的時候 findByRole 可能在 effect 前一刻回來 —— 等它，不是假設同步。
+    await waitFor(() => expect(document.activeElement).toBe(alert))
     expect(alert.textContent?.length).toBeGreaterThan(0)
     await submit()
     await waitFor(() => expect(server.calls).toHaveLength(2))
