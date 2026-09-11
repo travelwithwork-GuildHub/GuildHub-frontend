@@ -82,6 +82,19 @@ interface UiError {
 所以它有自己的一種，語彙表裡那一句只是為了 `S11`「不多不少」—— 消費者看到
 `aborted` 該做的是**什麼都不畫**。
 
+## D7｜`fetch` 的 rejection 在 `send()` 就包成 `NetworkError`
+
+實作審查兩邊都擋在同一點：`instanceof TypeError` 會把程式自己的 bug 說成「檢查一下網路」。
+兩個修法：(a) 認 `TypeError` 的訊息（`fetch failed`／`Failed to fetch`／`Load failed`⋯⋯
+每個瀏覽器不同，而且會變）；(b) 在**唯一呼叫 `fetch` 的地方**（`send()`）把 rejection
+包成專屬的 `NetworkError`，翻譯器只認型別。選 (b)。代價：動到 `FE-O02` 已封存的
+`transport.ts` 幾行 —— 加一個 class、包一個 try/catch，`HttpError` 與契約驗證的路徑不變。
+
+## D8｜「永遠不拋」要用 try/catch 兜底，不是靠小心
+
+`instanceof` 對 Proxy 的 `getPrototypeOf` trap 也會拋。整個分類包在 try/catch 裡，
+失敗時回「預期之外」，而 fallback **不讀輸入的任何屬性**。
+
 ## 待答問題
 
 1. **`request-rejected`（418／429）要不要跟 `server-error` 合併？** 對使用者的處置
@@ -90,9 +103,9 @@ interface UiError {
 ## 這一份怎麼驗
 
 - **全部是單元判準**，輸入直接建構，**不連任何外部服務**。
-- `S01`–`S10`、`S17` 對映表（`S06`／`S07` 是掃整段範圍，不是挑幾個數字）；
+- `S01`–`S10`、`S17`、`S19`、`S20` 對映表（`S06`／`S07` 是掃整段範圍，不是挑幾個數字）；
   `S11`／`S13` 語彙表完整且互異；`S12` 哨兵不外漏；`S14`／`S15` 結構化欄位；
-  `S16` import 邊界；`S18` 身分層改看 `kind`。
+  `S16` import 邊界（lint 規則＋負向測試）；`S18` 身分層改看 `kind`。
 - **驗收條件不是「測試全綠」**：把 403 併進 401 → `S02` 紅；
   把 `message` 改成 `error.message` → `S12` 紅；
   語彙表少一鍵 → `S11` 紅（型別也紅）；

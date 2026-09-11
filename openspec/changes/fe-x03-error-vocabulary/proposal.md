@@ -90,5 +90,5 @@
 
 - 新增 `openspec/specs/error-vocabulary/`
 - 新增 `src/errors/`（純邏輯：分類器 ＋ 語彙表）
-- `src/api/` 不改：`HttpError`／`ContractDriftError`／`AdapterNotImplementedError` 的形狀已經夠用
+- `src/api/transport.ts`：多一個 `NetworkError`，`send()` 把 `fetch` 的 rejection 包起來（design `D7`，實作審查抓到的）
 - `FE-X04` 之後消費它；`FE-B01` 的 `BoardPanel` 那三個空著的插槽在 `FE-X04` 補上
