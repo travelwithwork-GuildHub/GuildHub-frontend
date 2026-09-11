@@ -67,9 +67,14 @@ afterEach(async () => {
 type World = { registry: InteractableRegistry; lock: RefObject<boolean> }
 /** S12 的探針：跟 Canvas 同一層（provider 底下）的元件，數自己掛載了幾次。 */
 let probeMounts = 0
+let probeUnmounts = 0
 function MountProbe() {
   useEffect(() => {
     probeMounts += 1
+    return () => {
+      // 卸載也要記：只數掛載的話，「整棵樹被拔掉、沒再掛回來」也是 1（審查抓到的）。
+      probeUnmounts += 1
+    }
   }, [])
   return null
 }
@@ -387,6 +392,7 @@ describe('網址改變時世界不重掛', () => {
     server.replyFor('/api/profiles', 200, [profile(0), profile(1)])
     server.replyFor(`/api/profiles/${UUID(0)}`, 200, profile(0))
     probeMounts = 0
+    probeUnmounts = 0
     const { pressE } = arriveAt('/world')
     pressE()
     await waitFor(() => expect(cards()).toHaveLength(2))
@@ -402,5 +408,6 @@ describe('網址改變時世界不重掛', () => {
     await waitFor(() => expect(url()).toBe('/world'))
     // 這裡只證明 provider 那一層沒重掛 —— `key={url}` 綁在 Canvas 上這裡照樣是 1。真的 Canvas 在 e2e。
     expect(probeMounts).toBe(1)
+    expect(probeUnmounts, 'provider 那一層被拔掉了').toBe(0)
   })
 })

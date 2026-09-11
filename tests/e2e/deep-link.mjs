@@ -102,13 +102,22 @@ try {
   await page.evaluate(() => {
     window.__guildhubMark = 'mounted-once'
   })
+  // 「仍然連在 DOM 上」是**整段序列期間從沒斷開**，不只是每一步量的那一刻（審查抓到的：
+  // 拔掉再插回同一個節點，事後看 isConnected 還是 true）。MutationObserver 盯著整棵樹，斷開過就記下來。
+  await canvas.evaluate((el) => {
+    window.__guildhubDetached = false
+    new MutationObserver(() => {
+      if (!el.isConnected) window.__guildhubDetached = true
+    }).observe(document.documentElement, { childList: true, subtree: true })
+  })
   const sameCanvas = async (label) => {
     // 整頁重載之後舊的 handle 連 evaluate 都做不了（執行環境沒了）—— 那也是「不是同一個」。
     const connected = await canvas.evaluate((el) => el.isConnected).catch(() => false)
     const count = await page.evaluate(() => document.querySelectorAll('canvas').length)
     const mark = await page.evaluate(() => window.__guildhubMark)
-    if (connected && count === 1 && mark === 'mounted-once') ok(`[S12] ${label}：Canvas 還是同一個節點（頁面沒重載）`)
-    else bad(`[S12] ${label}：Canvas 被重掛了`, `isConnected=${connected}，canvas 數=${count}，記號=${mark}（記號不見 = 整頁重載）`)
+    const detached = await page.evaluate(() => window.__guildhubDetached)
+    if (connected && !detached && count === 1 && mark === 'mounted-once') ok(`[S12] ${label}：Canvas 還是同一個節點，中途沒斷開（頁面沒重載）`)
+    else bad(`[S12] ${label}：Canvas 被重掛了`, `isConnected=${connected}，中途斷開過=${detached}，canvas 數=${count}，記號=${mark}（記號不見 = 整頁重載）`)
   }
 
   // 出生點 (0, -1)；人才看板在 (3.5, -6.5)。
@@ -141,13 +150,16 @@ try {
   await sameCanvas('下一頁之後')
 
   await page.keyboard.press('Escape')
+  await page.waitForSelector('[data-testid="talent-detail"]', { state: 'detached', timeout: 3_000 }).catch(() => {})
   await expectUrl(page, '[S10] 第一下 Escape', '/world?panel=profiles')
+  await sameCanvas('第一下 Escape 之後')
   await page.keyboard.press('Escape')
   await expectUrl(page, '[S10] 第二下 Escape', '/world')
-  const panelGone = (await page.$('[data-testid="list-panel"]')) === null
+  // 等面板真的從 DOM 拔掉再量 —— 量早了，「這一步剛好重掛」尺看不到（審查抓到的）。
+  const panelGone = await page.waitForSelector('[data-testid="list-panel"]', { state: 'detached', timeout: 3_000 }).then(() => true).catch(() => false)
   if (panelGone) ok('[S10] 兩下 Escape 之後面板關了')
   else bad('[S10] 兩下 Escape 之後面板還在', '')
-  await sameCanvas('Escape 兩次之後')
+  await sameCanvas('第二下 Escape 之後')
   // 退回去的紀錄還在：前進一次又是清單。
   await page.goForward()
   const forwardList = await page.waitForSelector('[data-testid="list-panel"]', { timeout: 3_000 }).catch(() => null)
