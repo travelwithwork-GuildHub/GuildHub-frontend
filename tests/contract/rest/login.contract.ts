@@ -8,7 +8,7 @@ import { ContractClient, baseUrl } from '../client'
 // 規格：openspec/changes/fe-o03-internal-backend/specs/internal-backend/spec.md
 //   Requirement: 每個 handler 走同一條管線，錯誤形狀複製真後端 —— S03
 //   Requirement: session 是簽章的 HttpOnly cookie —— S06、S07
-//   Requirement: 登入有三種模式，剛好給一組 —— S09、S10、S11（S12 要數名片，在 `profiles.contract.ts`）
+//   Requirement: 登入有三種模式，剛好給一組 —— S09～S12
 //
 // 同一組對 internal 與 guildhub 各跑一次；這個檔案不知道自己在打誰。
 // 422 的形狀對 `golden/422.json`（對真後端實錄）比：status、loc[0]、type。
@@ -73,6 +73,15 @@ describe('login', () => {
     expect(wrong.text).toBe(nobody.text)
   })
 
+  it('[FE-O03-S12] resume 一張不存在的名片：404，而且沒有建新名片（再 resume 一次還是 404）', async () => {
+    const c = new ContractClient(baseUrl())
+    const first = await c.raw('POST', '/api/login', { body: { resume_token: ZERO } })
+    expect(first.status).toBe(404)
+    expect(first.json).toEqual({ detail: '名片不存在' })
+    // 靜默改成「建一張新的」的話，第二次就會 200 —— 「我回來了」與「我是新來的」在前端會長得一模一樣。
+    const second = await c.raw('POST', '/api/login', { body: { resume_token: ZERO } })
+    expect(second.status, '第一次 404 之後第二次卻成功：resume 偷偷建了名片').toBe(404)
+  })
 })
 
 describe('session', () => {
