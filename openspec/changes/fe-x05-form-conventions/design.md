@@ -33,6 +33,11 @@ WBS 有這一條，但今天沒有表單該用它（`FE-A04` 悲觀更新：成�
 一位審查者：表單長、送出鈕在下面、錯誤在頂端 → 按了看不到。所以 alert 放送出鈕**上方**（DOM 順序在鈕之前），`role="alert"`。
 文案唯一來源 `toUiError`（`FE-X03`）；不做 422 的 per-field 對映（前端已先驗，422 是漂移或 bug）。
 
+**修正（實作 `LoginForm` 時發現）**：`toUiError` 是封閉語彙，`NicknameLengthError`／`RecoveryKeyRejectedError` 會變成「預期之外」——
+而 `FE-A01-S02`（alert 含 "20"）、`S10`（alert 含「不存在」）是已合併的判準、`S13` 要它們全綠。兩位審查者一致選：`useForm` 加可選
+`describeError(cause) → string | null`，只給前端自己定義的領域錯誤（`instanceof`）；拒絕的兩個替代 —— 把領域錯誤教給 `toUiError`
+（基礎層反向 import identity），或欄位錯誤各自 `role="alert"`（多個 alert：讀屏重播、`getByRole('alert')` 會 throw）。
+
 ## D6｜`LoginForm` 遷、`AvatarPicker` 不遷
 
 `AvatarPicker` 是草稿式 picker（點了就套用、失焦就丟），不是「多欄填好按送出」的表單；硬塞 RHF 只會模糊它的互動模型。
