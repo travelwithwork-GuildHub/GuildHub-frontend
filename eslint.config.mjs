@@ -33,6 +33,8 @@ import next from 'eslint-config-next'
 const DATA_ACCESS_PATHS = ['src/api/**', 'src/app/api/**']
 // 契約測試（FE-O05）刻意走真 HTTP、**刻意不經 `src/api/`**（經過的話 `max+1` 在送出前就被 Zod 擋掉，看不到後端）。
 // 精確到檔案，不是 `tests/**`：測試檔裡順手 fetch 的那一次還是要被擋。
+/** FE-O06：這兩個檔案的 `.min()`／`.max()` 只能接 `LIMITS.*`。精確路徑。 */
+const CONTRACT_SCHEMA_PATHS = ['src/api/contract/rest.ts', 'src/api/contract/ws.ts']
 const CONTRACT_HTTP_PATHS = ['tests/contract/client.ts', 'tests/contract/harness.ts', 'scripts/contract-guildhub.mjs', 'tests/contract/ws/rooms.contract.ts']
 // 本地後端問即時層替身人數（FE-O03 design D5）：伺服器對自己 loopback 的一次 HTTP，跟「元件裡的 fetch」是兩件事。精確到檔案。
 const SERVER_LOOPBACK_PATHS = ['src/server/realtime.ts']
@@ -226,6 +228,29 @@ const config = [
         ALIASED_PROCESS_ENV,
         ...ERROR_BOUNDARY,
         ...SLOT_RULES,
+      ],
+    },
+  },
+
+  // 規格 FE-O06：契約 schema 的 `.min()`／`.max()` 不接數字字面 —— 數字只能來自 `LIMITS`。
+  //
+  // **窄的規則，不是「元件不得出現 20／300／2000」那種 magic-number lint**（兩位審查者第二輪一致：那種誤報多、
+  // `19 + 1` 就繞過、證明不了 UI 用對欄位；repo 原則是沒有事故不加閘門）。這裡只掃**契約 schema 這兩個檔案**：
+  // 那是「數字第二次出現」最可能的地方，而且那裡沒有任何合法理由寫數字字面（連分頁大小都在 `limits.ts`）。
+  // `src/api/**` 在上面那條 `no-restricted-syntax` 的 ignores 裡，所以這條要自己一個區塊；
+  // 這個區塊**只有**這兩個檔案，不會覆蓋別人的規則。
+  {
+    files: CONTRACT_SCHEMA_PATHS,
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          // 引數（callee 之後的第一個 child）**只能是** `LIMITS.<欄位>.<min|max>` 這種 member expression。
+          // 不是「禁止數字字面」—— 那擋不住 `Number("20")`、`10 + 10`、本地常數（審查抓到的）；正面列舉才擋得住。
+          selector:
+            'CallExpression[callee.property.name=/^(min|max)$/] > :first-child:not(MemberExpression[object.object.name="LIMITS"])',
+          message: '契約 schema 的 .min()/.max() 只能接 LIMITS.<欄位>.min／.max（src/api/contract/limits.ts），規格 FE-O06。',
+        },
       ],
     },
   },

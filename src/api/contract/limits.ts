@@ -67,6 +67,8 @@ export const LIMITS = {
    * 不在資料庫 —— 而且是每個專案不同的值，所以放不進這張表。
    */
   seatIndex: { min: 0, max: 7 },
+  /** WS `move.f`：面向 0～3（`protocol.py` 的 `Move.f`、`FACING`）。是範圍不是長度，但同樣是「不能在 schema 裡再寫一次的數字」。 */
+  facing: { min: 0, max: 3 },
 
   /**
    * ⚠️ **後端完全沒有上限的欄位。** 記成 `UNBOUNDED` 而不是省略。
@@ -83,3 +85,49 @@ export const LIMITS = {
 
 /** 後端 `list_*` 的 offset 翻頁大小。沒有 total、沒有 `has_more`（`BE-G05`）。 */
 export const PAGE_SIZE = 20
+
+/** 一個限制的形狀：`max` 是 `UNBOUNDED`（null）代表後端沒有上限。 */
+export type Limit = { readonly min: number; readonly max: number | typeof UNBOUNDED }
+
+/**
+ * 每一個數字從哪抄的、什麼時候對過。規格 `FE-O06`〈`LIMITS` 是唯一來源〉。
+ * 這是資料不是註解：`FE-O05` 對真後端跑綠的那一天，`checkedOn` 要跟著更新；
+ * 「哪個數字最久沒對過」列得出來。
+ */
+export const LIMIT_SOURCES: Record<keyof typeof LIMITS, { source: string; checkedOn: string }> = {
+  displayName: { source: 'sql/001_schema.sql:13', checkedOn: '2026-09-11' },
+  loginId: { source: 'sql/001_schema.sql:14', checkedOn: '2026-09-11' },
+  password: { source: 'app/models.py RegisterIn.password Field(min_length=8)', checkedOn: '2026-09-11' },
+  bio: { source: 'sql/001_schema.sql:17', checkedOn: '2026-09-11' },
+  messageBody: { source: 'sql/001_schema.sql:61', checkedOn: '2026-09-11' },
+  statusText: { source: 'app/realtime/presence.py:10 STATUS_MAX_CHARS', checkedOn: '2026-09-11' },
+  seatIndex: { source: 'sql/001_schema.sql:53 seat_in_range', checkedOn: '2026-09-11' },
+  facing: { source: 'app/realtime/protocol.py Move.f（0～3）', checkedOn: '2026-09-11' },
+  projectTitle: { source: 'sql/001_schema.sql:27（沒有 check）', checkedOn: '2026-09-11' },
+  projectBody: { source: 'sql/001_schema.sql:28（沒有 check）', checkedOn: '2026-09-11' },
+  skillCount: { source: 'sql/001_schema.sql skills text[]（沒有 check）', checkedOn: '2026-09-11' },
+  skillLength: { source: 'sql/001_schema.sql skills text[]（沒有 check）', checkedOn: '2026-09-11' },
+}
+
+// ─── 長度單位是 Unicode code point：這三個 helper 是唯一算法。規格 `FE-O06`〈長度單位是 Unicode code point〉 ───
+//
+// ⚠️ **JS 的 `.length` 與 HTML `maxlength` 數的是 UTF-16 code unit**：20 個 emoji 的 `.length` 是 40，
+// 後端（`char_length`、Python `len`）數的是 20。用 `.length` 的 UI 會說「超長」而後端其實收得下。
+
+/** `s` 有幾個 code point。 */
+export function codePointLength(s: string): number {
+  return Array.from(s).length
+}
+
+/** 還可以打幾個字；可為負（超過幾個字）；`max` 是 `UNBOUNDED` 時是 `null`。**不 clamp** —— 表單要顯示「超過 3 字」。 */
+export function remaining(limit: Limit, s: string): number | null {
+  return limit.max === UNBOUNDED ? null : limit.max - codePointLength(s)
+}
+
+/** 違反了哪一邊：少於 `min`、多於 `max`（`UNBOUNDED` 永不），或沒有。 */
+export function violates(limit: Limit, s: string): 'too-short' | 'too-long' | null {
+  const n = codePointLength(s)
+  if (n < limit.min) return 'too-short'
+  if (limit.max !== UNBOUNDED && n > limit.max) return 'too-long'
+  return null
+}
