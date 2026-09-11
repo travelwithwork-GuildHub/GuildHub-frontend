@@ -24,4 +24,4 @@
 ## 4. 收尾
 
 - [x] 4.1 `npm run typecheck`、`npm run lint`、`npm test` 全綠
-- [ ] 4.2 封存（`archive/fe-o06-limit-source`，獨立 PR）
+- [x] 4.2 封存（`archive/fe-o06-limit-source`，下一個 PR）
