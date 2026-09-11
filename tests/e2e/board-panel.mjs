@@ -118,9 +118,16 @@ try {
   await page.route('**/api/rooms', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
   )
-  await page.route(`**/api/profiles/${PROFILES[0].id}`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DETAIL) }),
-  )
+  // 兩張卡的詳情都攔：返回之後焦點回到那張卡（FE-X06-S12），下一個 Tab 到的是**第二張**卡。
+  for (const p of PROFILES) {
+    await page.route(`**/api/profiles/${p.id}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(p.id === PROFILES[0].id ? DETAIL : p),
+      }),
+    )
+  }
 
   const response = await page.goto(`${FRONTEND}/world`).catch(() => null)
   if (response === null) throw new Error(`連不到 ${FRONTEND} —— dev server 起了嗎？（npm run dev）`)
@@ -210,23 +217,63 @@ try {
   const detail = await page.waitForSelector('[data-testid="talent-detail"][data-phase="ready"]', { timeout: 5_000 }).catch(() => null)
   if (detail === null) bad('[B04-S06] 詳情沒有載入完成', '')
   else {
+    const which = await detail.getAttribute('data-profile-id')
     const bio = await page.$eval('[data-testid="talent-bio"]', (n) => n.textContent ?? '')
-    if (bio.includes('詳情端點回的新自介')) ok('[B04-S06] 詳情呈現的是 GET /api/profiles/{id} 回的那一筆，不是列表那一筆')
-    else bad('[B04-S06] 詳情用的是列表那一筆', `bio：${bio}`)
+    // Space 那一輪開的是第一張（bio 是詳情端點的新自介）；Enter 那一輪焦點從第一張卡 Tab 到第二張。
+    const expected = which === PROFILES[0].id ? '詳情端點回的新自介' : '未提供'
+    if (bio.includes(expected)) ok(`[B04-S06] 詳情（${which === PROFILES[0].id ? '第一張' : '第二張'}）呈現的是 GET /api/profiles/{id} 回的那一筆`)
+    else bad('[B04-S06] 詳情用的是列表那一筆', `id=${which}，bio：${bio}`)
     const inert = await page.$eval('[data-testid="list-panel-list"]', (n) => n.hasAttribute('inert'))
     if (inert) ok('[B04-S16] 詳情開著時列表區是 inert')
     else bad('[B04-S16] 列表區沒有 inert', '')
   }
   await page.screenshot({ path: path.join(OUT, 'talent-detail-open.png') })
-  await page.click('button:has-text("返回")')
+
+  // ── FE-X06 S11：詳情開著，Tab 在面板內循環，不會跑到標題列 ──────────
+  const activeIds = []
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('Tab')
+    activeIds.push(
+      await page.evaluate(() => {
+        const el = document.activeElement
+        return el === null ? 'null' : `${el.tagName.toLowerCase()}:${el.getAttribute('data-testid') ?? el.textContent?.trim().slice(0, 8) ?? ''}`
+      }),
+    )
+  }
+  const insidePanel = await page.evaluate(
+    (ids) => {
+      const panel = document.querySelector('[data-testid="list-panel"]')
+      // 每一次 Tab 之後焦點都要在面板裡（用最後一次判斷，其餘看紀錄）
+      return panel !== null && panel.contains(document.activeElement) && ids.every((id) => !id.includes('建立你的身分'))
+    },
+    activeIds,
+  )
+  if (insidePanel) ok(`[X06-S11] Tab 六次都留在面板內：${activeIds.join(' → ')}`)
+  else bad('[X06-S11] Tab 跑出面板了', activeIds.join(' → '))
+
+  // ── FE-X06 S01：兩次 Escape，一次一層 ─────────────────────────────
+  await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
-  const stillDetail = await page.$('[data-testid="talent-detail"]')
+  const afterFirst = { detail: await page.$('[data-testid="talent-detail"]'), panel: await page.$('[data-testid="list-panel"]') }
+  if (afterFirst.detail === null && afterFirst.panel !== null) ok('[X06-S01] 第一下 Escape：詳情關、面板還在')
+  else bad('[X06-S01] 第一下 Escape 不對', `detail=${afterFirst.detail !== null}，panel=${afterFirst.panel !== null}`)
   const cardCount = (await page.$$('[data-testid="talent-card"]')).length
-  if (stillDetail === null && cardCount === PROFILES.length) ok(`[B04-S11] 返回之後列表還在（${cardCount} 張卡）`)
-  else bad('[B04-S11] 返回之後列表不對', `detail=${stillDetail !== null}，卡片 ${cardCount} 張`)
+  if (cardCount === PROFILES.length) ok(`[B04-S11] 返回之後列表還在（${cardCount} 張卡）`)
+  else bad('[B04-S11] 返回之後列表不對', `卡片 ${cardCount} 張`)
+  const focusAfterDetail = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName ?? 'null')
+  if (focusAfterDetail === 'talent-card') ok('[X06-S12] 詳情關了，焦點回到那張卡')
+  else bad('[X06-S12] 詳情關了焦點不在卡上', `activeElement 是 ${focusAfterDetail}`)
 
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
+  const afterSecond = await page.$('[data-testid="list-panel"]')
+  if (afterSecond === null) ok('[X06-S01] 第二下 Escape：面板關')
+  else bad('[X06-S01] 第二下 Escape 面板還在', '')
+  // ── FE-X06 S13：面板關了，焦點在世界焦點錨上 ──────────────────────
+  const anchor = await page.evaluate(() => document.activeElement?.getAttribute('data-focus-anchor') ?? `(${document.activeElement?.tagName ?? 'null'})`)
+  if (anchor === 'world') ok('[X06-S13] 面板關了，焦點在世界焦點錨上')
+  else bad('[X06-S13] 面板關了焦點不在錨上', `activeElement 是 ${anchor}`)
+  // 再打開人才看板讓後面 401 那一段照舊（它會自己按 Escape 關）
 
   // ── FE-X04 S04：訪客按 E 看到的是「要登入」，不是空白 ─────────────
   guest = true

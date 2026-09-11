@@ -80,11 +80,14 @@ export function ListPanel<K extends ListKind>({
     if (focusable.length === 0) return
     const first = focusable[0] as HTMLElement
     const last = focusable[focusable.length - 1] as HTMLElement
-    const active = document.activeElement
-    if (e.shiftKey && (active === first || active === section.current || active === list.current)) {
+    const index = focusable.indexOf(document.activeElement as HTMLElement)
+    // 只在邊界攔：最後一個往前 → 第一個；第一個往後 → 最後一個。
+    // 焦點在容器上（列表本身、詳情本身，tabIndex=-1）時往前走交給瀏覽器（DOM 順序的下一個就在容器裡），
+    // 往後走才繞到最後一個 —— 瀏覽器的預設會跑出面板。
+    if (e.shiftKey && (index === 0 || index === -1)) {
       e.preventDefault()
       last.focus()
-    } else if (!e.shiftKey && active === last) {
+    } else if (!e.shiftKey && index === focusable.length - 1) {
       e.preventDefault()
       first.focus()
     }
