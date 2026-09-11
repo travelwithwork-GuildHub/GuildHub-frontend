@@ -107,6 +107,8 @@ describe('名字是入口，面板是阻斷式的', () => {
     const panel = screen.getByTestId('profile-panel')
     expect(locked(), '面板開著，世界的輸入沒有被鎖住').toBe(true)
     expect(panel.contains(document.activeElement), '焦點不在面板內').toBe(true)
+    // 初次打開的焦點在面板的內容根節點（Tab 從頭開始），不是被「編輯」鈕搶走（審查抓到 effect 在掛載時也跑）。
+    expect(document.activeElement?.getAttribute('data-mode')).toBe('view')
   })
 
   it('[FE-A04-S02] Escape 關面板：面板不再顯示、鎖放開、焦點回按鈕', async () => {
