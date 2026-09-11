@@ -184,6 +184,40 @@ const SLOT_RULES = SLOT_ROOTS.flatMap((root) => [
   `${root} > JSXFragment`,
 ]).map((selector) => ({ selector, message: SLOT_MSG }))
 
+// ─────────────────────────────────────────────────────────────────────────
+// 規格 FE-T06：危險面在 lint 就被擋下 —— 語法閘門，正面列舉、窄。
+//
+// 三條：`dangerouslySetInnerHTML`（JSX 屬性、物件屬性 —— spread 進 JSX、`createElement` 的 props 都是物件屬性）、
+// 四種主動嵌入的靜態 JSX 標籤、**原生 `<a>`** 的 `href` 只放行字串字面與沒有 `${}` 的樣板字面
+//（`` `${user.url}` `` 是直接的繞法；數字／null／布林字面與裸的 `<a href />` 也報）。
+// 要畫使用者給的網址只能用 `src/security/SafeExternalLink.tsx`（那個檔案是第三條的唯一例外，見下面的 override）。
+//
+// **擋得住**：上面列的語法形狀。**擋不住**（規格明寫不宣稱）：`const Tag = 'iframe'; <Tag />`、`createElement('iframe')`、
+// 同名遮蔽的元件、把 `<a>` 包成自訂元件再傳 href —— 那些是刻意繞法，靠 review。
+// 自訂元件（`<Link href={…}>`）與 `src` 屬性不在裡面：站內動態路徑走 `<Link>`；`<img src={asset}>` 是 Next 的常態。
+const OUTPUT_SAFETY_MSG = (what) => `${what} —— 規格 FE-T06〈危險面在 lint 就被擋下〉。`
+const DANGEROUS_HTML = [
+  { selector: "JSXIdentifier[name='dangerouslySetInnerHTML']", message: OUTPUT_SAFETY_MSG('不得使用 dangerouslySetInnerHTML') },
+  { selector: "Property[key.name='dangerouslySetInnerHTML'], Property[key.value='dangerouslySetInnerHTML']", message: OUTPUT_SAFETY_MSG('不得使用 dangerouslySetInnerHTML（物件屬性、spread、createElement 都算）') },
+]
+const EMBED_TAGS = {
+  selector: 'JSXOpeningElement[name.name=/^(iframe|script|embed|object)$/]',
+  message: OUTPUT_SAFETY_MSG('不得直接寫 <iframe>／<script>／<embed>／<object>'),
+}
+const RAW_ANCHOR_HREF_MSG = OUTPUT_SAFETY_MSG('原生 <a> 的 href 只能是字串字面或沒有 ${} 的樣板字面；使用者給的網址用 <SafeExternalLink>（src/security）')
+const RAW_ANCHOR_HREF = [
+  {
+    selector:
+      // `Literal.value` 是原始值、沒有 `.type` —— 要分「字串字面」只能看 `raw`（以引號開頭）；審查抓到 `[value.type='string']` 永遠不匹配、會誤擋 `href={'/world'}`。
+      "JSXOpeningElement[name.name='a'] > JSXAttribute[name.name='href'] > JSXExpressionContainer > :not(Literal[raw=/^[\"']/], TemplateLiteral[expressions.length=0])",
+    message: RAW_ANCHOR_HREF_MSG,
+  },
+  { selector: "JSXOpeningElement[name.name='a'] > JSXAttribute[name.name='href'][value=null]", message: RAW_ANCHOR_HREF_MSG },
+]
+const OUTPUT_SAFETY = [...DANGEROUS_HTML, EMBED_TAGS, ...RAW_ANCHOR_HREF]
+const OUTPUT_SAFETY_WITHOUT_ANCHOR = [...DANGEROUS_HTML, EMBED_TAGS]
+const SAFE_EXTERNAL_LINK = 'src/security/SafeExternalLink.tsx'
+
 const config = [
   { ignores: ['.next/**', 'node_modules/**'] },
 
@@ -208,7 +242,7 @@ const config = [
   {
     files: ['src/**'],
     rules: {
-      'no-restricted-syntax': ['error', ANY_PROCESS_ENV, COMPUTED_PROCESS_ENV, ALIASED_PROCESS_ENV],
+      'no-restricted-syntax': ['error', ANY_PROCESS_ENV, COMPUTED_PROCESS_ENV, ALIASED_PROCESS_ENV, ...OUTPUT_SAFETY],
     },
   },
 
@@ -219,7 +253,7 @@ const config = [
   // `ignores` 是精確路徑不是 `**/src/api/**`，理由同 no-fetch。
   {
     files: ['src/**'],
-    ignores: ['src/api/**', 'src/errors/**', ENV_ONLY],
+    ignores: ['src/api/**', 'src/errors/**', ENV_ONLY, SAFE_EXTERNAL_LINK],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -228,6 +262,25 @@ const config = [
         ALIASED_PROCESS_ENV,
         ...ERROR_BOUNDARY,
         ...SLOT_RULES,
+        ...OUTPUT_SAFETY,
+      ],
+    },
+  },
+
+  // 規格 FE-T06：`SafeExternalLink.tsx` 是「原生 `<a>` 的動態 href」那一條的**唯一**例外（它裡面就是 `<a href={safe}>`）。
+  // 不是整個 block 的 `ignores`（那會連 process.env、dangerouslySetInnerHTML、嵌入標籤一起放掉 —— 審查抓到的）：
+  // 這個 override 帶著除了那一條以外的全部。**完整路徑不是萬用字元**，理由同 `ENV_ONLY`。
+  {
+    files: [SAFE_EXTERNAL_LINK],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ANY_PROCESS_ENV,
+        COMPUTED_PROCESS_ENV,
+        ALIASED_PROCESS_ENV,
+        ...ERROR_BOUNDARY,
+        ...SLOT_RULES,
+        ...OUTPUT_SAFETY_WITHOUT_ANCHOR,
       ],
     },
   },
