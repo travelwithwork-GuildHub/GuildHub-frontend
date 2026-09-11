@@ -13,7 +13,10 @@ import { ErrorEnvelope } from './contract/errors'
 // 那是唯一准許讀 `process.env` 的檔案，而它對「部署出去卻沒設位址」的處置
 // 是拋錯而不是退回 localhost。在這裡寫死位址會繞過那道防線。
 
-/** 這個 adapter 還沒有後端可以連。規格 `FE-O02-S02`。 */
+/**
+ * 這個 adapter 還沒有後端可以連。`FE-O03` 之前 `internal` 會拋它；現在兩個 adapter 都有後端，
+ * 沒有任何一條路會拋 —— 型別留著給 `FE-X03` 的翻譯（`unexpected`）與未來新的 adapter。
+ */
 export class AdapterNotImplementedError extends Error {
   override name = 'AdapterNotImplementedError'
   constructor(
@@ -224,26 +227,33 @@ export function buildRequest(spec: RequestSpec): Request {
     init.body = JSON.stringify(spec.body)
     init.headers = { 'content-type': 'application/json' }
   }
-  return new Request(`${restBase()}${path}${queryString(spec.query)}`, init)
+  return new Request(`${baseFor(dataAdapter())}${path}${queryString(spec.query)}`, init)
+}
+
+/**
+ * 兩個 adapter 走同一份 operation 與契約，差別**只在這裡**：`guildhub` 打 `NEXT_PUBLIC_GUILDHUB_REST`，
+ * `internal` 打**同源**的 `/api/...`（我們自己的 Route Handlers，`FE-O03`）。規格 `FE-O02-S02`（改寫版）。
+ * 同源用相對網址：瀏覽器自己補主機名；jsdom 裡 `new Request('/api/me')` 會拿 `location.origin` 補上。
+ */
+function baseFor(adapter: ReturnType<typeof dataAdapter>): string {
+  if (adapter !== 'internal') return restBase()
+  // 同源。用 `location.origin` 組成絕對網址：Node 的 `Request` 不接受相對網址（jsdom 裡是 Node 的 `Request`），
+  // 而瀏覽器裡 `location.origin` 就是這個頁面的來源 —— 兩邊同一個寫法。
+  return typeof location === 'undefined' ? '' : location.origin
 }
 
 /**
  * 送出一個請求並用契約解析回應。
  *
- * ⚠️ **adapter 的判斷在最前面，在建立任何請求之前。**
- * 放在後面的話，`internal` 模式下會先送出去、失敗了才拋錯 ——
- * 那等於偷偷打到真後端（規格 `FE-O02-S02` 明文要求「不得送出任何網路請求」）。
+ * adapter 的差別在 `buildRequest` 組網址那一步（`baseFor`）；`FE-O03` 之前 `internal` 在這裡直接拋
+ * `AdapterNotImplementedError`（本地後端還不存在）。現在兩邊都是真的後端，走同一條路。
+ * `dataAdapter()` 認不得的值仍在讀設定時就拋（`FE-O02-S03`），不會退回任何一邊。
  */
 export async function send<T>(
   operation: string,
   spec: RequestSpec,
   output: z.ZodType<T>,
 ): Promise<T> {
-  const adapter = dataAdapter()
-  if (adapter !== 'guildhub') {
-    throw new AdapterNotImplementedError(operation, adapter)
-  }
-
   // ⚠️ `buildRequest` 在 `try` **外面**：它拋的是設定錯誤或程式 bug，
   // 包成 `NetworkError` 就是把「位址沒設」說成「檢查一下網路」。
   const request = buildRequest(spec)
