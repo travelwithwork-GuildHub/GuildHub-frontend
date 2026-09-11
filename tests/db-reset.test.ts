@@ -1,9 +1,12 @@
 // @vitest-environment node
+import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import net from 'node:net'
+import os from 'node:os'
+import path from 'node:path'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { DbScriptError, reset, seed } from '../scripts/db.mjs'
-import { testDatabase } from './support/test-db'
+import { databaseIdentity, testDatabase } from './support/test-db'
 
 // 規格：openspec/changes/fe-o04-disposable-db/specs/disposable-db/spec.md
 //   Requirement: 一個指令回到乾淨狀態 —— S03、S04、S05、S07
@@ -56,7 +59,7 @@ describe.skipIf(url === null)('reset／seed（需要 INTERNAL_TEST_DATABASE_URL�
     await client.query('drop schema public cascade; create schema public;')
     expect(await tables(client)).toEqual([])
     await reconnect()
-    await expect(reset({ url: url ?? '' })).rejects.toThrow(/第一次請用 --init/)
+    await expect(reset({ url: url ?? '' })).rejects.toThrow(/請用 reset --init/)
     await expect(reset({ url: url ?? '', init: true })).resolves.toEqual(expect.arrayContaining(['001_schema.sql', '002_seed.sql']))
     await reconnect()
     expect(await tables(client)).toContain('_guildhub_disposable')
@@ -103,12 +106,39 @@ describe.skipIf(url === null)('reset／seed（需要 INTERNAL_TEST_DATABASE_URL�
     expect(after.messages).toBe(before.messages + 8)
   })
 
-  it('[FE-O04-S08] 沒有標記的資料庫不能被 reset，內容原封不動', async () => {
+  it('[FE-O04-S04] 中途失敗整個回滾：標記還在、資料不變', async () => {
+    await reconnect()
+    const before = await counts(client)
+    // 一份 schema 目錄：真的 001／002 加一個語法錯誤的 1xx。
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'schema-'))
+    try {
+      await cp(path.resolve(__dirname, '..', 'db', 'schema'), dir, { recursive: true })
+      await writeFile(path.join(dir, '150_broken.sql'), `${'-- 前端自己加的，後端沒有：'}故意壞掉\nthis is not sql;`)
+      await expect(reset({ url: url ?? '', dir })).rejects.toThrow()
+    } finally {
+      await rm(dir, { recursive: true })
+    }
+    await reconnect()
+    expect(await tables(client), '失敗之後標記不見了 —— 這個庫從此誰都不能 reset').toContain('_guildhub_disposable')
+    expect(await counts(client)).toEqual(before)
+  })
+
+  it('[FE-O04-S04] 兩個 reset 同時跑：至少一個成功，結束時庫是完整的', async () => {
+    await reconnect()
+    const results = await Promise.allSettled([reset({ url: url ?? '' }), reset({ url: url ?? '' })])
+    expect(results.some((r) => r.status === 'fulfilled')).toBe(true)
+    await reconnect()
+    expect(await tables(client)).toContain('_guildhub_disposable')
+    expect(await counts(client)).toEqual(SEEDED)
+  })
+
+  it('[FE-O04-S08] 沒有標記的資料庫不能被 reset、不能被 seed，內容原封不動', async () => {
     await reconnect()
     await client.query('drop table _guildhub_disposable')
     const before = await counts(client)
     await expect(reset({ url: url ?? '' })).rejects.toThrow(/不是這支腳本建立的/)
     await expect(reset({ url: url ?? '', init: true }), '有表的庫不能被 --init').rejects.toThrow(/已經有 .* 張表/)
+    await expect(seed({ url: url ?? '' }), 'seed 寫進了沒有標記的庫').rejects.toThrow(/不是這支腳本建立的/)
     expect(await counts(client)).toEqual(before)
     // 還原給後面的測試檔用。
     await client.query('drop schema public cascade; create schema public;')
@@ -125,9 +155,17 @@ describe('守門不需要資料庫', () => {
     expect(Date.now() - started, '花太久 —— 像是真的去連了').toBeLessThan(500)
   })
 
-  it('[FE-O04-S10] 測試庫等於開發庫：拒絕', () => {
-    const same = 'postgresql://guildhub:guildhub@localhost:5432/guildhub_frontend'
-    expect(() => testDatabase({ INTERNAL_DATABASE_URL: same, INTERNAL_TEST_DATABASE_URL: same })).toThrow(/必須分開/)
+  it('[FE-O04-S10] 測試庫等於開發庫：拒絕 —— 等價的寫法也算同一個庫', () => {
+    const dev = 'postgresql://guildhub:guildhub@localhost:5432/guildhub_frontend'
+    for (const test of [
+      dev,
+      'postgresql://guildhub:guildhub@localhost/guildhub_frontend',
+      'postgresql://other:pw@LOCALHOST:5432/guildhub_frontend?sslmode=disable',
+    ]) {
+      expect(() => testDatabase({ INTERNAL_DATABASE_URL: dev, INTERNAL_TEST_DATABASE_URL: test }), test).toThrow(/必須分開/)
+    }
+    expect(testDatabase({ INTERNAL_DATABASE_URL: dev, INTERNAL_TEST_DATABASE_URL: `${dev}_test` })).toEqual({ url: `${dev}_test` })
+    expect(databaseIdentity('postgresql://a@[::1]:5432/x')).toBe('::1:5432/x')
   })
 
   it('[FE-O04-S11] 沒設測試庫：skip，開發庫沒有收到任何連線', async () => {

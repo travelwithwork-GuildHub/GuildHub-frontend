@@ -1,8 +1,9 @@
 import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { FRONTEND_HEADER, schemaFiles } from '../scripts/db.mjs'
+import { FRONTEND_HEADER, reset, schemaFiles } from '../scripts/db.mjs'
 
 // 規格：openspec/changes/fe-o04-disposable-db/specs/disposable-db/spec.md
 //   Requirement: schema 與 seed 是後端檔案的逐字複本，漂移由機器抓 —— S01、S02
@@ -56,26 +57,29 @@ describe('schema 與 seed 是後端檔案的逐字複本', () => {
 })
 
 describe('前端自己的檔案另外標明', () => {
-  it('[FE-O04-S06] 1xx 沒有標頭：reset 在碰資料庫之前就拒絕；有標頭：列在檔案清單裡、排在 002 之後', async () => {
+  it('[FE-O04-S06] 1xx 沒有標頭：reset 在建立任何連線之前就拒絕；有標頭：列在清單裡、排在 002 之後', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'schema-'))
+    // 一個會數連線的假「資料庫」（loopback，所以過得了 loopback 檢查）：reset 先驗檔案的話它收不到任何連線。
+    let connections = 0
+    const server = net.createServer((socket) => {
+      connections += 1
+      socket.destroy()
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const url = `postgresql://u:p@127.0.0.1:${(server.address() as net.AddressInfo).port}/x`
     try {
       await writeFile(path.join(dir, '001_schema.sql'), 'select 1;')
       await writeFile(path.join(dir, '002_seed.sql'), 'select 2;')
       await writeFile(path.join(dir, '100_roles.sql'), 'create table roles (id int);')
-      await expect(schemaFiles(dir)).rejects.toThrow(/100_roles\.sql 的第一行/)
+      await expect(reset({ url, dir })).rejects.toThrow(/100_roles\.sql 的第一行/)
+      await new Promise((r) => setTimeout(r, 50))
+      expect(connections, '標頭驗不過還去連了資料庫').toBe(0)
       await writeFile(path.join(dir, '100_roles.sql'), `${FRONTEND_HEADER} roles 是 W6 的\ncreate table roles (id int);`)
       const files = (await schemaFiles(dir)).map((f) => path.basename(f))
       expect(files).toEqual(['001_schema.sql', '002_seed.sql', '100_roles.sql'])
     } finally {
+      server.close()
       await rm(dir, { recursive: true })
-    }
-  })
-
-  it('repo 裡現有的 1xx 都有標頭', async () => {
-    const files = await schemaFiles()
-    for (const f of files) {
-      if (!/^1\d\d_/.test(path.basename(f))) continue
-      expect((await readFile(f, 'utf8')).startsWith(FRONTEND_HEADER), f).toBe(true)
     }
   })
 })

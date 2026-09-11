@@ -13,6 +13,10 @@
 //
 // reset 之前先終止這個庫上的其他連線：開著的 GUI client 或背景的 dev server 會讓 `drop schema` 卡住（審查抓到的）。
 //
+// ⚠️ **drop → schema → seed → 標記在同一個交易裡**（Postgres 的 DDL 是交易的）：任何一個 `.sql` 中途失敗就整個回滾，
+// 不會留下一個清空了一半、又沒有標記、之後誰都不能 reset 的庫（審查抓到的）。交易開頭拿 advisory lock，
+// 兩個 reset 同時跑時第二個等第一個 commit；被 `pg_terminate_backend` 請走的那個會失敗，但資料是完整的。
+//
 // 整個 `.sql` 檔當一個 multi-statement query 送（`pg` 的簡單查詢協定）；seed 檔裡沒有 psql 的 `\` 指令（實測過）。
 
 import { readdir, readFile } from 'node:fs/promises'
@@ -23,6 +27,8 @@ import pg from 'pg'
 const SCHEMA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'db', 'schema')
 const MARKER = '_guildhub_disposable'
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
+/** advisory lock 的鍵：任意常數，只要兩個 reset 用同一個。 */
+const RESET_LOCK = 7_04_2026
 
 export class DbScriptError extends Error {
   name = 'DbScriptError'
@@ -66,6 +72,15 @@ async function hasMarker(client) {
   return r.rows[0].t !== null
 }
 
+async function requireMarker(client, what) {
+  if (await hasMarker(client)) return
+  const n = await userTableCount(client)
+  throw new DbScriptError(
+    `這個資料庫沒有 ${MARKER} 標記，不是這支腳本建立的 —— ${what}不動它。` +
+      (n === 0 ? ' 它是空的：第一次請用 reset --init。' : ` 它有 ${n} 張表，看起來是真的資料。`),
+  )
+}
+
 async function userTableCount(client) {
   const r = await client.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'")
   return r.rows[0].n
@@ -82,41 +97,48 @@ export async function reset({ url, init = false, dir = SCHEMA_DIR }) {
   const client = new pg.Client({ connectionString: url })
   await client.connect()
   try {
-    if (!(await hasMarker(client))) {
-      const n = await userTableCount(client)
-      if (!init) {
-        throw new DbScriptError(
-          `這個資料庫沒有 ${MARKER} 標記，不是這支腳本建立的 —— 不動它。` +
-            (n === 0 ? ' 它是空的：第一次請用 --init。' : ` 它有 ${n} 張表，看起來是真的資料。`),
-        )
+    if (init) {
+      if (await hasMarker(client)) {
+        // 已經是我們的庫：--init 多餘但無害，照一般 reset 走。
+      } else {
+        const n = await userTableCount(client)
+        if (n !== 0) throw new DbScriptError(`--init 只給空的資料庫；這個庫已經有 ${n} 張表，不初始化。`)
       }
-      if (n !== 0) {
-        throw new DbScriptError(`--init 只給空的資料庫；這個庫已經有 ${n} 張表，不初始化。`)
-      }
+    } else {
+      await requireMarker(client, 'reset ')
     }
     // 其他連線先請走：drop schema 會等它們的鎖。
     await client.query(
       'select pg_terminate_backend(pid) from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid()',
     )
-    await client.query('drop schema public cascade; create schema public;')
-    for (const file of files) {
-      await client.query(await readFile(file, 'utf8'))
+    await client.query('begin')
+    try {
+      await client.query('select pg_advisory_xact_lock($1)', [RESET_LOCK])
+      await client.query('drop schema public cascade; create schema public;')
+      for (const file of files) {
+        await client.query(await readFile(file, 'utf8'))
+      }
+      // 帶參數的查詢走 extended protocol，一次只能一句 —— 建表與寫入分開。
+      await client.query(`create table ${MARKER} (created_at timestamptz not null default now(), schema_files text[] not null)`)
+      await client.query(`insert into ${MARKER} (schema_files) values ($1)`, [files.map((f) => path.basename(f))])
+      await client.query('commit')
+    } catch (e) {
+      await client.query('rollback').catch(() => {})
+      throw e
     }
-    // 帶參數的查詢走 extended protocol，一次只能一句 —— 建表與寫入分開。
-    await client.query(`create table ${MARKER} (created_at timestamptz not null default now(), schema_files text[] not null)`)
-    await client.query(`insert into ${MARKER} (schema_files) values ($1)`, [files.map((f) => path.basename(f))])
     return files.map((f) => path.basename(f))
   } finally {
     await client.end()
   }
 }
 
-/** 只套 seed（可重複執行：seed 本身是 on conflict do nothing）。 */
+/** 只套 seed（可重複執行：seed 本身是 on conflict do nothing）。寫進去之前一樣先看標記 —— 設錯的環境變數不該污染別的庫。 */
 export async function seed({ url }) {
   assertLoopback(url)
   const client = new pg.Client({ connectionString: url })
   await client.connect()
   try {
+    await requireMarker(client, 'seed ')
     await client.query(await readFile(path.join(SCHEMA_DIR, '002_seed.sql'), 'utf8'))
   } finally {
     await client.end()
