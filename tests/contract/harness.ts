@@ -125,6 +125,15 @@ async function stop(child: ChildProcess): Promise<void> {
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const target = resolveTarget(process.env.CONTRACT_TARGET)
+  // 錄製 golden：只對 guildhub 有意義（golden 是真後端的形狀）；錄製那一次**不算通過**（teardown exit 非 0）。
+  const record = process.env.CONTRACT_RECORD === '1'
+  if (record && target !== 'guildhub') throw new Error('CONTRACT_RECORD=1 只能對 guildhub 錄 —— golden 是真後端的形狀，不是替身的。')
+  project.provide('contractRecord', record)
+  const recorded = async () => {
+    if (!record) return
+    console.log('\n[contract] 已錄製 golden（tests/contract/golden/422.json），這一次不算通過 —— 再不帶 CONTRACT_RECORD 跑一次 compare。')
+    process.exitCode = 1
+  }
 
   if (target === 'guildhub') {
     const base = assertLoopbackBase(process.env.CONTRACT_BASE_URL, 'CONTRACT_BASE_URL')
@@ -160,7 +169,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
     // 真後端沒有 `/online`，room token 由 `enter` 簽發（W4）：這兩個能力在這一輪不存在。
     project.provide('contractOnlineUrl', null)
     project.provide('contractRoomToken', null)
-    return async () => {}
+    return recorded
   }
 
   // ── internal ──
@@ -251,6 +260,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
   return async () => {
     await stop(child)
     await stop(stub)
+    await recorded()
   }
 }
 
