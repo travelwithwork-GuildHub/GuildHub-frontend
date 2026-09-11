@@ -25,15 +25,18 @@ describe('契約 schema 裡的數字字面', () => {
     expect(good).toEqual([])
   }, 30_000)
 
-  it('[FE-O06-S02] ws.ts 一樣擋；負數字面也擋', async () => {
-    expect((await messagesFor('src/api/contract/ws.ts', SCHEMA('3'))).length).toBeGreaterThan(0)
-    expect((await messagesFor('src/api/contract/ws.ts', SCHEMA('-1'))).length).toBeGreaterThan(0)
-  }, 30_000)
+  it('[FE-O06-S02] 正面列舉：不是 LIMITS.<欄位>.<min|max> 的一律擋（數字、負數、模板、Number()、算式、本地常數、ws.ts 也一樣）', async () => {
+    for (const arg of ['3', '-1', '2e1', '`20`', 'Number("20")', '10 + 10', 'LOCAL']) {
+      const code = `const LOCAL = 20\n${SCHEMA(arg)}void LOCAL\n`
+      expect((await messagesFor('src/api/contract/ws.ts', code)).length, `.max(${arg}) 沒被擋`).toBeGreaterThan(0)
+    }
+    expect(await messagesFor('src/api/contract/ws.ts', SCHEMA('LIMITS.facing.min'))).toEqual([])
+  }, 60_000)
 
   it('[FE-O06-S02] 規則是窄的：同樣的 .max(20) 在別的路徑通過', async () => {
     for (const p of ['src/api/contract/limits.ts', 'src/api/operations.ts', 'src/list-panel/paging.ts', 'tests/whatever.test.ts']) {
       const messages = await messagesFor(p, SCHEMA('20'))
-      expect(messages.filter((m) => /LIMITS（src\/api\/contract\/limits\.ts）/.test(m.message)), p).toEqual([])
+      expect(messages.filter((m) => /規格 FE-O06/.test(m.message)), p).toEqual([])
     }
   }, 30_000)
 })

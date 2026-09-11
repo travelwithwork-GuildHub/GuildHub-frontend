@@ -17,8 +17,9 @@ describe('邊界值從 limit 算', () => {
     expect(two.reject).toContain('字'.repeat(201))
 
     const bio = boundaryValues(LIMITS.bio)
-    expect(bio.accept).toContain('字'.repeat(300))
-    expect(bio.reject).toContain('字'.repeat(301))
+    const bioMax = LIMITS.bio.max as number
+    expect(bio.accept).toContain('字'.repeat(bioMax))
+    expect(bio.reject).toContain('字'.repeat(bioMax + 1))
     expect(bio.reject, 'min 是 0 沒有 min-1').not.toContain('')
     expect(bio.accept).toContain('')
 

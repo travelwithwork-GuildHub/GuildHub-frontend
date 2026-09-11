@@ -245,12 +245,11 @@ const config = [
       'no-restricted-syntax': [
         'error',
         {
-          selector: 'CallExpression[callee.property.name=/^(min|max)$/] > Literal[raw=/^[0-9]/]',
-          message: '契約 schema 的 .min()/.max() 不接數字字面：數字只能來自 LIMITS（src/api/contract/limits.ts），規格 FE-O06。',
-        },
-        {
-          selector: 'CallExpression[callee.property.name=/^(min|max)$/] > UnaryExpression > Literal[raw=/^[0-9]/]',
-          message: '契約 schema 的 .min()/.max() 不接數字字面（含負數）：數字只能來自 LIMITS，規格 FE-O06。',
+          // 引數（callee 之後的第一個 child）**只能是** `LIMITS.<欄位>.<min|max>` 這種 member expression。
+          // 不是「禁止數字字面」—— 那擋不住 `Number("20")`、`10 + 10`、本地常數（審查抓到的）；正面列舉才擋得住。
+          selector:
+            'CallExpression[callee.property.name=/^(min|max)$/] > :first-child:not(MemberExpression[object.object.name="LIMITS"])',
+          message: '契約 schema 的 .min()/.max() 只能接 LIMITS.<欄位>.min／.max（src/api/contract/limits.ts），規格 FE-O06。',
         },
       ],
     },
