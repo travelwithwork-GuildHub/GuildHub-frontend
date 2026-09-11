@@ -1,6 +1,6 @@
 import { LIMITS } from '@/api/contract/limits'
 import { getMyProfile, login } from '@/api/operations'
-import { HttpError } from '@/api/transport'
+import { toUiError } from '@/errors/uiError'
 import { browserRecoveryKeyStore, type RecoveryKeyStore } from './recoveryKey'
 import { NicknameLengthError, RecoveryKeyRejectedError, type Identity } from './types'
 
@@ -14,14 +14,18 @@ import { NicknameLengthError, RecoveryKeyRejectedError, type Identity } from './
 // 唯一落地的東西是**恢復金鑰**，而它只在使用者明確選擇之後才寫（`recoveryKey.ts`）。
 
 
-/** 401 是「你是訪客」，不是錯誤。分辨它是這一層最重要的一件事。 */
+// ⚠️ **這一層不讀 HTTP status。** 「這個失敗是哪一種」只有一處在決定
+//（`src/errors/uiError.ts`，規格 `FE-X03-S16`／`S18`）；這裡看的是翻譯出來的 `kind`。
+// 下面兩個 helper 是控制流，不是文案 —— 行為跟以前比 `status === 401`／`404` 時一模一樣。
+
+/** 「要登入」是「你是訪客」，不是錯誤。分辨它是這一層最重要的一件事。 */
 function isUnauthorized(error: unknown): boolean {
-  return error instanceof HttpError && error.status === 401
+  return toUiError(error).kind === 'authentication-required'
 }
 
-/** 404 在登入這條路徑上只有一個意思：那把金鑰指向的名片不存在。 */
+/** 「找不到」在登入這條路徑上只有一個意思：那把金鑰指向的名片不存在。 */
 function isNotFound(error: unknown): boolean {
-  return error instanceof HttpError && error.status === 404
+  return toUiError(error).kind === 'not-found'
 }
 
 /**

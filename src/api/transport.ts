@@ -44,6 +44,24 @@ export class ContractDriftError extends Error {
   }
 }
 
+/**
+ * `fetch` 在拿到回應之前就失敗了：DNS、連線被拒、CORS、離線。規格 `FE-X03-S08`。
+ *
+ * ⚠️ **為什麼要包一層。** `fetch` 自己 reject 的是一個 `TypeError`，而程式自己的 bug
+ * 也是 `TypeError`（`Cannot read properties of undefined`）。翻譯層用 `instanceof TypeError`
+ * 分的話，每一個屬性讀取錯誤都會被說成「檢查一下網路」。這裡是**唯一呼叫 `fetch` 的地方**，
+ * 所以在這裡把它變成一個專屬的型別，翻譯層只認型別不認訊息。
+ */
+export class NetworkError extends Error {
+  override name = 'NetworkError'
+  constructor(
+    readonly operation: string,
+    override readonly cause: unknown,
+  ) {
+    super(`操作「${operation}」連不上後端。`)
+  }
+}
+
 /** 後端回了 4xx／5xx。規格 `FE-O02-S07`。 */
 export class HttpError extends Error {
   override name = 'HttpError'
@@ -226,7 +244,21 @@ export async function send<T>(
     throw new AdapterNotImplementedError(operation, adapter)
   }
 
-  const response = await fetch(buildRequest(spec))
+  // ⚠️ `buildRequest` 在 `try` **外面**：它拋的是設定錯誤或程式 bug，
+  // 包成 `NetworkError` 就是把「位址沒設」說成「檢查一下網路」。
+  const request = buildRequest(spec)
+  let response: Response
+  try {
+    response = await fetch(request)
+  } catch (cause) {
+    // 被中止的請求也是 `fetch` 的 rejection —— 但那是呼叫端自己做的事，不是連不上。
+    // 原樣往上丟，翻譯層認得它（`FE-X03-S17`）。
+    if (cause instanceof Error && cause.name === 'AbortError') throw cause
+    if (typeof DOMException !== 'undefined' && cause instanceof DOMException && cause.name === 'AbortError') {
+      throw cause
+    }
+    throw new NetworkError(operation, cause)
+  }
 
   if (!response.ok) {
     // 錯誤 body 解不出來不是致命的 —— 真正要傳出去的是 status。
