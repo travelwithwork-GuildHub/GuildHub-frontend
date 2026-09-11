@@ -48,8 +48,11 @@ export function useProfileDetail(id: string, preview: ProfileOut | undefined): P
     const controller = new AbortController()
     const captured = id
     void getProfile(captured, { signal: controller.signal }).then(
-      (profile) =>
-        setState((s) => (s.id === captured ? { ...s, phase: 'ready', fetched: profile, error: null } : s)),
+      (profile) => {
+        // 中止之後才成功結算的（理論上 fetch 不會，但別的 adapter 可能）：跟失敗那一支一樣不提交。
+        if (controller.signal.aborted) return
+        setState((s) => (s.id === captured ? { ...s, phase: 'ready', fetched: profile, error: null } : s))
+      },
       (error: unknown) => {
         if (controller.signal.aborted) return
         setState((s) => (s.id === captured ? { ...s, phase: 'error', error } : s))
@@ -62,7 +65,10 @@ export function useProfileDetail(id: string, preview: ProfileOut | undefined): P
     setState((s) => (s.phase === 'error' ? { ...s, phase: 'loading', error: null, attempt: s.attempt + 1 } : s))
   }, [])
 
-  // 上面那個繪製期間的 setState 讓 React 立刻用新狀態重繪，所以走到這裡時 `state.id === id` 一定成立。
+  // 繪製期間 setState 之後 React 會丟掉這一次的輸出重繪 —— 但**這一次的函式還是會跑完**。
+  // 不在這裡遮住的話，這個被丟掉的繪製會回傳「新 id 配舊人的資料」；
+  // 消費者拿它去畫的那一格雖然不會 commit，`renderHook` 的每一格紀錄看得到（審查抓到的）。
+  if (state.id !== id) return { phase: 'loading', profile: preview, error: null, retry }
   return {
     phase: state.phase,
     profile: state.phase === 'ready' ? state.fetched : preview,

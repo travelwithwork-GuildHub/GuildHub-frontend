@@ -120,6 +120,29 @@ describe('詳情的內容一律來自 GET /api/profiles/{id}', () => {
     expect(leaked, 'prop 已經是 B、回的卻是 A 的資料或 A 的錯誤').toEqual([])
   })
 
+  it('[FE-B04-S09] A 已經載入完成才換成 B：連被丟掉的那一格繪製都不得回傳 A 的資料', async () => {
+    // 繪製期間 setState 之後 React 會丟掉那一次的輸出重繪 —— 但那一次的函式還是會跑完。
+    // 不遮住的話，那一格回傳的是「id 是 B、資料是 A」。審查抓到的；上一條抓不到，因為 A 還沒回來。
+    server.replyFor(detailPath(UUID(0)), 200, profile(0, { bio: 'A 的自介' }))
+    server.replyFor(detailPath(UUID(1)), 200, profile(1, { bio: 'B 的自介' }))
+    const frames: Array<{ id: string; name: string | undefined; bio: string | null | undefined }> = []
+    const { result, rerender } = renderHook(
+      (id: string) => {
+        const d = useProfileDetail(id, id === UUID(0) ? profile(0) : profile(1))
+        frames.push({ id, name: d.profile?.display_name, bio: d.profile?.bio })
+        return d
+      },
+      { initialProps: UUID(0) },
+    )
+    await waitFor(() => expect(result.current.phase).toBe('ready'))
+    expect(result.current.profile?.bio).toBe('A 的自介')
+    rerender(UUID(1))
+    await waitFor(() => expect(result.current.phase).toBe('ready'))
+    expect(result.current.profile?.bio).toBe('B 的自介')
+    const leaked = frames.filter((f) => f.id === UUID(1) && (f.name === '人才0' || f.bio === 'A 的自介'))
+    expect(leaked, 'id 已經是 B、回的卻是 A 的資料（被丟掉的那一格也不行）').toEqual([])
+  })
+
   it('[FE-B04-S10] 詳情的欄位與缺值：技能、time[dateTime]、null 是「未提供」不是 0', async () => {
     const p = profile(0, { hours_per_week: null, bio: null, updated_at: '2026-09-10T12:34:56Z' })
     server.replyFor(detailPath(UUID(0)), 200, p)
