@@ -5,7 +5,11 @@
 第一輪一位主張自製小 hook（5 欄的表單不值得 10 KB）。第二輪看了事實收回：WBS 明寫 RHF＋Zod；RHF 處理過 touched／errors／
 isSubmitting／欄位陣列；**React Compiler 的規則對第三方庫不管、對自製 hook 會管**（ref 不可在 render 讀、effect 不可同步 setState），
 自製版本會一路踩。代價：+10 KB gzip、多一個依賴要跟 React 版本走。
-`@hookform/resolvers/zod` 接 Zod 4；`mode: 'onChange'` 給即時那一層，缺必填／太短用 `reValidateMode` 與 submit 後的 `trigger` 達成「送出過才說」。
+`@hookform/resolvers/zod` 接 Zod 4。**兩層時機不是靠 RHF 的 `mode`／`reValidateMode` 做的**（審查抓到：單一 resolver 在 `onChange` 會一次回報
+required／too_small，`reValidateMode` 延後不了）—— 是 `useForm` 的封裝依 Zod issue 的 `code` 分流：
+`too_big`／`invalid_format`／`invalid_type`／數值範圍 → 即時（一律顯示，且算進「送出禁用」）；`too_small`（含空字串的必填）→ 只在
+`formState.submitCount > 0` 之後顯示、永不算進禁用。RHF 本身 `mode: 'onChange'`、`criteriaMode: 'all'`，`handleSubmit` 在有任何錯誤時不呼叫 onValid
+並把焦點放到第一個錯誤欄位（`shouldFocusError`）。`canSubmit = !busy && !hasImmediateErrors`；**不用 `formState.isValid`**（它含 too_small）。
 
 ## D2｜驗證時機的兩層，不是三層
 
@@ -43,6 +47,7 @@ WBS 有這一條，但今天沒有表單該用它（`FE-A04` 悲觀更新：成�
 - `S01`～`S07`：一個測試用的 `Fixture` 表單（兩個必填文字欄、一個上限 20 的欄、一個 number 欄）＋ `contract-server` 收請求；不是 `LoginForm`（它只有一個欄位，測不到 `S04`）。
 - `S08`～`S10`：`optimistic()` 純函式。
 - `S11`、`S12`：純函式 ＋ ESLint API。
-- `S13`：既有測試檔。
+- `S13`：既有測試檔 ＋ `input[name=nickname]`。
+- `S14`：Fixture 表單的下限 3 欄位。
 - **不連任何外部服務。**
 - 驗收不是全綠：guard 拿掉 → `S05` 紅；失敗 reset → `S06` 紅；自動重送 → `S07` 紅；太短即時擋 → `S02` 紅；回滾不還原 → `S08` 紅；`FORM_LIMITS` 加一個後端有上限的鍵 → `S11` 紅。

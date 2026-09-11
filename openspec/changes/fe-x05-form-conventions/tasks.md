@@ -9,7 +9,7 @@
 對應 Requirement〈驗證時機是全站規則〉、〈送出中、失敗、重試〉
 
 - [ ] 2.1 `react-hook-form`、`@hookform/resolvers` 依賴；`src/forms/useForm.ts`（封裝：zod resolver、時機、guard、submit error）；`src/forms/SubmitError.tsx`（alert 在鈕上方）
-- [ ] 2.2 判準：`S01`～`S07`（Fixture 表單）
+- [ ] 2.2 判準：`S01`～`S07`、`S14`（Fixture 表單：兩個必填、一個下限 3、一個上限 20、一個 number）
 - [ ] 2.3 **突變**：guard 拿掉 → `S05`；失敗 reset → `S06`；自動重送 → `S07`；太短即時擋 → `S02`
 
 ## 3. 樂觀回滾與 FORM_LIMITS
