@@ -71,11 +71,12 @@ export function ListPanel<K extends ListKind>({
 
   // Escape 走層級（`FE-X06`）：這個面板是底下那一層，overlay（詳情）自己再註冊一層在上面。
   // 只在面板開著的時候在堆疊裡（`FE-B01-S16`）：這個元件不在畫面上，層也不在。
-  useEscapeLayer(onClose)
+  // 帶自己的元素：overlay 在這個 section 裡面，就算跟它同一個 commit 掛載（深連結直達詳情）也在它上面。
+  const section = useRef<HTMLElement>(null)
+  useEscapeLayer(onClose, section)
 
   // focus trap（`FE-X06-S11`）：持有鎖的面板，Tab／Shift+Tab 只在面板內循環。
   // 誰算「瀏覽器會 Tab 到」在 `focusTrap.ts`（每次按鍵現算：列表會翻頁、詳情會蓋上）。
-  const section = useRef<HTMLElement>(null)
   // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——
   // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
   // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，

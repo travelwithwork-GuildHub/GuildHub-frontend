@@ -118,7 +118,7 @@ export function AvatarPicker() {
           className="bg-surface-raised border-control-edge absolute top-full left-0 mt-2 flex flex-col gap-gutter rounded border p-gutter"
         >
           {/* 開著才在 Escape 的堆疊裡；面板開著時它在下面（但會先因失焦而關）。 */}
-          <EscapeLayer onEscape={dismiss} />
+          <EscapeLayer onEscape={dismiss} element={popover} />
           <div className={FIELD_LABEL}>
             <span>選一個角色</span>
             <div className="flex gap-2">
