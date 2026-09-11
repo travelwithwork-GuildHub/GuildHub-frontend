@@ -6,12 +6,23 @@
 抽 `src/panel/PanelShell.tsx`（殼：`aria-label`、`data-testid`、trap、Escape、關閉鈕 → `onClose`）→ `ListPanel` 用它、名片面板也用它。
 **抽的時候 `FE-B01`／`FE-X06` 的判準一條都不能動**（那是重構的定義）。
 名片面板的開關狀態**不放進 `ListPanelProvider`**（那是看板清單的，塞進去是污染模組邊界 —— 審查抓到的）：`FE-A04` 自己一個
-`ProfilePanelProvider`（`open`／`openPanel`／`closePanel`，自己 `holdInputLock('profile-panel')`；鎖是可合成的，兩個 provider 各持各的）。
+`ProfilePanelProvider`（`open`／`openPanel(opener)`／`closePanel`）。
 殼的「關閉意圖」是一個回呼：`onCloseRequest()` —— 名片面板在 dirty／submitting 時攔下它，不是殼自己判斷。
+
+**修正（實作時發現）**：真實頁面裡 `InteractionProvider` 在 `WorldCanvas` **裡面**（client-only、自帶 provider、巢狀會 throw、約 15 個測試直接
+`render(<WorldCanvas/>)`），而標題列的 `IdentityBadge` 在它**外面** —— 一個 provider 沒辦法同時被按鈕與鎖看到。兩位審查者一致選：
+`ProfilePanelProvider` 放 `page.tsx`（`IdentityProvider` 底下、標題列與 `WorldBoundary` 之上），**只管開關狀態與「關閉後焦點回開啟者」**；
+`ProfilePanel` 跟 `BoardPanel` 一樣渲染在 `WorldCanvas` 的 `data-focus-anchor` div 裡（`InteractionProvider` 底下、同一個定位基準），
+開著時 `useEffect(() => holdInputLock('profile-panel'))` 持鎖、卸載釋放 —— 鎖晚一個 effect：面板是滑鼠點標題列按鈕開的，不是世界裡的鍵，
+沒有「下一個方向鍵」的問題（`ListPanelProvider` 同步持鎖的理由不適用）。拒絕的替代：把 `InteractionProvider` 搬到 `page.tsx`（破壞 `WorldCanvas` 自洽、改 15 個測試）。
 
 ## D2｜`TalentDetail` 純呈現，編輯鈕在面板層
 
 `TalentDetail` 不知道「是不是我」；面板知道（它就是「我的」）。別人的名片走 `BoardPanel`，那裡沒有編輯鈕。**不在 `TalentDetail` 加 `editable` prop。**
+
+**修正（實作時發現）**：`TalentDetail` 不是純呈現 —— 它 `useProfileDetail(id)` 打 `GET /api/profiles/{id}`（`FE-B04`「內容一律來自那支 API」），
+還有 Escape 層、返回鈕、焦點。名片面板要的是「同步可得、不另外請求」，所以把它的呈現部分抽成 `src/talent/TalentFacts.tsx`（名字、頭像色、四欄 `<dl>`），
+`TalentDetail` 改用它（`FE-B04` 判準不動）；名片面板用 `TalentFacts`。「同一個呈現元件」的意思沒變，只是那個元件叫 `TalentFacts`。
 
 ## D2b｜PATCH 的回應是唯一 canonical
 
@@ -42,7 +53,7 @@ Escape 層級剛好處理：確認層在最上，Escape 關它等於「繼續編
 
 ## 這一份怎麼驗
 
-- `S01`～`S11`：jsdom，整棵樹 `InteractionProvider > ListPanelProvider > IdentityProvider(mock) > AvatarDraftProvider > header(IdentityBadge, AvatarPicker) + ProfilePanel`，`contract-server` 收 PATCH。
+- `S01`～`S11`：jsdom，整棵樹 `IdentityProvider(mock) > AvatarDraftProvider > ProfilePanelProvider > [ header(IdentityBadge, AvatarPicker), InteractionProvider > ProfilePanel ]`（跟真實頁面同一個形狀），`contract-server` 收 PATCH。
 - `S07`：面板開著、表單填好，測試直接 `await saveAvatar(3)`（後端寫入、adopt），再送名片表單，看 body 與最終身分。
 - **不連任何外部服務。**
 - 驗收不是全綠：payload 帶 `avatar_id` → `S04`／`S07` 紅；成功用 input 不用回應 → `S05` 紅；失敗 reset → `S06` 紅；不確認就關 → `S09` 紅；送出中可關 → `S10` 紅；草稿沿用 → `S11` 紅；去重不分大小寫拿掉 → `S04` 紅。

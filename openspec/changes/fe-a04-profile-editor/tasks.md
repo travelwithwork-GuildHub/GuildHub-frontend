@@ -9,9 +9,9 @@
 對應 Requirement〈名字是入口，面板是阻斷式的〉、〈顯示我的名片〉
 
 - [ ] 2.1 抽 `src/panel/PanelShell.tsx`；`ListPanel` 改用它，`FE-B01`／`FE-X06` 判準全綠（獨立一片）
-- [ ] 2.2 `src/profile/ProfilePanelProvider.tsx`（自己持鎖）；`IdentityBadge` 的名字變按鈕；`src/profile/ProfilePanel.tsx`（顯示：`TalentDetail` ＋ 編輯鈕）
+- [ ] 2.2 `src/profile/ProfilePanelProvider.tsx`（開關與焦點回開啟者）；`IdentityBadge` 的名字變按鈕；抽 `src/talent/TalentFacts.tsx`（`TalentDetail` 改用它）；`src/profile/ProfilePanel.tsx`（渲染在 `WorldCanvas` 裡、effect 持鎖；顯示：`TalentFacts` ＋ 編輯鈕）
 - [ ] 2.3 判準：`S01`～`S03`
-- [ ] 2.4 **突變**：不持鎖 → `S01`；焦點不回按鈕 → `S02`；`TalentDetail` 自己長編輯鈕 → `S03`（別人的也有）
+- [ ] 2.4 **突變**：不持鎖 → `S01`；焦點不回按鈕 → `S02`；`TalentFacts` 自己長編輯鈕 → `S03`（別人的也有）；面板改用 `TalentDetail` → `S03`（多了一個請求）
 
 ## 3. 表單
 
