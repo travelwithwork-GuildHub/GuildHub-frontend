@@ -204,21 +204,18 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
   )
   const enterThread = useCallback((withId: string) => setView({ kind: 'thread', with: withId, openedFrom: 'list' }), [])
   const backToList = useCallback(() => setView({ kind: 'list' }), [])
-  const [closedAt, setClosedAt] = useState(0)
   const closePanel = useCallback(() => {
-    setView({ kind: 'closed' })
-    setClosedAt((n) => n + 1)
-  }, [])
-  // 關閉後還焦點：等面板真的卸載之後（effect），回開啟者；開啟者不在了就回世界焦點錨（`FE-X06-S13`）。
-  useEffect(() => {
-    if (view.kind !== 'closed' || restoreFocusRef.current === null) return
+    // 關閉時還焦點：回開啟者；開啟者不在了就回世界焦點錨（`FE-X06-S13`）。
+    // **在 setView 之前、同步做**：兩者都在面板外面，先把焦點放過去再卸載面板，焦點就不會掉到 body。
+    // 原本是「等面板卸載之後在 effect 裡還」—— 本機綠、CI 三次有兩次 activeElement 停在 body（S01），改成同步就沒有那個窗。
     const where = restoreFocusRef.current
     restoreFocusRef.current = null
     const opener = openerRef.current
     openerRef.current = null
     if (where === 'opener' && opener?.isConnected) opener.focus()
-    else document.querySelector<HTMLElement>('[data-focus-anchor="world"]')?.focus()
-  }, [view.kind, closedAt])
+    else if (where !== null) document.querySelector<HTMLElement>('[data-focus-anchor="world"]')?.focus()
+    setView({ kind: 'closed' })
+  }, [])
 
   const loadMore = useCallback(() => {
     if (loading || exhausted) return
