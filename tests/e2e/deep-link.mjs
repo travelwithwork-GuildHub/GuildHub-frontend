@@ -104,10 +104,13 @@ try {
   })
   // 「仍然連在 DOM 上」是**整段序列期間從沒斷開**，不只是每一步量的那一刻（審查抓到的：
   // 拔掉再插回同一個節點，事後看 isConnected 還是 true）。MutationObserver 盯著整棵樹，斷開過就記下來。
+  // ⚠️ 看的是 `removedNodes`，不是回呼當下的 `isConnected`：回呼是 microtask 批次，同步「拔掉再插回」跑到回呼時已經接回去了。
   await canvas.evaluate((el) => {
     window.__guildhubDetached = false
-    new MutationObserver(() => {
-      if (!el.isConnected) window.__guildhubDetached = true
+    new MutationObserver((records) => {
+      for (const r of records) {
+        for (const n of r.removedNodes) if (n === el || n.contains(el)) window.__guildhubDetached = true
+      }
     }).observe(document.documentElement, { childList: true, subtree: true })
   })
   const sameCanvas = async (label) => {
