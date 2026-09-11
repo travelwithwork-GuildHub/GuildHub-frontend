@@ -118,6 +118,37 @@ const ALIASED_PROCESS_ENV = {
   message: INLINE_MSG,
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// 規格 FE-X03-S16：`HttpError`／`NetworkError` 只能被建立它們的 `src/api/` 與翻譯它們的
+// `src/errors/` 引用。別處要知道「這個失敗是哪一種」，看 `toUiError(error).kind`。
+//
+// 第二張「status → 該怎麼說」的對照表就是從 `error.status === 401` 這種一行開始長的，
+// 而要寫那一行就得先 import `HttpError`。所以擋在 import。
+//
+// **三種寫法都擋**：具名 import（含 `as` 改名）、整個模組 `import * as`、再匯出。
+// 字串掃描擋不住前兩種 —— 這是它變成 lint 規則的理由。
+const TRANSPORT = '@/api/transport'
+const BOUNDED_ERRORS = ['HttpError', 'NetworkError']
+const BOUNDARY_MSG =
+  `${BOUNDED_ERRORS.join('／')} 只能在 src/api/ 與 src/errors/ 引用。` +
+  '要知道這個失敗是哪一種，用 toUiError(error).kind —— 別處自己比 status 就是第二張對照表。見 FE-X03 的規格。'
+
+const ERROR_BOUNDARY = [
+  ...BOUNDED_ERRORS.map((name) => ({
+    selector: `ImportDeclaration[source.value='${TRANSPORT}'] ImportSpecifier[imported.name='${name}']`,
+    message: BOUNDARY_MSG,
+  })),
+  {
+    selector: `ImportDeclaration[source.value='${TRANSPORT}'] ImportNamespaceSpecifier`,
+    message: BOUNDARY_MSG,
+  },
+  ...BOUNDED_ERRORS.map((name) => ({
+    selector: `ExportNamedDeclaration[source.value='${TRANSPORT}'] ExportSpecifier[local.name='${name}']`,
+    message: BOUNDARY_MSG,
+  })),
+  { selector: `ExportAllDeclaration[source.value='${TRANSPORT}']`, message: BOUNDARY_MSG },
+]
+
 const config = [
   { ignores: ['.next/**', 'node_modules/**'] },
 
@@ -143,6 +174,25 @@ const config = [
     files: ['src/**'],
     rules: {
       'no-restricted-syntax': ['error', ANY_PROCESS_ENV, COMPUTED_PROCESS_ENV, ALIASED_PROCESS_ENV],
+    },
+  },
+
+  // `src/**` 底下、`src/api/**` 與 `src/errors/**` 以外：不准 import 資料層的錯誤型別。
+  //
+  // ⚠️ **同一條 `no-restricted-syntax` 要把上面的三個 env selector 一起帶著** ——
+  // flat config 是後者整條覆蓋前者，不是合併；少帶的話這些檔案就沒有人擋 `process.env` 了。
+  // `ignores` 是精確路徑不是 `**/src/api/**`，理由同 no-fetch。
+  {
+    files: ['src/**'],
+    ignores: ['src/api/**', 'src/errors/**', ENV_ONLY],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ANY_PROCESS_ENV,
+        COMPUTED_PROCESS_ENV,
+        ALIASED_PROCESS_ENV,
+        ...ERROR_BOUNDARY,
+      ],
     },
   },
 

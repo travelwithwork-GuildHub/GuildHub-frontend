@@ -1,5 +1,5 @@
 import type { ValidationError } from '@/api/contract/errors'
-import { ContractDriftError, HttpError } from '@/api/transport'
+import { ContractDriftError, HttpError, NetworkError } from '@/api/transport'
 
 // 唯一一份錯誤語彙。規格 `FE-X03`（error-vocabulary）。
 //
@@ -8,9 +8,9 @@ import { ContractDriftError, HttpError } from '@/api/transport'
 // `FE-X04`，表單是 `FE-X05`。
 //
 // ⚠️⚠️ **翻譯永遠不拋。** 一個在 catch 裡拋錯的翻譯器會把「拿不到清單」
-// 升級成「整個面板炸掉」。所以這裡對輸入零信任：`instanceof` 先，讀屬性後，
-// 連 `error.message` 這種看起來無害的讀取都包起來（規格 `S10` 餵的是一個
-// 每個 getter 都會拋錯的物件）。
+// 升級成「整個面板炸掉」。所以整個分類包在 try/catch 裡，失敗時回「預期之外」，
+// 而那個 fallback **不讀輸入的任何屬性**（規格 `S10` 餵的是一個每個 getter 都會拋錯的
+// 物件；`instanceof` 對 Proxy 的 `getPrototypeOf` trap 也會拋 —— design `D8`）。
 //
 // ⚠️ **`message` 永遠是這裡的字，不是後端的、不是例外的。**
 // `Internal Server Error`、Zod 的 `Expected string, received number`、`fetch failed`
@@ -27,7 +27,7 @@ export type UiErrorKind =
   | 'validation' // 422、400
   | 'request-rejected' // 其他 4xx
   | 'server-error' // 5xx —— 含 text/plain 的資料庫錯誤，到這一層分不開（design D3）
-  | 'network-unavailable' // fetch 在拿到回應之前 reject
+  | 'network-unavailable' // NetworkError —— send() 把 fetch 的 rejection 包成它（design D7）
   | 'contract-drift' // ContractDriftError
   | 'aborted' // AbortError —— 呼叫端自己中止的，不是錯誤
   | 'unexpected' // 認不得的一切，含 AdapterNotImplementedError
@@ -67,8 +67,12 @@ export const VOCABULARY: Record<UiErrorKind, string> = {
   unexpected: '發生了預期之外的錯誤。',
 }
 
-/** 把 status 對到種類。**這是整個前端唯一一張對照表。** */
+/**
+ * 把 status 對到種類。**這是整個前端唯一一張對照表。**
+ * 不在 400–599 的一律「預期之外」（`S20`）：`>= 500` 會把 600 說成伺服器壞了。
+ */
 function kindOfStatus(status: number): UiErrorKind {
+  if (!Number.isInteger(status) || status < 400 || status > 599) return 'unexpected'
   if (status >= 500) return 'server-error'
   switch (status) {
     case 401:
@@ -87,15 +91,6 @@ function kindOfStatus(status: number): UiErrorKind {
   }
 }
 
-/** 讀一個可能會拋錯的屬性。翻譯器對輸入零信任（`S10`）。 */
-function safeGet(value: unknown, key: string): unknown {
-  try {
-    return (value as Record<string, unknown>)[key]
-  } catch {
-    return undefined
-  }
-}
-
 function fromHttp(error: HttpError): UiError {
   const kind = kindOfStatus(error.status)
   const out: UiError = { kind, message: VOCABULARY[kind], status: error.status, cause: error }
@@ -105,25 +100,36 @@ function fromHttp(error: HttpError): UiError {
   return out
 }
 
+const just = (kind: UiErrorKind, cause: unknown): UiError => ({ kind, message: VOCABULARY[kind], cause })
+
 /**
- * 翻譯。**永遠回傳，永遠不拋。**
- *
- * 判斷順序是刻意的：先 `instanceof` 自己的型別（不讀任何屬性），
- * 再看 `name`（`AbortError` 是 `DOMException`，在 jsdom 與瀏覽器裡都不是同一個 class，
- * 只能認名字），最後才是「網路層的 `TypeError`」—— `fetch` 在拿到回應之前失敗
- * 就是一個 `TypeError`，這是 WHATWG 的規定，不是某個瀏覽器的習慣。
+ * `AbortError` 是 `DOMException`。**它在 jsdom 裡不是 `Error` 的子類**（不同 realm），
+ * 所以兩種都認；但一定要是其中一種 —— 純物件 `{ name: 'AbortError' }` 是「預期之外」（`S17`）。
  */
-export function toUiError(error: unknown): UiError {
+function isAbort(error: unknown): boolean {
+  const errorLike =
+    error instanceof Error || (typeof DOMException !== 'undefined' && error instanceof DOMException)
+  return errorLike && (error as Error).name === 'AbortError'
+}
+
+/** 判斷順序是刻意的：先 `instanceof` 自己的型別，再認 `AbortError`，其餘一律「預期之外」。 */
+function classify(error: unknown): UiError {
   if (error instanceof HttpError) return fromHttp(error)
-  if (error instanceof ContractDriftError) {
-    return { kind: 'contract-drift', message: VOCABULARY['contract-drift'], cause: error }
-  }
-  const name = safeGet(error, 'name')
-  if (name === 'AbortError') return { kind: 'aborted', message: VOCABULARY.aborted, cause: error }
-  if (error instanceof TypeError) {
-    return { kind: 'network-unavailable', message: VOCABULARY['network-unavailable'], cause: error }
-  }
+  if (error instanceof NetworkError) return just('network-unavailable', error)
+  if (error instanceof ContractDriftError) return just('contract-drift', error)
+  if (isAbort(error)) return just('aborted', error)
   // ⚠️ 純物件 `{ status: 401 }` **不是** 401 —— 形狀像不代表是 `HttpError`。
-  // `AdapterNotImplementedError` 也落在這裡：它是開發期缺陷，不替它編一句像使用者錯誤的話。
-  return { kind: 'unexpected', message: VOCABULARY.unexpected, cause: error }
+  // 程式自己的 `TypeError` 也落在這裡（`S19`）：`fetch` 的那一種在 `send()` 已經變成 `NetworkError`。
+  // `AdapterNotImplementedError` 也是：它是開發期缺陷，不替它編一句像使用者錯誤的話。
+  return just('unexpected', error)
+}
+
+/** 翻譯。**永遠回傳，永遠不拋。** */
+export function toUiError(error: unknown): UiError {
+  try {
+    return classify(error)
+  } catch {
+    // 兜底不讀 `error` 的任何屬性 —— 讀了可能又拋（design `D8`）。
+    return just('unexpected', error)
+  }
 }
