@@ -88,9 +88,21 @@ export function wsUrl(): string {
   return inject('contractWsUrl')
 }
 
+/** 兩個目標共用的測試庫（可拋棄）：給要直接動資料的判準用（刪名片、塞過期專案）。 */
+export function databaseUrl(): string {
+  return inject('contractDatabaseUrl')
+}
+
+/** 這個目標刻意沒實作的端點（`"<METHOD> <path>"`）；真後端是空清單。 */
+export function unimplemented(): string[] {
+  return inject('contractUnimplemented')
+}
+
 declare module 'vitest' {
   export interface ProvidedContext {
     contractBaseUrl: string
     contractWsUrl: string
+    contractDatabaseUrl: string
+    contractUnimplemented: string[]
   }
 }

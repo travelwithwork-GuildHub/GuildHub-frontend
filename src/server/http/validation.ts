@@ -21,7 +21,7 @@ export class ValidationFailure extends Error {
   }
 }
 
-type Where = 'body' | 'query'
+type Where = 'body' | 'query' | 'path'
 
 /** 讀 body：不是 JSON、字面 null、不是物件 → 各自的 422。回傳解析出來的物件。 */
 export async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
@@ -111,4 +111,30 @@ export function queryEnum<const T extends readonly string[]>(params: URLSearchPa
     throw new ValidationFailure([{ type: 'enum', loc: ['query', key], msg: `Input should be ${expected}`, input: raw, ctx: { expected } }])
   }
   return raw as T[number]
+}
+
+/**
+ * Pydantic 的 uuid 解析**接受的不只標準形**（對真後端的 pydantic 實測）：`8-4-4-4-12`、32 位無連字號、`{…}`、`urn:uuid:…` 都收；
+ * 少一位、多一位、亂字 → 422。這裡照它收，回 canonical 小寫 —— 自己縮窄的話 guildhub 是 404 而 internal 是 422（審查抓到的）。
+ */
+export function parseUuidLikePydantic(raw: string): string | null {
+  let s = raw.trim()
+  if (/^urn:uuid:/i.test(s)) s = s.slice(9)
+  if (s.startsWith('{') && s.endsWith('}')) s = s.slice(1, -1)
+  const hex = s.replace(/-/g, '')
+  if (!/^[0-9a-f]{32}$/i.test(hex)) return null
+  // 有連字號的話位置要對（`8-4-4-4-12`）。
+  if (s.includes('-') && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return null
+  const h = hex.toLowerCase()
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+
+/** 路徑參數的 uuid：FastAPI 對 `uuid.UUID` 的路徑參數驗證失敗回 422，`loc: ["path", "<name>"]`。 */
+export function pathUuid(params: Record<string, string>, name: string): string {
+  const raw = params[name] ?? ''
+  const id = parseUuidLikePydantic(decodeURIComponent(raw))
+  if (id === null) {
+    throw new ValidationFailure([{ type: 'uuid_parsing', loc: ['path', name], msg: 'Input should be a valid UUID', input: raw, ctx: { error: 'invalid format' } }])
+  }
+  return id
 }

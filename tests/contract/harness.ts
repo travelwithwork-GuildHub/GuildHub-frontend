@@ -17,6 +17,12 @@ import { testDatabase } from '../support/test-db'
 import { assertLoopbackBase, resolveTarget } from './target'
 
 const ROOT = path.resolve(__dirname, '..', '..')
+
+function assertLoopbackDb(url: string | undefined): string {
+  const decision = testDatabase({ INTERNAL_TEST_DATABASE_URL: url, INTERNAL_DATABASE_URL: process.env.INTERNAL_DATABASE_URL })
+  if ('skip' in decision) throw new Error(`guildhub 目標也需要 INTERNAL_TEST_DATABASE_URL（真後端指向它）：${decision.skip}`)
+  return decision.url
+}
 const execFileAsync = promisify(execFile)
 /** 本地後端的 session secret：測試用固定值，WS 替身也用同一把。 */
 export const CONTRACT_SESSION_SECRET = 'contract-test-secret'
@@ -146,6 +152,10 @@ export default async function setup(project: TestProject): Promise<() => Promise
     }
     project.provide('contractBaseUrl', base)
     project.provide('contractWsUrl', ws)
+    // 兩個目標讀的是同一個測試庫（wrapper 把真後端的 DATABASE_URL 指過來）：測試要「刪一張名片」「塞一筆過期專案」直接動它。
+    project.provide('contractDatabaseUrl', assertLoopbackDb(process.env.INTERNAL_TEST_DATABASE_URL))
+    // 真後端 17 個端點都在。
+    project.provide('contractUnimplemented', [])
     return async () => {}
   }
 
@@ -193,6 +203,10 @@ export default async function setup(project: TestProject): Promise<() => Promise
   }
   project.provide('contractBaseUrl', assertLoopbackBase(base, 'internal base'))
   project.provide('contractWsUrl', `ws://127.0.0.1:${port}/ws`)
+  project.provide('contractDatabaseUrl', db.url)
+  // 本地版 W2 刻意沒做的端點（`FE-O03-S05`）：測試對這些要求 Next 自己的 404／405、不是本地版假造的 detail。
+  // 這是目標的**能力**，不是目標的名字 —— 測試檔仍然不知道自己在打誰。
+  project.provide('contractUnimplemented', ['POST /api/projects', 'GET /api/messages', 'POST /api/messages', 'GET /api/projects/{id}/seats'])
   return async () => {
     await stop(child)
   }
