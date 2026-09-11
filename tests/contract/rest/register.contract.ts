@@ -40,6 +40,8 @@ describe('register', () => {
     const nobody = await new ContractClient(baseUrl()).raw('POST', '/api/login', { body: { login_id: fresh('nobody'), password: 'whatever-pass' } })
     expect(wrong.status).toBe(403)
     expect(nobody.status).toBe(403)
+    // 鎖定實錄的那一句（兩邊一起漂成別的字也要紅），再比兩邊逐字相同。
+    expect(wrong.json).toEqual({ detail: '帳號或密碼錯誤' })
     expect(wrong.text, '錯密碼與不存在的帳號回了不同的字 —— 送出了帳號存在性').toBe(nobody.text)
     const right = await new ContractClient(baseUrl()).raw('POST', '/api/login', { body: { login_id: loginId, password: PASSWORD } })
     expect(right.status).toBe(200)
@@ -48,21 +50,25 @@ describe('register', () => {
 
   it('[FE-A08-S15] 兩個人同時註冊同一個帳號：恰好一個 200、一個 409，沒有 500', async () => {
     const loginId = fresh('race')
+    // 暱稱也要這一次獨有（資料庫跨重跑累積；第 0 頁本來就有一張「乙」會誤判）；nickname 上限 20，短尾碼就好。
+    const tag = Math.random().toString(36).slice(2, 8)
+    const nickA = `甲${tag}`
+    const nickB = `乙${tag}`
     const ca = new ContractClient(baseUrl())
     const cb = new ContractClient(baseUrl())
     const [a, b] = await Promise.all([
-      ca.raw('POST', '/api/register', { body: { login_id: loginId, password: PASSWORD, nickname: '甲' } }),
-      cb.raw('POST', '/api/register', { body: { login_id: loginId, password: PASSWORD, nickname: '乙' } }),
+      ca.raw('POST', '/api/register', { body: { login_id: loginId, password: PASSWORD, nickname: nickA } }),
+      cb.raw('POST', '/api/register', { body: { login_id: loginId, password: PASSWORD, nickname: nickB } }),
     ])
     expect([a.status, b.status].sort(), `${a.text.slice(0, 80)} | ${b.text.slice(0, 80)}`).toEqual([200, 409])
     const winner = ProfileOut.parse((a.status === 200 ? a : b).json)
-    const loserNick = a.status === 200 ? '乙' : '甲'
+    const loserNick = a.status === 200 ? nickB : nickA
     // 那個帳號只有一張名片：第 0 頁（updated_at 新到舊；清單要登入，用贏的那個 jar）找得到贏的那張、找不到輸的那個暱稱。
     const list = await (a.status === 200 ? ca : cb).raw('GET', '/api/profiles?page=0')
     expect(list.status, list.text.slice(0, 120)).toBe(200)
     const page0 = list.json as Array<{ id: string; display_name: string }>
     expect(page0.some((p) => p.id === winner.id && p.display_name === winner.display_name)).toBe(true)
-    expect(page0.some((p) => p.display_name === loserNick && p.id !== winner.id), '輸的那次也建了名片 —— 先查再寫').toBe(false)
+    expect(page0.some((p) => p.display_name === loserNick), '輸的那次也建了名片 —— 先查再寫').toBe(false)
     // 用對的密碼登入回的是贏的那張。
     const back = await new ContractClient(baseUrl()).raw('POST', '/api/login', { body: { login_id: loginId, password: PASSWORD } })
     expect(back.status).toBe(200)
