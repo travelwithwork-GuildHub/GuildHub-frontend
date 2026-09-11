@@ -206,8 +206,9 @@ export async function claimSeat(projectId: string, input: contract.SeatClaim) {
 // ---------------------------------------------------------------- 站內信
 
 /** ⚠️ 收件與寄件**混在同一份清單**（後端如此），要靠 `sender_id` 分。 */
-export async function listMessages() {
-  return send('listMessages', { method: 'GET', path: '/api/messages' }, z.array(contract.MessageOut))
+/** 我寄的＋我收的混在一份，新到舊，`page` 0-based 20 一頁（`FE-K01`）。跟 `listProfiles` 一樣沒有 `limit`、尾頁後 `[]`。 */
+export async function listMessages(options: { page?: number; signal?: AbortSignal } = {}) {
+  return send('listMessages', { method: 'GET', path: '/api/messages', query: { page: options.page }, signal: options.signal }, z.array(contract.MessageOut))
 }
 
 export async function sendMessage(input: contract.MessageCreate) {

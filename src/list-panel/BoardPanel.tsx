@@ -5,6 +5,7 @@ import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { TalentCard } from '@/talent/TalentCard'
+import { SendMessageButton } from '@/inbox/SendMessageButton'
 import { TalentDetail } from '@/talent/TalentDetail'
 import { ListPanel } from './ListPanel'
 import { useListPanel } from './ListPanelProvider'
@@ -41,7 +42,7 @@ function projectLine(item: ProjectOut): ReactNode {
 }
 /** 人才那一支：選中的 id 在 provider，列表手上的那一筆（詳情的載入中預覽）在這裡。 */
 function TalentBoard({ onClose }: { onClose: () => void }) {
-  const { selected, selectProfile, page, reportPage } = useListPanel()
+  const { selected, selectProfile, page, reportPage, closePanel } = useListPanel()
   // 只記最後一張點開的卡：詳情的 id 對得上才當預覽，對不上（深連結、上一頁／下一頁）就沒有預覽。
   const [preview, setPreview] = useState<ProfileOut | null>(null)
   // 詳情關閉時焦點回到開它的那張卡（`FE-X06-S12`）。`ListPanel` 自己會把焦點放回列表
@@ -84,6 +85,8 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
             preview={preview?.id === selected ? preview : undefined}
             labels={DETAIL_LABELS}
             onBack={() => selectProfile(null)}
+            // 「寄信給他」（`FE-K01`）：關掉這個面板、開收件匣直接進對話。只在已登入、對方不是我、有收件匣 provider 時出現。
+            actions={<SendMessageButton to={selected} onBeforeOpen={closePanel} />}
           />
         )
       }
