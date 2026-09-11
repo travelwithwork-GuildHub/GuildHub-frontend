@@ -149,7 +149,8 @@ Escape 或「返回」SHALL 回到清單（面板不關）：從清單進來的�
 ### Requirement: 本地後端與契約測試補上 messages
 
 本地後端（`FE-O03`）SHALL 有 `GET /api/messages?page=`（**主體條件在 SQL 的 WHERE**：`sender_id = me or recipient_id = me`，`created_at desc`，20 一頁，翻過尾頁 `[]`；`page` 省略是 0、負數當 0、非整數 422（照真後端）；未登入 401）
-與 `POST /api/messages`（201 回 `MessageOut`；寄給自己 → 400 `{"detail":"不能寄信給自己"}`（資料庫 `no_self_send` check，不在應用層判斷）；收件人不存在 → 404 `{"detail":"收件人不存在"}`（FK）；body 形狀不合 → 422 golden）。
+與 `POST /api/messages`（201 回 `MessageOut`；寄給自己 → 400 `{"detail":"不能寄信給自己"}`（資料庫 `no_self_send` check，不在應用層判斷）；收件人不存在 → 404 `{"detail":"收件人不存在"}`（FK）；
+body 形狀不合 → 422 golden —— 只有 Pydantic 有的：`recipient_id` 不是 uuid、缺欄位；**`body` 的 1–2000 是資料庫 check → 500**（真後端 `MessageCreate.body: str` 沒有長度；前端 `LIMITS.messageBody` 先擋））。
 契約測試（`FE-O05`）SHALL 對兩個目標各驗這些，且 SHALL 以資料驗可觀察的契約「**分頁套用在授權後的集合上**」：別人的信超過一頁時我的信仍在我的第 0 頁（取前 20 筆再過濾的實作會回空）。
 「條件在 SQL 的 WHERE」本身是實作要求，黑箱契約證不了 —— 本地後端另以資料層的形狀判準守（`tests/server-messages.test.ts`：發出的 SQL 含 `sender_id = $1 or recipient_id = $1`、一道查詢）。
 
@@ -169,7 +170,9 @@ Escape 或「返回」SHALL 回到清單（面板不關）：從清單進來的�
 
 #### Scenario: [FE-K01-S15] 422 的形狀與分頁參數
 
-- **WHEN** body 是 `{}`、`body` 超過 2000 字、`recipient_id` 不是 uuid、`?page=abc`
+- **WHEN** body 是 `{}`、`recipient_id` 不是 uuid、`?page=abc`
 - **THEN** SHALL 是 golden 裡實錄的 422 形狀（各一條）
+- **WHEN** `body` 是 2001 個字
+- **THEN** SHALL 是 500（資料庫 check；兩個目標一樣）
 - **WHEN** `?page=-1`、省略 `page`
 - **THEN** SHALL 跟 `?page=0` 回同一份；`?page=5`（翻過尾頁）SHALL 回 `[]`（不是 404）
