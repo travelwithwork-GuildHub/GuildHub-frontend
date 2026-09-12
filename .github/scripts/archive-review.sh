@@ -32,7 +32,7 @@ ledger() { python3 -c 'import json,sys,datetime;d=json.loads(sys.argv[1]);d["ts"
 TAG='^[[:space:]]*([-*]|[0-9]+[.)])?[[:space:]]*'
 count() { grep -Ec "${TAG}\[$2\]" "$1" 2>/dev/null || true; }
 # 一次審查「算數」的條件：CLI rc=0 而且真的寫了結論那一行。沒回答的記 ok=false，report 不算它。
-answered() { [ "$1" = 0 ] && grep -q "^結論" "$2" && echo true || echo false; }
+answered() { [ "$1" = 0 ] && grep -q "^結論[：:]" "$2" && echo true || echo false; }
 # 沒有 coreutils timeout（macOS）：自己盯。超過 ARCHIVE_REVIEW_TIMEOUT（預設 1500 秒）就殺，不要讓 wait 等到天亮。
 watch() { local pid=$1 t=0; while kill -0 "$pid" 2>/dev/null; do [ "$t" -ge "${ARCHIVE_REVIEW_TIMEOUT:-1500}" ] && { kill "$pid" 2>/dev/null; return 124; }; sleep 5; t=$((t+5)); done; wait "$pid"; }
 
@@ -43,7 +43,8 @@ import json, sys, statistics
 rows = [json.loads(l) for l in open(sys.argv[1], encoding="utf-8") if l.strip()]
 runs = [r for r in rows if r.get("kind") == "review" and r.get("ok", True)]
 skipped = sum(1 for r in rows if r.get("kind") == "review" and not r.get("ok", True))
-judg = [r for r in rows if r.get("kind") == "judge"]
+okpairs = {(r["id"], r["model"]) for r in runs if r["round"] == 1}
+judg = [r for r in rows if r.get("kind") == "judge" and (r["id"], r["model"]) in okpairs]  # 沒回答的 run 上的判定不算
 ids = sorted({r["id"] for r in runs})
 print(f"審過的 change：{len(ids)} 個（{', '.join(ids)}）；沒回答不算數的 run：{skipped}")
 for m in ("codex", "gemini"):
