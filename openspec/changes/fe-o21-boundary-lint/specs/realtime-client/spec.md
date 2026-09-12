@@ -57,6 +57,10 @@
   即時訊息要先過 `realtime-protocol` 的驗證
 - **AND WHEN** 對 `src/world/deep/x.tsx` 跑 lint，內容 `import { RealtimeClient } from '../../realtime/client'`
 - **THEN** 同樣回報 —— 相對路徑不限深度
+- **AND WHEN** 對 `src/api/operations.ts`、`src/api/transport.ts`、`src/api/contract/rest.ts`、
+  `src/server/realtime.ts` 各跑 lint，內容 `import { RealtimeClient } from '@/realtime/client'`
+- **THEN** 每一個都回報 —— 這些檔案是 no-fetch 規則的例外區，**不是**這條規則的例外
+  （兩位審查者各自指出第一版 design 的區塊表會讓它們漏網）
 
 #### Scenario: [FE-O21-S02] type-only import、RemoteWorld 本身、tests 底下都不報
 
@@ -80,6 +84,8 @@
 - **WHEN** 對 `src/realtime/index.ts` 跑 lint，內容 `export { RealtimeClient } from './client'`
 - **THEN** 回報這條規則的錯誤
 - **AND WHEN** 對 `src/realtime/protocol.ts` 跑 lint，內容 `import { RealtimeClient } from './client'`
+- **THEN** 同樣回報
+- **AND WHEN** 對 `src/realtime/protocol.ts` 跑 lint，內容 `await import('./client')` 或 `require('./client')`
 - **THEN** 同樣回報
 - **AND WHEN** 對 `src/realtime/index.ts` 跑 lint，內容 `export type { ConnectionState } from './client'`
 - **THEN** 不回報 —— 型別放行的規則在這裡一樣適用

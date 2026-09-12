@@ -39,7 +39,7 @@ import 邊界規則、配一條 `lintText` 虛擬檔案的測試，**正式碼�
   可以 import `src/realtime/client` 的**值**；type-only import 放行；`src/realtime/` 內部
   不得以值再匯出 `./client`（barrel 擋在源頭）；由 lint 強制
 - `runtime-config` 新增 Requirement：`src/config/env.ts` MUST NOT import `src/api/` 底下任何模組
-  （**含 type import**，理由見 design D2）；由 lint 強制
+  （**含 type import**，理由見 design D2；範圍比 0005 寬 —— 傳輸層 import 設定，反過來是循環）；由 lint 強制
 - `api-contract` 新增 Requirement：`src/api/contract/` 底下 MUST NOT import `src/config/`
   底下任何模組（含 type import）；由 lint 強制。`src/api/transport.ts` 與
   `src/realtime/client.ts` 是兩個傳輸通道，**刻意不在限制範圍內**（0005 的 B 選項）
@@ -71,7 +71,7 @@ import 邊界規則、配一條 `lintText` 虛擬檔案的測試，**正式碼�
 ### Modified Capabilities
 
 - `realtime-client`：新增「只有 `RemoteWorld` 可以 import client 的值」
-- `runtime-config`：新增「設定模組不 import 契約」
+- `runtime-config`：新增「設定模組不依賴資料層」
 - `api-contract`：新增「契約不 import 設定」
 
 ## Impact

@@ -48,13 +48,20 @@
 
 | 區塊 | `no-restricted-imports` | `no-restricted-syntax` 加的 |
 |---|---|---|
-| `src/**`（除 RemoteWorld、`src/api/**`） | HTTP ＋ client | 動態 client |
+| `src/**`（除 RemoteWorld） | HTTP ＋ client | 動態 client |
 | `src/world/RemoteWorld.tsx` | HTTP | — |
 | `src/realtime/**` | HTTP ＋ client ＋ `./client`（值） | 動態 client、動態 `./client` |
 | `src/config/env.ts` | HTTP ＋ client ＋ env→api | 動態 client、動態 env→api |
-| `src/api/contract/**`（原本整條 off） | contract→config（HTTP 維持 off：這裡本來就是 fetch 的家） | 動態 contract→config ＋ D3 補回的 FE-O09 三條 ＋ OUTPUT_SAFETY ＋ LIMITS（限 rest/ws） |
+| `src/api/**` 非 contract、`src/server/realtime.ts`（原本 no-fetch 例外區，`no-restricted-imports` 整條 off） | **client**（HTTP 維持 off —— 那是 fetch 的家；但 client 邊界不是 no-fetch 的例外） | 動態 client |
+| `src/api/contract/**`（同上，原本整條 off） | HTTP ＋ client ＋ contract→config（契約是純 zod，沒有 fetch 的需求，HTTP 那串一起開回來） | 動態 client ＋ 動態 contract→config ＋ D3 補回的 FE-O09 三條 ＋ OUTPUT_SAFETY ＋ LIMITS（限 rest/ws） |
 
-**regex 的形狀**（字串比對，閉集）：client 是 `(^|/)realtime/client(\.tsx?)?$`；
+⚠️ **第二輪兩位審查者各自抓到同一個洞**：第一版這張表把 `src/api/**` 從第一列排除、又只給 contract 加
+contract→config，於是 `src/api/transport.ts`、`src/api/operations.ts`、`src/server/realtime.ts`
+可以 import client 的值而不被擋。no-fetch 的例外區塊（`DATA_ACCESS_PATHS`＋`CONTRACT_HTTP_PATHS`＋
+`SERVER_LOOPBACK_PATHS`）把 `no-restricted-imports` 整條關掉，**那個 off 現在要拆成「HTTP off、client on」**。
+`tests/contract/*` 在 `CONTRACT_HTTP_PATHS` 裡但不在 `src/`，不受影響。S01 多了這四個檔案的斷言釘住它。
+
+**regex 的形狀**（字串比對，閉集）：client 是 `(^|/)realtime/client(\.ts)?$`（`client.ts` 不是 `.tsx`，閉集只寫 `.ts`）；
 `src/realtime/**` 內部另加 `^\./client(\.ts)?$`；env→api 是 `^@/api/|(^|/)\.\./api/`；
 contract→config 是 `^@/config/|(^|/)\.\./config/`。
 
@@ -88,7 +95,7 @@ type import 在執行期不耦合，要擋就得在 Requirement 明說政策是*
 
 三條 message 各自指回 ADR 與 capability：
 - client：「即時訊息只有一條路：`RemoteWorld` → `realtime-protocol` 驗證 → 下游。別處拿到 client 就是第二條路。見 `docs/adr/0006`。」
-- env→api：「設定模組不依賴契約 —— 換後端位址與後端改形狀是兩個變更理由。見 `docs/adr/0005`。」
+- env→api：「設定模組是依賴樹的葉子，不依賴 `src/api/`：契約 —— 換後端位址與後端改形狀是兩個變更理由（`docs/adr/0005`）；傳輸層 —— 它 import 設定，反過來就是循環。」
 - contract→config：「契約不知道後端在哪；接兩邊的是 `src/api/transport.ts`／`src/realtime/client.ts`。見 `docs/adr/0005`。」
 
 ## D5｜驗收是突變，不是全綠

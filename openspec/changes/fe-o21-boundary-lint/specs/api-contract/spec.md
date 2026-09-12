@@ -29,8 +29,10 @@
 - **WHEN** 對 `src/api/contract/rest.ts` 跑 lint，內容是下列每一種之一（每一種各跑一次）：
   - `import { restBase } from '@/config/env'`
   - `import type { AppEnv } from '@/config/env'`
+  - `import { type AppEnv } from '@/config/env'`
   - `import * as env from '@/config/env'`
   - `export { restBase } from '@/config/env'`
+  - `export type { AppEnv } from '@/config/env'`
   - `import e = require('@/config/env')`
   - `await import('@/config/env')`
   - `require('@/config/env')`
