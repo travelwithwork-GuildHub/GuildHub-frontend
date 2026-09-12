@@ -1413,3 +1413,30 @@ PY
 檔案內容真的等於上游那個 commit 的內容。機器只驗「有一行 40 位 SHA」；
 一份改過的 `search.py` 跟原封的長得一模一樣。對雜湊是人的事，
 所以〈人類該深讀什麼〉把 `VENDOR.md` 放在深讀那一欄。
+---
+
+---
+
+## 沒有手寫的架構總覽，架構視圖是推導出來的
+
+2026-09-12。使用者問「要不要像 WBS.md 一樣有一份完整的文件統整全部架構，因為個別
+規劃項目最後常常會亂掉」。兩個外部審查者（gpt-5.6-sol、Gemini 3.1 Pro）兩輪之後的共識。
+
+**拒絕的替代**：一份手寫的 `ARCHITECTURE.md`，列 41 個 capability 各做什麼、彼此怎麼依賴。
+
+**為什麼**：`docs/WBS.md` 能活著是因為 `progress.sh --check` 用 ID 驗它、CI 會紅。
+一份 41 個 capability 的散文總覽沒有這種檢查 —— `docs/ROADMAP.md` 已經示範過一次
+（兩張總覽表，WBS 重排後沒跟著改，「頂端加了警告也沒用」，最後刪掉）。
+Gemini 的反駁值得記：推導出來的引用圖只能說「現狀是什麼」，說不了「邊界不該是什麼」。
+對 —— 所以「不該是什麼」留在 ADR 裡由人寫，而且每條要標**誰在擋**（`邊界狀態`），
+`arch-view.sh` 讀出來。
+
+**同時拒絕的**（兩位審查者都同意）：
+- `exports-risk`／`mitigates-risk` 這類 metadata 由 CI 驗 —— 寫個字串就過，空殼。
+- PR 上勾「我沒違反架構護欄」—— 勾選框，空殼。
+- 在每份 `design.md` 的每條決策加分類欄位 —— 271 條裡真正的邊界十來條，全填就是空殼資料。
+- 把 Spectra 的 `ingest`（實作中把需求寫回 artifact）搬過來 —— 這個 repo 規格先凍結，
+  實作中發現要改就回 `spec/` PR，不在 `feat/` 分支上吸收。
+
+**量出來的懸空**：`openspec/specs/world-physics/spec.md:5` 引用 `world-interaction`，
+那個 capability 叫 `spatial-interaction`。第一次跑就抓到，不是理論。

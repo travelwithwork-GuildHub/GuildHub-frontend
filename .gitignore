@@ -37,3 +37,4 @@ tests/contract/golden/.recording/
 # ui-ux-pro-max 的 `--persist` 產物。**不進版控** —— 它會變成第三套規格文件
 # （視覺規則的唯一來源是 openspec/specs/）。要留就留在本機，要定案就開 spec/ PR。
 design-system/
+docs/arch.html
