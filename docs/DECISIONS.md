@@ -1307,9 +1307,10 @@ PY
 - 標題本身：模板〈**外部**缺口不給週次也不給點數〉＝本專案〈**後端能力**缺口不給週次也不給點數〉
   （標題不同，所以量出來是**兩行**：「只在模板」1 ＋「只在本專案」1）
 
-**專案專屬的整節（1）**：
+**專案專屬的整節（2）**：
 
 - 〈欄位上限用契約測試，不抄一張常數表〉：綁 `docs/adr/0001-backend-contract.md` 與後端的 `run.sh`，模板沒有「後端」這個概念
+- 〈main 合併後的瀏覽器安全網：不是 required check，不重跑，flake 也是紅〉：綁 `tests/e2e/` 與 `e2e-main` workflow，模板沒有 e2e 腳本也沒有安全網
 
 **這三類以外的分岔一律要修**，而且**修的方向是往模板對齊** ——
 共用治理腳本的規則，真源在模板；專案可以加自己的節，不可以改共用節的規則。
@@ -1443,6 +1444,37 @@ Gemini 的反駁值得記：推導出來的引用圖只能說「現狀是什麼�
 那個 capability 叫 `spatial-interaction`。第一次跑就抓到，不是理論。
 
 ---
+
+## main 合併後的瀏覽器安全網：不是 required check，不重跑，flake 也是紅
+
+**問題**：`tests/e2e/` 裡的瀏覽器腳本已經寫了、也抓得到單元測試抓不到的回歸
+（實測：把 `WorldCanvas` 傳給 `LocalPlayer` 的 `av` 拿掉，971 條單元測試全綠，
+`avatar-pixels.mjs` 與 `avatar-picker.mjs` 紅），但只有人記得的時候才會跑。
+每天合 50–87 個 PR、中位數 3 分鐘，沒有人會記得。
+
+**決定**：一條 `e2e-main` workflow，push main 每一次跑，對 `next start` 的產物跑
+`tests/e2e/` 裡**不連任何服務、判準不綁 runner 速度**的那幾支（清單在 `.github/scripts/e2e-main.sh`，
+目前四支）。**不是 required check、不動 `ci.yml`** —— 它是安全網，不是閘門。concurrency 取消同一
+ref 還沒跑完的舊 run，只驗最新的 main。
+
+**拒絕的替代**：
+
+- **接進 `ci.yml` 當 required check**：PR 從 3 分鐘變 6 分鐘以上，而且瀏覽器冷下載本身就是 flake 來源，
+  會把「紅了去看」變成「紅了 re-run」。先當安全網量 flake 基線，再談閘門（〈新增閘門要有真實事故〉）。
+- **紅了自動重跑一次**：兩位驗收者都指出重跑會讓 flake 拿不到 artifact —— 第一次的截圖與 log 被第二次蓋掉，
+  而 flake 的處置是修那支腳本自己的尺（`tests/e2e/` 各支的閾值），不是把它蓋掉。**flake 也是紅**，
+  紅了看 artifact；flake ≥5% 是拆掉這條接線的條件，得看得見才數得到。
+- **把八支全接**：要真後端的（identity-flow、multi-tab）永遠不進來（〈測試環境隔離〉第 2 條）；
+  要本地 Postgres ＋ 第二次 build 的（inbox、profile-editor、internal-backend）等這一組跑出 flake 基線再說。
+  board-panel 與 deep-link **暫時不在**：它們用「按住方向鍵固定毫秒數」走到看板前，在 ubuntu runner 的
+  swiftshader 上一次走到、一次走不到（run 34706773895）—— 那是腳本的尺綁在 runner 速度上，要在
+  `tests/e2e/` 裡把 approach() 改成「走到提示出現為止、只設時間上限」才能進來。**加一支就是加一個 flake 來源。**
+- **`pkill -P` 殺 `next start`**：只殺直接子程序，孤兒咬著 port（契約 harness 抓過）。改成殺整棵樹＋清 port。
+
+**沒有的**：不驗任何要登入、要後端、要資料庫的流程；不比對截圖像素（judgement 在各支腳本自己的尺裡）。
+
+**停止條件**：flake ≥5% 或每週為它花超過 15 分鐘 → 刪 workflow 與 `e2e-main.sh`，腳本留在 `tests/e2e/` 手動跑。
+這是本專案專屬的一節：模板沒有 `tests/e2e/`，也沒有「安全網」這個概念。
 
 ## 地圖先於 change：新專案從整張 WBS 開始，孤兒 change 是違規
 
