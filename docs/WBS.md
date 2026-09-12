@@ -79,6 +79,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-B01 | 已封存 | `fe-b01-list-container` |
 | FE-B04 | 已封存 | `fe-b04-talent-directory` |
 | FE-B09 | 已封存 | `fe-b09-deep-link` |
+| FE-K01 | 已封存 | `fe-k01-inbox` |
 | FE-O01 | 已封存 | `fe-o01-contract` |
 | FE-O02 | 已封存 | `fe-o02-data-access` |
 | FE-O03 | 已封存 | `fe-o03-internal-backend` |
@@ -96,6 +97,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-R07 | 已封存 | `fe-r07-remote-players` |
 | FE-R08 | 已封存 | `fe-r08-interpolation` |
 | FE-R09 | 已封存 | `fe-r09-browser-load` |
+| FE-T06 | 已封存 | `fe-t06-output-safety` |
 | FE-W01 | 已封存 | `fe-w01-worldcanvas` |
 | FE-W02 | 已封存 | `fe-w02-coords` |
 | FE-W03 | 已封存 | `fe-w03-player`、`fe-w03-render-interpolation` |
@@ -119,10 +121,8 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-O10 | 已完成 | 標記 `Done` |
 | FE-X08 | 已完成 | 標記 `Done` |
 | FE-A06 | 規格已合併 | `fe-a06-first-entry` |
-| FE-K01 | 規格已合併 | `fe-k01-inbox` |
 | FE-R04 | 規格已合併 | `fe-r04-background-tab` |
 | FE-R10 | 規格已合併 | `fe-r10-presence` |
-| FE-T06 | 規格已合併 | `fe-t06-output-safety` |
 | FE-O18 | 常態 | — |
 | BE-G04 | 待裁決 | — |
 | BE-G25 | 待裁決 | — |
@@ -150,9 +150,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G18 | 已取消 | — |
 | BE-G19 | 已取消 | — |
 
-共 174 項：未開始 97、已封存 42、等外部 17、已取消 6、規格已合併 5、已完成 4、待裁決 2、常態 1
+共 175 項：未開始 98、已封存 44、等外部 17、已取消 6、已完成 4、規格已合併 3、待裁決 2、常態 1
 
-來源指紋 `cdb91d0f3663afa2`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `305b8c1092bbb7fe`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -477,6 +477,7 @@ bash .github/scripts/wbs-page.sh --open
 | | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W5 | 3 | | |
 | FE-O19 | 契約哨兵的新鮮度 | `src/api/contract/schema.d.ts` 是**人工**重產的，`GENERATED.md` 檔頭就寫著「這個哨兵會過期，而且不會有人告訴你」。⚠️ **2026-09-10 證實了那句話**：後端從 `27c3077` 走到 `cd2929c`（六個 commit、兩天），期間 `drift.ts` 一路綠燈；重產之後**立刻紅了兩處**（`_coverage` 少了 `RegisterIn`、`_LoginIn` 的 `nickname` 從必填變選填）。要做的是「CI 從一份**釘住版本的**後端 OpenAPI 重產，並要求工作樹零差異」——不是叫 CI 連活的後端（`AGENTS.md`：CI 不提供任何服務）。判準：改掉後端的任一 endpoint／method／entity 而不更新產出物，CI 必須紅 | W3 | 5 | | Alarm｜**它綠得合乎設計，所以沒有人會發現它過期** |
 | FE-O20 | 路徑參數的型別約束 | `RequestSpec.params` 現在是 `Record<string, string>`，**收任何鍵**。把 `profile_id` 打成 `id` 的話 `path.replace('{id}', …)` 找不到東西，客戶端會送出字面值 `/api/profiles/{profile_id}` 然後靜靜吃 404。**兩個審查者獨立指到同一個洞**，而它跟 `FE-A01` 那條「method 與 path 必須存在於產出契約」的判準是同一個缺陷類別（`path` 已經綁進型別了，`params` 沒有）。做法：用 template literal type 從路徑萃取 `{param}`，強制 `params` 的鍵完全吻合。⚠️ **期限不是「有空再說」：W3 第一個帶路徑參數的功能開工之前。** 今天沒有阻塞，是因為 `FE-A01` 只用 `POST /api/login` 與 `GET /api/me`，兩個都沒有路徑參數 | W3 | 3 | | TBD｜`FE-A01` 談定的處置（tasks 5.5）：不進那個 change，獨立追蹤 |
+| FE-O21 | 架構邊界的強制 | `docs/adr/0005`（僅約定）與 `docs/adr/0006`（已知缺口）各寫了一條同樣的路：`eslint.config.js` 加一段 `no-restricted-imports`，把「`src/config/env.ts` 不得 import `@/api/*`」「`src/api/contract/**` 不得 import `@/config/*`」「`src/**` 只有 `src/world/RemoteWorld.tsx` 可以 import `@/realtime/client` 的值（type import 放行）」三條從「大家都這樣寫」變成「不這樣寫會變紅」；配一條 `lintText` 虛擬檔案的測試（寫法照 `FE-O09` 那條 env lint 測試）。**正式碼零行**，不改 `realtime-client` 的 Purpose。做完把 0005／0006 的邊界狀態改「已強制」、證據改指到那條測試（`arch-view.sh` 會驗）。判準：在 `src/world/PositionSync.tsx` 寫 `new RealtimeClient(`，lint 必須紅在那條規則，不是紅在別處。它鎖的是 import，不是「進 `RemoteWorld` 之後有沒有先驗證」—— 那半截仍由 review 守，ADR 要寫明 | W3 | 3 | | |
 | FE-O16 | 技術可觀測性 | 前端錯誤回報、WS 斷線率、FPS 遙測。**只做技術 telemetry** —— 使用者行為追蹤被後端明文永久排除（BE-G17），兩者不要混在同一個提案裡 | W13–W16 | 6 | | |
 | FE-O17 | 規模化 | `PAGE_SIZE=20` 的 offset 翻頁在資料變多時會慢且會漏；快取與預取策略 | W17–W20 | 6 | BE-G05 待銜接 | Pending｜等真後端提供更好的查詢；本地端先做好快取與預取 |
 | FE-O18 | 文件與交接 | `CONTEXT.md` / ADR / 本表的維護節奏 | 常態 | — | | Regular｜常態維護，沒有完成點 |
