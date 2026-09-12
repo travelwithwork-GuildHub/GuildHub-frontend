@@ -67,6 +67,8 @@ bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
 /opsx:propose        產生 proposal → specs → design → tasks，產完就停
         ↓
    開 draft PR       讓隊友先看規格，這時還沒有任何 code
+                     （prompts/02-to-spec.md：propose 在 main 上跑，產完才
+                      git switch -c spec/<change-id>，還沒 add 的 artifact 會跟著過去）
         ↓
    規格審查          prompts/03-spec-review.md + openspec validate --strict
         ↓
@@ -81,7 +83,7 @@ bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
 /opsx:archive        delta 同步進 openspec/specs/
 ```
 
-一個 change = 一個目錄 = 一個分支 = 一個 PR，可以平行。
+一個 change = 一個目錄；兩個 phase（規格、實作）各自一支分支、一個 PR。change 之間可以平行。
 
 ```bash
 npm ci
