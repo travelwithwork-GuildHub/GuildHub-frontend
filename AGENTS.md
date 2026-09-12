@@ -147,7 +147,21 @@ change id 與 slice 的分界，不需要任何消歧邏輯。
 
 **change id 要以 `docs/WBS.md` 的工作項目 ID 開頭（小寫）**，
 例如 `fe-m02-apply` 對應 `FE-M02`。這不是美觀問題 ——
-`progress.sh` 靠它把 change 對回 WBS，對不上的會被單獨列成紅字。
+`progress.sh` 靠它把 change 對回 WBS，**對不上任何 WBS ID 的 change 是 `--check` 的違規**
+（2026-09-12 起；以前只是紅字）。`spec/<id>` 的 PR 會在規格階段就紅 ——
+先開 `governance/` PR 把那項工作加進地圖，再開 spec。
+
+**地圖會被 change 修正，那是正常的；但什麼時候要回寫，要分清楚：**
+
+- capability 內部拆分（一項變兩個 change、兩個 capability），交付結果／順序／阻塞
+  沒變 → **不改 WBS**。WBS ID 是交付意圖，不是架構單元；一個 ID 對多個 change 是正常的，
+  `progress.sh` 會列在〈工作拆分〉。
+- 交付結果、順序、依賴、範圍改了，或 WBS 的文字仍宣稱一個已被推翻的邊界 →
+  **由該 change 的提案者開最小的 `governance/` PR 改地圖**，在 `/opsx:apply` 之前合併。
+  （這個 repo 實際發生過的：三個系統邊界在 change 裡拆了，WBS 四天沒跟上。）
+- 要開的 change 在地圖上找不到 ID → 先改地圖。**不要借用相近的 ID，不要現場發明。**
+
+`spec/` PR 不能改 WBS 是刻意的：地圖的變動要被單獨看見，不能跟一份規格混在同一個 PR 裡。
 
 ### 開 change 之前先看它擋在哪
 
