@@ -15,11 +15,12 @@ Claude Code 進入此 Repository 後：
    **三個工具吃同一份** —— `progress.sh --json` 算一次狀態，網頁與 Excel 都吃它。
    **不要在別的地方重算** —— 那樣做過一次，三邊給出三個答案。
 
-   ```bash
-   ```
-
    **那份是算出來的，沒有人維護它**，所以它不會漂。資料來自
    `docs/WBS.md`、`openspec/changes/`、遠端分支。
+
+   **每個 change 的 id 都要對回 `docs/WBS.md` 上的一個 ID**（`<wbs-id 小寫>-<slug>`），
+   對不上的 `--check` 會擋，`spec/` PR 在規格階段就紅。找不到 ID 先開 `governance/` PR
+   改地圖，不要現場發明（規則在 `AGENTS.md`〈分支命名〉）。
 
    **改了 `docs/WBS.md` 一定要跑 `--check`。** 它會擋下沒寫理由的標記、
    互斥的處置、缺口少了決策期限或 fallback、
