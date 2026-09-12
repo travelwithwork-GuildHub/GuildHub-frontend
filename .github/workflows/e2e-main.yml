@@ -1,0 +1,82 @@
+# 主幹的瀏覽器安全網。**不是 required check，不動 `ci.yml`。**
+#
+# 跑什麼、為什麼、什麼時候拆：見 `.github/scripts/e2e-main.sh` 開頭。
+# 這裡只管「什麼時候跑」：
+#   - push main：每一次。只驗最新的 main —— concurrency 取消同一個 ref 還沒跑完的舊 run。
+#     group 帶 event_name 與 ref：改這個 workflow 的 PR 自己那一輪，不可以取消 main 的。
+#   - pull_request：**只有改到這兩個檔的 PR**。改安全網的 PR 要自己證明安全網還跑得動。
+#
+# 紅了不是 re-run 賭它變綠（AGENTS.md〈Git / CI〉），去看 artifact 裡的 log 與截圖。
+# 連續紅、或每週為它花超過 15 分鐘 → 刪這個檔與 e2e-main.sh，腳本留在 tests/e2e/ 手動跑。
+
+name: e2e-main
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/e2e-main.yml
+      - .github/scripts/e2e-main.sh
+
+concurrency:
+  group: e2e-main-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-main:
+    name: e2e-main
+    runs-on: ubuntu-latest
+    # 本機實測六支合計約兩分鐘；build 幾十秒；瀏覽器冷下載約一分鐘。20 分鐘是「卡住了」的判準，不是預算。
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      # 瀏覽器版本跟著 lockfile 裡的 playwright-core 走，快取也用它當 key ——
+      # 不快取的話每次 push main 都重抓一顆 Chromium，下載本身就是 flake 來源。
+      - name: Playwright version
+        run: echo "PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v4
+        id: browser
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}
+
+      # OS 層的依賴每次都裝（runner 映像每次都是新的）；瀏覽器本體只在快取沒中時抓。
+      - name: Browser deps
+        run: npx playwright-core install-deps chromium
+
+      - name: Browser
+        if: steps.browser.outputs.cache-hit != 'true'
+        run: npx playwright-core install chromium
+
+      # 跟 ci.yml 的 Build 一模一樣的環境：驗的要是同一份產物。
+      - name: Build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_APP_ENV: local
+        run: npm run build
+
+      - name: E2E (no services)
+        env:
+          E2E_OUT: ${{ runner.temp }}/e2e-main
+        run: bash .github/scripts/e2e-main.sh
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-main-${{ github.sha }}
+          path: ${{ runner.temp }}/e2e-main
+          if-no-files-found: ignore
+          retention-days: 7
