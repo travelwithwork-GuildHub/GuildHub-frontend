@@ -76,6 +76,8 @@ bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
         ↓
    CI 綠 + review → 合併
         ↓
+   影子審查          prompts/06-archive-review.md（第二、第三個模型看整個 change；不阻塞）
+        ↓
 /opsx:archive        delta 同步進 openspec/specs/
 ```
 
