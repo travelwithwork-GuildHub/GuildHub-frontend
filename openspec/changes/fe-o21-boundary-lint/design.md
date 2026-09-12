@@ -17,45 +17,59 @@
 
 **Non-Goals**：見 proposal。
 
-## D1｜用 `no-restricted-syntax` 的 selector，不用 `no-restricted-imports`
+## D1｜靜態 import 用 core `no-restricted-imports`（patterns＋regex，逐條 `allowTypeImports`），動態的用 `no-restricted-syntax` 補
 
-兩份 ADR 寫的是 `no-restricted-imports`。實際讀了 `eslint.config.mjs` 之後**不選它**，三個理由：
+兩份 ADR 寫的是 `no-restricted-imports`；第一版 design 選了 `no-restricted-syntax` selector，
+兩位審查者一致指出兩個理由站不住（`allowTypeImports` 可以逐條 pattern 設；flat config 的覆蓋
+問題兩種規則都有，D3 就是在處理它），並且一位建議改用 `eslint-plugin-import` 的
+`no-restricted-paths`。**沒有裁決，去量了**（`lintText` 帶虛擬路徑，2026-09-12，記在 PR 內文）：
 
-1. **它已經被用掉了**：`noFetchRules` 用 `no-restricted-imports` 擋 axios／ky 那串 HTTP client，
-   而且在 `src/api/**` 整條 `'off'`。flat config 對同名規則是**後者取代前者**，
-   為 `src/**` 再設一次就會把 HTTP client 那串蓋掉；要保住就得每個區塊重抄一次。
-2. **type import 的差別對待**：`realtime-client` 那條要放行 `import type`，
-   `runtime-config`／`api-contract` 兩條要連 type 一起擋。`no-restricted-imports` 的
-   `allowTypeImports` 是整條規則一個開關，做不到「同一個檔案兩種政策」。
-3. **repo 已有同型的先例**：`ERROR_BOUNDARY`（FE-X03-S16）就是用
-   `ImportDeclaration[source.value=…] ImportSpecifier` 這種 selector 擋 import，
-   三種寫法（具名、namespace、再匯出）都列了。照它寫，review 的人不用學第二種形狀。
+| 寫法 | `import/no-restricted-paths`（含 typescript resolver 設定） | core `no-restricted-imports` patterns.regex | `no-restricted-syntax` |
+|---|---|---|---|
+| `import { X } from '@/realtime/client'` | **不報**（`@/` 別名解析不到） | 報 | 報 |
+| `import type …`／`import { type … }` | 報（分不出 type） | 可逐條 `allowTypeImports` | 可用 `importKind` |
+| `import * as`／`export { } from`／`export * from` | 報（相對路徑）／不報（別名） | 報 | 報 |
+| `import x = require()` | **不報** | 報 | 要另寫 `TSImportEqualsDeclaration` |
+| `await import('…')`／`require('…')` | 報（相對路徑）／不報（別名） | **不報** | 報（`ImportExpression > Literal`、`CallExpression[callee.name='require'] > Literal`） |
+| `../../realtime/client`、`.ts` 副檔名 | 報 | 報（regex） | 報（regex） |
+| `import { X } from '@/realtime'`（barrel） | 不報 | 不報 | 不報 |
 
-代價：selector 比 `paths:` 囉嗦；`source.value` 用 regex 對字串，**不解析路徑**——
-所以 Requirement 把涵蓋的路徑寫法列成閉集（別名、`/realtime/client$`、`src/realtime/` 內的 `./client`），
-沒列的（`import(p)` 變數、字串拼接）明寫在 Non-goals。
+結論：
+- **`no-restricted-paths` 出局**：這個 repo 裡它解析不了 `@/` 別名（就算加了 resolver 設定），
+  而 repo 的 import 幾乎全用別名；分不出 type import；漏 `import x = require()`。
+- **core `no-restricted-imports`** 拿下靜態的全部（含 `import x = require()`），
+  `patterns: [{ regex, message, allowTypeImports }]` 一條一個 type 政策 —— 這正是 D2 要的不對稱。
+- **`no-restricted-syntax` 只補動態兩種**（`import('字面')`、`require('字面')`），兩個 selector。
+- **barrel 沒有規則直接擋**，改成擋源頭：`src/realtime/**` 裡 `./client` 的值 import／再匯出（S06）。
 
-**每一條 selector 的形狀**（三條規則共用，只換 source regex 與 message）：
+**覆蓋問題的處理**：三組 restriction 各做成常數陣列（`CLIENT_IMPORT_PATTERNS`、
+`ENV_TO_API_PATTERNS`、`CONTRACT_TO_CONFIG_PATTERNS`），HTTP client 那串也抽成 `HTTP_CLIENT_PATHS`。
+每個 override 區塊**只決定組合哪幾組**，不重抄內容：
 
-| 寫法 | selector 形狀 |
-|---|---|
-| 具名／預設 import（值） | `ImportDeclaration[importKind!='type'][source.value=/…/] > ImportSpecifier[importKind!='type']`，加 `ImportDefaultSpecifier` |
-| `import * as` | `ImportDeclaration[importKind!='type'][source.value=/…/] > ImportNamespaceSpecifier` |
-| 再匯出 | `ExportNamedDeclaration[exportKind!='type'][source.value=/…/]`、`ExportAllDeclaration[exportKind!='type'][source.value=/…/]` |
-| 動態 import | `ImportExpression > Literal[value=/…/]` |
-| `require()` | `CallExpression[callee.name='require'] > Literal[value=/…/]` |
+| 區塊 | `no-restricted-imports` | `no-restricted-syntax` 加的 |
+|---|---|---|
+| `src/**`（除 RemoteWorld、`src/api/**`） | HTTP ＋ client | 動態 client |
+| `src/world/RemoteWorld.tsx` | HTTP | — |
+| `src/realtime/**` | HTTP ＋ client ＋ `./client`（值） | 動態 client、動態 `./client` |
+| `src/config/env.ts` | HTTP ＋ client ＋ env→api | 動態 client、動態 env→api |
+| `src/api/contract/**`（原本整條 off） | contract→config（HTTP 維持 off：這裡本來就是 fetch 的家） | 動態 contract→config ＋ D3 補回的 FE-O09 三條 ＋ OUTPUT_SAFETY ＋ LIMITS（限 rest/ws） |
 
-`runtime-config`／`api-contract` 兩條把 `[importKind!='type']`／`[exportKind!='type']` 拿掉就是連 type 一起擋。
-**兩條 type 政策不同是刻意的**，見 D2。
+**regex 的形狀**（字串比對，閉集）：client 是 `(^|/)realtime/client(\.tsx?)?$`；
+`src/realtime/**` 內部另加 `^\./client(\.ts)?$`；env→api 是 `^@/api/|(^|/)\.\./api/`；
+contract→config 是 `^@/config/|(^|/)\.\./config/`。
 
-## D2｜0006 放行 type import，0005 不放行
+代價：不解析檔案系統，所以閉集以外的寫法（變數路徑、字串拼接）擋不住 —— Non-goals 明寫。
+
+## D2｜0006 放行 type import，0005 不放行 —— 而且 0005 的 Requirement 明寫「編譯期相依」
 
 `realtime-client`：型別拿不到訊息。`PositionSync.tsx` 今天 `import type { RealtimeClient }`
-是為了函式簽章，擋掉它等於逼它改成 `unknown`，換不到任何保護。
+是為了函式簽章，擋掉它等於逼它改成 `unknown`，換不到任何保護。兩位審查者都同意。
 
-`runtime-config`／`api-contract`：0005 的邊界是「兩個生命週期不同的變更理由不要綁在一起」，
-而 type import 是編譯期依賴 —— 契約的型別改名，`env.ts` 就要跟著動。今天兩邊都是零 import，
-**沒有任何合法用例要犧牲**，所以取最嚴的。要放寬的時候再開 spec PR，屆時要說得出用例。
+`runtime-config`／`api-contract`：一位審查者指出「生命週期不同」推不出「type 也要擋」——
+type import 在執行期不耦合，要擋就得在 Requirement 明說政策是**編譯圖完全分離**，
+不能從 ADR 的敘述自行推導。採納：兩條 Requirement 的字面改成「MUST NOT 有編譯期相依」。
+理由仍然是 0005 的：契約改名的 PR 不該動到 `env.ts`。今天兩邊都是零 import，沒有用例要犧牲；
+審查者舉的可能用例（branded primitive、共享 `Brand` 型別）現在不存在，要用的時候開 spec PR 說用例。
 
 ## D3｜順路補回 FE-O09 在 `rest.ts`／`ws.ts` 上的洞
 
@@ -82,9 +96,10 @@
 實作 PR 要做、而且寫進 PR 內文：
 1. 在 `src/world/PositionSync.tsx` 把 `import type` 改成值 import 並 `new RealtimeClient(…)`
    → `npm run lint` 紅，**而且紅的訊息是 D4 的第一則**
-2. 把 `eslint.config.mjs` 裡 client 那組 selector 拿掉 → `tests/boundary-lint-rule.test.ts`
-   裡 `FE-O21-S01` 紅、其他不紅
-3. 把 `CONTRACT_SCHEMA_PATHS` 區塊的 `ANY_PROCESS_ENV` 拿掉 → `FE-O09-S01` 那條斷言紅
+2. 把 `CLIENT_IMPORT_PATTERNS` 從各區塊拿掉 → `FE-O21-S01`／`S03`／`S06` 紅，`S04`／`S05` 不紅
+3. 把 contract 區塊補回的 `ANY_PROCESS_ENV` 拿掉 → 標 `FE-O09-S01` 的那條新斷言**必然**紅
+   （一位審查者指出：不要求「只有它紅」—— `tests/env-lint-rule.test.ts` 裡其他 FE-O09 案例
+   走的是別的區塊，理論上不受影響，但那不是這條突變要證明的事）
 
 ## 待答問題
 

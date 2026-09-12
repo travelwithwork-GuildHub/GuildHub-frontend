@@ -36,7 +36,8 @@ import 邊界規則、配一條 `lintText` 虛擬檔案的測試，**正式碼�
 ## What Changes
 
 - `realtime-client` 新增 Requirement：`src/` 底下**只有 `src/world/RemoteWorld.tsx`**
-  可以 import `src/realtime/client` 的**值**；type-only import 放行；由 lint 強制
+  可以 import `src/realtime/client` 的**值**；type-only import 放行；`src/realtime/` 內部
+  不得以值再匯出 `./client`（barrel 擋在源頭）；由 lint 強制
 - `runtime-config` 新增 Requirement：`src/config/env.ts` MUST NOT import `src/api/` 底下任何模組
   （**含 type import**，理由見 design D2）；由 lint 強制
 - `api-contract` 新增 Requirement：`src/api/contract/` 底下 MUST NOT import `src/config/`
@@ -75,8 +76,8 @@ import 邊界規則、配一條 `lintText` 虛擬檔案的測試，**正式碼�
 
 ## Impact
 
-- `eslint.config.mjs`：一段 boundary selectors；`CONTRACT_SCHEMA_PATHS` 區塊補回
-  `FE-O09` 的三個 selector（design D3）
+- `eslint.config.mjs`：三組 `no-restricted-imports` pattern 常數＋兩組動態 import selector，
+  各區塊只組合不重抄（design D1）；`CONTRACT_SCHEMA_PATHS` 區塊補回 `FE-O09` 的三個 selector（design D3）
 - `tests/boundary-lint-rule.test.ts`：新檔，寫法照 `tests/env-lint-rule.test.ts`
   （`lintText` 帶虛擬 filePath、每條自己的逾時）
 - `docs/adr/0005-*.md`、`docs/adr/0006-*.md`：只改 `邊界狀態` 與 `證據` 兩行
