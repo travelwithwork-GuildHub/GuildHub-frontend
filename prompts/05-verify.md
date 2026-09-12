@@ -41,8 +41,8 @@ npm run lint && npm run typecheck && npm test && npm run build
 bash .github/scripts/archive-review.sh <change-id>
 ```
 
-它把凍結的規格、WBS 那一列、DECISIONS 裡提到它的段落、所有 slice 的 diff 打成一包，平行送 codex 與
-gemini，結果只有三種標籤：需修正／可接受風險／誤報候選。**不阻塞** —— 標「需修正」而且你重現得了的，
+它把凍結的規格、WBS 那一列、DECISIONS 裡提到它的段落、所有 slice 的 diff（含 commit 內文）打成一包，平行送
+codex 與 gemini（3–6 分鐘；**放背景跑**，回來看 `.local/archive-review/<id>/r1/`），結果只有三種標籤：需修正／可接受風險／誤報候選。**不阻塞** —— 標「需修正」而且你重現得了的，
 在這個 session 修好、合併，再 `--rereview` 一次（只准一次）；每一條需修正判定後 `--judge`。
 為什麼是這裡不是每個 PR、什麼時候升成阻塞、什麼時候整套拆掉：寫在那支腳本開頭。
 
