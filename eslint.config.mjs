@@ -252,11 +252,15 @@ const ENV_TO_API_MSG =
 const CONTRACT_TO_CONFIG_MSG =
   '契約不知道後端在哪；接兩邊的是 src/api/transport.ts／src/realtime/client.ts。見 docs/adr/0005。'
 
-// `client.ts` 不是 `.tsx`，閉集只寫 `.ts`。相對路徑不限深度：`(^|/)` 讓 `../../realtime/client` 也中。
-const CLIENT_RE = '(^|/)realtime/client(\\.ts)?$'
-const CLIENT_INTERNAL_RE = '^\\./client(\\.ts)?$'
-const ENV_TO_API_RE = '^@/api/|(^|/)\\.\\./api/'
-const CONTRACT_TO_CONFIG_RE = '^@/config/|(^|/)\\.\\./config/'
+// `client.ts` 不是 `.tsx`，閉集只寫 `.ts`。開頭只認 `@/` 別名與相對路徑（`./`、任意層 `../`）——
+// 兩位審查者一致：design D1 草稿的 `(^|/)` 會連裸套件路徑 `some-package/realtime/client` 一起誤擋，規格閉集沒有那一種。
+const CLIENT_RE = '^(@/|\\./|(\\.\\./)+)realtime/client(\\.ts)?$'
+// `src/realtime/**` 內部：`./client`，以及子目錄往上的 `../client`、`../../client`（審查抓到：只寫 `./client` 的話，
+// `src/realtime/sub/index.ts` 一句 `export { RealtimeClient } from '../client'` 就繞過去了）。
+const CLIENT_INTERNAL_RE = '^(\\./|(\\.\\./)+)client(\\.ts)?$'
+// `($|/)`：目錄本身也算（`@/config`、`../../config` 會落到 index.ts）—— 審查抓到只寫 `/` 結尾的話，開一個 barrel 就繞過去。
+const ENV_TO_API_RE = '^@/api($|/)|(^|/)\\.\\./api($|/)'
+const CONTRACT_TO_CONFIG_RE = '^@/config($|/)|(^|/)\\.\\./config($|/)'
 
 const CLIENT_IMPORT_PATTERNS = [{ regex: CLIENT_RE, message: CLIENT_MSG, allowTypeImports: true }]
 const CLIENT_INTERNAL_PATTERNS = [{ regex: CLIENT_INTERNAL_RE, message: CLIENT_MSG, allowTypeImports: true }]

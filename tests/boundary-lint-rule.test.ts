@@ -106,6 +106,16 @@ describe('realtime-client：只有 RemoteWorld 可以 import client 的值', () 
   )
 
   it(
+    '[FE-O21-S02] 閉集只有 @/ 別名與相對路徑：裸套件路徑 some-package/realtime/client 不報',
+    async () => {
+      // 審查抓到的：`(^|/)` 開頭會把第三方套件裡剛好叫這個名字的路徑一起誤擋。
+      const msgs = await messagesFor(POSITION_SYNC, `import c from 'some-package/realtime/client'\nexport const a = c\n`)
+      expect(blocked(msgs, CLIENT_ONLY_VIA_REMOTE_WORLD)).toHaveLength(0)
+    },
+    120_000,
+  )
+
+  it(
     '[FE-O21-S02] RemoteWorld 本身 new 它不報；tests/ 底下不報',
     async () => {
       const remoteWorld = await messagesFor('src/world/RemoteWorld.tsx', NEW_CLIENT)
@@ -130,6 +140,9 @@ describe('realtime-client：只有 RemoteWorld 可以 import client 的值', () 
     ['src/realtime/protocol.ts', "import { RealtimeClient } from './client'", `import { RealtimeClient } from './client'\nexport const a = RealtimeClient\n`],
     ['src/realtime/protocol.ts', "await import('./client')", `export const a = await import('./client')\n`],
     ['src/realtime/protocol.ts', "require('./client')", `const c = require('./client')\nexport const a = c\n`],
+    // 審查抓到的：子目錄往上一層拿同一個檔案。閉集「相對路徑不限深度」在 src/realtime/ 內部一樣適用。
+    ['src/realtime/sub/index.ts', "export { RealtimeClient } from '../client'", `export { RealtimeClient } from '../client'\n`],
+    ['src/realtime/sub/deep/x.ts', "await import('../../client')", `export const a = await import('../../client')\n`],
   ])(
     '[FE-O21-S06] barrel 擋在源頭：%s 寫 %s → 擋',
     async (file, _label, code) => {
@@ -159,6 +172,9 @@ describe('runtime-config：設定模組不依賴資料層', () => {
     ["await import('@/api/transport')", `export const a = await import('@/api/transport')\n`],
     ["require('@/api/transport')", `const t = require('@/api/transport')\nexport const a = t\n`],
     ["import { restBase } from '../api/transport'", `import { restBase } from '../api/transport'\nexport const a = restBase\n`],
+    // 審查抓到的：目錄本身（會落到 index.ts）也算，不然開一個 barrel 就繞過去。
+    ["import { x } from '@/api'", `import { x } from '@/api'\nexport const a = x\n`],
+    ["import { x } from '../api'", `import { x } from '../api'\nexport const a = x\n`],
   ] satisfies Case[])(
     '[FE-O21-S04] env.ts 寫 %s → 擋（含 type），訊息說設定模組是葉子',
     async (_label, code) => {
@@ -189,6 +205,9 @@ describe('api-contract：契約不 import 設定', () => {
     ["await import('@/config/env')", `export const a = await import('@/config/env')\n`],
     ["require('@/config/env')", `const e = require('@/config/env')\nexport const a = e\n`],
     ["import { restBase } from '../../config/env'", `import { restBase } from '../../config/env'\nexport const a = restBase\n`],
+    // 審查抓到的：目錄本身（會落到 index.ts）也算。
+    ["import { x } from '@/config'", `import { x } from '@/config'\nexport const a = x\n`],
+    ["import { x } from '../../config'", `import { x } from '../../config'\nexport const a = x\n`],
   ] satisfies Case[])(
     '[FE-O21-S05] rest.ts 寫 %s → 擋（含 type），訊息說接兩邊的是傳輸層',
     async (_label, code) => {

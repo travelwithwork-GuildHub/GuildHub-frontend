@@ -4,7 +4,7 @@
 - **Date**: 2026-09-12
 - **Deciders**: 實作 `FE-R01`／`FE-R02` 的那個 session；2026-09-12 事後審查
 - **邊界狀態**: 已強制
-- **證據**: tests/boundary-lint-rule.test.ts:68、eslint.config.mjs:261、src/world/RemoteWorld.tsx:105
+- **證據**: tests/boundary-lint-rule.test.ts:68、eslint.config.mjs:265、src/world/RemoteWorld.tsx:105
 
 > `邊界狀態` 與 `證據` 兩欄由 `bash .github/scripts/arch-view.sh` 讀。
 > 三種狀態的意思見 `docs/adr/README.md`。
