@@ -448,6 +448,30 @@ run 1 main spec/demo-change "把 main 上的 ID 改名"    sh -c 'perl -pi -e "s
 run 1 main spec/demo-change "刪掉 main 上的 Scenario" sh -c 'perl -0pi -e "s/#### Scenario: \[DEMO-01-S02\].*?\n\n?//s" openspec/changes/demo-change/specs/demo/spec.md'
 run 0 main spec/demo-change "沿用舊 ID 並新增一條"    sh -c 'printf "\n#### Scenario: [DEMO-01-S03] 新增的情境\n- **WHEN** a\n- **THEN** b\n" >> openspec/changes/demo-change/specs/demo/spec.md'
 
+echo "── vendor/ ──"
+# 合法的最小形狀：目錄裡有 VENDOR.md（含 40 位 SHA 那一行）＋ 文字檔。
+# 每個負向案例都從這個形狀出發只改一件事 —— 不然紅燈可能來自別條防禦（見 run_msg 的說明）。
+VENDOR_OK='mkdir -p .claude/skills/demo-skill/scripts
+printf "上游 repo: example/demo-skill\n上游 commit: 0123456789abcdef0123456789abcdef01234567\n" > .claude/skills/demo-skill/VENDOR.md
+printf -- "---\nname: demo-skill\n---\n# demo\n" > .claude/skills/demo-skill/SKILL.md
+printf "print(1)\n" > .claude/skills/demo-skill/scripts/search.py
+printf "a,b\n1,2\n" > .claude/skills/demo-skill/data.csv'
+run     0 main vendor/demo-skill "最小合法形狀"                              sh -c "$VENDOR_OK"
+run_msg 1 main vendor/demo-skill "目錄外多一個檔案"          "只能修改"       sh -c "$VENDOR_OK; echo x > src/leak.ts"
+run_msg 1 main vendor/demo-skill "動到別的 skill 目錄"       "只能修改"       sh -c "$VENDOR_OK; mkdir -p .claude/skills/other && echo x > .claude/skills/other/SKILL.md"
+run_msg 1 main vendor/demo-skill "缺 VENDOR.md"              "缺 .claude/skills/demo-skill/VENDOR.md" sh -c "$VENDOR_OK; rm .claude/skills/demo-skill/VENDOR.md"
+run_msg 1 main vendor/demo-skill "VENDOR.md 釘 tag 不釘 SHA"  "40 位"          sh -c "$VENDOR_OK; printf '上游 commit: v2.15.0\n' > .claude/skills/demo-skill/VENDOR.md"
+run_msg 1 main vendor/demo-skill "有執行位元"                "100644"         sh -c "$VENDOR_OK; chmod +x .claude/skills/demo-skill/scripts/search.py"
+run_msg 1 main vendor/demo-skill "symlink"                   "100644"         sh -c "$VENDOR_OK; ln -s /etc/passwd .claude/skills/demo-skill/link.md"
+run_msg 1 main vendor/demo-skill "副檔名不在列舉裡（.sh）"    "副檔名"         sh -c "$VENDOR_OK; echo 'echo hi' > .claude/skills/demo-skill/run.sh"
+run_msg 1 main vendor/demo-skill "副檔名不在列舉裡（.js）"    "副檔名"         sh -c "$VENDOR_OK; echo '1' > .claude/skills/demo-skill/x.js"
+run_msg 1 main vendor/demo-skill "binary 冒充 .txt"          "binary"         sh -c "$VENDOR_OK; { printf PNG; head -c 4 /dev/zero; printf x; } > .claude/skills/demo-skill/blob.txt"
+run_msg 1 main vendor/demo-skill "單檔超過上限"              "單檔"           sh -c "$VENDOR_OK; head -c 260000 /dev/zero | tr '\0' a > .claude/skills/demo-skill/big.csv"
+run_msg 1 main vendor/demo-skill "總量超過上限"              "合計"           sh -c "$VENDOR_OK; for i in 1 2 3 4 5; do head -c 240000 /dev/zero | tr '\0' a > .claude/skills/demo-skill/p\$i.csv; done"
+run_msg 1 main vendor/demo-skill "LFS pointer"               "LFS"            sh -c "$VENDOR_OK; printf 'version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 999999\n' > .claude/skills/demo-skill/payload.json"
+run     1 main vendor/Bad_Name    "名稱格式不合"                              sh -c "$VENDOR_OK"
+run_msg 1 main vendor/demo-skill "把 openspec 檔案搬進來"    "只能修改"       sh -c "$VENDOR_OK; git mv openspec/config.yaml .claude/skills/demo-skill/config.yaml"
+
 echo "── 未知前綴 ──"
 run 1 main wip/whatever "未知前綴" sh -c 'echo x > z.md'
 run 1 main hotfix       "沒有前綴" sh -c 'echo x > z.md'

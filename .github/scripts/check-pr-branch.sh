@@ -31,6 +31,12 @@ CHORE_MAX_BYTES=20000
 # 見下面 chore/ 那段的說明。一般的套件增減遠低於這個數字。
 CHORE_MAX_LOCKFILE_BYTES=1000000
 
+# vendor/ 的上界：看**合併後**的檔案大小，不是 diff。單檔擋上游那種 800KB 的
+# 目錄 JSON（字型、圖示清單）；總量跟 chore 的 lockfile 上界同一個數量級 ——
+# 這條通道的 review 是核對來源雜湊，不是逐行讀，但面積仍然不能無限。
+VENDOR_MAX_FILE_BYTES=250000
+VENDOR_MAX_BYTES=1000000
+
 fail() { echo "✗ $*" >&2; exit 1; }
 
 # ── 0. base 一定要是 main ──────────────────────────────────────────
@@ -415,6 +421,80 @@ SCENARIO_IDS
     echo "✓ chore：${BYTES} bytes / 上限 ${CHORE_MAX_BYTES}（lockfile 另計 ${LOCK_BYTES}）"
     ;;
 
+  # ── vendor/<name> ── 把第三方 agent skill 原封不動放進 .claude/skills/<name>/
+  vendor/*)
+    # 這條通道存在的理由（2026-09-12，codex 與 Gemini 兩輪互審後的共識）：
+    # 使用者要 `ui-ux-pro-max` 這種第三方 skill「clone 即有、三種 agent 都看得到」。
+    # 它的最小子集 ≥ 800KB，chore 的 20000 bytes 上界要拆 40 個 PR；
+    # 而把 `.claude/` 加進 governance 的路徑列舉等於任何東西改名進 `.claude/`
+    # 就能繞過大小紀律。所以另開一條：**目錄固定、只准文字、有上界、要來源**。
+    #
+    # review 的形狀跟 chore 不同：不是逐行深讀（沒有人會讀 800KB 的 CSV），
+    # 是**核對來源** —— VENDOR.md 寫上游 commit 與逐檔 sha256，審的人拿上游那個
+    # commit 對雜湊。所以 VENDOR.md 不是文件，是這條通道的一部分，缺了就紅。
+    #
+    # 它不放寬任何別的通道：chore 仍然碰不了 .claude/ 以外的大東西，
+    # governance 仍然不含 .claude/。
+    NAME="${HEAD#vendor/}"
+    [[ "$NAME" =~ $ID_RE ]] || fail "skill 名稱 '${NAME}' 格式不合。只准小寫、數字、單個連字號。"
+    DIR=".claude/skills/${NAME}/"
+
+    # (1) 只准動自己那一個目錄。deny-by-default：目錄外一個檔案都不行。
+    if OUT="$(echo "$CHANGED" | grep -vE "^${DIR}" || true)"; [ -n "$OUT" ]; then
+      echo "✗ vendor/${NAME} 只能修改 ${DIR}**：" >&2
+      echo "$OUT" | sed 's/^/    /' >&2
+      exit 1
+    fi
+
+    # (2) 只准普通文字檔：mode 100644，副檔名在封閉列舉裡（或 LICENSE／NOTICE）。
+    #     symlink(120000)、submodule(160000)、executable(100755) 一律擋 ——
+    #     skill 裡的腳本是給 `python3 x.py` 跑的，不需要執行位元；
+    #     有執行位元的檔案是「clone 下來就能直接執行的東西」，那不該從第三方原樣搬進來。
+    if MODES="$(git diff --raw --no-renames "$RANGE" | awk '$2 != "000000" && $2 != "100644" {print $NF"  (mode "$2")"}')"; [ -n "$MODES" ]; then
+      echo "✗ vendor 只准 mode 100644 的普通檔案（不准 symlink／submodule／executable）：" >&2
+      echo "$MODES" | sed 's/^/    /' >&2
+      exit 1
+    fi
+    if OUT="$(echo "$CHANGED" | grep -vE '(\.(md|py|csv|json|txt|ya?ml|toml)|/LICENSE|/NOTICE)$' || true)"; [ -n "$OUT" ]; then
+      echo "✗ vendor 只准這些副檔名：md py csv json txt yaml yml toml，以及 LICENSE／NOTICE：" >&2
+      echo "$OUT" | sed 's/^/    /' >&2
+      exit 1
+    fi
+    if BIN="$(git diff --numstat --no-renames "$RANGE" | awk -F'\t' '$1=="-" && $2=="-" {print $3}')"; [ -n "$BIN" ]; then
+      echo "✗ vendor 不得包含 binary 檔案：" >&2
+      echo "$BIN" | sed 's/^/    /' >&2
+      exit 1
+    fi
+    if git diff --no-renames "$RANGE" | grep -q 'version https://git-lfs\.github\.com/spec/'; then
+      fail "vendor 的 diff 含 Git LFS pointer。實際內容不在這個 PR 裡，review 看不到。"
+    fi
+
+    # (3) 上界看的是**合併後的檔案大小**（HEAD 那一份），不是 diff 大小 ——
+    #     升級 skill 的 PR diff 可以很小，但目錄可以一路長大；量最後的東西。
+    #     單檔上界擋「一個 5MB 的字型目錄 JSON」，總量上界跟 chore 的 lockfile
+    #     上界同一個數量級（review 面積不是無限的，只是形狀不同）。
+    TOTAL=0
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      git cat-file -e "HEAD:${f}" 2>/dev/null || continue   # 刪除的檔案沒有大小
+      SZ="$(git cat-file -s "HEAD:${f}")"
+      [ "$SZ" -le "$VENDOR_MAX_FILE_BYTES" ] \
+        || fail "vendor 的單檔 ${f} 是 ${SZ} bytes，超過上限 ${VENDOR_MAX_FILE_BYTES}。上游的大型目錄檔（字型、圖示清單）不要搬進來。"
+      TOTAL=$((TOTAL + SZ))
+    done <<< "$CHANGED"
+    [ "$TOTAL" -le "$VENDOR_MAX_BYTES" ] \
+      || fail "vendor 這個 PR 動到的檔案合計 ${TOTAL} bytes，超過上限 ${VENDOR_MAX_BYTES}。只搬這個專案用得到的子集。"
+
+    # (4) 來源必須可核對：VENDOR.md 要在 HEAD 上，而且要有一行「上游 commit: <40 位十六進位>」。
+    #     沒有這一行，審的人沒有東西可以拿去對雜湊，這條通道就退化成「大一點的 chore」。
+    git cat-file -e "HEAD:${DIR}VENDOR.md" 2>/dev/null \
+      || fail "vendor/${NAME} 缺 ${DIR}VENDOR.md。它要寫上游 repo、commit、拿了哪些檔案、逐檔 sha256、授權。"
+    git cat-file -p "HEAD:${DIR}VENDOR.md" | grep -qE '^上游 commit: [0-9a-f]{40}$' \
+      || fail "${DIR}VENDOR.md 缺「上游 commit: <40 位十六進位 SHA>」這一行。釘 commit 不釘 tag —— tag 可以被重指。"
+
+    echo "✓ vendor：${NAME}，${TOTAL} bytes / 上限 ${VENDOR_MAX_BYTES}"
+    ;;
+
   # ── archive/<id> ── 把 delta 同步進 openspec/specs/
   archive/*)
     ID="${HEAD#archive/}"
@@ -566,6 +646,7 @@ ARCHIVE_IDENTITY
   feat/<id>--<slice>     實作。<id> 必須已在 main 上
   fix/<id>--<slice>      同上
   chore/<desc>           無規格的小型維護。不得碰 openspec/ 與 .github/
+  vendor/<name>          第三方 agent skill 原封搬進 .claude/skills/<name>/。只准文字、有上界、要 VENDOR.md
   archive/<id>           把 delta 同步進 openspec/specs/
   governance/<desc>      改 CI、CODEOWNERS、AGENTS.md、config.yaml
 

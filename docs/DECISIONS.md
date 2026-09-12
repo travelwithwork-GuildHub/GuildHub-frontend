@@ -1374,3 +1374,42 @@ PY
 它們是從上面那張回測表反推的：產品碼的實際最大值是 178，取 250 留餘裕；
 合計的實際最大值是 429，而「一個模組 ＋ 它的判準」的上緣約 500，取 800。
 **三到五個 change 之後要回來看分布再調。**
+
+## 第三方 agent skill 進版控：另開 `vendor/`，不放寬 `chore/`，不把 `.claude/` 加進 `governance/`
+
+**要解決的事**：使用者要 `ui-ux-pro-max`（UI/UX 設計指引，`SKILL.md` ＋ Python 搜尋腳本
+＋ CSV 資料庫）「放到專案裡面，clone 的人就可以繼續開發，不會忘記安裝」，
+而且這個團隊同時用 Claude Code、codex CLI、Gemini CLI —— 三種 agent 都要看得到。
+它的最小可用子集約 850KB；`chore/` 的 20000 bytes 上界要拆 40 個 PR。
+
+**採用**：`vendor/<name>` 通道。目錄固定在 `.claude/skills/<name>/`、只准 mode 100644
+的文字副檔名、擋 binary／symlink／submodule／executable／LFS pointer、
+**合併後**單檔 ≤ 250000、合計 ≤ 1000000 bytes、必須有 `VENDOR.md` 且含
+`上游 commit: <40 位 SHA>`。review 的形狀跟 `chore/` 不同：不是逐行深讀，
+是**拿上游那個 commit 對雜湊**；`VENDOR.md` 是通道的一部分，不是文件。
+（2026-09-12，codex gpt-5.6 與 Gemini 3.1 Pro 兩輪互審後的共識；第一輪兩位各選了
+不同方案，第二輪都改到這一個。）
+
+### 拒絕的替代
+
+- **`.claude/settings.json` 的插件設定**（`extraKnownMarketplaces` ＋ `enabledPlugins`，
+  釘 tag）—— 版控只多 15 行、最符合「小而可深讀」，**但只對 Claude Code 生效**，
+  而且要使用者在「信任資料夾」提示按同意才會裝、要網路 —— 不是 clone 即有。
+  tag 還可以被重指。另外 `CLAUDE.md` 強制叫用它，而插件沒裝成功時流程就卡死。
+- **npm devDependency ＋ `prepare`／`postinstall` 跑 `uipro init`，產物 gitignore** ——
+  沿用「產出物不進版控」的模式、不動閘門、產出的檔案三種 agent 都看得到。
+  但這個 repo 的 `package.json` 目前**沒有任何 postinstall**，加第一個就是讓
+  `npm ci` 隱性執行第三方程式並寫進工作區；而且那個 CLI 預設先試 GitHub 下載。
+  供應鏈面比 vendor 大，而換到的只是「不用審 850KB」—— 那本來就不該逐行審。
+- **把 `.claude/` 加進 `governance/` 的路徑列舉** —— 那等於任何東西改名進 `.claude/`
+  就能繞過大小紀律，而 governance 明文「只擋路徑不擋內容」。
+- **放寬 `chore/` 的 bytes 上界，或給 `.claude/skills/` 例外** —— 〈用分支前綴封閉列舉，
+  不用路徑白名單〉那一條的理由原封不動適用：例外是 fail-open 的方向。
+- **git submodule** —— `chore/` 明文拒絕 submodule，而且 clone 之後還要
+  `git submodule update --init`，正是使用者要避免的「忘記安裝」。
+
+### 這條通道**不保證**什麼
+
+檔案內容真的等於上游那個 commit 的內容。機器只驗「有一行 40 位 SHA」；
+一份改過的 `search.py` 跟原封的長得一模一樣。對雜湊是人的事，
+所以〈人類該深讀什麼〉把 `VENDOR.md` 放在深讀那一欄。

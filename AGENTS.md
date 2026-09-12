@@ -121,6 +121,7 @@ PR 標題和內文都不是（它們隨時可以改，而且不影響 CI 看到�
 | `feat/<id>--<slice>` | 不限，但**不得回改**任何 change 的 proposal/design/specs | `<id>` 必須已經在 main 上 |
 | `fix/<id>--<slice>` | 同上 | 同上 |
 | `chore/<描述>` | 不得碰 `openspec/`、`.github/` 與 `.gitattributes` | diff ≤ **20000 bytes**（lockfile 另計 ≤ 1000000），拒絕 binary / symlink / submodule / LFS pointer |
+| `vendor/<name>` | **只有** `.claude/skills/<name>/**` | 只准 mode 100644 的 `md py csv json txt yaml yml toml` 與 `LICENSE`／`NOTICE`；拒絕 binary / symlink / submodule / executable / LFS pointer；**合併後**單檔 ≤ 250000、合計 ≤ 1000000 bytes；必須有 `VENDOR.md` 且含 `上游 commit: <40 位 SHA>` |
 | `archive/<id>` | 那三種 openspec 路徑 | `validate --archived --strict` **與** `validate --all --strict` 都要過 |
 | `governance/<描述>` | 規則本身（CI、CODEOWNERS、AGENTS.md、config.yaml） | 只允許列舉的治理路徑；**機器不判斷那些檔案的內容是不是真的治理變更** |
 
@@ -490,6 +491,7 @@ bash .github/scripts/pr-size.sh          # 對 origin/main
 | **測試的 diff** | |
 | 驗證輸出的證據 | |
 | **`chore/` PR 的每一行** | |
+| **`vendor/` PR 的 `VENDOR.md`：拿上游那個 commit 對每一個雜湊** | vendor 的其他檔案（沒有人讀 800KB 的 CSV；對得上雜湊就是原封） |
 
 **`chore/` 一律深讀，不抽查。** 那是唯一一條不需要規格的通道，
 所以它沒有「規格說它該做什麼」可以對照 —— **diff 本身就是規格**。
@@ -528,6 +530,7 @@ bash .github/scripts/pr-size.sh          # 對 origin/main
 | `check-pr-branch.sh` 的 `spec/` 那條 | 每個 Scenario 有唯一且格式正確的 ID | ID 取得對不對、Scenario 寫得好不好 |
 | `check-pr-branch.sh` 的 `archive/` 那條 | 封存的內容跟 main 上那份**逐檔 blob 相同**（不是只看檔案有沒有被刪） | `openspec/specs/` 有沒有被另一個 change 覆蓋掉 |
 | `chore/` 的 bytes 上界 | review 面積小到人讀得完（lockfile 另有上界，不是無限） | 「這不是功能」。80 行的功能可以冒充 chore |
+| `check-pr-branch.sh` 的 `vendor/` 那條 | 只動 `.claude/skills/<name>/`、只有文字檔、有上界、`VENDOR.md` 釘了一個 40 位 commit | **檔案內容真的等於上游那個 commit 的內容**。雜湊要人拿上游對；一份改過的 `search.py` 跟原封的長得一樣 |
 | `openspec validate --strict` | 規格的**結構**：有沒有 Scenario、Purpose 夠不夠長 | 規格的**內容**對不對 |
 | `progress.sh --check` | 工作分解表的**形式**：標記附了理由、互斥的處置沒有並存、缺口有決策期限與 fallback、工作沒有排在它依賴的裁決之前、依賴不懸空；**引用不懸空** —— `docs/WBS.md` 與 `docs/ROADMAP.md` 這兩份裡提到的每一個工作項目 ID **與群組 ID** 都要真的存在（散文文件不掃）（圍籬程式碼區塊與〈舊 ID 去哪了〉除外）；以及**解析本身 fail-closed**（表頭畸形、表格被截斷、欄數對不上、ID 重複或漏掉都會紅，不會安靜跳過） | **那些理由與 fallback 寫得對不對**。「`Pending｜等後端`」格式完全合法，內容等於沒說。**也不驗前端項目彼此的先後** —— 跨項依賴那張表靠人維護 |
 | `archive/` 的雙重 validate | tasks 全部完成、archive 後 main spec 不會紅 | `openspec/specs/` 有沒有被另一個 change 覆蓋掉 |

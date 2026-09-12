@@ -54,8 +54,8 @@ Claude Code 進入此 Repository 後：
 5. 除非使用者指定其他語言，對人類使用繁體中文。
 6. **看得見的東西都要過 `ui-ux-pro-max`。** 動到 `src/**/*.tsx` 的版面、
    `src/app/globals.css`、`src/design/` 之前，先叫用 `ui-ux-pro-max` 這個 skill
-   （來源 `nextlevelbuilder/ui-ux-pro-max-skill`；`.claude/settings.json` 會替信任
-   這個資料夾的人裝好 —— 沒裝就先裝，不要跳過）：
+   （來源 `nextlevelbuilder/ui-ux-pro-max-skill`，原封搬在 `.claude/skills/ui-ux-pro-max/`，
+   clone 即有；來源與雜湊在那裡的 `VENDOR.md`。搜尋腳本用 `python3` 跑，不裝任何東西）：
 
    - 新頁面或整體視覺方向 → `--design-system`
    - 單一問題（對比、焦點、表單、間距、動態）→ 一個明確的 `--domain`
@@ -84,6 +84,7 @@ Claude Code 進入此 Repository 後：
 | 寫規格 | `spec/<change-id>` |
 | 寫實作（規格已在 main 上） | `feat/<change-id>--<slice>` |
 | 沒有規格的小改（有大小上界，不得碰 `openspec/` 與 `.github/`） | `chore/<描述>` |
+| 把第三方 agent skill 原封搬進 `.claude/skills/<name>/`（只准文字、有上界、要 `VENDOR.md`） | `vendor/<name>` |
 | 把 delta 同步進 `openspec/specs/` | `archive/<change-id>` |
 | 改 CI、CODEOWNERS、AGENTS.md、config.yaml | `governance/<描述>` |
 
