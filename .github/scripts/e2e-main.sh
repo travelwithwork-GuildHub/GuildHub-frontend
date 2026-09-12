@@ -32,9 +32,11 @@ FRONTEND="http://127.0.0.1:$PORT"
 # 直接跑 next 的 bin，不經 `npx` —— 多一層包裝，殺掉包裝會留孤兒咬著 port（契約 harness 抓過）。
 NEXT_PUBLIC_APP_ENV=local node node_modules/next/dist/bin/next start -p "$PORT" -H 127.0.0.1 > "$OUT/server.log" 2>&1 &
 SERVER=$!
+# 殺整棵樹，不只殺直接子程序：先葉後根，最後把還咬著 port 的一併清掉（macOS 沒有 setsid，用 pgrep 走樹）。
+killtree() { local c; for c in $(pgrep -P "$1" 2>/dev/null); do killtree "$c"; done; kill "$1" 2>/dev/null || true; }
 cleanup() {
-  kill "$SERVER" 2>/dev/null || true
-  pkill -P "$SERVER" 2>/dev/null || true
+  killtree "$SERVER"
+  lsof -ti "tcp:$PORT" 2>/dev/null | xargs kill 2>/dev/null || true
   wait "$SERVER" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -47,24 +49,17 @@ for _ in $(seq 1 60); do
 done
 curl -fsS -o /dev/null "$FRONTEND/" || { echo "✗ $FRONTEND 60 秒內沒有回 200" >&2; cat "$OUT/server.log" >&2; exit 2; }
 
-ran=0; failed=(); flaky=()
-run_one() {
-  # OUT／SHOTS：每支的截圖與 report.json 都收進 $OUT，不寫進 repo 的 docs/evidence/。
-  FRONTEND="$FRONTEND" OUT="$OUT/$1" SHOTS="$OUT/$1" node "tests/e2e/$1.mjs" > "$OUT/$1$2.log" 2>&1
-}
+ran=0; failed=()
 for n in "${SCRIPTS[@]}"; do
   start=$(date +%s)
-  if run_one "$n" ""; then
+  # OUT／SHOTS：每支的截圖與 report.json 都收進 $OUT，不寫進 repo 的 docs/evidence/。
+  # **不重跑。** 第一次紅重跑綠也是紅 —— 安全網要痛才有人去看；flake 的處置是修那支腳本的尺
+  # （tests/e2e/ 裡各支自己的閾值），不是在這裡把它蓋掉。flake ≥5% 是拆掉這條接線的條件，得看得見才數得到。
+  if FRONTEND="$FRONTEND" OUT="$OUT/$n" SHOTS="$OUT/$n" node "tests/e2e/$n.mjs" > "$OUT/$n.log" 2>&1; then
     echo "✓ ${n}（$(( $(date +%s) - start )) 秒）"
-  elif run_one "$n" ".retry"; then
-    # 第一次紅、重跑綠：**記成 flake，不記成通過**。這個數字是停止條件的分子（≥5% 就拆）——
-    # 用 workflow annotation 讓它在 run 的摘要頁看得到、`gh run view` 數得到。
-    echo "::warning title=e2e-main flake::${n} 第一次紅、重跑綠（log：${n}.log 與 ${n}.retry.log）"
-    echo "~ ${n}（flake，$(( $(date +%s) - start )) 秒）"
-    flaky+=("$n")
   else
-    echo "✗ ${n}（$(( $(date +%s) - start )) 秒）—— 重跑仍紅，最後 20 行："
-    tail -n 20 "$OUT/$n.retry.log" | sed 's/^/    /'
+    echo "✗ ${n}（$(( $(date +%s) - start )) 秒）—— 最後 20 行："
+    tail -n 20 "$OUT/$n.log" | sed 's/^/    /'
     failed+=("$n")
   fi
   ran=$((ran + 1))
@@ -79,4 +74,4 @@ if [ "${#failed[@]}" -gt 0 ]; then
   echo "✗ ${#failed[@]}/${#SCRIPTS[@]} 支紅：${failed[*]}（log 與截圖在 ${OUT}）" >&2
   exit 1
 fi
-echo "✓ ${#SCRIPTS[@]}/${#SCRIPTS[@]} 支通過，flake ${#flaky[@]} 支（${OUT}）"
+echo "✓ ${#SCRIPTS[@]}/${#SCRIPTS[@]} 支通過（${OUT}）"

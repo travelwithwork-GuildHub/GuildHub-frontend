@@ -709,7 +709,7 @@ gh api repos/travelwithwork-GuildHub/GuildHub-frontend/rulesets/21930388 \
 - **不得改 `.github/`**（CI 與 CODEOWNERS 是執法層自己，改它要獨立 PR 並讓人明確看到）
 - CI 紅燈不要靠 re-run 賭它變綠，去看為什麼紅
 - **main 合併後**另有一條 `e2e-main` workflow（不是 required check，是安全網）：對 `next start` 的產物跑
-  `tests/e2e/` 裡六支不連任何服務的瀏覽器腳本，flake 記成 warning annotation。紅了去看 artifact 的 log 與截圖；
+  `tests/e2e/` 裡六支不連任何服務的瀏覽器腳本。**flake 也是紅**（不重跑）：處置是修那支腳本的尺；紅了去看 artifact 的 log 與截圖；
   跑什麼、為什麼、什麼時候拆（flake ≥5% 或每週維護 >15 分鐘）寫在 `.github/scripts/e2e-main.sh` 開頭
 
 ## 完成的定義

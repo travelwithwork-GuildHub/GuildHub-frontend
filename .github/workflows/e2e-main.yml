@@ -2,7 +2,8 @@
 #
 # 跑什麼、為什麼、什麼時候拆：見 `.github/scripts/e2e-main.sh` 開頭。
 # 這裡只管「什麼時候跑」：
-#   - push main：每一次。只驗最新的 main —— concurrency 取消同一個 ref 還沒跑完的舊 run。
+#   - push main：每一次。只驗最新的 main —— concurrency 取消同一個 ref 還沒跑完的舊 run。**不重跑、不重試**：
+#     flake 也是紅，處置是修那支腳本自己的尺（tests/e2e/）；flake ≥5% 就拆這條接線。
 #     group 帶 event_name 與 ref：改這個 workflow 的 PR 自己那一輪，不可以取消 main 的。
 #   - pull_request：**只有改到這兩個檔的 PR**。改安全網的 PR 要自己證明安全網還跑得動。
 #
