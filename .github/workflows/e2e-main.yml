@@ -31,7 +31,7 @@ jobs:
   e2e-main:
     name: e2e-main
     runs-on: ubuntu-latest
-    # 本機實測六支合計約兩分鐘；build 幾十秒；瀏覽器冷下載約一分鐘。20 分鐘是「卡住了」的判準，不是預算。
+    # 本機實測四支合計約一分半；build 幾十秒；瀏覽器冷下載約一分鐘。20 分鐘是「卡住了」的判準，不是預算。
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7

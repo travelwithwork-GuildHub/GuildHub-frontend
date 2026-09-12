@@ -8,7 +8,7 @@
 # （實測：把 `WorldCanvas` 傳給 `LocalPlayer` 的 `av` 拿掉，971 條單元測試全綠，
 # `avatar-pixels.mjs` 與 `avatar-picker.mjs` 紅），但只有人記得的時候才會跑。
 #
-# 只列**用 `page.route`／`routeWebSocket` 偽造回應、不連任何後端與資料庫**的腳本。
+# 只列**用 `page.route`／`routeWebSocket` 偽造回應、不連任何後端與資料庫、判準不綁 runner 速度**的腳本。
 # 要真後端的（identity-flow、multi-tab…）永遠不進來（AGENTS.md〈測試環境隔離〉第 2 條）；
 # 要本地 Postgres ＋ 第二次 build 的（inbox、profile-editor、internal-backend）等這一組
 # 跑出 flake 基線再說。**加一支就是加一個 flake 來源，要有理由。**
@@ -16,7 +16,10 @@
 # 停止條件（第六輪共識）：flake ≥5% 或每週維護 >15 分鐘 → 刪 workflow 與這支，腳本留手動。
 set -euo pipefail
 
-SCRIPTS=(avatar-picker avatar-pixels board-panel control-contrast deep-link rooms-fixture)
+# board-panel 與 deep-link **暫時不在**：它們用「按住方向鍵固定毫秒數」走到看板前，在 ubuntu runner 的
+# swiftshader 上一次走到、一次走不到（run 34706773895：「走不到『看專案看板』前面」）。那是腳本的尺
+# 綁在 runner 速度上，要在 tests/e2e/ 裡把 approach() 改成「走到提示出現為止、只設時間上限」才能進來。
+SCRIPTS=(avatar-picker avatar-pixels control-contrast rooms-fixture)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
@@ -65,7 +68,7 @@ for n in "${SCRIPTS[@]}"; do
   ran=$((ran + 1))
 done
 
-# 六支都要真的跑過。少跑一支還回綠，這條安全網就是空殼。
+# 每一支都要真的跑過。少跑一支還回綠，這條安全網就是空殼。
 if [ "$ran" -ne "${#SCRIPTS[@]}" ]; then
   echo "✗ 只跑了 ${ran}/${#SCRIPTS[@]} 支" >&2
   exit 1
