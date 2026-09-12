@@ -930,6 +930,34 @@ else
   bump_fail
 fi
 
+# **拆成多個 change 這件事要在終端機看得見**，不只是 `--json`。
+baseline
+mkchange fe-c01-api fe-c01-ui
+run_all_has "一個 ID 對多個 change：終端機列出「工作拆分」" "FE-C01 → fe-c01-api、fe-c01-ui"
+run 0 "一個 ID 對多個 change 是正常的，--check 綠" ""
+
+# ── 孤兒 change（2026-09-12 起是違規）────────────────────────────
+#
+# 有地圖的專案裡，一個 change 開了、id 對不上任何 WBS ID、CI 綠 ——
+# 地圖就這樣靜靜過期。這條以前只印紅字，不影響退出碼。
+baseline
+mkchange zzz-q01-x
+run 1 "有 WBS、change 對不上任何 ID → 紅" "對不上任何 WBS ID"
+run_json_has "孤兒 change 也進 --json 的 violations"
+
+baseline
+mkarchived zzz-q01-x
+run 1 "封存的孤兒 change 一樣紅" "zzz-q01-x"
+
+baseline
+hide_wbs
+mkchange zzz-q01-x
+run 0 "沒有 WBS 時孤兒不算違規（沒有地圖就沒有孤兒）" ""
+
+baseline
+mkchange fe-c010-x
+run 1 "ID 前綴只是字面相似（fe-c010）不算對上" "fe-c010-x"
+
 # **change 清單要排序，不要靠字典的插入順序。** `changes` 是先塞 active
 # 再塞 archived，所以「第一個」剛好永遠是 active 的那個 —— 聚合與「只看第一個」
 # 在那種資料上同解，差別觀察不到。排序之後順序跟狀態無關。

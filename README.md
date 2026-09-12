@@ -57,8 +57,12 @@ bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
 
 規格由 **OpenSpec CLI** 管，git / PR / CI 的紀律在 `AGENTS.md`。
 
+地圖在 `docs/WBS.md`（這個 repo 一開始就有；新專案用 `prompts/00-map.md` 產）。
+**每個 change 都要對回地圖上的一個 ID**，對不上的 `progress.sh --check` 會擋 ——
+地圖先於 change，不是想到什麼開發什麼。
+
 ```
-   訪談需求          prompts/01-discovery.md
+   一個工作項目的探索  prompts/01-discovery.md（先在地圖上找到它）
         ↓
 /opsx:propose        產生 proposal → specs → design → tasks，產完就停
         ↓
@@ -84,13 +88,14 @@ npx openspec list
 
 ## `progress.sh --check` 在守什麼
 
-CI 每次都跑它。它讀 `docs/WBS.md`，有違規就讓 build 紅。守的東西分四類：
+CI 每次都跑它。它讀 `docs/WBS.md`，有違規就讓 build 紅。守的東西分五類：
 
 | 類 | 例子 |
 |---|---|
 | **表格自己的形式** | 標記要附理由；互斥的處置（`Cancelled`／`Pending`／`TBD`／`Regular`／`Done`）不得並存；缺口要有決策期限與 fallback；**工作的週次必須晚於它依賴的裁決期限** |
 | **欄位的文法** | ID、週、點、阻塞四欄都有明確文法。打錯一個字元不會被當成「沒填」，會紅 |
 | **引用不懸空** | `docs/WBS.md` 與 `docs/ROADMAP.md` 這兩份裡提到的每一個工作項目 ID 與群組 ID 都要真的存在（散文文件不掃）。範圍會展開成中間每一個 |
+| **地圖先於 change** | 每一個 `openspec/changes/<id>` 的 id 都要以某個 WBS ID 開頭。對不上的是違規 —— `spec/` PR 在規格階段就紅，逼人先開 `governance/` PR 把那項工作加進地圖 |
 | **解析本身 fail-closed** | 表頭畸形、表格被截斷、欄數對不上、ID 重複、沒關起來的圍籬或註解 —— **一律報，不會安靜跳過** |
 
 **它不驗內容對不對。** `Pending｜等後端` 格式完全合法，但那句理由等於沒說。
