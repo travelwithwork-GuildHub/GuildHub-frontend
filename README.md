@@ -90,6 +90,8 @@ npm ci
 npx openspec list
 ```
 
+多模型分工：先 `node .agents/skills/llm-team/setup.mjs --check`，流程見 `prompts/07-ticket.md`。
+
 ## `progress.sh --check` 在守什麼
 
 CI 每次都跑它。它讀 `docs/WBS.md`，有違規就讓 build 紅。守的東西分五類：
