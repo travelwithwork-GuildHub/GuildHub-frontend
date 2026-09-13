@@ -9,6 +9,7 @@ import { CredentialsRejectedError, LoginIdTakenError, NicknameLengthError, Recov
 import { CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
 import { LIMITS, remaining, violates } from '@/api/contract/limits'
 import { useForm, type FormApi } from '@/forms/useForm'
+import { browserClipboard, type ClipboardPort } from '@/identity/clipboard'
 import { SubmitError } from '@/forms/SubmitError'
 
 // 登入畫面。規格 `FE-A01-S01`／`S02`／`S03`／`S07`／`S09`／`S17`。
@@ -35,28 +36,100 @@ import { SubmitError } from '@/forms/SubmitError'
 // 成功**導向 `/world`**、不顯示恢復金鑰畫面：帳號密碼就是這個人回來的路（那個畫面是匿名路的義務）。
 // 任一入場表單送出中，當下的三個送出鈕與兩個切換鈕全部禁用（送出中切走，回來的 403 會掛在看不見的表單上）。
 
+/** 要填回幾個字元。 */
+const PROOF_LENGTH = 6
+
+/** 金鑰有沒有被帶走。 */
+type Taken =
+  | { readonly how: 'not-yet' }
+  | { readonly how: 'copied' }
+  | { readonly how: 'proved' }
+  | { readonly how: 'copy-failed'; readonly reason: string }
+
 /** 建立身分之後要給使用者看的東西。`S09` 要求兩件事都得說。 */
-function RecoveryKeyPanel({ identity }: { identity: Identity }) {
+export function RecoveryKeyPanel({
+  identity,
+  clipboard = browserClipboard(),
+}: {
+  identity: Identity
+  clipboard?: ClipboardPort
+}) {
+  const router = useRouter()
+  const [taken, setTaken] = useState<Taken>({ how: 'not-yet' })
+  const [proof, setProof] = useState('')
+
   if (identity.state !== 'signed-in') return null
+
+  async function copy(key: string) {
+    try {
+      await clipboard.write(key)
+      setTaken({ how: 'copied' })
+    } catch (caught) {
+      setTaken({
+        how: 'copy-failed',
+        reason: caught instanceof Error ? caught.message : '複製沒有成功。',
+      })
+    }
+  }
+
+  const key = identity.profile.id
+  const tail = key.slice(-PROOF_LENGTH)
+  const done = taken.how === 'copied' || taken.how === 'proved'
+  const proofWrong = proof.length >= PROOF_LENGTH && proof.toLowerCase() !== tail.toLowerCase()
+
   return (
-    <section aria-labelledby="recovery-key-heading" className="border-line border p-gutter">
+    <section aria-labelledby="recovery-key-heading" className={FORM}>
       <h2 id="recovery-key-heading" className="text-title">
-        你的恢復金鑰
+        帶走這把鑰匙，再進去
       </h2>
       <p>
         歡迎，<strong>{identity.profile.display_name}</strong>。
       </p>
-      {/* **金鑰本身要看得到、選得起來。** 只說「我們幫你記住了」的話，
-          沒勾記住的人什麼都拿不到，而 S09 要求無論有沒有勾都拿得到 */}
+      {/* **金鑰要選得起來。** 剪貼簿不可用的人只剩下「自己選起來複製」這條路 */}
       <p>
-        <code data-testid="recovery-key">{identity.profile.id}</code>
+        <code data-testid="recovery-key">{key}</code>
       </p>
-      {/* ⚠️ **這兩句是義務，不是提示。**（規格逐字：「最後那一條是義務不是提示。
-          沒有它，『預設不存』就從一個知情的選擇變成一個默默弄丟身分的陷阱」） */}
-      <p className="text-danger">拿到這把金鑰的人，就能成為你 —— 它不是密碼，不會驗證任何身分。</p>
+      <p className="text-danger">拿到這把鑰匙的人，就能成為你 —— 它不是密碼，不會驗證任何身分。</p>
       <p className="text-danger">
-        沒有把它抄下來、又清掉瀏覽器資料的話，這個身分就回不來了。
+        沒有把它帶走、又清掉瀏覽器資料的話，這個身分就回不來了。
       </p>
+
+      <button type="button" className={SECONDARY} onClick={() => void copy(key)}>
+        複製鑰匙
+      </button>
+
+      {taken.how === 'copied' && <p role="status">已經複製了。</p>}
+
+      {taken.how === 'copy-failed' && (
+        <div role="alert" className="text-danger">
+          <p>{taken.reason}請把上面那一串自己選起來複製，或抄下來。</p>
+        </div>
+      )}
+
+      <label className={FIELD_LABEL}>
+        <span>
+          或者，把鑰匙<strong>最後 {PROOF_LENGTH} 個字</strong>填回來（抄的、拍照的都算）
+        </span>
+        <input
+          className={FIELD}
+          value={proof}
+          onChange={(e) => {
+            const next = e.target.value
+            setProof(next)
+            if (next.toLowerCase() === tail.toLowerCase()) setTaken({ how: 'proved' })
+            else if (taken.how === 'proved') setTaken({ how: 'not-yet' })
+          }}
+        />
+      </label>
+      {proofWrong && (
+        <p role="alert" className="text-danger">
+          跟鑰匙的結尾對不上。
+        </p>
+      )}
+
+      <button type="button" className={PRIMARY} disabled={!done} onClick={() => router.push('/world')}>
+        進入世界
+      </button>
     </section>
   )
 }
@@ -109,7 +182,11 @@ export const ACCOUNT_LABELS = {
   submitRegister: '建立帳號',
 }
 
-export function LoginForm() {
+export interface LoginFormProps {
+  clipboard?: ClipboardPort
+}
+
+export function LoginForm({ clipboard = browserClipboard() }: LoginFormProps = {}) {
   const [identity, setIdentity] = useState<Identity>({ state: 'unknown' })
   const nick = useForm({
     schema: NicknameSchema,
@@ -172,7 +249,7 @@ export function LoginForm() {
   // 任一入場表單在送，別的都不能按（一個人一次只建立一個身分）；切換鈕也鎖（`FE-A08-S12`）。
   const anyBusy = nick.busy || recovery.busy || account.busy || signup.busy
 
-  if (identity.state === 'signed-in') return <RecoveryKeyPanel identity={identity} />
+  if (identity.state === 'signed-in') return <RecoveryKeyPanel identity={identity} clipboard={clipboard} />
 
   return (
     <div className="flex flex-col gap-section">

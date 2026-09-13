@@ -177,6 +177,12 @@ jobs:
       - name: Archive review tests
         run: bash .github/scripts/test-archive-review.sh
 
+      # 同上：寫手 wrapper 與票流程不是閘門，但它們的 fail-closed 判定是尺，尺要有測試。
+      # 事故：docs/DECISIONS.md「多模型分工工具進模板目錄」與「程式真源移到維護者的 config repo」兩則（2026-09-13，
+      # 快照手改／漂移在 web-agency-system 實測過）；停止條件：快照改由真源 CI 驗證、本 repo 只跑 setup --sync-check 那天，把這步縮成 sync-check。
+      - name: LLM team tests
+        run: bash .github/scripts/test-llm-team.sh
+
       # ─── 工程品質。2026-09-07 由 FE-O10 放回（governance/ci-quality-steps）───
       #
       # 為什麼曾經被拿掉：這個 repo 建立之初沒有任何程式碼，package.json 那四個
