@@ -2,12 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { LoginForm } from '@/app/login/LoginForm'
+import type { ClipboardPort } from '@/identity/clipboard'
 import { RECOVERY_KEY_STORAGE_KEY } from '@/identity/recoveryKey'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
 // `LoginForm` 在 `FE-A08` 之後有 `useRouter()`（帳號密碼成功導向 `/world`）；測試環境沒有 Next 的 app router context —— 只換掉導航。
-// 這裡的判準不走那條路，所以 push 什麼都不做。
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {}, replace: () => {} }) }))
+const pushed: string[] = []
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: (url: string) => pushed.push(url),
+    replace: () => {},
+  }),
+}))
 
 
 // 規格：openspec/changes/fe-a01-login/specs/identity-session/spec.md
@@ -31,7 +37,11 @@ const profileNamed = (name: string) => ({
   updated_at: '2026-09-10T00:00:00Z',
 })
 
+const workingClipboard: ClipboardPort = { write: vi.fn(async () => {}) }
+
 beforeEach(async () => {
+  if (vi.isMockFunction(workingClipboard.write)) (workingClipboard.write as any).mockClear()
+  pushed.length = 0
   server = await startContractServer()
   process.env.NEXT_PUBLIC_GUILDHUB_REST = server.base
   process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
@@ -59,6 +69,14 @@ function submit(button: HTMLElement) {
   act(() => {
     button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
+}
+
+async function reachRecoveryKey(clipboard: ClipboardPort = workingClipboard) {
+  server.reply(200, profileNamed('阿福'))
+  render(<LoginForm clipboard={clipboard} />)
+  type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
+  submit(screen.getByRole('button', { name: '進入世界' }))
+  await waitFor(() => expect(screen.getByTestId('recovery-key')).toBeDefined())
 }
 
 describe('登入畫面', () => {
@@ -163,5 +181,102 @@ describe('登入畫面', () => {
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('不存在'))
     expect(screen.queryByTestId('recovery-key'), '無效的金鑰讓人進去了').toBeNull()
+  })
+
+  it('[FE-A06-5.1b] 尚未證明前「進入世界」為 disabled', async () => {
+    await reachRecoveryKey()
+
+    const enterButton = screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement
+    expect(enterButton.disabled, '尚未證明前「進入世界」應該是 disabled').toBe(true)
+    submit(enterButton)
+    expect(pushed).toHaveLength(0)
+  })
+
+  it('[FE-A06-5.1b] 點擊「複製鑰匙」成功後啟用', async () => {
+    await reachRecoveryKey()
+
+    submit(screen.getByRole('button', { name: '複製鑰匙' }))
+
+    await waitFor(() => expect((screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement).disabled).toBe(false))
+    expect(workingClipboard.write).toHaveBeenCalledWith(ME)
+    expect(screen.getByRole('status').textContent).toContain('已經複製')
+
+    submit(screen.getByRole('button', { name: '進入世界' }))
+    expect(pushed).toContain('/world')
+  })
+
+  it('[FE-A06-5.1b] 正確輸入尾碼 6 碼後「進入世界」啟用', async () => {
+    await reachRecoveryKey()
+
+    const enterButton = screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement
+    expect(enterButton.disabled).toBe(true)
+
+    const proofInput = screen.getByLabelText(/最後 6 個字/)
+    type(proofInput, ME.slice(-6))
+
+    expect(enterButton.disabled).toBe(false)
+    submit(enterButton)
+    expect(pushed).toContain('/world')
+  })
+
+  it('[FE-A06-5.1b] 複製失敗時不假裝成功，維持鎖住，而且給得出另一條路', async () => {
+    const brokenClipboard: ClipboardPort = {
+      async write() {
+        throw new Error('這個瀏覽器（或這個連線）不允許自動複製。')
+      },
+    }
+    await reachRecoveryKey(brokenClipboard)
+
+    const enterButton = screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement
+    submit(screen.getByRole('button', { name: '複製鑰匙' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeDefined())
+    expect(screen.queryByRole('status'), '複製失敗了卻說已複製').toBeNull()
+    expect(enterButton.disabled, '複製失敗了卻放行').toBe(true)
+    expect(screen.getByRole('alert').textContent).toContain('選起來')
+  })
+
+  it('[FE-A06-5.1b] 填錯尾碼不放行，而且說得出來', async () => {
+    await reachRecoveryKey()
+
+    const enterButton = screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement
+    const proofInput = screen.getByLabelText(/最後 6 個字/)
+    type(proofInput, 'abcdef')
+
+    expect(enterButton.disabled, '填錯了竟然放行').toBe(true)
+    expect(screen.getByRole('alert').textContent).toContain('對不上')
+  })
+
+  it('[FE-A06-5.1b] 還沒填完不算填錯', async () => {
+    await reachRecoveryKey()
+
+    const enterButton = screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement
+    const proofInput = screen.getByLabelText(/最後 6 個字/)
+    type(proofInput, ME.slice(-6).slice(0, 3))
+
+    expect(screen.queryByRole('alert'), '才打三個字就說填錯').toBeNull()
+    expect(enterButton.disabled).toBe(true)
+  })
+
+  it('[FE-A06-5.1b] 手抄的人大小寫不一定一致，那不該被擋', async () => {
+    await reachRecoveryKey()
+
+    const enterButton = screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement
+    const proofInput = screen.getByLabelText(/最後 6 個字/)
+    type(proofInput, ME.slice(-6).toUpperCase())
+
+    expect(enterButton.disabled).toBe(false)
+  })
+
+  it('[FE-A06-5.1b] 填對之後又改壞，放行要收回去', async () => {
+    await reachRecoveryKey()
+
+    const enterButton = screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement
+    const proofInput = screen.getByLabelText(/最後 6 個字/)
+    type(proofInput, ME.slice(-6))
+    expect(enterButton.disabled).toBe(false)
+
+    type(proofInput, 'zzzzzz')
+    expect(enterButton.disabled, '改壞了還放行').toBe(true)
   })
 })
