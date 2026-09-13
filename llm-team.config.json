@@ -1,10 +1,8 @@
 {
   "schemaVersion": 1,
   "models": {
-    "writer": "gemini-3.8-flash-high",
-    "reviewers": [
-      "gemini-3.1-pro-high"
-    ],
+    "writer": "gemini-3.8-flash-medium",
+    "reviewers": [],
     "codex": "gpt-5.6-sol"
   },
   "allowCommandHeads": [
