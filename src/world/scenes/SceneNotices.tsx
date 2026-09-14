@@ -1,5 +1,6 @@
 'use client'
 
+import { SECONDARY } from '@/design/controls'
 import { useScene } from './SceneProvider'
 
 // 場景的兩種說明。規格 `FE-V01-S06`／`S07`（進不去）、`S14`（沒票的深連結）。
@@ -21,7 +22,7 @@ export function SceneNotices() {
       {notice !== null && (
         <div role="alert" className="border-danger text-danger p-gutter gap-gutter flex items-center border">
           <p>{FAILED_TEXT}</p>
-          <button type="button" onClick={dismissNotice} className="min-h-11 min-w-11 px-3">
+          <button type="button" onClick={dismissNotice} aria-label="關閉通知" className={`${SECONDARY} min-h-11 shrink-0`}>
             關閉
           </button>
         </div>
