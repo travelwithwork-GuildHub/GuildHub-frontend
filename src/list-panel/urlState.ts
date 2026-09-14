@@ -4,7 +4,7 @@ import type { ListKind } from './paging'
 //
 // `/world?panel=profiles&profile=<id>&page=N`：開著哪一種清單、哪一筆詳情、第幾頁。
 // 這裡是**純函式**：解析（含 canonical 化，design `D5`）與序列化。誰去讀 `window.location`、
-// 誰去寫 `history` 在 `world/scenes/WorldUrlSync`（原 `PanelUrlSync`；`FE-V01` 之後它也管 `room`）。
+// 誰去寫 `history` 在 `PanelUrlSync`（`WorldUrlSync`；`FE-V01` 之後它也管 `room`）。
 //
 // ⚠️ **解析出來的一定是 canonical 的。** `page=0` 省略、`page=abc` 去掉、`panel=bogus` 全部去掉、
 // 單獨的 `profile` 視為 `panel=profiles`、`panel=projects` 帶 `profile` 去掉 `profile`（案件面板沒有人才詳情）。

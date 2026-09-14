@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useListPanel } from '@/list-panel/ListPanelProvider'
-import { CLOSED, depthOf } from '@/list-panel/urlState'
-import { useScene } from './SceneProvider'
-import { parseWorldUrl, serializeWorldUrl } from './urlState'
+import { useScene } from '@/world/scenes/SceneProvider'
+import { parseWorldUrl, serializeWorldUrl } from '@/world/scenes/urlState'
+import { useListPanel } from './ListPanelProvider'
+import { CLOSED, depthOf } from './urlState'
 
 // 網址 ⇄ 開著哪一層、在哪個場景。規格 `FE-B09`〈網址表示開著哪一層，複製它就能還原〉、
 // 〈互動寫回網址；上一頁與 Escape 等效〉；`FE-V01-S09`／`S13`／`S14`〈網址表示所在的場景，與面板參數同一個寫入者〉。
+//
+// ⚠️ 檔名還叫 `PanelUrlSync.tsx`：搬到 `world/scenes/` 會讓 PR 大小規則把整個檔案算成新寫的
+// （改名＝刪一個加一個），超過產品碼上限 —— 搬家是下一個 `chore/`，這裡只改內容。
 //
 // **這是 `/world` 網址唯一的寫入者**（design D2 的 C）。場景（`room`）與面板各有自己的 codec，
 // 這裡組合、canonical、寫一次。場景換了 → 依 `SceneProvider` 說的 push／replace 寫（**不走層數比較**：

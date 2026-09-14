@@ -27,8 +27,8 @@ import { CORRIDOR_SLOTS } from './rooms/slots'
 import { useRooms } from './rooms/useRooms'
 import { sceneOf } from './scenes/registry'
 import { useSceneRef } from './scenes/SceneContext'
+import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
 import { SceneObjects } from './scenes/SceneObjects'
-import { WorldUrlSync } from './scenes/WorldUrlSync'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
