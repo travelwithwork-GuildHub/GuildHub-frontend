@@ -54,6 +54,8 @@ const ROOMS = [
   { project_id: DECOY, title: '深海探勘', online_count: 1 },
 ]
 const SLOT_GAP = 2
+/** 第一格門的 z（`CORRIDOR_SLOTS[0]`）。 */
+const DOOR_Z = -2
 /** 出生點（`world-layout` 的 hall spawn）。走位用它當起點，之後的位置都是量出來的。 */
 const SPAWN = { x: 0, z: -1 }
 /** 一眼認得出來的票。S14 要的是 `location.href` 從頭到尾不含這串字。 */
@@ -159,24 +161,27 @@ async function odometer(page) {
  */
 async function approachDoor(page) {
   const where = await odometer(page)
-  const leg = async (label, code, ms, done, maxSteps) => {
+  /** 每一步先量再決定往哪走：`steer` 回傳要按的鍵，回傳 null 就是到了。**雙向**：跨過頭就走回來（審查：單向＋單邊不等式會越界）。 */
+  const leg = async (label, ms, steer, maxSteps) => {
     for (let i = 0; i < maxSteps; i++) {
       const pos = await where()
-      if (await done(pos)) return pos
+      const code = await steer(pos)
+      if (code === null) return pos
       await hold(page, code, ms)
     }
     await page.screenshot({ path: path.join(OUT, 'lost.png') })
     throw new Error(`${label}：走了 ${maxSteps} 步還沒到（截圖 ${OUT}/lost.png）`)
   }
-  await leg('往北繞過隔牆', 'ArrowUp', 250, (p) => p.z <= -4, 30)
-  await leg('往西到門前', 'ArrowLeft', 300, (p) => p.doorWest <= 1.2, 60)
+  await leg('往北繞過隔牆', 250, (p) => (p.z > -4 ? 'ArrowUp' : p.z < -6 ? 'ArrowDown' : null), 30)
+  await leg('往西到門前', 300, (p) => (p.doorWest > 1.2 ? 'ArrowLeft' : p.doorWest < 0 ? 'ArrowRight' : null), 60)
   const arrived = await leg(
     '往南到門口',
-    'ArrowDown',
     120,
-    async () => {
+    async (p) => {
       const prompt = await promptText(page)
-      return prompt !== null && prompt.includes(ROOM_TITLE)
+      if (prompt !== null && prompt.includes(ROOM_TITLE)) return null
+      // 門在 z=-2、互動距離 2：過了 z=0.5 就是走過頭，往回
+      return p.z > DOOR_Z + 2.5 ? 'ArrowUp' : 'ArrowDown'
     },
     40,
   )
@@ -195,10 +200,31 @@ async function waitForWorld(page) {
   await page.waitForSelector('[data-testid="world-loading"]', { state: 'detached', timeout: 30_000 })
   await page.waitForTimeout(1500)
 }
-/** 過場覆蓋層出現再消失。每一場過場都至少顯示 300 ms（`S05`），所以「沒看到」就是紅，不是放行。 */
-async function waitForTransition(page, label) {
-  const seen = await page.waitForSelector('[data-testid="scene-transition"][role="status"]', { timeout: 5_000 }).catch(() => null)
-  if (seen !== null) ok(`[S05] ${label}：有過場覆蓋層`)
+/**
+ * 每個 document 從第一行就在數「覆蓋層出現過幾次」：`goto()` 回來的時候，快的機器上那場過場可能已經整個結束了
+ * （ready ＋ 300 ms ＋ 淡出），事後再 `waitForSelector` 會假紅（審查抓到的競態）。
+ */
+function countOverlays(context) {
+  return context.addInitScript(() => {
+    window.__guildhubOverlaysSeen = 0
+    const isOverlay = (n) => n instanceof Element && n.matches('[data-testid="scene-transition"][role="status"]')
+    new MutationObserver((records) => {
+      for (const r of records) {
+        for (const n of r.addedNodes) {
+          if (isOverlay(n) || (n instanceof Element && n.querySelector('[data-testid="scene-transition"][role="status"]'))) window.__guildhubOverlaysSeen += 1
+        }
+        if (r.type === 'attributes' && isOverlay(r.target)) window.__guildhubOverlaysSeen += 1
+      }
+      // 觀察 `document` 不是 `documentElement`：init script 跑的時候 `<html>` 還沒被解析出來，那是 null，整支 script 會靜默失敗。
+    }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['role'] })
+  })
+}
+const overlaysSeen = (page) => page.evaluate(() => window.__guildhubOverlaysSeen ?? 0)
+
+/** 過場覆蓋層出現再消失。每一場過場都至少顯示 300 ms（`S05`），所以「沒看到」就是紅，不是放行。`since`：這場之前已經數到幾次。 */
+async function waitForTransition(page, label, since) {
+  const seen = await page.waitForFunction((n) => (window.__guildhubOverlaysSeen ?? 0) > n, since, { timeout: 5_000 }).then(() => true).catch(() => false)
+  if (seen) ok(`[S05] ${label}：有過場覆蓋層`)
   else bad(`[S05] ${label}：沒有看到過場覆蓋層`, '')
   const gone = await page.waitForSelector('[data-testid="scene-transition"]', { state: 'detached', timeout: 15_000 }).then(() => true).catch(() => false)
   if (!gone) bad(`[S05] ${label}：覆蓋層 15 秒沒消失`, '')
@@ -268,6 +294,7 @@ try {
     const sockets = []
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
     await context.addInitScript(([key, token]) => sessionStorage.setItem(key, token), [tokenKey(P.id), TOKEN])
+    await countOverlays(context)
     await fakeRealtime(context, sockets)
     const page = await context.newPage()
     await fakeRest(page, { current: P })
@@ -283,8 +310,9 @@ try {
 
     const { prompt, pos } = await approachDoor(page)
     ok(`[S10] 走到門前（量到 z=${pos.z.toFixed(1)}、門在西邊 ${pos.doorWest.toFixed(1)} 單位），提示是「${prompt}」`)
+    let since = await overlaysSeen(page)
     await page.keyboard.press('KeyE')
-    await waitForTransition(page, '按 E 進房間')
+    await waitForTransition(page, '按 E 進房間', since)
     await expectUrl(page, '[S09] 按 E 進房間', `/world?room=${ROOM}`)
     const entered = sockets[1]
     if (sockets.length === 2 && entered?.scene === `room:${ROOM}` && entered.token === TOKEN) ok('[S04] 進房間：第二條 socket 帶 scene=room:<id> 與票，而且只建了一條')
@@ -295,8 +323,9 @@ try {
     else bad('[S13] 房間裡沒有「回到 Guild Hall」', '')
     await page.screenshot({ path: path.join(OUT, 'in-room.png') })
 
+    since = await overlaysSeen(page)
     await page.goBack()
-    await waitForTransition(page, '上一頁')
+    await waitForTransition(page, '上一頁', since)
     await expectUrl(page, '[S09] 上一頁（一次）', '/world')
     if (sockets.length === 3 && sockets[2]?.scene === 'lobby') ok('[S09] 上一頁：連線回到 scene=lobby（走過場）')
     else bad('[S09] 上一頁之後的 socket 不對', JSON.stringify(sockets))
@@ -304,8 +333,9 @@ try {
     if ((await page.$('button:has-text("回到 Guild Hall")')) === null) ok('[S13] 回到大廳之後按鈕不見了')
     else bad('[S13] 回到大廳之後按鈕還在', '')
 
+    since = await overlaysSeen(page)
     await page.goForward()
-    await waitForTransition(page, '下一頁')
+    await waitForTransition(page, '下一頁', since)
     await expectUrl(page, '[S09] 下一頁', `/world?room=${ROOM}`)
     if (sockets.length === 4 && sockets[3]?.scene === `room:${ROOM}` && sockets[3].token === TOKEN) ok('[S09] 下一頁：再進房間、票還在（沒被上一頁丟掉）')
     else bad('[S09] 下一頁之後的 socket 不對', JSON.stringify(sockets))
@@ -322,14 +352,15 @@ try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
     await context.addInitScript(([key, token]) => sessionStorage.setItem(key, token), [tokenKey(P.id), TOKEN])
     await traceUrls(context, urls)
+    await countOverlays(context)
     await fakeRealtime(context, sockets)
     const page = await context.newPage()
     await fakeRest(page, me)
 
     await page.goto(`${FRONTEND}/world?room=${ROOM}`)
     await expectNoToken(page, urls, '載入時')
-    // 直達房間的那場過場：`transitionSeq` 還是 0，第一版覆蓋層沒畫（這裡抓到的）。
-    await waitForTransition(page, '直達房間')
+    // 直達房間的那場過場：`transitionSeq` 還是 0，第一版覆蓋層沒畫（這裡抓到的）。新 document 從 0 數起。
+    await waitForTransition(page, '直達房間', 0)
     await expectNoToken(page, urls, '過場中')
     await waitForWorld(page)
     await expectNoToken(page, urls, 'ready 後')
@@ -340,15 +371,17 @@ try {
     else bad('[S14] 建了不只一條 socket', JSON.stringify(sockets))
     await page.screenshot({ path: path.join(OUT, 'reload-in-room.png') })
 
+    let since = await overlaysSeen(page)
     await page.click('button:has-text("回到 Guild Hall")')
-    await waitForTransition(page, '回到 Guild Hall')
+    await waitForTransition(page, '回到 Guild Hall', since)
     await expectUrl(page, '[S13] 回到 Guild Hall', '/world')
     await expectNoToken(page, urls, '按「回到 Guild Hall」後')
     if (sockets.length === 2 && sockets[1]?.scene === 'lobby') ok('[S13] 回到 Guild Hall：連線換成 scene=lobby')
     else bad('[S13] 回到 Guild Hall 之後的 socket 不對', JSON.stringify(sockets))
 
+    since = await overlaysSeen(page)
     await page.goBack()
-    await waitForTransition(page, '上一頁回到房間')
+    await waitForTransition(page, '上一頁回到房間', since)
     await expectUrl(page, '[S13] 上一頁回到房間（回大廳是 push）', `/world?room=${ROOM}`)
     await expectNoToken(page, urls, '上一頁後')
 
