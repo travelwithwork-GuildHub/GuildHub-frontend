@@ -1,8 +1,8 @@
 {
-  "version": "1",
-  "sourceCommit": "e96fc29513e79b3154840e34f58fb175fbe2c107",
+  "version": "1.2",
+  "sourceCommit": "616aa765143bec88248333c1ae48eedfdc275c45",
   "sourceDirty": false,
-  "exportedAt": "2026-09-14T06:09:16.744Z",
+  "exportedAt": "2026-09-14T09:28:33.909Z",
   "files": [
     "lib.mjs",
     "write.mjs",
@@ -15,8 +15,11 @@
     "export.test.mjs",
     "agy-pretooluse.sh",
     "agy-pretooluse.test.mjs",
+    "codex-pretooluse.sh",
+    "codex-pretooluse.test.mjs",
     "SKILL.md",
     "test.sh",
-    "VERSION"
+    "VERSION",
+    "config.json"
   ]
 }
