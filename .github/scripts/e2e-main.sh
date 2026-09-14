@@ -19,7 +19,8 @@ set -euo pipefail
 # board-panel 與 deep-link **暫時不在**：它們用「按住方向鍵固定毫秒數」走到看板前，在 ubuntu runner 的
 # swiftshader 上一次走到、一次走不到（run 34706773895：「走不到『看專案看板』前面」）。那是腳本的尺
 # 綁在 runner 速度上，要在 tests/e2e/ 裡把 approach() 改成「走到提示出現為止、只設時間上限」才能進來。
-SCRIPTS=(avatar-picker avatar-pixels control-contrast rooms-fixture)
+# scene-switch（#416）就是那種寫法：門標籤當里程計、每一小步量一次、只設步數上限；本機對 next start 跑 4 次全綠。
+SCRIPTS=(avatar-picker avatar-pixels control-contrast rooms-fixture scene-switch)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
