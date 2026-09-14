@@ -1,6 +1,7 @@
 'use client'
 
 import type {} from '@react-three/fiber'
+import { useCallback } from 'react'
 import type { RoomDoorOut } from '@/api/contract/rest'
 import { PropParts } from '../environment/PropParts'
 import { doorDefinition } from '../environment/semantic'
@@ -26,19 +27,26 @@ import type { DoorSlot } from './slots'
 // 真正被 `FE-W12-S17` 守住的是另一件事：畫面上的名字與互動登記
 // **一路釘回同一筆房間**（兩邊一起綁到同一個錯的 id 也要紅）。
 //
-// ⚠️ **門不帶 `onInteract`。** 「進入專案房間」是場景切換（`FE-V01`，W4）。
-// `spatial-interaction` 的契約明文允許沒有動作的物件
-// ——「只顯示提示，按下去什麼都不做」。今天造一個交給空函式的 callback prop，
-// 是這個 repo 三次否決過的「沒有讀取者的抽象」。
+// 門的動作是「請求進入那間房」（`FE-V01-S10`／`S11`）：票在就走過場、票不在交給門禁。
+// 讀取者現在存在了 —— `FE-W12` 時「不造沒有讀取者的 callback」的理由不再成立。
+// **沒給 `onEnter` 的門仍然是沒有動作的物件**（`spatial-interaction` 允許）；`WorldCanvas` 一定會給。
 
 export interface ProjectDoorsProps {
   /** 已經排好序、已經截斷的房間（`doorsFor`）。 */
   readonly rooms: readonly RoomDoorOut[]
   /** 走廊的槽位（`doorSlots`）。**第 i 個房間放在第 i 個槽位。** */
   readonly slots: readonly DoorSlot[]
+  /** 對著這扇門按 E。帶著 `project_id` 與標題（覆蓋層要顯示「前往 ○○」）。 */
+  readonly onEnter?: (projectId: string, title: string) => void
 }
 
-export function ProjectDoors({ rooms, slots }: ProjectDoorsProps) {
+/** 一扇門的互動註冊。callback 用 `useCallback` 釘住 —— `Interactable` 換 callback 會重新註冊。 */
+function Door({ room, x, z, onEnter }: { room: RoomDoorOut; x: number; z: number; onEnter?: ProjectDoorsProps['onEnter'] }) {
+  const enter = useCallback(() => onEnter?.(room.project_id, room.title), [onEnter, room.project_id, room.title])
+  return <Interactable id={doorTargetId(room.project_id)} x={x} z={z} label={doorLabel(room)} onInteract={onEnter ? enter : undefined} />
+}
+
+export function ProjectDoors({ rooms, slots, onEnter }: ProjectDoorsProps) {
   return (
     <>
       {rooms.map((room, index) => {
@@ -53,12 +61,7 @@ export function ProjectDoors({ rooms, slots }: ProjectDoorsProps) {
             rotation={[0, (slot.turns * Math.PI) / 2, 0]}
           >
             <PropParts definition={doorDefinition()} />
-            <Interactable
-              id={doorTargetId(room.project_id)}
-              x={slot.x}
-              z={slot.z}
-              label={doorLabel(room)}
-            />
+            <Door room={room} x={slot.x} z={slot.z} onEnter={onEnter} />
           </group>
         )
       })}

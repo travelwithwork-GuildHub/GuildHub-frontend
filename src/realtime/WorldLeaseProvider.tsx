@@ -33,8 +33,8 @@ export function useWorldLease(): WorldLease {
 
 export interface WorldLeaseProviderProps {
   /**
-   * 協調用的鍵。**要含身分與 scene** —— 同一個人在兩個不同的 scene
-   * 各連一條是合法的。`null` 代表匿名（不協調）。
+   * 協調用的鍵。**只含身分、不含 scene**（`FE-V01-S12`，design D6）—— 同一個人在兩個不同的 scene
+   * 各連一條會被後端清掉，不是合法的。`null` 代表匿名（不協調）。
    */
   leaseKey: string | null
   children: ReactNode

@@ -16,12 +16,12 @@ import { WorldLeaseProvider } from '@/realtime/WorldLeaseProvider'
 //   `unavailable`  問不到身分。**猜錯的兩個方向不對稱**：誤擋讓人完全
 //                  進不去世界，誤放最多是後端那個已知的覆蓋問題。
 //
-// scene 進鍵裡：同一個人在大廳與某個房間各連一條是合法的。
-// 今天只有 `lobby`，寫成常數是為了它變成變數時看得到要改哪裡。
-const SCENE = 'lobby'
+// 鍵只含身分、**不含 scene**（`FE-V01-S12`，design D6）：後端的 presence 以 `user_id` 為鍵，`disconnect()` 只查
+// 同 scene 的兄弟連線 —— 同一人在兩個 scene 各連一條，大廳那條會憑空消失。這裡原本寫「各連一條是合法的」，是錯的。
+// 同一個分頁換場景時鍵不變 → `WorldLeaseProvider` 不重掛、資格不放、不重搶。
 
 export function WorldGate({ children }: { children: ReactNode }) {
   const identity = useIdentity()
-  const leaseKey = identity.state === 'signed-in' ? `${identity.profile.id}/${SCENE}` : null
+  const leaseKey = identity.state === 'signed-in' ? identity.profile.id : null
   return <WorldLeaseProvider leaseKey={leaseKey}>{children}</WorldLeaseProvider>
 }

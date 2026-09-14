@@ -29,6 +29,7 @@ import { sceneOf } from './scenes/registry'
 import { useSceneRef } from './scenes/SceneContext'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
 import { SceneObjects } from './scenes/SceneObjects'
+import { useRequestEntry } from './scenes/EntryGate'
 import { useScene } from './scenes/SceneProvider'
 import { SceneTransitionOverlay } from './scenes/SceneTransitionOverlay'
 
@@ -106,6 +107,8 @@ export default function WorldCanvas() {
   const def = sceneOf(scene)
   // 票與連線事件的回報（`FE-V01` 的過場）。`reportConnection` 身分穩定 —— 它會進 `RemoteWorld` 的 effect 依賴。
   const { token, reportConnection } = useScene()
+  // 對著門按 E（`FE-V01-S10`）：在 Canvas 外面拿動作、當 prop 交給 Canvas 裡的門。
+  const requestEntry = useRequestEntry()
 
   // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
   // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
@@ -179,7 +182,14 @@ export default function WorldCanvas() {
                   提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
                   那是 FE-W12（W3）。 */}
               {/* 隨場景不同的物件：門、看板、門標籤的投影 —— **只在 Guild Hall**（`FE-V01-S03`）。 */}
-              <SceneObjects scene={scene} doors={rooms.doors} slots={CORRIDOR_SLOTS} anchors={anchors} nodesRef={labelNodesRef} />
+              <SceneObjects
+                scene={scene}
+                doors={rooms.doors}
+                slots={CORRIDOR_SLOTS}
+                anchors={anchors}
+                nodesRef={labelNodesRef}
+                requestEntry={requestEntry}
+              />
               <SpatialInteraction poseRef={localPose} />
             </Suspense>
           </Canvas>

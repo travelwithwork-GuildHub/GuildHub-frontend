@@ -64,6 +64,9 @@ export interface SceneValue {
   /** 進不去的通知（`S07`）。留到成功進入任何場景、使用者關閉、或被取代。 */
   readonly notice: { readonly kind: 'failed'; readonly room: string } | null
   readonly dismissNotice: () => void
+  /** 預設門禁的說明（`S11`）：對著哪間房的門按了 E 但沒有票。下一個願望出現就清。 */
+  readonly gateNotice: string | null
+  readonly showGateNotice: (projectId: string) => void
   /** `RemoteWorld` 回報連線事件（帶著它連的 scene 參數）。**身分穩定**：它在 `RemoteWorld` 的 effect 依賴裡。 */
   readonly reportConnection: (event: ConnectionEvent, wsScene: string) => void
 }
@@ -102,6 +105,8 @@ const DEFAULT: SceneValue = {
   destinationTitle: null,
   notice: null,
   dismissNotice: () => {},
+  gateNotice: null,
+  showGateNotice: () => {},
   reportConnection: () => {},
 }
 const Ctx = createContext<SceneValue>(DEFAULT)
@@ -139,6 +144,7 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
   // 上一次 `ready` 的場景。一開始就是大廳：大廳的第一次連線不算過場（那是 `FE-W01` 的載入畫面）。
   const [committed, setCommitted] = useState<SceneRef>(HALL)
   const [notice, setNotice] = useState<SceneValue['notice']>(null)
+  const [gateNotice, setGateNotice] = useState<string | null>(null)
   const [transitionSeq, setTransitionSeq] = useState(0)
   const identity = useIdentity()
   // `undefined`：還沒問完；`null`：問完了，沒有身分（匿名進不了房間：票的持有人比對對不上任何一張）。
@@ -149,21 +155,29 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
     (projectId: string, { mode = 'push', title }: EnterOptions = {}) => {
       setDesired({ ref: { id: 'room', projectId }, mode, forProfile: profileId, title })
       setTransitionSeq((n) => n + 1)
+      setGateNotice(null)
     },
     [profileId],
   )
   const returnToHall = useCallback((mode: UrlMode = 'push') => {
     setDesired({ ref: HALL, mode, forProfile: undefined })
     setTransitionSeq((n) => n + 1)
+    setGateNotice(null)
   }, [])
   const applyUrl = useCallback(
     (room: string | null) => {
       setDesired({ ref: refOf(room), mode: 'replace', forProfile: profileId })
       setTransitionSeq((n) => n + 1)
+      setGateNotice(null)
     },
     [profileId],
   )
   const dismissNotice = useCallback(() => setNotice(null), [])
+  // 門禁的說明也是「下一則通知」：取代還留著的失敗通知（`S07`），不並排兩則。
+  const showGateNotice = useCallback((projectId: string) => {
+    setGateNotice(projectId)
+    setNotice(null)
+  }, [])
   const settleDenied = useCallback(() => {
     setDesired((prev) =>
       prev.ref.id === 'room' ? { ref: HALL, mode: 'replace', forProfile: undefined, denied: prev.ref.projectId } : prev,
@@ -258,9 +272,11 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
       destinationTitle: desired.title ?? null,
       notice,
       dismissNotice,
+      gateNotice,
+      showGateNotice,
       reportConnection,
     }),
-    [resolved, enterRoom, returnToHall, applyUrl, settleDenied, transition, transitionSeq, desired.title, notice, dismissNotice, reportConnection],
+    [resolved, enterRoom, returnToHall, applyUrl, settleDenied, transition, transitionSeq, desired.title, notice, dismissNotice, gateNotice, showGateNotice, reportConnection],
   )
 
   return (

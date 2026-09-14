@@ -25,14 +25,16 @@ export interface SceneObjectsProps {
   slots: readonly DoorSlot[]
   anchors: readonly LabelAnchor[]
   nodesRef: RefObject<LabelNodes>
+  /** 對著門按 E（`FE-V01-S10`）。從 Canvas 外面用 `useRequestEntry()` 拿、當 prop 傳進來。 */
+  requestEntry?: (projectId: string, title: string) => void
 }
 
-export function SceneObjects({ scene, doors, slots, anchors, nodesRef }: SceneObjectsProps) {
+export function SceneObjects({ scene, doors, slots, anchors, nodesRef, requestEntry }: SceneObjectsProps) {
   if (scene.id !== 'hall') return null
   return (
     <>
       {/* 走廊上依 `GET /api/rooms` 生成的門（`FE-W12-S01`）。 */}
-      <ProjectDoors rooms={doors} slots={slots} />
+      <ProjectDoors rooms={doors} slots={slots} onEnter={requestEntry} />
       {/* 兩塊看板接上互動系統（`FE-W12-S14`）；按 E 開清單面板（`FE-B01-S01`／`S02`）。 */}
       <BoardTargets />
       {/* 把標籤釘在門上（`FE-W12-S10`）。**它渲染 null** —— 標籤本身是 Canvas 外面的 DOM。 */}

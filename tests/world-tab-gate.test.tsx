@@ -1,9 +1,36 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { useState } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { IdentityProvider } from '@/identity/IdentityProvider'
+import type { SceneRef } from '@/world/scenes/registry'
+import { SceneRefProvider } from '@/world/scenes/SceneContext'
+import { IdentityProvider, useIdentity } from '@/identity/IdentityProvider'
 import { OtherTabNotice } from '@/app/world/OtherTabNotice'
 import { WorldGate } from '@/app/world/WorldGate'
 import { claimTabLease, type TabLease } from '@/realtime/tabLease'
+import { holdRoomToken } from '@/world/scenes/roomTokens'
+
+// `WorldLeaseProvider` 拿 lease 的次數：spy 在模組邊界上（正式碼照舊跑），數 claim 與 release。
+const claimCalls = vi.hoisted(() => [] as { releases: number }[])
+vi.mock('@/realtime/tabLease', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/realtime/tabLease')>()
+  return {
+    ...actual,
+    claimTabLease: (key: string, options?: Parameters<typeof actual.claimTabLease>[1]) => {
+      const lease = actual.claimTabLease(key, options)
+      // 測試自己開的「另一個分頁」也走這裡：用 graceMs=1 分辨（正式碼不給 options）
+      if (options?.graceMs === 1) return lease
+      const record = { releases: 0 }
+      claimCalls.push(record)
+      return {
+        ...lease,
+        release: () => {
+          record.releases += 1
+          lease.release()
+        },
+      }
+    },
+  }
+})
 import { useWorldLease } from '@/realtime/WorldLeaseProvider'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
@@ -27,8 +54,9 @@ const PROFILE = {
 }
 const others: TabLease[] = []
 
-/** 假裝「另一個分頁」已經佔著同一個身分的 lobby。 */
-function otherTabHolds(key = `${ME}/lobby`) {
+/** 假裝「另一個分頁」已經佔著同一個身分。**鍵只含身分、不含 scene**（`FE-V01-S12`）：後端的 presence 以 `user_id` 為鍵、
+ *  `disconnect()` 只查同 scene 的兄弟連線 —— 同一人在兩個 scene 各連一條，大廳那條會憑空消失。 */
+function otherTabHolds(key = ME) {
   const lease = claimTabLease(key, { graceMs: 1 })
   others.push(lease)
   return lease
@@ -49,6 +77,30 @@ const mount = () =>
       </WorldGate>
     </IdentityProvider>,
   )
+/** 掛載序號：`WorldLeaseProvider` 用 `key` 重掛時，它底下的元件會拿到新的序號。 */
+let seqCounter = 0
+function MountSeq() {
+  const [seq] = useState(() => (seqCounter += 1))
+  return <p data-testid="mount-seq">{seq}</p>
+}
+const mountSeq = () => screen.getByTestId('mount-seq').textContent
+function IdentityProbe() {
+  const identity = useIdentity()
+  return <p data-testid="identity">{identity.state}</p>
+}
+const treeInScene = (scene: SceneRef) => (
+  <IdentityProvider>
+    <SceneRefProvider scene={scene}>
+      <WorldGate>
+        <OtherTabNotice />
+        <LeaseProbe />
+        <MountSeq />
+        <IdentityProbe />
+      </WorldGate>
+    </SceneRefProvider>
+  </IdentityProvider>
+)
+const mountInScene = (scene: SceneRef) => render(treeInScene(scene))
 
 const allowed = () => screen.getByTestId('allowed').textContent
 
@@ -112,6 +164,43 @@ describe('登入之後的分頁守衛', () => {
     await waitFor(() => expect(screen.getByRole('status')).toBeDefined())
     expect(allowed(), '第二個分頁拿到了連線資格').toBe('false')
     expect(screen.getByRole('status').textContent).toContain('另一個分頁')
+  })
+
+  it('[FE-V01-S12] 第二個分頁想進房間也不連線：鍵只含身分，不分 scene；同一分頁換場景不放資格', async () => {
+    // 分頁 A 佔著（鍵是身分，不帶 `/lobby`）；分頁 B 想進房間 —— 同一個鍵，被擋
+    otherTabHolds(ME)
+    await new Promise((r) => setTimeout(r, 20))
+    server.reply(200, PROFILE)
+    // 分頁 B 持有票 —— 擋它的是資格，不是票
+    holdRoomToken(ME, 'a0000000-0000-4000-8000-00000000000a', 'T')
+    window.history.replaceState(null, '', '/world?room=a0000000-0000-4000-8000-00000000000a')
+    const view = mountInScene({ id: 'room', projectId: 'a0000000-0000-4000-8000-00000000000a' })
+    await waitFor(() => expect(screen.getByRole('status')).toBeDefined())
+    // ⚠️ 等過 grace（預設 150 ms）再斷言：一開始「還不知道」也是 false，那時斷言是恆真的。
+    await new Promise((r) => setTimeout(r, 300))
+    expect(allowed(), '第二個分頁在房間也不得拿到資格').toBe('false')
+    expect(screen.getByRole('status').textContent).toContain('另一個分頁')
+    expect(screen.getByRole('button', { name: '改用這個分頁' })).toBeDefined()
+    // 同一個分頁從大廳換到房間再回來：`WorldLeaseProvider` 不重掛（key 沒變 → 探針的掛載序號不變）
+    for (const lease of others.splice(0)) lease.release()
+    view.unmount()
+    server.reply(200, PROFILE)
+    claimCalls.length = 0
+    const w = mountInScene({ id: 'hall' })
+    // 等身分問完（`signed-in`）：問完之前 leaseKey 是 null、走「一律放行」那條，LeaseHolder 還沒掛 —— 那時取的序號是假的。
+    await waitFor(() => expect(screen.getByTestId('identity').textContent).toBe('signed-in'))
+    await waitFor(() => expect(allowed()).toBe('true'))
+    const seqInHall = mountSeq()
+    w.rerender(treeInScene({ id: 'room', projectId: 'a0000000-0000-4000-8000-00000000000a' }))
+    await waitFor(() => expect(allowed()).toBe('true'))
+    expect(mountSeq(), '換場景不得重掛資格的 provider').toBe(seqInHall)
+    w.rerender(treeInScene({ id: 'hall' }))
+    await waitFor(() => expect(allowed()).toBe('true'))
+    expect(mountSeq()).toBe(seqInHall)
+    // 直接看 lease：整段只 claim 一次、沒有 release（規格：「各只在掛載時發生一次」）
+    expect(claimCalls, 'claim 只該在掛載時發生一次').toHaveLength(1)
+    expect(claimCalls[0]!.releases, '換場景不得 release').toBe(0)
+    window.history.replaceState(null, '', '/')
   })
 
   it('[FE-R06-S02] 沒有別的分頁時，已登入的分頁連得上', async () => {
