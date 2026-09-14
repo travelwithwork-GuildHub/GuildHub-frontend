@@ -57,8 +57,9 @@ function arriveAt(url: string) {
   window.history.replaceState(window.history.state, '', url)
   const push = vi.spyOn(window.history, 'pushState')
   const replace = vi.spyOn(window.history, 'replaceState')
+  const goSpy = vi.spyOn(window.history, 'go')
   const sinkRef: RefObject<Probe | null> = { current: null }
-  render(
+  const tree = () => (
     <InteractionProvider>
       <ListPanelProvider>
         <SceneProvider>
@@ -66,12 +67,16 @@ function arriveAt(url: string) {
           <ProbeSink sinkRef={sinkRef} />
         </SceneProvider>
       </ListPanelProvider>
-    </InteractionProvider>,
+    </InteractionProvider>
   )
+  const view = render(tree())
   return {
     probe: () => sinkRef.current!,
     pushes: () => push.mock.calls.length,
     replaces: () => replace.mock.calls.length,
+    goes: () => goSpy.mock.calls.length,
+    /** 同一棵樹重繪（身分 mock 在 render 時讀 `identity.current`）。 */
+    rerender: () => act(() => view.rerender(tree())),
   }
 }
 const go = (delta: number) =>
@@ -159,6 +164,68 @@ describe('深連結：有票直接進，沒票安靜地回大廳', () => {
     identity.current = { state: 'signed-in', profile: PROFILE }
     const again = arriveAt(`/world?room=${ROOM}`)
     expect(again.probe().scene.scene).toEqual({ id: 'room', projectId: ROOM })
+  })
+
+  it('[FE-V01-S14] 同一棵樹裡身分從 unknown 變成 signed-in：那一刻才進房（不重掛）', () => {
+    holdRoomToken(PROFILE.id, ROOM, 'T')
+    identity.current = { state: 'unknown' }
+    const world = arriveAt(`/world?room=${ROOM}`)
+    expect(world.probe().scene.scene).toEqual({ id: 'hall' })
+    identity.current = { state: 'signed-in', profile: PROFILE }
+    world.rerender()
+    expect(world.probe().scene.scene).toEqual({ id: 'room', projectId: ROOM })
+    expect(world.probe().scene.settled).toBe(true)
+    expect(url()).toBe(`/world?room=${ROOM}`)
+  })
+
+  it('[FE-V01-S09] 身分沒問完時上一頁回到 /world，之後身分問完：留在大廳（網址才是想去哪的來源）', async () => {
+    holdRoomToken(PROFILE.id, ROOM, 'T')
+    identity.current = { state: 'unknown' }
+    window.history.replaceState(null, '', '/world')
+    window.history.pushState(null, '', `/world?room=${ROOM}`)
+    const world = arriveAt(`/world?room=${ROOM}`)
+    expect(world.probe().scene.desiredRoom).toBe(ROOM)
+    await go(-1)
+    expect(url()).toBe('/world')
+    expect(world.probe().scene.desiredRoom, '想去的要跟著網址').toBeNull()
+    identity.current = { state: 'signed-in', profile: PROFILE }
+    world.rerender()
+    expect(world.probe().scene.scene, '身分問完不得把人送進一間網址早就不是的房').toEqual({ id: 'hall' })
+    expect(url()).toBe('/world')
+  })
+
+  it('[FE-V01-S14] 被擋之後換帳號：那個願望不跟著過去（換成剛好有票的人也不自動進房）', () => {
+    const Q = { ...PROFILE, id: 'q0000000-0000-4000-8000-00000000000q' }
+    holdRoomToken(Q.id, ROOM, 'TQ')
+    identity.current = { state: 'signed-in', profile: PROFILE } // P 沒有票
+    const world = arriveAt(`/world?room=${ROOM}`)
+    expect(world.probe().scene.scene).toEqual({ id: 'hall' })
+    expect(url()).toBe('/world')
+    identity.current = { state: 'signed-in', profile: Q }
+    world.rerender()
+    expect(world.probe().scene.scene, 'Q 有票，但那是 P 提出的願望、網址也已經不是了').toEqual({ id: 'hall' })
+  })
+
+  it('[FE-V01-S09] 兩層深的詳情進房間、上一頁回來、再 Escape：lineage 沒被房間那一層弄壞', async () => {
+    holdRoomToken(PROFILE.id, ROOM, 'T')
+    const world = arriveAt('/world')
+    act(() => world.probe().panel.openPanel('profiles'))
+    act(() => world.probe().panel.selectProfile(ROOM_B))
+    expect(url()).toBe(`/world?panel=profiles&profile=${ROOM_B}`)
+    act(() => world.probe().scene.enterRoom(ROOM))
+    expect(url()).toBe(`/world?room=${ROOM}`)
+    await go(-1)
+    expect(url()).toBe(`/world?panel=profiles&profile=${ROOM_B}`)
+    expect(world.probe().panel.selected).toBe(ROOM_B)
+    const goes = world.goes()
+    // Escape 關一層：本站有上一層（是這次掛載 push 的），所以是「退」不是 replace
+    await new Promise<void>((resolve) => {
+      window.addEventListener('popstate', () => resolve(), { once: true })
+      act(() => world.probe().panel.selectProfile(null))
+    })
+    expect(world.goes(), '關詳情要用 history.go(-1)').toBe(goes + 1)
+    expect(url()).toBe('/world?panel=profiles')
+    expect(world.probe().scene.scene).toEqual({ id: 'hall' })
   })
 
   it('[FE-V01-S14] 匿名：沒有票可言，回大廳', () => {

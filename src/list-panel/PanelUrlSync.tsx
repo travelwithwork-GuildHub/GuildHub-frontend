@@ -64,7 +64,7 @@ function write(mode: 'push' | 'replace', search: string, lineage: Lineage) {
 export function WorldUrlSync(): null {
   const { open, selected, page, restore, closePanel } = useListPanel()
   const scene = useScene()
-  const { applyUrl } = scene
+  const { applyUrl, settleDenied } = scene
   const room = scene.scene.id === 'room' ? scene.scene.projectId : null
   // 房間裡沒有看板，也就沒有清單那一層（`FE-V01-S08`）。
   const world = { room, panel: room === null ? { panel: open, profile: selected, page } : CLOSED }
@@ -72,9 +72,9 @@ export function WorldUrlSync(): null {
   const depth = depthOf(world.panel)
   const [session] = useState(() => Math.random().toString(36).slice(2))
 
-  const latestRef = useRef({ search, depth, room, settled: scene.settled, urlMode: scene.urlMode })
+  const latestRef = useRef({ search, depth, room, desiredRoom: scene.desiredRoom, settled: scene.settled, urlMode: scene.urlMode })
   useEffect(() => {
-    latestRef.current = { search, depth, room, settled: scene.settled, urlMode: scene.urlMode }
+    latestRef.current = { search, depth, room, desiredRoom: scene.desiredRoom, settled: scene.settled, urlMode: scene.urlMode }
   })
   const pendingBackRef = useRef(false)
 
@@ -87,7 +87,7 @@ export function WorldUrlSync(): null {
   const reconcileRef = useRef(() => {})
   useEffect(() => {
     reconcileRef.current = () => {
-      const { search, depth, room, settled, urlMode } = latestRef.current
+      const { search, depth, room, desiredRoom, settled, urlMode } = latestRef.current
       if (pendingBackRef.current) return
       if (!settled) return
       const current = window.location.search
@@ -98,6 +98,8 @@ export function WorldUrlSync(): null {
       if (urlState.room !== room) {
         // 場景換了：進房間、回大廳是 push；失敗與「沒票的深連結」是 replace（`FE-V01-S06`／`S14`）。
         write(urlMode, search, { session, pushed: urlMode === 'push' ? inherited + 1 : inherited })
+        // 沒票的 `?room=` 被 canonical 掉了：願望也要收斂，不然它會留在那裡等下一次推導把人送進去。
+        if (room === null && desiredRoom !== null) settleDenied()
         return
       }
       const urlDepth = depthOf(urlState.panel)
@@ -135,12 +137,14 @@ export function WorldUrlSync(): null {
       // 上一頁／下一頁：網址說的跟狀態一樣就只做 canonicalize（落在別人寫的、不 canonical 的 entry 上 ——
       // 審查抓到的）；不一樣就套上（狀態變了 → 上面那支再比一次 → 一樣 → 停）。
       const parsed = parseWorldUrl(window.location.search)
+      // 場景跟著網址（`FE-V01-S09`）：比的是**想去的**，不是實際的 —— 想去 A 但沒票（或身分沒問完）時實際在大廳，
+      // 這時上一頁回到 `/world`，實際沒變、想去的變了；不套上的話，身分問完那一刻會把人送進一間網址早就不是的房
+      // （審查抓到的）。所以這一行在 canonicalize 的早退**之前**。
+      if (parsed.room !== latestRef.current.desiredRoom) applyUrl(parsed.room)
       if (serializeWorldUrl(parsed) === latestRef.current.search) {
         reconcileRef.current()
         return
       }
-      // 場景跟著網址（`FE-V01-S09`）：想去的變了，進不進得去由 `SceneProvider` 推導（沒票 → 大廳 ＋ replace）。
-      if (parsed.room !== latestRef.current.room) applyUrl(parsed.room)
       restore(parsed.panel)
     }
     window.addEventListener('popstate', onPopState)
