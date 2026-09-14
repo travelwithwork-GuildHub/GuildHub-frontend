@@ -1,7 +1,7 @@
 // `FE-O03` tasks 5.2：`NEXT_PUBLIC_DATA_ADAPTER=internal` 的 dev server 上，人才看板真的從**本地資料庫**開出來。
 // 不攔任何 `/api/*` —— 這支的重點就是資料是真的走過 Route Handlers 與 Postgres。
 //
-//   NEXT_PUBLIC_DATA_ADAPTER=internal NEXT_PUBLIC_REALTIME_ADAPTER=none INTERNAL_DATABASE_URL=… npx next dev -p 3103
+//   NEXT_PUBLIC_DATA_ADAPTER=internal NEXT_PUBLIC_REALTIME_ADAPTER=none INTERNAL_DATABASE_URL=… pnpm exec next dev -p 3103
 //   node tests/e2e/internal-backend.mjs
 //
 // **只打本機自己起的 dev server 與可拋棄的資料庫。**

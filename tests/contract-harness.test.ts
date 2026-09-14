@@ -10,7 +10,7 @@ import { assertLoopbackBase, resolveTarget } from './contract/target'
 //   Requirement: 唯一一份，兩個目標各跑一次，都走真 HTTP —— S01、S02
 //   Requirement: 目標必須是自己起的、可拋棄的 —— S04、S05、S06
 //
-// 這些是 harness／wrapper 自己的判準，跑在 `npm test` 裡，不需要任何後端。**不連任何外部服務。**
+// 這些是 harness／wrapper 自己的判準，跑在 `pnpm test` 裡，不需要任何後端。**不連任何外部服務。**
 
 const CONTRACT_DIR = path.resolve(__dirname, 'contract')
 

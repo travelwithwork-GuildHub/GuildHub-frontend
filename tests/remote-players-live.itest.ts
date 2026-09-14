@@ -7,7 +7,7 @@ import { toProtocol } from '@/world/coords'
 // 規格 FE-R07 的人工驗證那幾條，改成對**真的後端**跑。**不進 CI。**
 //
 //     cd ~/Desktop/workshop/fergus/GuildHub-backend && bash run.sh
-//     npm run test:integration
+//     pnpm run test:integration
 //
 // **這一組驗的是資料路徑端到端真的通了** —— 兩個獨立的連線，
 // 一邊看得到另一邊，而且對方移動時位置真的更新。

@@ -103,7 +103,7 @@ async function listenersOf(port: number): Promise<number[] | null> {
 }
 
 /**
- * 關掉整個 process group：`npx next start` 的 Next 是孫子，只 kill `npx` 會留孤兒咬著 port（審查兩位都抓到）。
+ * 關掉整個 process group：`pnpm exec next start` 的 Next 是孫子，只 kill `npx` 會留孤兒咬著 port（審查兩位都抓到）。
  * 「關好了」看的是 **group 裡沒人了**，不是 leader 退了（leader 先走、孫子還在的話 group 還活著）。
  */
 async function stop(child: ChildProcess): Promise<void> {
@@ -183,7 +183,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
     throw new Error(`internal 目標需要 INTERNAL_TEST_DATABASE_URL：${db.skip}`)
   }
   await access(path.join(ROOT, '.next', 'BUILD_ID')).catch(() => {
-    throw new Error('沒有 .next/BUILD_ID —— 契約測試打的是 `next start`，先 `npm run build`。（不用 `next dev`：第一次請求會編譯，timeout 判準會亂。）')
+    throw new Error('沒有 .next/BUILD_ID —— 契約測試打的是 `next start`，先 `pnpm run build`。（不用 `next dev`：第一次請求會編譯，timeout 判準會亂。）')
   })
   await reset({ url: db.url })
 

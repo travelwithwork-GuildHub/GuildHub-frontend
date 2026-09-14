@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────
 // 用法
 //
-//   1. npm run dev                （預設 adapter 就是 guildhub）
+//   1. pnpm run dev                （預設 adapter 就是 guildhub）
 //   2. node tests/e2e/rooms-fixture.mjs
 //
 //   環境變數：FRONTEND（預設 http://localhost:3100）、
@@ -85,7 +85,7 @@ async function main() {
 
     const response = await page.goto(`${FRONTEND}/world`).catch(() => null)
     if (response === null) {
-      throw new Error(`連不到 ${FRONTEND} —— dev server 起了嗎？（npm run dev）`)
+      throw new Error(`連不到 ${FRONTEND} —— dev server 起了嗎？（pnpm run dev）`)
     }
 
     // 等世界真的畫出來（載入中的字消失）。

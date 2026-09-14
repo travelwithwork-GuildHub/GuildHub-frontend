@@ -78,7 +78,7 @@ export function checkGolden(name: string, r: RawResponse): void {
 
 /** golden 檔的 metadata 是程式內的常數：重錄**完全不讀舊檔**，舊檔壞掉也修得回來。 */
 const NOTE =
-  '對真後端（FastAPI）實錄；`CONTRACT_RECORD=1 npm run test:contract:guildhub` 重錄（錄製那一次 exit 非 0，整組換掉）。' +
+  '對真後端（FastAPI）實錄；`CONTRACT_RECORD=1 pnpm run test:contract:guildhub` 重錄（錄製那一次 exit 非 0，整組換掉）。' +
   '比 status、contentType、整個 detail 的 type／loc；msg 不比（Pydantic 的英文訊息不是契約）。規格 FE-O05 S12／S16。'
 /** 時間字串：Pydantic 微秒非 0 時 6 位＋Z，為 0 時省略小數（實錄 2026-09-11：`2026-09-11T13:00:33.281950Z`）。 */
 const TIMESTAMP = '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{6})?Z$'

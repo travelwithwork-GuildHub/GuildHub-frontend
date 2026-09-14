@@ -12,7 +12,7 @@
 // ⚠️ **回應是這支腳本攔截並偽造的**（`page.route`）。**不連任何團隊共用的位址** —— 只打本機自己起的 dev server。
 //
 // 用法：
-//   1. npm run dev
+//   1. pnpm run dev
 //   2. node tests/e2e/deep-link.mjs
 //   環境變數：FRONTEND（預設 http://localhost:3100）、HEADED=1、OUT（截圖目錄）
 
@@ -95,7 +95,7 @@ try {
 
   // ── S12：從 /world 開清單、開詳情、上一頁、下一頁、Escape 兩次；Canvas 是同一個節點 ──
   const response = await page.goto(`${FRONTEND}/world`).catch(() => null)
-  if (response === null) throw new Error(`連不到 ${FRONTEND} —— dev server 起了嗎？（npm run dev）`)
+  if (response === null) throw new Error(`連不到 ${FRONTEND} —— dev server 起了嗎？（pnpm run dev）`)
   await waitForWorld(page)
   const canvas = await page.$('canvas')
   if (canvas === null) throw new Error('沒有 canvas —— 世界沒畫出來')

@@ -7,7 +7,7 @@ import { createSyncState, markSent, planSend, SEND_INTERVAL_MS } from '@/realtim
 // 規格 FE-R03 的 tasks 第 4 節。**不進 CI**（要一份跑著的後端）。
 //
 //     cd ~/Desktop/workshop/fergus/GuildHub-backend && bash run.sh
-//     npm run test:integration
+//     pnpm run test:integration
 //
 // 驗的是**單元測試證明不了的那一半**：節流與去重算出來的東西，
 // 送到真後端之後，另一個連線真的看得到。
