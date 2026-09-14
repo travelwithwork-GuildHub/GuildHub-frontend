@@ -62,6 +62,19 @@ export class RealtimeError extends Error {
 }
 
 /**
+ * 換 scene 時等舊 socket 的 `close` 事件的上限。規格 `FE-V01-S18`。
+ *
+ * ⚠️ **為什麼要等**：後端 `manager.disconnect()` 只查**同一個 scene** 裡有沒有同一個 `user_id`
+ * 的其他連線，沒有就 `presence.clear(user_id)`。新連線若已經在另一個 scene `join()` 了，
+ * 被清掉的是**新的那個人** —— 連線開著，房間裡沒人看得到他。
+ * 舊 socket 的 close 事件代表伺服器的傳輸層已回應 close 幀；那之後再建新連線，
+ * `disconnect()` 幾乎必然排在 `join()` 之前。**這是降機率，不是證明**（應用層跑完沒有客戶端看不到）。
+ *
+ * 上限是為了不永遠等：到了仍建，代價是那一次可能撞上上面那個競態。
+ */
+export const CLOSE_ACK_TIMEOUT_MS = 1000
+
+/**
  * `scene` 與 `token` 進查詢參數，base 來自設定模組 —— 不寫死。
  *
  * ⚠️ **即時層資料來源是 `none` 時拋錯**（`wsUrl()` 那時回 `null`）。
@@ -94,6 +107,15 @@ export class RealtimeClient {
   #closeEmitted = false
   #scene: string
   #token: string | undefined
+  /** 「等舊 close 再進」的代號：`close()` 或再一次 `closeAndEnter()` 會讓上一次 pending 的進入作廢。 */
+  #enterGeneration = 0
+  /**
+   * 還在等 close 事件的舊 socket 有幾個。**不是 boolean**：等 ack 期間又 `closeAndEnter()`，
+   * 那時 `#socket` 已經是 `null`，但最舊的那條還沒關乾淨 —— 新的進入要排在**它**後面，不能立刻連。
+   */
+  #acksPending = 0
+  /** ack 全部到齊時要跑的東西（依序）。 */
+  #ackWaiters: (() => void)[] = []
   readonly #options: RealtimeClientOptions
 
   // **每個 listener 都要留著 reference**，否則關閉時移不掉 ——
@@ -153,18 +175,27 @@ export class RealtimeClient {
    * **名字刻意寫成「關掉再進去」** —— 協定沒有切換 scene 的訊息，
    * 一條連線只屬於一個 scene。叫 `switchScene()` 會讓人以為不會斷線。
    *
-   * 舊連線的監聽器**先移除**再建新的：兩條同時存在的話後端會當成兩個人，
-   * 位置互相覆寫（那個行為未定義，是 `FE-R06` 的題目）。
+   * 舊連線的監聽器**先移除**、再等它的 close 事件（上限 `CLOSE_ACK_TIMEOUT_MS`）、才建新的
+   * （規格 `FE-V01-S18`；為什麼要等見那個常數）。同一個 `user_id` 的兩條連線在後端是**同一個**
+   * `Player` 互相覆蓋（`multi-tab` 那條的實測），不是兩個人。
+   *
+   * 等的期間 `state` 是 `closed`（舊的已經關了、新的還沒建）；這段期間再 `close()` 或再
+   * `closeAndEnter()`，這一次的進入就作廢 —— 靠代號比對，不靠旗標。
    */
   closeAndEnter(scene: string, token?: string): void {
-    this.close()
-    this.#scene = scene
-    this.#token = token
-    this.#state = 'idle'
-    this.#selfId = null
-    this.#opened = false
-    this.#closeEmitted = false
-    this.connect()
+    // ⚠️ 走同步的 callback，不走 promise：close 事件到達的**同一個 tick** 就建新連線，
+    // 中間不插 microtask —— 測試與時序都要能對 close 事件那一刻斷言。
+    // 沒有 socket 時（例如上一次已經失敗關掉）callback 是同步被叫的，所以重設要放在 callback 裡。
+    this.#close((generation) => {
+      if (generation !== this.#enterGeneration) return
+      this.#scene = scene
+      this.#token = token
+      this.#state = 'idle'
+      this.#selfId = null
+      this.#opened = false
+      this.#closeEmitted = false
+      this.connect()
+    })
   }
 
   /** 送出。**只有 `ready` 才准** —— 見下面為什麼不能靜默丟棄。 */
@@ -178,20 +209,56 @@ export class RealtimeClient {
     this.#socket.send(data)
   }
 
-  /** 關閉。**幂等** —— 重複呼叫不拋錯，關閉事件也只發一次。 */
-  close(): void {
+  /**
+   * 關閉。**幂等** —— 重複呼叫不拋錯，關閉事件也只發一次（當下就發，不等伺服器）。
+   *
+   * 回傳的 promise 在**舊 socket 的 close 事件到達**時解決，最多等 `CLOSE_ACK_TIMEOUT_MS`；
+   * 沒有 socket 的話立刻解決。那個 close 事件**不會**觸發 `onClosed`——是自己關的，上面已經發過一次。
+   * 等它的那個監聽器是一次性的：事件到或逾時都會拆掉，舊 socket 之後不再影響任何狀態。
+   */
+  close(): Promise<void> {
+    return new Promise((resolve) => this.#close(() => resolve()))
+  }
+
+  /** `close()` 的同步核心。`onAcked` 在舊 socket 的 close 事件到達（或逾時）時被呼叫，帶著這次的代號。 */
+  #close(onAcked: (generation: number) => void): void {
+    const generation = ++this.#enterGeneration
     const socket = this.#socket
     if (socket !== null) {
       socket.removeEventListener('open', this.#onOpen)
       socket.removeEventListener('message', this.#onMessage)
       socket.removeEventListener('close', this.#onClose)
       this.#socket = null
+      // ack 的監聽器在 `socket.close()` **之前**掛好：同步送 close 事件的實作（或替身）才不會漏掉、白等 1 秒。
+      this.#acksPending += 1
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | null = null
+      const done = () => {
+        if (settled) return
+        settled = true
+        socket.removeEventListener('close', done)
+        if (timer !== null) clearTimeout(timer)
+        this.#acksPending -= 1
+        if (this.#acksPending === 0) this.#flushAckWaiters()
+      }
+      socket.addEventListener('close', done)
+      timer = setTimeout(done, CLOSE_ACK_TIMEOUT_MS)
       socket.close()
     }
+    // 先把「關了」這件事發出去，再排進入 —— 沒有東西要等時進入是同步的，
+    // 而 `closeAndEnter` 的 callback 會接著 `connect()`；順序反過來的話這段會把新連線的狀態蓋回 closed。
     if (this.#state !== 'closed') {
       this.#setState('closed')
       this.#emitClosed({ code: 1000, reason: '', wasClean: true })
     }
+    if (this.#acksPending === 0) onAcked(generation)
+    else this.#ackWaiters.push(() => onAcked(generation))
+  }
+
+  #flushAckWaiters(): void {
+    const waiters = this.#ackWaiters
+    this.#ackWaiters = []
+    for (const waiter of waiters) waiter()
   }
 
   #setState(next: ConnectionState): void {

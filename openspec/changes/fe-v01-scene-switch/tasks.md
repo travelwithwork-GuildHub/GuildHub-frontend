@@ -13,9 +13,9 @@
 
 ## 2b. 連線等舊 close（`feat/fe-v01-scene-switch--close-ack`）
 
-- [ ] 2b.1 `tests/realtime-client.test.ts` 加 `[FE-V01-S18]` —— 紅，commit
-- [ ] 2b.2 `RealtimeClient.close()` 留一次性 close 監聽器、`closeAndEnter()` 等它或 1 秒；`FE-R01-S01`～`S0n` 照舊綠
-- [ ] 2b.3 突變：不等、或上限拿掉 —— 紅
+- [x] 2b.1 `tests/realtime-client.test.ts` 加 `[FE-V01-S18]` —— 紅，commit
+- [x] 2b.2 `RealtimeClient.close()` 留一次性 close 監聽器、`closeAndEnter()` 等它或 1 秒；`FE-R01-S01`～`S0n` 照舊綠
+- [x] 2b.3 突變：不等、或上限拿掉 —— 紅（另加：等 ack 期間再進入、同步 close、onClosed 重入、A→B→C；`RemoteWorld` 的 `closeGateRef` 串接）
 
 ## 3. 網址（`feat/fe-v01-scene-switch--url`）
 
