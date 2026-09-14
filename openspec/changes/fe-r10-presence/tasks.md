@@ -7,13 +7,19 @@
 ## 2. 遠端狀態文字
 
 - [x] 2.1 先為 `FE-R10-S01`／`S02` 寫失敗測試，證明 snapshot 與 presence.join 的 `st` 目前會被丟掉
-      —— 實作前 `tests/remote-players.test.ts` 的 S01～S06 六條全紅
+      —— 實作前 R10 的 7 條測試是 **6 紅 1 綠**（#405 審查後更正；原文「六條全紅」不精確）。
+      S01／S02 紅在 `st` 被丟掉
 - [x] 2.2 將狀態文字納入低頻 roster identity，讓 `FE-R10-S01`／`S02` 通過，並確認既有 `FE-R07`／`FE-R08` 測試仍綠
       —— `RemoteIdentity.st`；`remote-players`（22）與 `remote-players-render` 全綠。突變「`identityOf` 丟掉 st」→ S01／S02 紅
 - [x] 2.3 先為 `FE-R10-S03`／`S04` 寫失敗測試，涵蓋指定玩家更新、相同文字不重繪、未知 id 與自己的 id 不建立鬼影
+      —— ⚠️ 不是每一條都能先紅：「相同文字不換名單」實作前本來就綠（舊程式忽略 `status`），它守的是實作後不退化，
+      靠突變「相同文字也換 Map」證明；S04 實作前紅在最後的 `st` 斷言，「不建立鬼影」那半由突變證明
 - [x] 2.4 處理已驗證的 `status` 訊息並把回傳語意改為低頻 Presence view 是否改變；以 `FE-R10-S03`／`S04` 通過及 `pos` 仍不觸發 roster 重繪驗證
       —— `FE-R07-S01` 仍綠（pos 回 false、名單物件不換）。突變：未知 id 建立新的人 → S04 紅；
-      相同文字也換 Map → S03 紅；改到所有人 → S03 紅；改了卻回 false → S03 紅
+      相同文字也換 Map → S03 紅；改到所有人 → S03 紅；改了卻回 false → S03 紅。
+      #405 合併後審查補的判準（`fix/fe-r10-presence--status-tests`）：就地改舊物件不換 Map、換 Map 但沿用被改過的物件、
+      丟掉 name／av、把 name 改掉、status 做 trim、截成 2 字 → S03 紅；未知 id 清空所有人樣本 → S04 紅；
+      snapshot／join 做 trim → S01／S02 紅（改用 12 個 code point、前後有空白的文字）
 - [x] 2.5 先為 `FE-R10-S05`／`S06` 寫清理測試，直接驗證 leave 與新 snapshot 後舊狀態不可再讀
       —— S05 直接斷言 leave 之後名單裡沒有他（不靠「再加入之後是空白」，`FE-R08-S11` 的教訓）
 - [x] 2.6 完成 leave／snapshot 的狀態清理，讓 `FE-R10-S05`／`S06` 通過，並確認其他玩家的 identity 與 motion 不受影響
