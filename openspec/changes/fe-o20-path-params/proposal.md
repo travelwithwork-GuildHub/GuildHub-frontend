@@ -15,8 +15,9 @@
 ## What Changes
 
 - `api-contract` 加一條 Requirement：`RequestSpec` 對每一條路徑用 template literal type 萃取 `{param}`；
-  有參數的路徑 `params` **必填**且鍵**完全相等**（少一個、拼錯、多一個都是 typecheck 錯），沒有參數的路徑**不收** `params`。
-- 判準走既有的 `tests/type-fixtures/`（故意違規的檔案、單獨一份 tsconfig、測試對它跑 tsc 並斷言錯誤輸出含檔名）。
+  有參數的路徑 `params` **必填**且鍵**完全相等**（少一個、拼錯、多一個都是 typecheck 錯），沒有參數的路徑**不收** `params`；
+  多參數路徑今天契約裡沒有，用型別哨兵守萃取本身。
+- 判準走既有的 `tests/type-fixtures/`（故意違規的檔案、單獨一份 tsconfig、測試對它跑 tsc 並**按檔名比對診斷碼**——只看檔名的話，fixture 自己少寫一個 import 也算「紅」，約束拿掉照樣綠）。
 - `buildRequest` 的執行期行為不變；既有七個操作不用改 —— 它們本來就對。
 - 產品碼只動 `src/api/transport.ts` 的型別（預估 < 20 行）。
 
@@ -27,4 +28,6 @@
 - **不做執行期的檢查**（例如送出前掃 `{`）：型別層擋得住的事不在執行期再擋一次。
 - **不改 `path` 的型別**（`FE-A01` 的那一套不動）、**不改 `query`**（沒有樣板可萃取）。
 - **不改 `params` 的值型別**（維持 `string`）：後端 id 全是字串；要放寬時另開 spec。
+- **不開 `exactOptionalPropertyTypes`**：那是全 repo 的事；無參數路徑寫 `params: undefined` 放行，規格明寫。
+- **不宣稱擋得住存進變數再傳的超集**：那是 TS 多餘屬性檢查的邊界，量過，寫進 Requirement。
 - **不動 `tests/design-tokens.test.ts` 裡那個 `npx tsc`**：它是別的 change 的判準，改它是 `chore/` 的事。
