@@ -321,6 +321,27 @@ describe('房間裡隨時回得了 Guild Hall', () => {
 })
 
 describe('深連結', () => {
+  it('[FE-V01-S05] 直達房間的那場過場也有覆蓋層（不是 enterRoom 發起的，也一樣 ≥300 ms、淡出）', async () => {
+    holdRoomToken(PROFILE.id, ROOM, 'T')
+    const w = arriveAt(`/world?room=${ROOM}`)
+    await flush()
+    expect(w.last().scene).toBe(`room:${ROOM}`)
+    expect(w.probe().transition, '過場進行中').not.toBeNull()
+    expect(w.overlay()?.textContent, '瀏覽器 e2e 抓到的：直達房間沒有覆蓋層').toContain('前往')
+    await act(async () => w.last().ready())
+    await tick(1)
+    expect(w.probe().transition, '1 ms：狀態已提交').toBeNull()
+    expect(w.overlay(), '1 ms：覆蓋層還在').not.toBeNull()
+    await tick(OVERLAY_MIN_MS - 1)
+    expect(w.overlay(), '300 ms：消失').toBeNull()
+    await tick(FADE_MS)
+    expect(screen.queryByTestId('scene-transition'), '淡完才卸載').toBeNull()
+    // 之後從房間回大廳是新的一場：新的覆蓋層、新的文字
+    act(() => w.probe().returnToHall())
+    await flush()
+    expect(w.overlay()?.textContent).toContain('回到 Guild Hall')
+  })
+
   it('[FE-V01-S14] 有票直接進；沒票回大廳並說明（status 不是 alert）；票不進網址', async () => {
     holdRoomToken(PROFILE.id, ROOM, 'T')
     const w = arriveAt(`/world?room=${ROOM}`)
