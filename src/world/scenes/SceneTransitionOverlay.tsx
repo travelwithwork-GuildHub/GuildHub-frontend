@@ -34,10 +34,9 @@ export function SceneTransitionOverlay() {
   // 深連結直達房間（design〈重新整理〉：「有票 → 直接進房間（過場照 D3）」）：那場過場不是 `enterRoom` 發起的，
   // 代號還是 0。只看代號的話它沒有覆蓋層 —— 瀏覽器 e2e 抓到的。記住「代號 0 的過場開始過」，提交之後它才留得住、淡得出。
   // 大廳的第一次載入從沒進過過場（`committed` 一開始就是大廳），所以不會誤把它畫成「回到 Guild Hall⋯⋯」。
+  // 在 render 裡調整 state（React 的「adjusting state when a prop changes」寫法，不是 effect）：同一次 commit 就畫出來。
   const [deepLinkStarted, setDeepLinkStarted] = useState(false)
-  useLayoutEffect(() => {
-    if (inTransition && transitionSeq === 0) setDeepLinkStarted(true)
-  }, [inTransition, transitionSeq])
+  if (inTransition && transitionSeq === 0 && !deepLinkStarted) setDeepLinkStarted(true)
 
   if (transitionSeq === 0 && !deepLinkStarted) return null
   // 提交之後 `transition` 已是 null；最短顯示期間的目的地就是現在所在的場景。
