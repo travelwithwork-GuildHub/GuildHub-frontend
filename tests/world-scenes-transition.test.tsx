@@ -93,6 +93,7 @@ class FakeSocket {
 }
 
 const ROOM = 'a0000000-0000-4000-8000-00000000000a'
+const ROOM_B = 'b0000000-0000-4000-8000-00000000000b'
 const PROFILE = { id: 'p0000000-0000-4000-8000-00000000000p', display_name: 'P', avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-14T00:00:00Z' }
 const ROOMS = [{ project_id: ROOM, title: '星際導航', online_count: 3 }]
 
@@ -290,6 +291,25 @@ describe('進不去就回 Guild Hall、說一句話、不重試、票留著', ()
     await flush()
     expect(w.notice(), '使用者要求的成功進入 → 清').toBeNull()
     expect(w.probe().scene).toEqual({ id: 'room', projectId: ROOM })
+
+    // 從房間 A 進 B 被拒 → 自動回大廳（這次是真的過場：A→hall）→ 大廳 ready 不得清通知
+    holdRoomToken(PROFILE.id, ROOM_B, 'TB')
+    const inA = w.last()
+    act(() => w.probe().enterRoom(ROOM_B))
+    await flush()
+    await act(async () => inA.closeEvent(1000))
+    await flush()
+    const b = w.last()
+    expect(b.scene).toBe(`room:${ROOM_B}`)
+    await act(async () => b.closeEvent(1006))
+    await flush()
+    expect(w.probe().transition?.to).toEqual({ id: 'hall' })
+    await act(async () => b.closeEvent(1000))
+    await flush()
+    await act(async () => w.last().ready())
+    await flush()
+    expect(w.probe().transition).toBeNull()
+    expect(w.notice(), '自動回大廳的 ready 不算成功進入').toEqual({ kind: 'failed', room: ROOM_B })
   })
 
   it('[FE-V01-S16] 回大廳也連不上時，不會永久 busy、沒有第三條連線', async () => {
@@ -304,6 +324,27 @@ describe('進不去就回 Guild Hall、說一句話、不重試、票留著', ()
     expect(w.probe().transition, '過場結束（覆蓋層會消失、輸入會解鎖）').toBeNull()
     expect(w.probe().scene).toEqual({ id: 'hall' })
     expect(w.notice(), '回大廳失敗不再多一則').toEqual({ kind: 'failed', room: ROOM })
+    await tick(60_000)
+    expect(w.sockets()).toHaveLength(3)
+  })
+
+  it('[FE-V01-S16] 從房間回大廳、大廳連不上：過場結束、不再建', async () => {
+    const w = await inHall()
+    const fresh = await enter(w)
+    await act(async () => fresh.ready())
+    await flush()
+    act(() => w.probe().returnToHall())
+    await flush()
+    await act(async () => fresh.closeEvent(1000))
+    await flush()
+    const lobby = w.last()
+    expect(lobby.scene).toBe('lobby')
+    expect(w.probe().transition?.to).toEqual({ id: 'hall' })
+    await act(async () => lobby.closeEvent(1006))
+    await flush()
+    expect(w.probe().transition).toBeNull()
+    expect(w.probe().scene).toEqual({ id: 'hall' })
+    expect(w.notice(), '回大廳失敗不是「進不了這間房」').toBeNull()
     await tick(60_000)
     expect(w.sockets()).toHaveLength(3)
   })
@@ -365,5 +406,18 @@ describe('過場只提交一次，遲到的事件不算數', () => {
     expect(w.notice()).toBeNull()
     expect(w.sockets(), '沒有再建').toHaveLength(3)
     expect(url()).toBe('/world')
+  })
+
+  it('[FE-V01-S15] 帶著別的 scene 參數的事件不算數（ready 不提交、closed 不算失敗）', async () => {
+    const w = await inHall()
+    await enter(w)
+    expect(w.probe().transition?.to).toEqual({ id: 'room', projectId: ROOM })
+    act(() => w.probe().reportConnection({ kind: 'ready' }, 'lobby'))
+    expect(w.probe().transition, '別的 scene 的 ready 不得提交').not.toBeNull()
+    act(() => w.probe().reportConnection({ kind: 'closed', opened: false }, `room:${ROOM_B}`))
+    expect(w.probe().transition, '別的 scene 的 closed 不得算失敗').not.toBeNull()
+    expect(w.notice()).toBeNull()
+    act(() => w.probe().reportConnection({ kind: 'ready' }, `room:${ROOM}`))
+    expect(w.probe().transition).toBeNull()
   })
 })
