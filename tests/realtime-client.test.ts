@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  CLOSE_ACK_TIMEOUT_MS,
   RealtimeClient,
   RealtimeError,
   connectionUrl,
@@ -213,13 +214,64 @@ describe('RealtimeClient', () => {
     client.closeAndEnter('room:xyz', 'tok-2')
 
     expect(sockets[0]!.closeCalls, '舊的 socket 應該被關閉').toBe(1)
-    expect(sockets[0]!.listenerCount, '舊 socket 的監聽器應該全部移除').toBe(0)
+    // 新的要等舊 socket 的 close 事件（`FE-V01-S18`）—— 舊連線的事件在那之前到，也不得影響狀態
+    sockets[0]!.emit('message', { data: HELLO('u-other') })
+    expect(client.selfId, '舊連線的訊息竟然改到了狀態').toBeNull()
+    sockets[0]!.emit('close', { code: 1006, reason: '', wasClean: false })
+    expect(sockets[0]!.listenerCount, '舊 socket 的監聽器應該全部移除（含等 close 的那一個）').toBe(0)
     expect(sockets).toHaveLength(2)
     expect(new URL(urls[1]!).searchParams.get('scene')).toBe('room:xyz')
+    expect(client.state, '舊連線的事件竟然改到了新連線的狀態').toBe('connecting')
 
     // 舊連線之後不得再影響狀態
     sockets[0]!.emit('close', { code: 1006, reason: '', wasClean: false })
-    expect(client.state, '舊連線的事件竟然改到了新連線的狀態').toBe('connecting')
+    expect(client.state).toBe('connecting')
+  })
+
+  it('[FE-V01-S18] 新連線等舊 socket 的 close 事件，最多 1 秒', () => {
+    vi.useFakeTimers()
+    const { client, sockets, closed } = setup()
+    client.connect()
+    sockets[0]!.emit('open', null)
+    sockets[0]!.emit('message', { data: HELLO() })
+    expect(client.state).toBe('ready')
+
+    client.closeAndEnter('room:a', 'tok')
+    expect(closed, 'close() 當下就發過一次 onClosed').toHaveLength(1)
+    vi.advanceTimersByTime(199)
+    expect(sockets, '199 ms：舊的 close 事件還沒到，不得建新的').toHaveLength(1)
+    sockets[0]!.emit('close', { code: 1000, reason: '', wasClean: true })
+    expect(sockets, 'close 事件到了那一刻之後才建').toHaveLength(2)
+    expect(closed, '舊 socket 的 close 事件不得再觸發 onClosed').toHaveLength(1)
+
+    // 永遠不發 close 事件：1 秒時建
+    sockets[1]!.emit('open', null)
+    sockets[1]!.emit('message', { data: HELLO() })
+    client.closeAndEnter('lobby')
+    vi.advanceTimersByTime(CLOSE_ACK_TIMEOUT_MS - 1)
+    expect(sockets, '上限之前不得建').toHaveLength(2)
+    vi.advanceTimersByTime(1)
+    expect(sockets, '1 秒時建').toHaveLength(3)
+    expect(closed).toHaveLength(2)
+    // 上限之後舊 socket 才發 close：不觸發 onClosed、不影響狀態
+    sockets[1]!.emit('close', { code: 1006, reason: '', wasClean: false })
+    expect(closed).toHaveLength(2)
+    expect(client.state).toBe('connecting')
+    expect(sockets[1]!.listenerCount, '逾時後那個等 close 的監聽器也要拆掉').toBe(0)
+  })
+
+  it('[FE-V01-S18] 等 close 期間又被 close()：不得再建新的', () => {
+    vi.useFakeTimers()
+    const { client, sockets } = setup()
+    client.connect()
+    sockets[0]!.emit('open', null)
+    sockets[0]!.emit('message', { data: HELLO() })
+    client.closeAndEnter('room:a', 'tok')
+    client.close()
+    sockets[0]!.emit('close', { code: 1000, reason: '', wasClean: true })
+    vi.advanceTimersByTime(CLOSE_ACK_TIMEOUT_MS + 1)
+    expect(sockets, '卸載（close）之後 pending 的進入不得再建 socket').toHaveLength(1)
+    expect(client.state).toBe('closed')
   })
 
   it('[FE-R01-S06] 握手失敗與連線中斷交出的事實不同', () => {
