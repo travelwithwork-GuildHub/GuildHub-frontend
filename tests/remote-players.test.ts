@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ServerMessage } from '@/api/contract/ws'
-import { applyMessage, createRemotePlayersState } from '@/realtime/remotePlayers'
+import { applyMessage, createRemotePlayersState, onlineCountOf, resetRemotePlayers } from '@/realtime/remotePlayers'
 import { RENDER_DELAY_MS, evaluate } from '@/realtime/interpolation'
 
 // 規格：openspec/changes/fe-r07-remote-players/specs/remote-players/spec.md
@@ -466,5 +466,93 @@ describe('遠端玩家的狀態文字', () => {
     expect([...state.roster.keys()].sort(), '前提：兩個人都仍然在名單裡').toEqual(['u1', 'u2'])
     expect(stOf(state, 'u1'), '舊狀態不得被合併或保留').toBe('')
     expect(stOf(state, 'u2'), '同一份 snapshot 裡的其他人照 payload，不受影響').toBe('沒變')
+  })
+})
+
+// ── FE-R10 重複 join 與在線人數（資料層） ─────────────────────────────────
+//
+// 規格：openspec/changes/fe-r10-presence/specs/remote-players/spec.md
+//   Requirement: 離場與權威重建不留下舊狀態 —— FE-R10-S11
+//   Requirement: 使用者看得到目前 scene 的在線人數 —— 這裡只驗「人數怎麼算」。
+//
+// ⚠️ `S07`／`S08`／`S09` 的 THEN 講的是**畫面上顯示的**人數，所以 Scenario ID 放在
+// 真的看畫面的那幾條（`WorldCanvas` 那一層），**不放在這裡** —— 只驗推導卻掛著 ID，
+// 就是「標題帶 ID 但沒驗那條行為」（`AGENTS.md`〈Scenario 缺口報告〉）。
+
+describe('在線人數的推導', () => {
+  it('初始 snapshot 到達之前沒有人數（null），不是 0', () => {
+    const state = createRemotePlayersState()
+    expect(onlineCountOf(state), '還沒有基準線 —— 0 會被讀成「真的沒有人」').toBeNull()
+
+    // `presence` 比 snapshot 早到（不該發生，但不能因此變成「已就緒」）
+    apply(state, presence([player('u1')], []))
+    expect(onlineCountOf(state), 'join 不是權威基準線').toBeNull()
+  })
+
+  it('snapshot 之後是不同 id 的數量，包含自己（remote 名單 + 1）', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player(SELF), player('u1'), player('u2')))
+
+    expect(state.roster.size, '前提：名單排除自己').toBe(2)
+    expect(onlineCountOf(state)).toBe(3)
+  })
+
+  it('join、重複 join、leave、未知 leave、status、pos 各自對人數的影響', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player(SELF), player('u1'), player('u2')))
+    expect(onlineCountOf(state)).toBe(3)
+
+    apply(state, presence([player('u3')], []))
+    expect(onlineCountOf(state), '新 id 加入').toBe(4)
+
+    apply(state, presence([player('u3')], []))
+    expect(onlineCountOf(state), '同一 id 因另一條連線重複 join').toBe(4)
+
+    apply(state, presence([player(SELF)], []))
+    expect(onlineCountOf(state), '自己的另一條連線 join —— 自己本來就算進去了').toBe(4)
+
+    apply(state, presence([], ['u1']))
+    expect(onlineCountOf(state), '現有 id 離開').toBe(3)
+
+    apply(state, presence([], ['nobody']))
+    apply(state, status('u2', '改狀態'))
+    apply(state, pos(['u2', 32, 0, 0]))
+    expect(onlineCountOf(state), '未知 leave、status、pos 都不改人數').toBe(3)
+  })
+
+  it('重設之後回到未就緒，下一份 snapshot 才有新的人數', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player(SELF), player('u1'), player('u2')))
+    expect(onlineCountOf(state)).toBe(3)
+
+    resetRemotePlayers(state)
+
+    expect(onlineCountOf(state), '換連線之後不得沿用上一條連線的人數').toBeNull()
+    expect(state.roster.size, '名單一起清掉').toBe(0)
+    expect(state.motion.size, '動態一起清掉').toBe(0)
+
+    apply(state, snapshot(player(SELF)))
+    expect(onlineCountOf(state), '新連線的 snapshot 只有自己').toBe(1)
+  })
+
+  it('[FE-R10-S11] 重複 join 不建立第二筆，但刷新該 id 的狀態', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player(SELF), player('u1', 0, 0, 0, '忙碌中'), player('u2', 0, 0, 0, '在')))
+    const countBefore = onlineCountOf(state)
+    const u2Before = state.roster.get('u2')
+    expect(countBefore, '前提：人數已就緒').toBe(3)
+
+    const changed = apply(state, presence([player('u1', 0, 0, 0, '')], []))
+
+    expect(changed, '狀態真的變了 —— 呼叫端要重繪').toBe(true)
+    expect(state.roster.get('u1')?.st, '以 join payload 的 st 為準').toBe('')
+    expect([...state.roster.keys()].filter((id) => id === 'u1'), '名單裡仍然只有這一筆').toHaveLength(1)
+    expect(onlineCountOf(state), '在線人數不變').toBe(countBefore)
+    expect(state.roster.get('u2'), '其他人的身分連物件都不換').toBe(u2Before)
+
+    // 同樣內容的重複 join 不該讓 React 重繪
+    const rosterBefore = state.roster
+    expect(apply(state, presence([player('u1', 0, 0, 0, '')], []))).toBe(false)
+    expect(state.roster, '內容相同就不換 Map').toBe(rosterBefore)
   })
 })
