@@ -25,8 +25,9 @@
 
 ## 4. 過場、失敗、返回、票（`feat/fe-v01-scene-switch--transition`）
 
-- [ ] 4.1 先寫判準：`tests/world-scenes-transition.test.tsx`（`[FE-V01-S04]`～`S07`、`S13`～`S17`；`<StrictMode>`；假 socket 記錄 `close()`／`createSocket` 順序與遲到事件、假時鐘）—— 紅，commit
-- [ ] 4.2 `SceneProvider`（D3 的狀態機、過場代號、10 秒逾時可注入、300 ms 最短）、`SceneSubtree key`、覆蓋層、`role="alert"` 通知（可關閉）、「回到 Guild Hall」按鈕、`roomTokens.ts`（D5，鍵含身分）、沒票深連結的 `role="status"` 說明
+- [x] 4.1 先寫判準：`tests/world-scenes-transition.test.tsx`（`[FE-V01-S04]`／`S06`／`S07`／`S15`／`S16`／`S19` 狀態機那一半；`S05`／`S13`／`S14`／`S17` 與 DOM 在 `--transition-ui`；`<StrictMode>`；假 socket 記錄 `close()`／`createSocket` 順序與遲到事件、假時鐘）—— 紅，commit
+- [x] 4.2a `SceneProvider` 的狀態機（D3：`committed`＋推導的 `transition`、代號、10 秒逾時從 `connect()` 起算可注入）、`RemoteWorld` 回報 connecting／ready／closed —— `--transition-state`
+- [ ] 4.2b 覆蓋層（300 ms 最短、鎖輸入）、`role="alert"` 通知（可關閉）、「回到 Guild Hall」按鈕、沒票深連結的 `role="status"` 說明 —— `--transition-ui`
 - [ ] 4.3 覆蓋層與按鈕過 `ui-ux-pro-max --stack nextjs` 的 pre-delivery checklist
 - [ ] 4.4 突變：D 表裡對應的六項各自紅
 
