@@ -30,14 +30,14 @@ vi.mock('@/identity/IdentityProvider', () => ({ useIdentity: () => identity.curr
 const ROOM: RoomDoorOut = { project_id: 'a0000000-0000-4000-8000-00000000000a', title: '星際導航', online_count: 3 }
 const PROFILE = { id: 'p0000000-0000-4000-8000-00000000000p', display_name: 'P', avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-14T00:00:00Z' }
 
-function Spy({ seen, sink }: { seen: (id: string | null) => void; sink: RefObject<SceneValue | null> }) {
+function Spy({ seen, sink }: { seen: (id: string | null) => void; sink: (scene: SceneValue) => void }) {
   const { target } = useInteraction()
   const scene = useScene()
   useEffect(() => {
     seen(target?.id ?? null)
   }, [target, seen])
   useEffect(() => {
-    sink.current = scene
+    sink(scene)
   })
   return null
 }
@@ -54,12 +54,12 @@ function Objects() {
 async function atTheDoor(gate?: (projectId: string, title: string) => void) {
   const slot = CORRIDOR_SLOTS[0]!
   const seen: Array<string | null> = []
-  const sink: RefObject<SceneValue | null> = { current: null }
+  let latest: SceneValue | null = null
   const poseRef: RefObject<LocalPose> = { current: { x: slot.x + 0.6, z: slot.z, f: FACING.left } }
   const inner = (
     <InteractionProvider>
       <ListPanelProvider>
-        <Spy seen={(id) => seen.push(id)} sink={sink} />
+        <Spy seen={(id) => seen.push(id)} sink={(scene) => (latest = scene)} />
         <SpatialInteraction poseRef={poseRef} />
         <Objects />
       </ListPanelProvider>
@@ -79,7 +79,7 @@ async function atTheDoor(gate?: (projectId: string, title: string) => void) {
       await renderer.advanceFrames(1, 1 / 60)
     })
   }
-  return { scene: () => sink.current!, pressE, renderer }
+  return { scene: () => latest!, pressE, renderer }
 }
 
 beforeEach(() => {
