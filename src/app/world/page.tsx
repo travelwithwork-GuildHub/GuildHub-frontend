@@ -5,6 +5,8 @@ import { InboxButton } from '@/inbox/InboxButton'
 import { InboxPanelProvider } from '@/inbox/InboxPanelProvider'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
+import { ReturnToHallButton } from '@/world/scenes/ReturnToHallButton'
+import { SceneNotices } from '@/world/scenes/SceneNotices'
 import { SceneProvider } from '@/world/scenes/SceneProvider'
 import { AvatarPicker } from './AvatarPicker'
 import { FirstEntryNotice } from './FirstEntryNotice'
@@ -44,8 +46,12 @@ export default function WorldPage() {
               {/* ⚠️ **入口一直都在**（規格 `FE-A05-S11`）。它在標題列裡，
                   也就是 `<Canvas>` 的兄弟 —— 所以天生不會被 3D 畫面蓋住。 */}
               <AvatarPicker />
+              {/* 「回到 Guild Hall」（`FE-V01-S13`）：只在房間裡出現；在標題列，不被 Canvas 蓋住。 */}
+              <ReturnToHallButton />
             </div>
             <OtherTabNotice />
+            {/* 進不去的通知、沒票的說明（`FE-V01-S07`／`S14`）。 */}
+            <SceneNotices />
             {/* ⚠️ **`relative` 是引導層 `absolute inset-0` 的定位基準。**
                 少了它，引導層會相對於整個視窗定位 —— 蓋到標題列上。 */}
             <div className="relative min-h-0 flex-1">

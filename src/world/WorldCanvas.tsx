@@ -30,6 +30,7 @@ import { useSceneRef } from './scenes/SceneContext'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
 import { SceneObjects } from './scenes/SceneObjects'
 import { useScene } from './scenes/SceneProvider'
+import { SceneTransitionOverlay } from './scenes/SceneTransitionOverlay'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -185,6 +186,8 @@ export default function WorldCanvas() {
 
           {/* 規格 FE-W01-S05：ready 之後等待狀態消失 */}
           {!ready && <LoadingOverlay />}
+          {/* 過場（`FE-V01-S05`）：蓋在 Canvas 上、`hud` 層；目的地的名字由發起過場的人給（門知道房間標題）。 */}
+          <SceneTransitionOverlay />
           {/* 規格 FE-W06-S13：提示在 Canvas **外面** */}
           <InteractionPrompt />
           {/* 看板開出來的清單面板（`FE-B01`）。DOM，`layer('panel')`。 */}
