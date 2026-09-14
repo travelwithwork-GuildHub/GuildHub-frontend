@@ -151,12 +151,16 @@ export default function WorldCanvas() {
               castShadow
               shadow-mapSize={[1024, 1024]}
             />
-            <Suspense fallback={null}>
+            {/* ⚠️ **`key` 是換場景的機制**（`FE-V01`，design D3）：`wsScene` 變了，這整棵子樹卸載再掛 ——
+                物理世界（在 `LocalPlayer` 的 effect 裡建）連同碰撞體全拆全建、`LocalPlayer` 在掛載時讀一次的
+                `spawn`／`layout` 拿到新的、`RemoteWorld` 的 cleanup 關掉舊連線。**`<Canvas>` 在外面，不重掛**
+                （`FE-B09-S12`）。少了這個 key，畫面會換成房間、玩家卻還撞著大廳的牆。 */}
+            <Suspense fallback={null} key={def.wsScene}>
               <WorldShell layout={def.layout} />
               <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} spawn={def.spawn} layout={def.layout} />
               {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
-                  WorldCanvas 不知道即時層的存在，也不該知道。 */}
-              <RemoteWorld poseRef={localPose} generation={generation} />
+                  WorldCanvas 不知道即時層的存在，也不該知道；連哪個 scene 由註冊表決定（`FE-V01-S01`）。 */}
+              <RemoteWorld poseRef={localPose} generation={generation} scene={def.wsScene} />
               {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
                   提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
                   那是 FE-W12（W3）。 */}

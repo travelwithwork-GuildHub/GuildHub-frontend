@@ -11,7 +11,7 @@ import { CORRIDOR_SLOTS } from '@/world/rooms/slots'
 import { POLL_INTERVAL_MS } from '@/world/rooms/useRooms'
 import { SceneObjects } from '@/world/scenes/SceneObjects'
 import { SceneRefProvider } from '@/world/scenes/SceneContext'
-import type { SceneRef } from '@/world/scenes/registry'
+import { sceneOf, type SceneRef } from '@/world/scenes/registry'
 import WorldCanvas from '@/world/WorldCanvas'
 
 // 只屬於 Guild Hall 的東西在房間裡**不存在**。規格 `FE-V01-S03`。
@@ -33,8 +33,30 @@ vi.mock('@react-three/fiber', () => ({
     return <div data-testid="r3f-canvas-stub">{children}</div>
   },
 }))
-vi.mock('@/world/player/LocalPlayer', () => ({ LocalPlayer: () => null }))
-vi.mock('@/world/RemoteWorld', () => ({ RemoteWorld: () => null }))
+// 這兩個在 jsdom 裡掛不起來（three 的場景圖、真的 socket），換成**會記錄自己怎麼被掛的**殼：
+// 每次掛載拿一個新的序號（`useState` 的 lazy initializer 只在掛載時跑一次），
+// 所以「換場景有沒有重掛」看序號有沒有變；`spawn`／`scene` 看最後一次收到的 prop。
+const mounts = vi.hoisted(() => ({ player: [] as { seq: number; spawn: unknown }[], remote: [] as { seq: number; scene: unknown }[], seq: 0 }))
+vi.mock('@/world/player/LocalPlayer', async () => {
+  const { useState } = await import('react')
+  return {
+    LocalPlayer: ({ spawn }: { spawn: unknown }) => {
+      const [seq] = useState(() => (mounts.seq += 1))
+      mounts.player.push({ seq, spawn })
+      return null
+    },
+  }
+})
+vi.mock('@/world/RemoteWorld', async () => {
+  const { useState } = await import('react')
+  return {
+    RemoteWorld: ({ scene }: { scene: unknown }) => {
+      const [seq] = useState(() => (mounts.seq += 1))
+      mounts.remote.push({ seq, scene })
+      return null
+    },
+  }
+})
 
 const uuid = (letter: string) => `${letter}0000000-0000-4000-8000-00000000000${letter}`
 const ROOMS: RoomDoorOut[] = [
@@ -123,11 +145,78 @@ describe('Canvas 外面：門標籤與輪詢', () => {
     view.unmount()
   })
 
+  it('[FE-V01-S01] 換場景：子樹重掛、出生點與 scene 參數都換成註冊表給的', async () => {
+    mounts.player.length = 0
+    mounts.remote.length = 0
+    const view = render(
+      <SceneRefProvider scene={HALL}>
+        <WorldCanvas />
+      </SceneRefProvider>,
+    )
+    const hallPlayer = mounts.player.at(-1)!
+    const hallRemote = mounts.remote.at(-1)!
+    expect(hallRemote.scene).toBe('lobby')
+    expect(hallPlayer.spawn).toEqual(sceneOf(HALL).spawn)
+
+    view.rerender(
+      <SceneRefProvider scene={ROOM}>
+        <WorldCanvas />
+      </SceneRefProvider>,
+    )
+    const roomPlayer = mounts.player.at(-1)!
+    const roomRemote = mounts.remote.at(-1)!
+    // 序號變了＝卸載再掛（design D3 的 `key`）。少了 key 的話畫面換成房間、玩家卻還撞著大廳的牆。
+    expect(roomPlayer.seq).not.toBe(hallPlayer.seq)
+    expect(roomRemote.seq).not.toBe(hallRemote.seq)
+    expect(roomPlayer.spawn).toEqual(sceneOf(ROOM).spawn)
+    expect(roomRemote.scene).toBe(`room:${uuid('a')}`)
+    // Canvas 本身沒重掛（`FE-B09-S12`）：同一個 DOM 節點。
+    view.unmount()
+  })
+
   it('[FE-V01-S03] 大廳裡：有輪詢、有門標籤、有走廊提示（這條防「兩邊都拿掉」也綠）', async () => {
     const view = await mountWorld(HALL)
     expect(listRooms.mock.calls.length).toBeGreaterThanOrEqual(3)
     expect(screen.getByTestId('door-labels')).toBeTruthy()
     expect(screen.getByTestId('rooms-failed')).toBeTruthy()
     view.unmount()
+  })
+})
+
+describe('useRooms 的 enabled 來回切', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    listRooms.mockReset()
+    listRooms.mockResolvedValue(ROOMS)
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('[FE-V01-S03] true→false 停下來並交出空的 loading；false→true 立刻再請求、先交出上一次的門', async () => {
+    const { renderHook } = await import('@testing-library/react')
+    const { useRooms } = await import('@/world/rooms/useRooms')
+    const hook = renderHook(({ enabled }: { enabled: boolean }) => useRooms(4, enabled), {
+      initialProps: { enabled: true },
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10)
+    })
+    expect(hook.result.current.doors.length).toBe(ROOMS.length)
+    const before = listRooms.mock.calls.length
+
+    hook.rerender({ enabled: false })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 2 + 10)
+    })
+    expect(listRooms.mock.calls.length, '停用後還在輪詢').toBe(before)
+    expect(hook.result.current).toEqual({ status: 'loading', doors: [], hidden: 0 })
+
+    listRooms.mockReturnValue(new Promise(() => {})) // 這次永遠不回 —— 看回應到之前交出什麼
+    hook.rerender({ enabled: true })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10)
+    })
+    expect(listRooms.mock.calls.length, '重新啟用沒有立刻請求').toBe(before + 1)
+    expect(hook.result.current.doors.length, '回應到之前應該交出上一次的門（FE-W12-S22 同一個理由）').toBe(ROOMS.length)
+    hook.unmount()
   })
 })

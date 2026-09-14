@@ -48,6 +48,8 @@ const EMPTY: readonly RoomDoorOut[] = []
  * @param enabled 只有 Guild Hall 有走廊（`FE-V01-S03`）。`false` 時**不打、不輪詢**，
  *   回一個空的 `loading` —— 不是「打了不用」：房間裡每 30 秒打一次 `GET /api/rooms` 是白打的。
  *   它是參數不是條件式呼叫：hook 的順序要穩定。
+ *   再從 `false` 變回 `true` 時立刻重新請求；回應到之前交出的是**上一次的門**（有的話）——
+ *   跟 `stale` 同一個理由（`FE-W12-S22`）：一次來回不該讓走廊先變空再長回來。
  */
 export function useRooms(capacity: number, enabled = true): RoomsView {
   const [status, setStatus] = useState<RoomsStatus>('loading')
@@ -133,6 +135,10 @@ export function useRooms(capacity: number, enabled = true): RoomsView {
     }
   }, [enabled])
 
+  // 停用時交出空的 `loading`：是**推導**不是 setState —— 狀態留著，下次啟用先有東西可畫。
+  if (!enabled) return DISABLED
   const { doors, hidden } = doorsFor(rooms, capacity)
   return { status, doors, hidden }
 }
+
+const DISABLED: RoomsView = { status: 'loading', doors: EMPTY, hidden: 0 }
