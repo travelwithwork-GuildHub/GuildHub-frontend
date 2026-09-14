@@ -90,8 +90,18 @@ async function flush() {
   })
 }
 
-/** 畫面上的在線人數文字；沒有就是 `null`。 */
-const shownCount = () => screen.queryByTestId('online-count')?.textContent ?? null
+/**
+ * 畫面上顯示的在線人數；沒有就是 `null`。
+ *
+ * ⚠️ **解析出數字再比，不用 `toContain('3 人在線')`**：「13 人在線」也包含那幾個字，
+ * 多算十個人的實作會照樣綠。文案不是契約，所以只認「開頭的整數 ＋ 人在線」這個形狀。
+ */
+const shownCount = () => {
+  const text = screen.queryByTestId('online-count')?.textContent
+  if (text == null) return null
+  const match = /^(\d+)\s*人在線/.exec(text)
+  return match ? Number(match[1]) : Number.NaN
+}
 /** 畫面上任何「N 人在線」形狀的數字 —— `S09` 要求未就緒時**一個都沒有**，不只是那個元素不在。 */
 const anyCountNumber = () => /\d+\s*人在線/.test(document.body.textContent ?? '')
 
@@ -133,7 +143,7 @@ describe('目前 scene 的在線人數（畫面）', () => {
 
     await send(socket, { t: 'snapshot', players: [player(SELF), player('u1'), player('u2')] })
 
-    expect(shownCount(), '含自己 —— 不是遠端角色數 2').toContain('3 人在線')
+    expect(shownCount(), '含自己 —— 不是遠端角色數 2').toBe(3)
     expect(rendered.remoteCount, '畫面上的遠端角色仍只有另外兩個人').toBe(2)
     view.unmount()
   })
@@ -144,21 +154,21 @@ describe('目前 scene 的在線人數（畫面）', () => {
     const socket = FakeSocket.instances[0]!
     await openAndHello(socket)
     await send(socket, { t: 'snapshot', players: [player(SELF), player('u1'), player('u2')] })
-    expect(shownCount()).toContain('3 人在線')
+    expect(shownCount()).toBe(3)
 
     await send(socket, { t: 'presence', join: [player('u3')], leave: [] })
-    expect(shownCount(), '新 id 加入').toContain('4 人在線')
+    expect(shownCount(), '新 id 加入').toBe(4)
 
     await send(socket, { t: 'presence', join: [player('u3', '另一條連線')], leave: [] })
-    expect(shownCount(), '同一 id 因另一條連線重複 join').toContain('4 人在線')
+    expect(shownCount(), '同一 id 因另一條連線重複 join').toBe(4)
 
     await send(socket, { t: 'presence', join: [], leave: ['u1'] })
-    expect(shownCount(), '現有 id 離開').toContain('3 人在線')
+    expect(shownCount(), '現有 id 離開').toBe(3)
 
     await send(socket, { t: 'status', id: 'u2', text: '開會中' })
     await send(socket, { t: 'pos', p: [['u2', 32, 0, 1]] })
     await send(socket, { t: 'presence', join: [], leave: ['nobody'] })
-    expect(shownCount(), 'status、pos 與未知 id 的 leave 都不改變人數').toContain('3 人在線')
+    expect(shownCount(), 'status、pos 與未知 id 的 leave 都不改變人數').toBe(3)
 
     // 上面每一次人數改變都經過 WorldCanvas 重繪 —— callback 身分不穩的話，每一次都會重連。
     expect(FakeSocket.instances, '單純更新人數不得建立新的 WebSocket 連線').toHaveLength(1)
@@ -171,7 +181,7 @@ describe('目前 scene 的在線人數（畫面）', () => {
     const hall = FakeSocket.instances[0]!
     await openAndHello(hall)
     await send(hall, { t: 'snapshot', players: [player(SELF), player('u1'), player('u2')] })
-    expect(shownCount(), '前提：前一條連線顯示過非零人數').toContain('3 人在線')
+    expect(shownCount(), '前提：前一條連線顯示過非零人數').toBe(3)
 
     // 換場景＝場景子樹以 key 重掛（`FE-V01` D3）：舊連線卸載、新連線建立
     view.rerender(<World scene={ROOM} />)
@@ -191,7 +201,7 @@ describe('目前 scene 的在線人數（畫面）', () => {
     expect(anyCountNumber(), 'join 比 snapshot 早到也不得顯示').toBe(false)
 
     await send(room, { t: 'snapshot', players: [player(SELF), player('u9')] })
-    expect(shownCount(), '新 snapshot 到達後才顯示它所代表的人數').toContain('2 人在線')
+    expect(shownCount(), '新 snapshot 到達後才顯示它所代表的人數').toBe(2)
     view.unmount()
   })
 })
