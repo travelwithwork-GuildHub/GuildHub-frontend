@@ -2,7 +2,7 @@
 
 import type {} from '@react-three/fiber'
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { Group, Object3D } from 'three'
 import { FACING, type Facing } from '@/world/coords'
 import type { MutableVector3 } from '@/world/camera'
@@ -15,7 +15,8 @@ import { displacement, speedOf } from './movement'
 import { advanceRenderMotion, createRenderMotion } from './renderMotion'
 import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/world/physics/world'
 import { staticBoxesFor } from '@/world/layout/geometry'
-import { LAYOUT, SPAWN } from '@/world/layout/guildHallLayout'
+import { LAYOUT as HALL_LAYOUT, SPAWN as HALL_SPAWN } from '@/world/layout/guildHallLayout'
+import type { LayoutItem } from '@/world/layout/types'
 import { useInputLockRef } from '@/world/interaction/InteractionProvider'
 
 // 本地玩家。
@@ -44,9 +45,17 @@ export interface LocalPlayerProps {
    * 跟位置與朝向不同，那兩個每秒變十次，所以走 ref。
    */
   av?: unknown
+  /**
+   * 出生點與配置，來自場景註冊表（`FE-V01-S01`）。沒給就是 Guild Hall —— 既有的呼叫端不用改。
+   *
+   * ⚠️ **這兩個只在掛載時讀一次**（物理世界在下面那個 effect 建、之後不換）。
+   * 換場景是把這棵子樹用 `key` 整棵重掛（design D3），不是改 prop —— 改 prop 不會有任何效果。
+   */
+  spawn?: { readonly x: number; readonly z: number }
+  layout?: readonly LayoutItem[]
 }
 
-export function LocalPlayer({ targetRef, poseRef, av }: LocalPlayerProps) {
+export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout = HALL_LAYOUT }: LocalPlayerProps) {
   const rootRef = useRef<Group>(null)
   const bodyRef = useRef<Group>(null)
   /** 子部位查一次就快取。查不到的話動畫會靜默停止 —— 見 partsRef 的初始化。 */
@@ -64,6 +73,9 @@ export function LocalPlayer({ targetRef, poseRef, av }: LocalPlayerProps) {
   // 累加器 ＋ 前後兩個物理位置。**畫面位置是從這裡插值出來的**，
   // 不是直接讀 rigid body（規格 `FE-W03-S14`）。
   const motion = useRef(createRenderMotion({ x: 0, z: 0 }))
+  // 掛載時的那一份 —— 見 props 的說明：換場景是重掛，不是改 prop。
+  // `useState` 的 lazy initializer 給的正是「建立一次、之後不變」的語意（同 `RemoteWorld` 的理由）。
+  const [initial] = useState(() => ({ spawn, layout }))
 
   useEffect(() => {
     let cancelled = false
@@ -74,8 +86,8 @@ export function LocalPlayer({ targetRef, poseRef, av }: LocalPlayerProps) {
       // ⚠️ **靜態障礙物全部來自配置** —— 邊界也是（`FE-W11`）。
       // 這裡是世界裡唯一一個把 `StaticBox` 交給物理引擎的地方。
       physics.current = createPhysicsWorld(rapier, {
-        spawn: SPAWN,
-        staticBoxes: staticBoxesFor(LAYOUT),
+        spawn: initial.spawn,
+        staticBoxes: staticBoxesFor(initial.layout),
       })
     })()
     return () => {
@@ -83,7 +95,7 @@ export function LocalPlayer({ targetRef, poseRef, av }: LocalPlayerProps) {
       physics.current?.world.free()
       physics.current = null
     }
-  }, [])
+  }, [initial])
 
   // 子部位查一次，之後每幀直接寫它們的 transform。
   useEffect(() => {

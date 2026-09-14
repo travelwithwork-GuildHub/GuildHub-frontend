@@ -91,7 +91,9 @@ describe('Canvas 外面：門標籤與輪詢', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     listRooms.mockReset()
-    listRooms.mockResolvedValue(ROOMS)
+    // 讓它失敗：大廳那時會顯示「暫時拿不到專案清單」的提示（`FE-W12-S03`），
+    // 房間裡連那個提示都不該有 —— 因為根本沒打。
+    listRooms.mockRejectedValue(new Error('offline'))
     HTMLCanvasElement.prototype.getContext = vi.fn((id: string) =>
       id === 'webgl2' ? ({} as RenderingContext) : null,
     ) as typeof realGetContext
@@ -121,11 +123,11 @@ describe('Canvas 外面：門標籤與輪詢', () => {
     view.unmount()
   })
 
-  it('[FE-V01-S03] 大廳裡：有輪詢、有門標籤（這條防「兩邊都拿掉」也綠）', async () => {
+  it('[FE-V01-S03] 大廳裡：有輪詢、有門標籤、有走廊提示（這條防「兩邊都拿掉」也綠）', async () => {
     const view = await mountWorld(HALL)
     expect(listRooms.mock.calls.length).toBeGreaterThanOrEqual(3)
     expect(screen.getByTestId('door-labels')).toBeTruthy()
-    expect(screen.getByTestId('rooms-notice')).toBeTruthy()
+    expect(screen.getByTestId('rooms-failed')).toBeTruthy()
     view.unmount()
   })
 })

@@ -1,4 +1,4 @@
-import { PHYSICS } from '../physics/world'
+import { BOUNDARY_WALLS } from './boundary'
 import { WORLD_HALF_EXTENT } from './geometry'
 import type { LayoutItem, Zone } from './types'
 
@@ -39,18 +39,6 @@ import type { LayoutItem, Zone } from './types'
  */
 export const SPAWN = { x: 0, z: -1 } as const
 
-const HALF = WORLD_HALF_EXTENT
-/** 邊界牆比場地長一個厚度，讓四個角接起來。 */
-const BOUNDARY_LENGTH = HALF * 2 + PHYSICS.wallThickness
-/**
- * 邊界牆的中心。
- *
- * ⚠️ **牆的內側面要貼齊 `±HALF`，所以中心在 `HALF + 厚度/2`。**
- * 把中心放在 `HALF` 的話牆會有一半長在遊玩區域裡面 ——
- * 角色會停在牆的正中間，看起來像半個身體陷進牆裡。
- */
-const BOUNDARY_AT = HALF + PHYSICS.wallThickness / 2
-
 /** 走廊隔牆的開口：中心與淨寬。 */
 const GAP = { center: 3, width: 1.8 } as const
 /** 走廊隔牆涵蓋的 Z 範圍。 */
@@ -62,11 +50,8 @@ const northSeg = segment(CORRIDOR_WALL.from, GAP.center - GAP.width / 2)
 const southSeg = segment(GAP.center + GAP.width / 2, CORRIDOR_WALL.to)
 
 export const LAYOUT: readonly LayoutItem[] = [
-  // ── 邊界。**視覺與碰撞都從這裡來** ────────────────────────────────
-  { id: 'boundary-north', kind: 'wall', role: 'boundary', x: 0, z: -BOUNDARY_AT, length: BOUNDARY_LENGTH },
-  { id: 'boundary-south', kind: 'wall', role: 'boundary', x: 0, z: BOUNDARY_AT, length: BOUNDARY_LENGTH },
-  { id: 'boundary-west', kind: 'wall', role: 'boundary', x: -BOUNDARY_AT, z: 0, turns: 1, length: BOUNDARY_LENGTH },
-  { id: 'boundary-east', kind: 'wall', role: 'boundary', x: BOUNDARY_AT, z: 0, turns: 1, length: BOUNDARY_LENGTH },
+  // ── 邊界。**視覺與碰撞都從這裡來**；推導在 `boundary.ts`，跟 Project Room 共用 ──
+  ...BOUNDARY_WALLS,
 
   // ── Board 區（北）。出生時要看得到（`FE-W11-S12`）────────────────
   { id: 'carpet-boards', kind: 'carpet', x: 0, z: -6, width: 14, depth: 5 },

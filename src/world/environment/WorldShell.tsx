@@ -3,7 +3,9 @@
 import { useThree } from '@react-three/fiber'
 import { PHYSICS } from '../physics/world'
 import { groundOverscan } from '../layout/framing'
-import { GuildHall } from '../layout/GuildHall'
+import { LayoutItems } from '../layout/GuildHall'
+import { LAYOUT as HALL_LAYOUT } from '../layout/guildHallLayout'
+import type { LayoutItem } from '../layout/types'
 import { Floor } from './structural'
 
 // 世界的外殼。規格 `FE-W10-S10`／`S11`／`S12`。
@@ -22,7 +24,8 @@ import { Floor } from './structural'
 // ⚠️ **尺寸一律從 `PHYSICS` 推導，不寫死數字。** 寫死的話，改了物理範圍之後
 // 玩家會走到牆外面 —— 而畫面上看起來只是「牆的位置怪怪的」。
 
-export function WorldShell() {
+/** 場景的配置由註冊表決定（`FE-V01-S01`）；沒給就是 Guild Hall —— 既有的呼叫端與測試不用改。 */
+export function WorldShell({ layout = HALL_LAYOUT }: { layout?: readonly LayoutItem[] }) {
   const span = PHYSICS.halfExtent * 2
   // ⚠️ **視覺地板要比碰撞邊界大**（`FE-W11-S14`）：牆只有 2 單位高，
   // 相機從 12 個單位的高處往下看 —— 玩家走到邊緣時看得到牆外面。
@@ -45,10 +48,10 @@ export function WorldShell() {
         <Floor width={outside} depth={outside} color="outside" />
       </group>
       <Floor width={span} depth={span} />
-      {/* ⚠️ **四面邊界牆已經搬進 `LAYOUT`**（`FE-W11`）——
+      {/* ⚠️ **四面邊界牆已經搬進配置**（`FE-W11`；`boundary.ts`，兩個場景共用）——
           它們現在跟內牆走同一條路，視覺與碰撞吃同一份資料。
           在這裡再畫一次的話就是第二份真相。 */}
-      <GuildHall />
+      <LayoutItems layout={layout} />
     </>
   )
 }

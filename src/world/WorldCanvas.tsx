@@ -16,19 +16,19 @@ import { EditableFocusLock } from './interaction/EditableFocusLock'
 import { InteractionProvider } from './interaction/InteractionProvider'
 import { InteractionPrompt } from './interaction/InteractionPrompt'
 import { SpatialInteraction } from './interaction/SpatialInteraction'
-import { BoardTargets } from './rooms/BoardTargets'
 import { BoardPanel } from '@/list-panel/BoardPanel'
 import { InboxPanel } from '@/inbox/InboxPanel'
 import { ProfilePanel } from '@/profile/ProfilePanel'
 import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import { PanelUrlSync } from '@/list-panel/PanelUrlSync'
 import { labelAnchorsFor } from './rooms/anchors'
-import { DoorLabelProjector } from './rooms/DoorLabelProjector'
 import { DoorLabels, useLabelNodes } from './rooms/DoorLabels'
-import { ProjectDoors } from './rooms/ProjectDoors'
 import { RoomsNotice } from './rooms/RoomsNotice'
 import { CORRIDOR_SLOTS } from './rooms/slots'
 import { useRooms } from './rooms/useRooms'
+import { sceneOf } from './scenes/registry'
+import { useSceneRef } from './scenes/SceneContext'
+import { SceneObjects } from './scenes/SceneObjects'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -95,9 +95,15 @@ export default function WorldCanvas() {
   // 但相機之後可能鎖定別的東西（FE-R03 的 design D1）。
   const localPose = useRef({ x: 0, z: 0, f: 0 })
 
+  // 現在在哪個場景（`FE-V01`）。渲染的配置、出生點、只屬於大廳的東西都從註冊表推導 —— 不各自 `if`。
+  const scene = useSceneRef()
+  const hall = scene.id === 'hall'
+  const def = sceneOf(scene)
+
   // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
   // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
-  const rooms = useRooms(CORRIDOR_SLOTS.length)
+  // 只有大廳有走廊：房間裡**不打、不輪詢** `GET /api/rooms`（`FE-V01-S03`）。
+  const rooms = useRooms(CORRIDOR_SLOTS.length, hall)
   // 標籤的 DOM 節點。**身分穩定，不進 React** —— 位置每幀由投影元件直接寫進 style。
   const labelNodesRef = useLabelNodes()
 
@@ -146,21 +152,16 @@ export default function WorldCanvas() {
               shadow-mapSize={[1024, 1024]}
             />
             <Suspense fallback={null}>
-              <WorldShell />
-              <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} />
+              <WorldShell layout={def.layout} />
+              <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} spawn={def.spawn} layout={def.layout} />
               {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
                   WorldCanvas 不知道即時層的存在，也不該知道。 */}
               <RemoteWorld poseRef={localPose} generation={generation} />
               {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
                   提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
                   那是 FE-W12（W3）。 */}
-              {/* 走廊上依 `GET /api/rooms` 生成的門（`FE-W12-S01`）。 */}
-              <ProjectDoors rooms={rooms.doors} slots={CORRIDOR_SLOTS} />
-              {/* 兩塊看板接上互動系統（`FE-W12-S14`）；按 E 開清單面板（`FE-B01-S01`／`S02`）。 */}
-              <BoardTargets />
-              {/* 把標籤釘在門上（`FE-W12-S10`）。**它渲染 null** ——
-                  標籤本身是 Canvas 外面的 DOM。 */}
-              <DoorLabelProjector anchors={anchors} nodesRef={labelNodesRef} />
+              {/* 隨場景不同的物件：門、看板、門標籤的投影 —— **只在 Guild Hall**（`FE-V01-S03`）。 */}
+              <SceneObjects scene={scene} doors={rooms.doors} slots={CORRIDOR_SLOTS} anchors={anchors} nodesRef={labelNodesRef} />
               <SpatialInteraction poseRef={localPose} />
             </Suspense>
           </Canvas>
@@ -180,8 +181,9 @@ export default function WorldCanvas() {
           {/* 規格 `FE-W12-S09`：名稱與在線數**常態可見**。
               `CONTEXT.md` 那條鏈的第一環是「看見」—— 只在走到門前才顯示的話，
               那已經是第二環「靠近」了。 */}
-          <DoorLabels anchors={anchors} nodesRef={labelNodesRef} />
-          <RoomsNotice view={rooms} />
+          {/* 門標籤與走廊提示也是大廳的（`FE-V01-S03`）：房間裡沒有走廊。 */}
+          {hall && <DoorLabels anchors={anchors} nodesRef={labelNodesRef} />}
+          {hall && <RoomsNotice view={rooms} />}
           {/* ⚠️ 規格 FE-O14-S11／S12：這裡刻意什麼都沒有。
               以前這裡有一段「目前是單人預覽，看不到其他人」——
               拿掉是產品決定（這個網址對外的用途是展示世界，而那段字是

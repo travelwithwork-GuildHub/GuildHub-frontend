@@ -45,12 +45,16 @@ const EMPTY: readonly RoomDoorOut[] = []
  * 取得走廊要生成的門。
  *
  * @param capacity 走廊排得下幾扇（由 `slotCapacity` 從分區推導）
+ * @param enabled 只有 Guild Hall 有走廊（`FE-V01-S03`）。`false` 時**不打、不輪詢**，
+ *   回一個空的 `loading` —— 不是「打了不用」：房間裡每 30 秒打一次 `GET /api/rooms` 是白打的。
+ *   它是參數不是條件式呼叫：hook 的順序要穩定。
  */
-export function useRooms(capacity: number): RoomsView {
+export function useRooms(capacity: number, enabled = true): RoomsView {
   const [status, setStatus] = useState<RoomsStatus>('loading')
   const [rooms, setRooms] = useState<readonly RoomDoorOut[]>(EMPTY)
 
   useEffect(() => {
+    if (!enabled) return undefined
     /**
      * 進行中的那一次。
      *
@@ -127,7 +131,7 @@ export function useRooms(capacity: number): RoomsView {
       stop()
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [])
+  }, [enabled])
 
   const { doors, hidden } = doorsFor(rooms, capacity)
   return { status, doors, hidden }
