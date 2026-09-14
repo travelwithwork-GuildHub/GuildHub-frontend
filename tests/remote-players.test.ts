@@ -38,8 +38,8 @@ function shown(state: ReturnType<typeof createRemotePlayersState>, id: string, a
   return track === undefined ? undefined : evaluate(track, at)
 }
 
-function player(id: string, x = 0, y = 0, f = 0) {
-  return { id, name: '訪客', av: 0, x, y, f, st: '' }
+function player(id: string, x = 0, y = 0, f = 0, st = '') {
+  return { id, name: '訪客', av: 0, x, y, f, st }
 }
 
 /** 過一次真的 schema，確保測試資料本身是合法的協定訊息。 */
@@ -55,6 +55,7 @@ const presence = (join: ReturnType<typeof player>[], leave: string[]) =>
   message({ t: 'presence', join, leave })
 const pos = (...entries: Array<[string, number, number, number]>) =>
   message({ t: 'pos', p: entries })
+const status = (id: string, text: string) => message({ t: 'status', id, text })
 
 describe('遠端玩家的狀態', () => {
   it('[FE-R07-S01] 收到位置更新時，名單不會改變', () => {
@@ -295,9 +296,9 @@ describe('遠端玩家的狀態', () => {
     apply(state, snapshot(player('u1')))
     const rosterBefore = state.roster
 
+    // ⚠️ `status` **不在這張清單裡了**：`FE-R10` 把它收進這一層（見下面 `FE-R10-S03`／`S04`）。
     for (const m of [
       message({ t: 'hello', you: SELF, hz: 10 }),
-      message({ t: 'status', id: 'u1', text: '趕工中' }),
       message({ t: 'chat', id: 'u1', name: '訪客', body: '嗨' }),
       message({ t: 'err', code: 'x', msg: 'y' }),
     ]) {
@@ -312,5 +313,124 @@ describe('遠端玩家的狀態', () => {
     const state = createRemotePlayersState()
     applyMessage(state, snapshot(player(SELF), player('u1')), null, clock)
     expect([...state.roster.keys()].sort()).toEqual([SELF, 'u1'].sort())
+  })
+})
+
+// ── FE-R10 遠端玩家的狀態文字 ─────────────────────────────────────────
+//
+// 規格：openspec/changes/fe-r10-presence/specs/remote-players/spec.md
+//   Requirement: 遠端玩家保有目前的狀態文字 —— FE-R10-S01 / S02 / S03 / S04
+//   Requirement: 離場與權威重建不留下舊狀態 —— FE-R10-S05 / S06
+//   （`S11` 的 THEN 含在線人數，跟人數同一刀）
+//
+// ⚠️ 「對每一個 X ⋯ 不變」的斷言都先釘住 X **非空**（`FE-W12` 空集合恆真的教訓）。
+
+describe('遠端玩家的狀態文字', () => {
+  const stOf = (state: ReturnType<typeof createRemotePlayersState>, id: string) =>
+    state.roster.get(id)?.st
+
+  it('[FE-R10-S01] snapshot 建立每個人的狀態', () => {
+    const state = createRemotePlayersState()
+
+    apply(
+      state,
+      snapshot(player(SELF, 0, 0, 0, '我自己的'), player('u1', 0, 0, 0, ''), player('u2', 0, 0, 0, '趕工中')),
+    )
+
+    // 兩個人的值**不同**：寫死成同一個值（例如一律空字串）的實作過不了
+    expect(stOf(state, 'u1'), '空白的 st 要原樣保留').toBe('')
+    expect(stOf(state, 'u2'), '非空白的 st 要取自 snapshot').toBe('趕工中')
+    expect(state.roster.has(SELF), '自己仍然不會成為遠端玩家').toBe(false)
+  })
+
+  it('[FE-R10-S02] 後來加入的人從 join 取得狀態', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player(SELF), player('u1')))
+
+    const changed = apply(state, presence([player('u2', 0, 0, 0, '開會中')], []))
+
+    expect(changed).toBe(true)
+    expect(stOf(state, 'u2'), '加入名單的當下就要有 join 帶來的狀態').toBe('開會中')
+  })
+
+  it('[FE-R10-S03] status 只更新指定玩家', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player('u1', 32, 0, 0, '原本一'), player('u2', 64, 0, 0, '原本二')))
+    for (let i = 1; i <= 3; i++) {
+      clock += 100
+      apply(state, pos(['u1', 32 + i * 32, 0, 0], ['u2', 64 + i * 32, 0, 0]))
+    }
+    const keysBefore = [...state.roster.keys()]
+    const u2Before = state.roster.get('u2')
+    const tracksBefore = new Map(
+      [...state.motion].map(([id, t]) => [id, { ref: t, samples: JSON.stringify(t.samples) }]),
+    )
+    expect(tracksBefore.size, '前提：兩個人都有樣本').toBe(2)
+
+    const changed = apply(state, status('u1', '換了'))
+
+    expect(changed, '狀態文字是低頻、看得見的資料 —— 要讓呼叫端重繪').toBe(true)
+    expect(stOf(state, 'u1')).toBe('換了')
+    expect([...state.roster.keys()], '名單成員不變').toEqual(keysBefore)
+    expect(state.roster.get('u2'), '另一個人的身分連物件都不換').toBe(u2Before)
+    expect(stOf(state, 'u2')).toBe('原本二')
+    for (const [id, before] of tracksBefore) {
+      expect(state.motion.get(id), `${id} 的樣本容器不換`).toBe(before.ref)
+      expect(JSON.stringify(state.motion.get(id)!.samples), `${id} 的樣本不變`).toBe(before.samples)
+    }
+  })
+
+  it('[FE-R10-S03] 相同的文字不換名單（不觸發重繪）', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player('u1', 0, 0, 0, '一樣')))
+    const rosterBefore = state.roster
+
+    expect(apply(state, status('u1', '一樣'))).toBe(false)
+    expect(state.roster, '內容相同也換一個新 Map 的話，React 照樣重繪').toBe(rosterBefore)
+  })
+
+  it('[FE-R10-S04] 未知與自己的 status 不建立鬼影', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player(SELF), player('u1', 32, 0, 0, '在')))
+    const rosterBefore = state.roster
+    const motionKeysBefore = [...state.motion.keys()]
+    expect(rosterBefore.size, '前提：名單非空').toBe(1)
+
+    for (const id of ['nobody', SELF]) {
+      let changed: boolean | undefined
+      expect(() => {
+        changed = apply(state, status(id, '鬼'))
+      }).not.toThrow()
+      expect(changed, `${id} 的 status 不該讓呼叫端重繪`).toBe(false)
+      expect(state.roster, `${id} 的 status 不該換掉名單`).toBe(rosterBefore)
+      expect(state.roster.has(id), `${id} 不該被建立`).toBe(false)
+      expect([...state.motion.keys()], `${id} 不該多出樣本容器`).toEqual(motionKeysBefore)
+    }
+    expect(stOf(state, 'u1'), '名單上的人不受影響').toBe('在')
+  })
+
+  it('[FE-R10-S05] leave 後同 id 再加入不會讀到舊狀態', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player('u1', 0, 0, 0, '離開前的字'), player('u2')))
+
+    apply(state, presence([], ['u1']))
+    // **直接斷言容器**（`FE-R08-S11` 的教訓）：只看「再加入之後是空白」的話，
+    // join 本來就會帶新值，leave 忘了清也照樣綠。
+    expect(state.roster.has('u1'), 'leave 之後名單裡不該還有他').toBe(false)
+
+    apply(state, presence([player('u1', 0, 0, 0, '')], []))
+
+    expect(stOf(state, 'u1'), '再加入後的狀態是 join 帶來的空白').toBe('')
+  })
+
+  it('[FE-R10-S06] 新 snapshot 取代仍在線玩家的舊狀態', () => {
+    const state = createRemotePlayersState()
+    apply(state, snapshot(player('u1', 0, 0, 0, '舊的')))
+    apply(state, status('u2', '不在名單的人'))
+
+    apply(state, snapshot(player('u1', 0, 0, 0, '')))
+
+    expect([...state.roster.keys()], '前提：他仍然在名單裡').toEqual(['u1'])
+    expect(stOf(state, 'u1'), '舊狀態不得被合併或保留').toBe('')
   })
 })
