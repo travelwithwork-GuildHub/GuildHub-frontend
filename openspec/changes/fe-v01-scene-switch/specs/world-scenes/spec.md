@@ -121,7 +121,8 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 顯示一則 `role="alert"` 的通知。通知 MUST NOT 宣稱失敗原因（客戶端分不出來）；語彙固定為
 「進不了這間房 —— 可能暫時連不上，或通行證已經失效、房間已經關閉。已回到 Guild Hall。」
 系統 MUST NOT 自動重試進入那間房；MUST NOT 丟棄持有的票（連不上跟票失效分不出來，丟票會讓網路瞬斷的人重輸一次密碼；換票是 `FE-N08` 的事）。
-通知 SHALL 留到下一次**成功**進入任何場景、使用者關閉它、或被下一則通知取代為止。
+通知 SHALL 留到下一次**使用者發起的**成功進入任何場景（按 E、按「回到 Guild Hall」、上一頁）、使用者關閉它、或被下一則通知取代為止。
+失敗之後**系統自動**回大廳的那次連線 `ready` MUST NOT 清掉它 —— 大廳的 `hello` 在幾毫秒內就到，清了沒有人看得到通知。
 
 10 秒 SHALL 是一個具名常數、測試可注入；背景分頁的計時器被瀏覽器節流時允許晚觸發（`FE-R04` 管背景分頁）。
 
@@ -147,7 +148,8 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 - **AND WHEN** 使用者關閉通知
 - **THEN** SHALL 沒有 `role="alert"` 的元素
 - **AND WHEN** 第三次按 E 且這次 `ready`；接著再讓第四次被拒、然後按「回到 Guild Hall」成功
-- **THEN** 第三次 `ready` 時 SHALL 沒有 alert；第四次之後有一個；回大廳成功後 SHALL 沒有（成功進入任何場景都清）
+- **THEN** 第三次 `ready` 時 SHALL 沒有 alert；第四次之後有一個；回大廳成功後 SHALL 沒有（使用者發起的成功進入都清）
+- **AND** 每一次被拒之後系統自動回大廳的那條連線 `ready` 時，alert SHALL 仍在
 
 #### Scenario: [FE-V01-S16] 回大廳也連不上時，不會永久 busy
 
