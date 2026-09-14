@@ -147,15 +147,25 @@ export function RemoteWorld({
     let cancelled = false
     const gate = closeGateRef?.current ?? null
     if (gate === null) client.connect()
-    else void gate.then(() => {
-      if (!cancelled) client.connect()
-    })
+    else
+      void gate
+        .then(() => {
+          if (!cancelled) client.connect()
+        })
+        // 走到這裡代表上面那個 `cancelled` 的守衛壞了（卸載後 `connect()` 一個已關的 client 會拋）。
+        // 不吞掉：留一行給人看，測試也靠這一行抓突變。
+        .catch((error: unknown) => console.error('[realtime] 換場景後建立連線失敗：', error))
 
     return () => {
       cancelled = true
       clientRef.current = null
       const acked = client.close()
-      if (closeGateRef) closeGateRef.current = acked
+      // ⚠️ **接在前一個閘門後面，不是蓋掉它。** 連換兩次（A→B→C）時 B 可能還沒等到 A 的 ack 就卸載了：
+      // B 自己沒有 socket，`close()` 立刻解決 —— 直接放進去的話 C 會立刻連，A 的 ack 就被跳過了。
+      if (closeGateRef) {
+        const previous = closeGateRef.current ?? Promise.resolve()
+        closeGateRef.current = previous.then(() => acked)
+      }
       // 卸載時把兩個容器都清乾淨 —— 留著的話，重新掛載會先閃出一批舊角色。
       state.motion.clear()
       state.roster = new Map()

@@ -275,6 +275,70 @@ describe('RealtimeClient', () => {
     expect(client.state).toBe('closed')
   })
 
+  it('[FE-V01-S18] 等 ack 期間再 closeAndEnter：排在最舊那條的 close 之後，不得立刻建', () => {
+    vi.useFakeTimers()
+    const { client, sockets, urls } = setup()
+    client.connect()
+    sockets[0]!.emit('open', null)
+    sockets[0]!.emit('message', { data: HELLO() })
+
+    client.closeAndEnter('room:a', 'ta')
+    client.closeAndEnter('room:b', 'tb') // 這時 #socket 已經是 null —— 但最舊的那條還沒關乾淨
+    expect(sockets, '第二次不得因為「沒有 socket」就立刻建').toHaveLength(1)
+    sockets[0]!.emit('close', { code: 1000, reason: '', wasClean: true })
+    expect(sockets, 'ack 到了才建，而且只建最後那一個目的地').toHaveLength(2)
+    expect(new URL(urls[1]!).searchParams.get('scene')).toBe('room:b')
+    expect(new URL(urls[1]!).searchParams.get('token')).toBe('tb')
+  })
+
+  it('[FE-V01-S18] socket.close() 同步送出 close 事件也等得到，不白等 1 秒', () => {
+    vi.useFakeTimers()
+    class SyncCloseSocket extends FakeSocket {
+      override close() {
+        super.close()
+        this.emit('close', { code: 1000, reason: '', wasClean: true })
+      }
+    }
+    const { client, sockets, closed } = setup({ SocketClass: SyncCloseSocket })
+    client.connect()
+    sockets[0]!.emit('open', null)
+    sockets[0]!.emit('message', { data: HELLO() })
+    client.closeAndEnter('room:a', 'ta')
+    expect(sockets, '事件同步到了就同步建').toHaveLength(2)
+    expect(closed).toHaveLength(1)
+    expect(client.state).toBe('connecting')
+  })
+
+  it('[FE-V01-S18] onClosed 裡同步再 closeAndEnter（重入）：仍等 ack、只建一條', () => {
+    vi.useFakeTimers()
+    const sockets: FakeSocket[] = []
+    const urls: string[] = []
+    let reentered = false
+    const client = new RealtimeClient({
+      onClosed: () => {
+        if (reentered) return
+        reentered = true
+        client.closeAndEnter('room:b', 'tb')
+      },
+      createSocket: (url) => {
+        urls.push(url)
+        const s = new FakeSocket()
+        sockets.push(s)
+        return s
+      },
+    })
+    client.connect()
+    sockets[0]!.emit('open', null)
+    sockets[0]!.emit('message', { data: HELLO() })
+    client.closeAndEnter('room:a', 'ta')
+    expect(sockets).toHaveLength(1)
+    sockets[0]!.emit('close', { code: 1000, reason: '', wasClean: true })
+    expect(sockets).toHaveLength(2)
+    expect(new URL(urls[1]!).searchParams.get('scene')).toBe('room:b')
+    vi.advanceTimersByTime(CLOSE_ACK_TIMEOUT_MS + 1)
+    expect(sockets, '之後也不再多建').toHaveLength(2)
+  })
+
   it('[FE-V01-S18] 已經關掉（沒有 socket）的 client 再 closeAndEnter：立刻建', () => {
     const { client, sockets, urls } = setup()
     client.connect()

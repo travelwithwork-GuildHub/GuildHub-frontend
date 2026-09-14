@@ -104,7 +104,8 @@ describe('RemoteWorld 重掛時的 close 閘門', () => {
     view.unmount()
   })
 
-  it('[FE-V01-S18] 等閘門期間就卸載：不建 socket', async () => {
+  it('[FE-V01-S18] 等閘門期間就卸載：不建 socket、也不在 console 留錯', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const gateRef: RefObject<Promise<void> | null> = { current: null }
     const view = render(<Harness scene="lobby" gateRef={gateRef} />)
     await flush()
@@ -117,5 +118,27 @@ describe('RemoteWorld 重掛時的 close 閘門', () => {
     })
     await flush()
     expect(FakeSocket.instances, '卸載之後不得再建').toHaveLength(1)
+    // 卸載後還去 `connect()` 一個已關的 client 會拋 —— 那條 promise 鏈把它印成 console.error，這裡要是零。
+    expect(consoleError, '卸載後仍嘗試連線').not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+
+  it('[FE-V01-S18] 連換兩次（A→B→C）：C 要等 A 的 close 事件，不因 B 沒有 socket 就立刻連', async () => {
+    const gateRef: RefObject<Promise<void> | null> = { current: null }
+    const view = render(<Harness scene="lobby" gateRef={gateRef} />)
+    await flush()
+    const a = FakeSocket.instances[0]!
+    view.rerender(<Harness scene="room:b" gateRef={gateRef} />)
+    await flush()
+    view.rerender(<Harness scene="room:c" gateRef={gateRef} />) // B 還在等 A 的 ack 就被換掉
+    await flush()
+    expect(FakeSocket.instances, 'A 的 close 事件還沒到，C 不得連').toHaveLength(1)
+    await act(async () => {
+      a.emitClose()
+    })
+    await flush()
+    expect(FakeSocket.instances).toHaveLength(2)
+    expect(new URL(FakeSocket.instances[1]!.url).searchParams.get('scene'), '只有 C 連，B 從來沒連').toBe('room:c')
+    view.unmount()
   })
 })

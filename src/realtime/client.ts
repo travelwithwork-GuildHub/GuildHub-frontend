@@ -109,6 +109,13 @@ export class RealtimeClient {
   #token: string | undefined
   /** 「等舊 close 再進」的代號：`close()` 或再一次 `closeAndEnter()` 會讓上一次 pending 的進入作廢。 */
   #enterGeneration = 0
+  /**
+   * 還在等 close 事件的舊 socket 有幾個。**不是 boolean**：等 ack 期間又 `closeAndEnter()`，
+   * 那時 `#socket` 已經是 `null`，但最舊的那條還沒關乾淨 —— 新的進入要排在**它**後面，不能立刻連。
+   */
+  #acksPending = 0
+  /** ack 全部到齊時要跑的東西（依序）。 */
+  #ackWaiters: (() => void)[] = []
   readonly #options: RealtimeClientOptions
 
   // **每個 listener 都要留著 reference**，否則關閉時移不掉 ——
@@ -222,26 +229,36 @@ export class RealtimeClient {
       socket.removeEventListener('message', this.#onMessage)
       socket.removeEventListener('close', this.#onClose)
       this.#socket = null
+      // ack 的監聽器在 `socket.close()` **之前**掛好：同步送 close 事件的實作（或替身）才不會漏掉、白等 1 秒。
+      this.#acksPending += 1
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | null = null
+      const done = () => {
+        if (settled) return
+        settled = true
+        socket.removeEventListener('close', done)
+        if (timer !== null) clearTimeout(timer)
+        this.#acksPending -= 1
+        if (this.#acksPending === 0) this.#flushAckWaiters()
+      }
+      socket.addEventListener('close', done)
+      timer = setTimeout(done, CLOSE_ACK_TIMEOUT_MS)
       socket.close()
     }
-    // 先把「關了」這件事發出去，再等 ack —— 沒有 socket 時 ack 是同步的，
-    // 而 `closeAndEnter` 的 callback 會接著 `connect()`；順序反過來的話下面這段會把新連線的狀態蓋回 closed。
+    // 先把「關了」這件事發出去，再排進入 —— 沒有東西要等時進入是同步的，
+    // 而 `closeAndEnter` 的 callback 會接著 `connect()`；順序反過來的話這段會把新連線的狀態蓋回 closed。
     if (this.#state !== 'closed') {
       this.#setState('closed')
       this.#emitClosed({ code: 1000, reason: '', wasClean: true })
     }
-    if (socket === null) {
-      onAcked(generation)
-      return
-    }
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const done = () => {
-      socket.removeEventListener('close', done)
-      if (timer !== null) clearTimeout(timer)
-      onAcked(generation)
-    }
-    socket.addEventListener('close', done)
-    timer = setTimeout(done, CLOSE_ACK_TIMEOUT_MS)
+    if (this.#acksPending === 0) onAcked(generation)
+    else this.#ackWaiters.push(() => onAcked(generation))
+  }
+
+  #flushAckWaiters(): void {
+    const waiters = this.#ackWaiters
+    this.#ackWaiters = []
+    for (const waiter of waiters) waiter()
   }
 
   #setState(next: ConnectionState): void {
