@@ -34,7 +34,7 @@ PY
 expect_rc 1 "拿掉 test:contract:internal 那一步 → 紅" "$TMP/no-internal.yml"
 
 # 4. 偷加一步跑 guildhub → 紅（三種寫法各一）。
-for bad in "node scripts/contract-guildhub.mjs" "bash ../GuildHub-backend/run.sh" "CONTRACT_TARGET=guildhub npx vitest run --config vitest.contract.mts"; do
+for bad in "node scripts/contract-guildhub.mjs" "bash ../GuildHub-backend/run.sh" "CONTRACT_TARGET=guildhub pnpm exec vitest run --config vitest.contract.mts"; do
   python3 - "$TMP/guildhub.yml" "$bad" <<'PY'
 import sys, yaml
 d = yaml.safe_load(open('.github/workflows/ci.yml'))

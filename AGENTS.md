@@ -27,8 +27,8 @@ Repository 內其他文件與本檔衝突時，以本檔為準。
 
 ```bash
 git branch --show-current                  # 你在哪個 change 上
-npx openspec list                          # 有哪些 change
-npx openspec status --change <name>        # 已經在某個 change 上才跑；<name> 是上一行列出的其中一個
+pnpm exec openspec list                          # 有哪些 change
+pnpm exec openspec status --change <name>        # 已經在某個 change 上才跑；<name> 是上一行列出的其中一個
 bash .github/scripts/progress.sh           # 做到哪裡；還沒設定的東西也會列出來
 ```
 
@@ -400,6 +400,34 @@ ADR 證據路徑不存在、標「已強制」卻沒有一條證據是測試）�
 它**抓不到**的：兩條決策語意衝突但沒寫 `Supersedes`（不推斷，人審）；證據測試其實是
 `test.skip`（路徑存在只代表有交卷）。
 
+### 多模型分工的票流程（**是寫手的自我約束，不是 repo 的門**）
+
+`.agents/skills/llm-team/` 放的是唯讀快照，以 `node .agents/skills/llm-team/setup.mjs --sync-check` 驗 manifest。
+快照**不准手改**——要改程式去真源改、重新 export；`SOURCE.json` 記來源 commit。
+
+```bash
+node .agents/skills/llm-team/setup.mjs --check              # 對帳 settings.json
+node .agents/skills/llm-team/ticket.mjs run --name <n> ...   # 寫手實作＋雙模型複審
+node .agents/skills/llm-team/ticket.mjs publish --name <n>  # 提交、推分支、開 draft PR
+```
+
+**為什麼分工。** 統整者（Claude 或 agy，看你從哪個 CLI 進來：`CLAUDE.md`／`GEMINI.md`）回合數寶貴，把目標明確、≤ 5 檔的葉子票交給便宜模型
+動手寫，再由兩位獨立模型複審（寫手與複審名單**只住 `llm-team.config.json`**；2026-09-13 起寫手 Gemini 3.8 Flash、複審 Opus 4.6＋Codex sol、全級同名單）。省的是統整者回合，
+作者≠審核者避免「自己寫自己審」的盲區。
+
+**寫手 wrapper 的自我約束（G1–G6 各擋什麼）。**
+- G1：worktree 不在 main 且乾淨（不污損主分支）。
+- G2：settings.json allow regex 對帳（防指令被拒靜默退出）。
+- G3：stream-json 判定工作成功而非程序成功（防 exit 0 假象）。
+- G4：越界改檔 fail-closed（不修、不還原、回統整者）。
+- G5：每輪寫 ndjson 台帳（留可稽核軌跡）。
+- G6：迴圈硬上限 ≤ 5 輪（防無窮空轉）。
+
+**信任邊界。** 本機閘可繞、不得當安全邊界；GitHub PR ruleset 才是唯一的門。
+產物與台帳在 `.local/llm-team/`。
+「不簽」不是紅燈，是統整者要讀的訊息；統整者必須親自開檔坐實每位審查者的 Q6，
+無誤才觸發 `publish`，永不自動 merge，最終由人核准合併。
+
 ### CI 的 workflow 檢查
 
 ```yaml
@@ -752,6 +780,7 @@ gh api repos/travelwithwork-GuildHub/GuildHub-frontend/rulesets/21930388 \
 
 ## Git / CI
 
+- **套件管理一律 pnpm**（2026-09-14 定案，全系統預設；理由＝同機多專案共用 store＋不放 phantom dependency）：本機與 brief 用 `pnpm install --frozen-lockfile`、`pnpm test`、`pnpm run <script>`、`pnpm exec openspec validate`，不寫 `pnpm install --frozen-lockfile`／`npx`。`package.json` 的 `packageManager` 欄是真源。CI 與 `.github/scripts/` 已全面 pnpm（2026-09-14；`package-lock.json` 已刪，唯一 lockfile 是 `pnpm-lock.yaml`）。模板 ai-team-starter 的同一步另開票
 - 分支命名見上面〈分支命名〉那張表。**CI 會擋，不是建議**
 - 一個 PR 對應一個 phase；實作 phase 可以有多個 PR
 - **不得 `git commit --no-verify`**（就算本機沒有 hook，這個習慣要留著）

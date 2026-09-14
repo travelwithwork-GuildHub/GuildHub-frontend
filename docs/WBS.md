@@ -435,7 +435,7 @@ bash .github/scripts/wbs-page.sh --open
 | ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 |
 |---|---|---|---|---|---|---|
 | FE-O01 | 資料層契約 | **唯一一份。** 用 Zod 定義每一個操作的輸入與輸出，放在 `src/api/contract/`。REST entity、operation、WS 訊息集合全部在這裡，**別處不得再定義一次** | W1 | 8 | | Alarm｜這份被複製到第二個地方的那天，整套就開始漂 |
-| | | 已存在的那一半用產的：`npx openapi-typescript` 從真後端的 `/openapi.json`；WS 依 `protocol.py` 手寫並標明對應段落 | W1 | 5 | | |
+| | | 已存在的那一半用產的：`pnpm dlx openapi-typescript` 從真後端的 `/openapi.json`；WS 依 `protocol.py` 手寫並標明對應段落 | W1 | 5 | | |
 | FE-O02 | 資料存取介面 | domain operations（Profile / Project / Role / Application / Invitation / Offer / Message / Room / Seat）。**元件裡不准出現 `fetch`** | W1 | 6 | | Alarm｜這條破了，之後銜接是重寫不是切換 |
 | | | Adapter 切換：`internal`（自己的 Route Handlers）或 `guildhub`（真後端），環境變數決定。**元件不知道自己連的是誰**。**刻意不叫 `local`** —— `NEXT_PUBLIC_APP_ENV=local` 的 `local` 是「跑在開發者機器上、連 localhost 的真後端」，兩個是相反的資料來源（`FE-O02` design 的 D1） | W1 | 5 | | |
 | | | 兩個 adapter 的錯誤都對映到 `FE-X03` 的那一份語彙 | W2 | 4 | | |

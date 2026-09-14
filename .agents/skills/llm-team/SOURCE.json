@@ -1,0 +1,22 @@
+{
+  "version": "1",
+  "sourceCommit": "e96fc29513e79b3154840e34f58fb175fbe2c107",
+  "sourceDirty": false,
+  "exportedAt": "2026-09-14T06:09:16.744Z",
+  "files": [
+    "lib.mjs",
+    "write.mjs",
+    "council.mjs",
+    "ticket.mjs",
+    "setup.mjs",
+    "llm-team.test.mjs",
+    "ticket.test.mjs",
+    "export.mjs",
+    "export.test.mjs",
+    "agy-pretooluse.sh",
+    "agy-pretooluse.test.mjs",
+    "SKILL.md",
+    "test.sh",
+    "VERSION"
+  ]
+}

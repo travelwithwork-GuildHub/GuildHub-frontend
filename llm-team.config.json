@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "models": {
+    "writer": "gemini-3.8-flash-medium",
+    "reviewers": [],
+    "codex": "gpt-5.6-sol"
+  },
+  "allowCommandHeads": [
+    "pnpm test",
+    "pnpm run",
+    "pnpm exec openspec validate",
+    "bash .github/scripts/test-"
+  ],
+  "worktreeRoot": ".claude/worktrees",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "maxRounds": 3,
+  "riskDomains": [],
+  "outDir": ".local/llm-team",
+  "branchPrefixes": [
+    "spec/",
+    "feat/",
+    "fix/",
+    "chore/",
+    "archive/",
+    "governance/"
+  ],
+  "codexTier": "all"
+}

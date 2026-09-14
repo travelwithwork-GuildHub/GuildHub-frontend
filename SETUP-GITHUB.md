@@ -9,22 +9,22 @@
 所以你只要裝：
 
 ```bash
-npm ci
+pnpm install --frozen-lockfile
 ```
 
 **不用跑 `openspec init`** —— 它會產生的 `openspec/config.yaml` 與 `.claude/`
 底下 12 個檔案，模板都已經附了。
 
-**不要全域安裝。** 版本由 `package-lock.json` 鎖住，CI 跟每個人本機跑的才是同一份。
+**不要全域安裝。** 版本由 `pnpm-lock.yaml` 鎖住，CI 跟每個人本機跑的才是同一份。
 
-模板釘的是 `"@fission-ai/openspec": "1.11.0"`（沒有 caret）。`npm ci` 本來就認
-lockfile，但少了這個，有人跑 `npm install` 就會在 `1.x` 之內漂移然後把新的
+模板釘的是 `"@fission-ai/openspec": "1.11.0"`（沒有 caret）。`pnpm install --frozen-lockfile` 本來就認
+lockfile，但少了這個，有人跑 `pnpm install` 就會在 `1.x` 之內漂移然後把新的
 lockfile commit 上去。
 
 `.claude/` 底下的 6 個 skill 與 6 個 `/opsx:*` 指令**要跟著 git 走** ——
 `.gitignore` 沒有擋它，隊友 clone 就有。它們的 frontmatter 是
 `generatedBy: "1.11.0"`，跟 `package.json` 釘的版本綁在一起；
-升級 CLI 的時候要跑 `npx openspec update` 把它們一起換掉。
+升級 CLI 的時候要跑 `pnpm exec openspec update` 把它們一起換掉。
 
 ### 讓 `openspec` 指到專案這一份
 
@@ -92,7 +92,7 @@ mv .github/CODEOWNERS.example .github/CODEOWNERS
 
 > **Next.js 專案注意**：16 起 `next lint` 已被移除，`lint` 要寫 `eslint .`，
 > `next.config` 的 `eslint` 選項也不再需要。舊專案遷移用官方 codemod：
-> `npx @next/codemod@canary next-lint-to-eslint-cli .`
+> `pnpm dlx @next/codemod@canary next-lint-to-eslint-cli .`
 > 另外 `create-next-app` 只會產生 `lint` 與 `build`，`typecheck` 與 `test` 要自己加。
 
 ## 3. CI
@@ -100,13 +100,13 @@ mv .github/CODEOWNERS.example .github/CODEOWNERS
 `.github/workflows/ci.yml` 是 Node 專案的預設形狀，**依你的 stack 改**
 （換 setup action、換安裝指令、換 Node 版本）。
 
-**但 `Spec` 那一關不要拿掉。** 它排在 `npm ci` 之後是刻意的 ——
-`npx openspec` 要先有 `node_modules` 才解析得到 lockfile 鎖住的那個版本。
+**但 `Spec` 那一關不要拿掉。** 它排在 `pnpm install --frozen-lockfile` 之後是刻意的 ——
+`pnpm exec openspec` 要先有 `node_modules` 才解析得到 lockfile 鎖住的那個版本。
 真的沒有 spec 變更的 change（純重構、工具、文件），在它的 `.openspec.yaml`
 標 `skip_specs: true`，不是把這一關刪掉。
 
 非 Node 專案沒有 lockfile 可以鎖，就改回釘死版本的
-`npx --yes @fission-ai/openspec@1.11.0`，並自己確保團隊裝的是同一版。
+`pnpm dlx @fission-ai/openspec@1.11.0`，並自己確保團隊裝的是同一版。
 
 `job` 的 `name: ci` 就是 required check 的名稱，改名要同步改下面的 ruleset。
 

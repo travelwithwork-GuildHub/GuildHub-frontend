@@ -86,9 +86,11 @@ bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
 一個 change = 一個目錄；兩個 phase（規格、實作）各自一支分支、一個 PR。change 之間可以平行。
 
 ```bash
-npm ci
-npx openspec list
+pnpm install --frozen-lockfile
+pnpm exec openspec list
 ```
+
+多模型分工：先 `node .agents/skills/llm-team/setup.mjs --check`，流程見 `prompts/07-ticket.md`。
 
 ## `progress.sh --check` 在守什麼
 

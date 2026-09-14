@@ -36,12 +36,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # pnpm 版本讀 package.json 的 packageManager 欄（唯一真源，不在這裡重複釘）。
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       # 瀏覽器版本跟著 lockfile 裡的 playwright-core 走，快取也用它當 key ——
       # 不快取的話每次 push main 都重抓一顆 Chromium，下載本身就是 flake 來源。
@@ -56,18 +59,18 @@ jobs:
 
       # OS 層的依賴每次都裝（runner 映像每次都是新的）；瀏覽器本體只在快取沒中時抓。
       - name: Browser deps
-        run: npx playwright-core install-deps chromium
+        run: pnpm exec playwright-core install-deps chromium
 
       - name: Browser
         if: steps.browser.outputs.cache-hit != 'true'
-        run: npx playwright-core install chromium
+        run: pnpm exec playwright-core install chromium
 
       # 跟 ci.yml 的 Build 一模一樣的環境：驗的要是同一份產物。
       - name: Build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
           NEXT_PUBLIC_APP_ENV: local
-        run: npm run build
+        run: pnpm run build
 
       - name: E2E (no services)
         env:
