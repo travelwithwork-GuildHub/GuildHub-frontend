@@ -780,7 +780,7 @@ gh api repos/travelwithwork-GuildHub/GuildHub-frontend/rulesets/21930388 \
 
 ## Git / CI
 
-- **套件管理一律 pnpm**（2026-09-14 定案，全系統預設；理由＝同機多專案共用 store＋不放 phantom dependency）：本機與 brief 用 `pnpm install --frozen-lockfile`、`pnpm test`、`pnpm run <script>`、`pnpm exec openspec validate`，不寫 `pnpm install --frozen-lockfile`／`npx`。`package.json` 的 `packageManager` 欄是真源。⚠️ 過渡期：CI 仍跑 `pnpm install --frozen-lockfile`＋`pnpm-lock.yaml`（遷移票：先模板 ai-team-starter、後本 repo），所以動相依時 `pnpm-lock.yaml` 與 `pnpm-lock.yaml` **兩份都要更新**，只改一份會在 CI 或本機其中一邊裝到不同版本
+- **套件管理一律 pnpm**（2026-09-14 定案，全系統預設；理由＝同機多專案共用 store＋不放 phantom dependency）：本機與 brief 用 `pnpm install --frozen-lockfile`、`pnpm test`、`pnpm run <script>`、`pnpm exec openspec validate`，不寫 `pnpm install --frozen-lockfile`／`npx`。`package.json` 的 `packageManager` 欄是真源。CI 與 `.github/scripts/` 已全面 pnpm（2026-09-14；`package-lock.json` 已刪，唯一 lockfile 是 `pnpm-lock.yaml`）。模板 ai-team-starter 的同一步另開票
 - 分支命名見上面〈分支命名〉那張表。**CI 會擋，不是建議**
 - 一個 PR 對應一個 phase；實作 phase 可以有多個 PR
 - **不得 `git commit --no-verify`**（就算本機沒有 hook，這個習慣要留著）
