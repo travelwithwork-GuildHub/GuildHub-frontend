@@ -411,9 +411,13 @@ describe('遠端玩家的狀態文字', () => {
 
   it('[FE-R10-S05] leave 後同 id 再加入不會讀到舊狀態', () => {
     const state = createRemotePlayersState()
-    apply(state, snapshot(player('u1', 0, 0, 0, '離開前的字'), player('u2')))
+    apply(state, snapshot(player('u1', 0, 0, 0, '離開前的字'), player('u2', 64, 0, 0, '留下的人')))
+    const u2Before = state.roster.get('u2')
+    const u2TrackBefore = state.motion.get('u2')
 
     apply(state, presence([], ['u1']))
+    expect(state.roster.get('u2'), '另一個人的身分連物件都不換').toBe(u2Before)
+    expect(state.motion.get('u2'), '另一個人的樣本容器不受影響').toBe(u2TrackBefore)
     // **直接斷言容器**（`FE-R08-S11` 的教訓）：只看「再加入之後是空白」的話，
     // join 本來就會帶新值，leave 忘了清也照樣綠。
     expect(state.roster.has('u1'), 'leave 之後名單裡不該還有他').toBe(false)
@@ -425,12 +429,12 @@ describe('遠端玩家的狀態文字', () => {
 
   it('[FE-R10-S06] 新 snapshot 取代仍在線玩家的舊狀態', () => {
     const state = createRemotePlayersState()
-    apply(state, snapshot(player('u1', 0, 0, 0, '舊的')))
-    apply(state, status('u2', '不在名單的人'))
+    apply(state, snapshot(player('u1', 0, 0, 0, '舊的'), player('u2', 0, 0, 0, '沒變')))
 
-    apply(state, snapshot(player('u1', 0, 0, 0, '')))
+    apply(state, snapshot(player('u1', 0, 0, 0, ''), player('u2', 0, 0, 0, '沒變')))
 
-    expect([...state.roster.keys()], '前提：他仍然在名單裡').toEqual(['u1'])
+    expect([...state.roster.keys()].sort(), '前提：兩個人都仍然在名單裡').toEqual(['u1', 'u2'])
     expect(stOf(state, 'u1'), '舊狀態不得被合併或保留').toBe('')
+    expect(stOf(state, 'u2'), '同一份 snapshot 裡的其他人照 payload，不受影響').toBe('沒變')
   })
 })
