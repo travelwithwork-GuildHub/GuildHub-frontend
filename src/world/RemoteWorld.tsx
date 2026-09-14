@@ -59,11 +59,28 @@ export interface RemoteWorldProps {
   scene?: string
   /** 進受密碼保護的房間才要。怎麼拿到它是 `FE-N08`；怎麼持有它是 `FE-V01` 的 `--transition` 那一片。 */
   token?: string
+  /**
+   * 換場景的閘門（規格 `FE-V01-S18`）。**跨兩次掛載的共用 ref**：舊的那一個在卸載時把
+   * `client.close()` 回的 promise（舊 socket 的 close 事件到達、或 1 秒）放進來，新的那一個
+   * 在 `connect()` 之前等它。
+   *
+   * ⚠️ 為什麼要等：後端 `disconnect()` 只查同 scene 的兄弟連線；新連線先 `join()` 的話被清掉的是新的人
+   * （見 `CLOSE_ACK_TIMEOUT_MS`）。為什麼是 ref 不是 context：這個元件在 `<Canvas>` 裡。
+   * 沒給的話不等 —— 既有的呼叫端與測試不用改。
+   */
+  closeGateRef?: RefObject<Promise<void> | null>
 }
 
 const monotonicNow = () => performance.now()
 
-export function RemoteWorld({ poseRef, now = monotonicNow, generation = 0, scene = 'lobby', token }: RemoteWorldProps) {
+export function RemoteWorld({
+  poseRef,
+  now = monotonicNow,
+  generation = 0,
+  scene = 'lobby',
+  token,
+  closeGateRef,
+}: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
   // **動態不在 React 裡**（每秒 400 次）。這個容器建立一次就不再換掉，
@@ -124,11 +141,21 @@ export function RemoteWorld({ poseRef, now = monotonicNow, generation = 0, scene
       },
     })
     clientRef.current = client
-    client.connect()
+    // 先等上一棵子樹的連線關乾淨（`FE-V01-S18`），再連。閘門是空的（第一次掛載）就立刻連。
+    // `cancelled`：等的期間就被卸載（Strict Mode 的第二次 effect、或使用者又換了場景）的話不連 ——
+    // 那時 `client.close()` 已經跑過，而一個 idle 的 client 被 `close()` 之後再 `connect()` 會拋錯。
+    let cancelled = false
+    const gate = closeGateRef?.current ?? null
+    if (gate === null) client.connect()
+    else void gate.then(() => {
+      if (!cancelled) client.connect()
+    })
 
     return () => {
+      cancelled = true
       clientRef.current = null
-      client.close()
+      const acked = client.close()
+      if (closeGateRef) closeGateRef.current = acked
       // 卸載時把兩個容器都清乾淨 —— 留著的話，重新掛載會先閃出一批舊角色。
       state.motion.clear()
       state.roster = new Map()
@@ -140,7 +167,7 @@ export function RemoteWorld({ poseRef, now = monotonicNow, generation = 0, scene
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now, allowed, generation, scene, token])
+  }, [state, now, allowed, generation, scene, token, closeGateRef])
 
   return (
     <>

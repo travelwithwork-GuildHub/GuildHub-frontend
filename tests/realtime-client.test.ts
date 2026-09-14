@@ -216,7 +216,8 @@ describe('RealtimeClient', () => {
     expect(sockets[0]!.closeCalls, '舊的 socket 應該被關閉').toBe(1)
     // 新的要等舊 socket 的 close 事件（`FE-V01-S18`）—— 舊連線的事件在那之前到，也不得影響狀態
     sockets[0]!.emit('message', { data: HELLO('u-other') })
-    expect(client.selfId, '舊連線的訊息竟然改到了狀態').toBeNull()
+    expect(client.selfId, '舊連線的訊息竟然改到了狀態').not.toBe('u-other')
+    expect(client.state, '等 ack 期間是 closed').toBe('closed')
     sockets[0]!.emit('close', { code: 1006, reason: '', wasClean: false })
     expect(sockets[0]!.listenerCount, '舊 socket 的監聽器應該全部移除（含等 close 的那一個）').toBe(0)
     expect(sockets).toHaveLength(2)
@@ -274,6 +275,17 @@ describe('RealtimeClient', () => {
     expect(client.state).toBe('closed')
   })
 
+  it('[FE-V01-S18] 已經關掉（沒有 socket）的 client 再 closeAndEnter：立刻建', () => {
+    const { client, sockets, urls } = setup()
+    client.connect()
+    sockets[0]!.emit('close', { code: 1006, reason: '', wasClean: false }) // 握手被拒
+    expect(client.state).toBe('closed')
+    client.closeAndEnter('lobby')
+    expect(sockets, '沒有舊 socket 可等，同步就建').toHaveLength(2)
+    expect(new URL(urls[1]!).searchParams.get('scene')).toBe('lobby')
+    expect(client.state).toBe('connecting')
+  })
+
   it('[FE-R01-S06] 握手失敗與連線中斷交出的事實不同', () => {
     // 握手被拒：open 從來沒觸發
     const rejected = setup()
@@ -305,7 +317,7 @@ describe('RealtimeClient', () => {
     client.close()
 
     expect(closed, '關閉事件只該發一次').toHaveLength(1)
-    expect(sockets[0]!.listenerCount).toBe(0)
+    expect(sockets[0]!.listenerCount, '只剩等 close 事件的那一個（`FE-V01-S18`）').toBe(1)
 
     // 關閉之後，原本那個 socket 再送任何東西都不得改變狀態
     sockets[0]!.emit('message', { data: HELLO('u-other') })
@@ -313,6 +325,7 @@ describe('RealtimeClient', () => {
     expect(client.state).toBe('closed')
     expect(client.selfId).toBe('u-self')
     expect(closed).toHaveLength(1)
+    expect(sockets[0]!.listenerCount, 'close 事件到了，等它的那個也拆掉').toBe(0)
   })
 
   it('[FE-R01-S08] 進入 ready 之後靜止很久，一則訊息都不送', () => {
