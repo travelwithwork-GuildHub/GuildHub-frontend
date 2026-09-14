@@ -19,9 +19,9 @@
 
 ## 3. 網址（`feat/fe-v01-scene-switch--url`）
 
-- [ ] 3.1 `tests/deep-link.test.tsx` 加 `[FE-V01-S08]`／`[FE-V01-S09]` —— 紅，commit
-- [ ] 3.2 `WorldHistory` 單一寫入者（D2 的 C）：場景 codec ＋ 面板 codec ＋ 整段 canonical；`PanelUrlSync` 改走它；既有 `FE-B09-S01`～`S12` 全部照舊綠
-- [ ] 3.3 突變：`serialize` 不寫 `room`、`parse` 不去掉 `panel` —— 紅
+- [x] 3.1 `tests/world-scenes-url.test.tsx`（原訂放 deep-link.test）加 `[FE-V01-S08]`／`[FE-V01-S09]` —— 紅，commit
+- [x] 3.2 `WorldUrlSync`（原檔 `PanelUrlSync.tsx`，搬家留給 chore）單一寫入者（D2 的 C）：場景 codec ＋ 面板 codec ＋ 整段 canonical；`PanelUrlSync` 改走它；既有 `FE-B09-S01`～`S12` 全部照舊綠
+- [x] 3.3 突變：`serialize` 不寫 `room`、`parse` 不去掉 `panel` —— 紅（另加十個：大寫、replace、popstate 不套、面板不歸零、沒票也進、鍵不含身分、身分沒問完洗網址、popstate 比實際的、不 settleDenied、setItem 不包）
 
 ## 4. 過場、失敗、返回、票（`feat/fe-v01-scene-switch--transition`）
 

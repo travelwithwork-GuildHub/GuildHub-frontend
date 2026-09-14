@@ -1,11 +1,21 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useScene } from '@/world/scenes/SceneProvider'
+import { parseWorldUrl, serializeWorldUrl } from '@/world/scenes/urlState'
 import { useListPanel } from './ListPanelProvider'
-import { depthOf, parsePanelUrl, serializePanelUrl } from './urlState'
+import { CLOSED, depthOf } from './urlState'
 
-// 網址 ⇄ 開著哪一層。規格 `FE-B09`〈網址表示開著哪一層，複製它就能還原〉、
-// 〈互動寫回網址；上一頁與 Escape 等效〉。
+// 網址 ⇄ 開著哪一層、在哪個場景。規格 `FE-B09`〈網址表示開著哪一層，複製它就能還原〉、
+// 〈互動寫回網址；上一頁與 Escape 等效〉；`FE-V01-S09`／`S13`／`S14`〈網址表示所在的場景，與面板參數同一個寫入者〉。
+//
+// ⚠️ 檔名還叫 `PanelUrlSync.tsx`：搬到 `world/scenes/` 會讓 PR 大小規則把整個檔案算成新寫的
+// （改名＝刪一個加一個），超過產品碼上限 —— 搬家是下一個 `chore/`，這裡只改內容。
+//
+// **這是 `/world` 網址唯一的寫入者**（design D2 的 C）。場景（`room`）與面板各有自己的 codec，
+// 這裡組合、canonical、寫一次。場景換了 → 依 `SceneProvider` 說的 push／replace 寫（**不走層數比較**：
+// 房間不是面板的一層，從兩層深的詳情進房間也是 push，不是「退」）；場景沒換 → 面板的規則照舊。
+// 身分還沒問完（`settled: false`）→ 不動網址：那時 `?room=` 還不知道進不進得去，洗掉就回不去了。
 //
 // 起始狀態是 provider 掛載時從網址解析的（已 canonical）。這裡負責兩個方向：
 //
@@ -51,30 +61,48 @@ function write(mode: 'push' | 'replace', search: string, lineage: Lineage) {
   else window.history.replaceState(state, '', url)
 }
 
-export function PanelUrlSync(): null {
-  const { open, selected, page, restore } = useListPanel()
-  const route = { panel: open, profile: selected, page }
-  const search = serializePanelUrl(route)
-  const depth = depthOf(route)
+export function WorldUrlSync(): null {
+  const { open, selected, page, restore, closePanel } = useListPanel()
+  const scene = useScene()
+  const { applyUrl, settleDenied } = scene
+  const room = scene.scene.id === 'room' ? scene.scene.projectId : null
+  // 房間裡沒有看板，也就沒有清單那一層（`FE-V01-S08`）。
+  const world = { room, panel: room === null ? { panel: open, profile: selected, page } : CLOSED }
+  const search = serializeWorldUrl(world)
+  const depth = depthOf(world.panel)
   const [session] = useState(() => Math.random().toString(36).slice(2))
 
-  const latestRef = useRef({ search, depth })
+  const latestRef = useRef({ search, depth, room, desiredRoom: scene.desiredRoom, settled: scene.settled, urlMode: scene.urlMode })
   useEffect(() => {
-    latestRef.current = { search, depth }
+    latestRef.current = { search, depth, room, desiredRoom: scene.desiredRoom, settled: scene.settled, urlMode: scene.urlMode }
   })
   const pendingBackRef = useRef(false)
+
+  // 進房間的那一次，面板狀態同時歸零（`FE-V01-S09`）—— 面板的 DOM 也要關，不只是網址上沒有它。
+  useEffect(() => {
+    if (room !== null && open !== null) closePanel()
+  }, [room, open, closePanel])
 
   // 狀態 → 網址。用 ref 讀最新狀態：popstate 的處理也要呼叫它。
   const reconcileRef = useRef(() => {})
   useEffect(() => {
     reconcileRef.current = () => {
-      const { search, depth } = latestRef.current
+      const { search, depth, room, desiredRoom, settled, urlMode } = latestRef.current
       if (pendingBackRef.current) return
+      if (!settled) return
       const current = window.location.search
       if (current === search) return
       const ours = lineageOf(window.history.state)
       const inherited = ours?.session === session ? ours.pushed : 0
-      const urlDepth = depthOf(parsePanelUrl(current))
+      const urlState = parseWorldUrl(current)
+      if (urlState.room !== room) {
+        // 場景換了：進房間、回大廳是 push；失敗與「沒票的深連結」是 replace（`FE-V01-S06`／`S14`）。
+        write(urlMode, search, { session, pushed: urlMode === 'push' ? inherited + 1 : inherited })
+        // 沒票的 `?room=` 被 canonical 掉了：願望也要收斂，不然它會留在那裡等下一次推導把人送進去。
+        if (room === null && desiredRoom !== null) settleDenied()
+        return
+      }
+      const urlDepth = depthOf(urlState.panel)
       if (depth > urlDepth) {
         write('push', search, { session, pushed: inherited + 1 })
         return
@@ -95,7 +123,7 @@ export function PanelUrlSync(): null {
   })
   useEffect(() => {
     reconcileRef.current()
-  }, [search, depth])
+  }, [search, depth, scene.settled])
 
   // 網址 → 狀態。
   useEffect(() => {
@@ -108,16 +136,20 @@ export function PanelUrlSync(): null {
       }
       // 上一頁／下一頁：網址說的跟狀態一樣就只做 canonicalize（落在別人寫的、不 canonical 的 entry 上 ——
       // 審查抓到的）；不一樣就套上（狀態變了 → 上面那支再比一次 → 一樣 → 停）。
-      const parsed = parsePanelUrl(window.location.search)
-      if (serializePanelUrl(parsed) === latestRef.current.search) {
+      const parsed = parseWorldUrl(window.location.search)
+      // 場景跟著網址（`FE-V01-S09`）：比的是**想去的**，不是實際的 —— 想去 A 但沒票（或身分沒問完）時實際在大廳，
+      // 這時上一頁回到 `/world`，實際沒變、想去的變了；不套上的話，身分問完那一刻會把人送進一間網址早就不是的房
+      // （審查抓到的）。所以這一行在 canonicalize 的早退**之前**。
+      if (parsed.room !== latestRef.current.desiredRoom) applyUrl(parsed.room)
+      if (serializeWorldUrl(parsed) === latestRef.current.search) {
         reconcileRef.current()
         return
       }
-      restore(parsed)
+      restore(parsed.panel)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [restore])
+  }, [restore, applyUrl])
 
   return null
 }

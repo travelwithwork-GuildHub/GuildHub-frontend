@@ -5,6 +5,7 @@ import { InboxButton } from '@/inbox/InboxButton'
 import { InboxPanelProvider } from '@/inbox/InboxPanelProvider'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
+import { SceneProvider } from '@/world/scenes/SceneProvider'
 import { AvatarPicker } from './AvatarPicker'
 import { FirstEntryNotice } from './FirstEntryNotice'
 import { OtherTabNotice } from './OtherTabNotice'
@@ -26,6 +27,8 @@ export default function WorldPage() {
         {/* 收件匣（`FE-K01`）：按鈕在標題列、面板在 World 裡、資料在 provider —— 同樣要包住兩者。 */}
         <InboxPanelProvider>
         <RealtimeGenerationProvider>
+        {/* 在哪個場景（`FE-V01`）：從網址與票推導，要身分（`IdentityProvider` 在外面）；世界與網址那一層都在它底下。 */}
+        <SceneProvider>
         <WorldGate>
           <main className="flex h-dvh flex-col">
             {/* ⚠️ **`IdentityBadge` 是 client component，這一頁仍然是同步的
@@ -51,6 +54,7 @@ export default function WorldPage() {
             </div>
           </main>
         </WorldGate>
+        </SceneProvider>
         </RealtimeGenerationProvider>
         </InboxPanelProvider>
         </ProfilePanelProvider>
