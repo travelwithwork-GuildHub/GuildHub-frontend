@@ -180,7 +180,17 @@ async function inHall(options: { strict?: boolean } = {}) {
   holdRoomToken(PROFILE.id, ROOM, 'T')
   const w = arriveAt('/world', options)
   await flush()
-  expect(w.sockets()).toHaveLength(1)
+  if (options.strict) {
+    // Strict Mode：第一次 effect 建的那條在 cleanup 被 close()；第二次要等它的 close 事件才建 —— 任何時刻不同時兩條未關。
+    expect(w.sockets()).toHaveLength(1)
+    expect(w.last().closeCalls, '第一次 effect 的那條被關了').toBe(1)
+    await act(async () => w.last().closeEvent(1000))
+    await flush()
+    expect(w.sockets(), '關了才建第二條').toHaveLength(2)
+    expect(w.sockets()[0]!.closeCalls).toBe(1)
+  } else {
+    expect(w.sockets()).toHaveLength(1)
+  }
   await act(async () => w.last().ready(['u-1', 'u-2']))
   await flush()
   expect(w.probe().scene).toEqual({ id: 'hall' })
@@ -200,13 +210,14 @@ async function enter(w: ReturnType<typeof arriveAt>) {
 describe('進入房間是關掉舊連線再開新的', () => {
   it('[FE-V01-S04] 舊的先關乾淨、遠端清空、新的帶 scene 與票、Canvas 是同一個節點（Strict Mode）', async () => {
     const w = await inHall({ strict: true })
-    expect(w.sockets().filter((s) => s.scene === 'lobby'), 'Strict Mode 下大廳也只建一條').toHaveLength(1)
+    expect(w.sockets().filter((s) => s.scene === 'lobby' && s.closeCalls === 0), 'Strict Mode 下活著的大廳連線只有一條').toHaveLength(1)
     const canvas = w.canvas()
     const old = w.last()
     act(() => w.probe().enterRoom(ROOM))
     await flush()
     expect(old.closeCalls, '舊的先關').toBe(1)
-    expect(w.sockets(), 'close 事件還沒到，新的不得建').toHaveLength(1)
+    const before = w.sockets().length
+    expect(w.sockets().filter((s) => s.scene === `room:${ROOM}`), 'close 事件還沒到，新的不得建').toHaveLength(0)
     // 對舊 socket 事後再發東西：不得影響
     await act(async () => {
       old.open()
@@ -215,11 +226,12 @@ describe('進入房間是關掉舊連線再開新的', () => {
       old.closeEvent(1006)
     })
     await flush()
-    expect(w.sockets()).toHaveLength(2)
+    expect(w.sockets()).toHaveLength(before + 1)
     const fresh = w.last()
     expect(fresh.scene).toBe(`room:${ROOM}`)
     expect(fresh.token).toBe('T')
-    expect(w.sockets().filter((s) => s.scene === `room:${ROOM}`), '房間只建一條').toHaveLength(1)
+    expect(w.sockets().filter((s) => s.scene === `room:${ROOM}` && s.closeCalls === 0), '房間活著的只有一條').toHaveLength(1)
+    expect(w.sockets().filter((s) => s.closeCalls === 0), '任何時刻未關的世界連線只有一條').toHaveLength(1)
     expect(w.probe().transition?.to).toEqual({ id: 'room', projectId: ROOM })
     await act(async () => fresh.ready(['u-3']))
     await flush()
