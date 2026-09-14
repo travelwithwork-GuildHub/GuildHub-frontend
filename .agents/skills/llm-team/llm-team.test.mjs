@@ -1564,7 +1564,9 @@ describe('git 環境剝除：cleanGitEnv 真實生效', () => {
       mode: 'plan',
       prompt: 'test',
       cwd: process.cwd(),
-      env: { PATH: '/custom/bin', GIT_DIR: '/x', GIT_WORK_TREE: '/y' },
+      // AGY_BIN 走 resolveAgyBin 的覆寫路徑：spawn 是假的，binary 不會被執行，
+      // 但沒有它 runAgy 會在沒裝 cask 的機器（GitHub Actions）先 throw（H9e，2026-09-14 GuildHub CI 坐實）。
+      env: { PATH: '/custom/bin', GIT_DIR: '/x', GIT_WORK_TREE: '/y', AGY_BIN: '/fake/agy' },
       spawn: fakeSpawn,
     })
     assert.ok(capturedSpawnEnv, 'spawn 應被呼叫')
