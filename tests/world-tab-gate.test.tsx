@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import type { SceneRef } from '@/world/scenes/registry'
 import { SceneRefProvider } from '@/world/scenes/SceneContext'
@@ -7,6 +7,30 @@ import { IdentityProvider, useIdentity } from '@/identity/IdentityProvider'
 import { OtherTabNotice } from '@/app/world/OtherTabNotice'
 import { WorldGate } from '@/app/world/WorldGate'
 import { claimTabLease, type TabLease } from '@/realtime/tabLease'
+import { holdRoomToken } from '@/world/scenes/roomTokens'
+
+// `WorldLeaseProvider` 拿 lease 的次數：spy 在模組邊界上（正式碼照舊跑），數 claim 與 release。
+const claimCalls = vi.hoisted(() => [] as { releases: number }[])
+vi.mock('@/realtime/tabLease', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/realtime/tabLease')>()
+  return {
+    ...actual,
+    claimTabLease: (key: string, options?: Parameters<typeof actual.claimTabLease>[1]) => {
+      const lease = actual.claimTabLease(key, options)
+      // 測試自己開的「另一個分頁」也走這裡：用 graceMs=1 分辨（正式碼不給 options）
+      if (options?.graceMs === 1) return lease
+      const record = { releases: 0 }
+      claimCalls.push(record)
+      return {
+        ...lease,
+        release: () => {
+          record.releases += 1
+          lease.release()
+        },
+      }
+    },
+  }
+})
 import { useWorldLease } from '@/realtime/WorldLeaseProvider'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
@@ -147,6 +171,8 @@ describe('登入之後的分頁守衛', () => {
     otherTabHolds(ME)
     await new Promise((r) => setTimeout(r, 20))
     server.reply(200, PROFILE)
+    // 分頁 B 持有票 —— 擋它的是資格，不是票
+    holdRoomToken(ME, 'a0000000-0000-4000-8000-00000000000a', 'T')
     window.history.replaceState(null, '', '/world?room=a0000000-0000-4000-8000-00000000000a')
     const view = mountInScene({ id: 'room', projectId: 'a0000000-0000-4000-8000-00000000000a' })
     await waitFor(() => expect(screen.getByRole('status')).toBeDefined())
@@ -159,6 +185,7 @@ describe('登入之後的分頁守衛', () => {
     for (const lease of others.splice(0)) lease.release()
     view.unmount()
     server.reply(200, PROFILE)
+    claimCalls.length = 0
     const w = mountInScene({ id: 'hall' })
     // 等身分問完（`signed-in`）：問完之前 leaseKey 是 null、走「一律放行」那條，LeaseHolder 還沒掛 —— 那時取的序號是假的。
     await waitFor(() => expect(screen.getByTestId('identity').textContent).toBe('signed-in'))
@@ -170,6 +197,9 @@ describe('登入之後的分頁守衛', () => {
     w.rerender(treeInScene({ id: 'hall' }))
     await waitFor(() => expect(allowed()).toBe('true'))
     expect(mountSeq()).toBe(seqInHall)
+    // 直接看 lease：整段只 claim 一次、沒有 release（規格：「各只在掛載時發生一次」）
+    expect(claimCalls, 'claim 只該在掛載時發生一次').toHaveLength(1)
+    expect(claimCalls[0]!.releases, '換場景不得 release').toBe(0)
     window.history.replaceState(null, '', '/')
   })
 

@@ -68,6 +68,7 @@ async function atTheDoor(gate?: (projectId: string, title: string) => void) {
   const renderer = await ReactThreeTestRenderer.create(
     <SceneProvider>{gate ? <EntryGateProvider needsToken={gate}>{inner}</EntryGateProvider> : inner}</SceneProvider>,
   )
+  renderers.push(renderer)
   await ReactThreeTestRenderer.act(async () => {
     await renderer.advanceFrames(3, 1 / 60)
   })
@@ -79,22 +80,25 @@ async function atTheDoor(gate?: (projectId: string, title: string) => void) {
       await renderer.advanceFrames(1, 1 / 60)
     })
   }
-  return { scene: () => latest!, pressE, renderer }
+  return { scene: () => latest!, pressE, renderer, seen }
 }
 
+const renderers: { unmount: () => Promise<void> }[] = []
 beforeEach(() => {
   window.sessionStorage.clear()
   identity.current = { state: 'signed-in', profile: PROFILE }
   window.history.replaceState(null, '', '/world')
 })
-afterEach(() => {
+afterEach(async () => {
+  // 卸載：`SpatialInteraction` 的 keydown 監聽器掛在 window 上，不拆會跨案例殘留。
+  for (const r of renderers.splice(0)) await r.unmount()
   vi.unstubAllGlobals()
 })
 
 describe('對著門按 E', () => {
   it('[FE-V01-S10] 持有票：開始過場、帶著房間名；鍵盤重複不觸發第二次', async () => {
     holdRoomToken(PROFILE.id, ROOM.project_id, 'T')
-    const { scene, pressE } = await atTheDoor()
+    const { scene, pressE, seen } = await atTheDoor()
     expect(scene().transition).toBeNull()
     await pressE()
     expect(scene().desiredRoom).toBe(ROOM.project_id)
@@ -104,14 +108,16 @@ describe('對著門按 E', () => {
     await pressE(true)
     await pressE(true)
     expect(scene().transitionSeq, '鍵盤重複的 keydown 不得再開始一次').toBe(seq)
+    expect(seen.at(-1), '提示仍指著同一扇門').toBe(doorTargetId(ROOM.project_id))
   })
 
-  it('[FE-V01-S11] 沒有票：預設門禁是一句說明；沒有願望、沒有過場', async () => {
-    const { scene, pressE } = await atTheDoor()
+  it('[FE-V01-S11] 沒有票：預設門禁是一句說明；沒有願望、沒有過場、提示仍指著門；取代掉還留著的失敗通知', async () => {
+    const { scene, pressE, seen } = await atTheDoor()
     await pressE()
     expect(scene().desiredRoom).toBeNull()
     expect(scene().transition).toBeNull()
     expect(scene().gateNotice).toBe(ROOM.project_id)
+    expect(seen.at(-1)).toBe(doorTargetId(ROOM.project_id))
   })
 
   it('[FE-V01-S11] 掛了門禁 provider：替身收到 project_id，預設說明不出現', async () => {

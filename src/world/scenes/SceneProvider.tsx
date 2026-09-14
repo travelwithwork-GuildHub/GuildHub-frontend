@@ -173,7 +173,11 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
     [profileId],
   )
   const dismissNotice = useCallback(() => setNotice(null), [])
-  const showGateNotice = useCallback((projectId: string) => setGateNotice(projectId), [])
+  // 門禁的說明也是「下一則通知」：取代還留著的失敗通知（`S07`），不並排兩則。
+  const showGateNotice = useCallback((projectId: string) => {
+    setGateNotice(projectId)
+    setNotice(null)
+  }, [])
   const settleDenied = useCallback(() => {
     setDesired((prev) =>
       prev.ref.id === 'room' ? { ref: HALL, mode: 'replace', forProfile: undefined, denied: prev.ref.projectId } : prev,
