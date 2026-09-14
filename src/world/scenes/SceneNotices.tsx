@@ -14,9 +14,11 @@ import { useScene } from './SceneProvider'
 
 export const FAILED_TEXT = '進不了這間房 —— 可能暫時連不上，或通行證已經失效、房間已經關閉。已回到 Guild Hall。'
 export const DENIED_TEXT = '這間房需要房間密碼 —— 走到走廊上它的門前按 E。'
+/** 預設門禁（`FE-N08` 還沒接上）：對著門按 E 但沒有票（`S11`）。誠實說「還沒開放」，不假裝門壞了。 */
+export const GATE_TEXT = '這間房需要房間密碼。輸入密碼的功能還沒開放。'
 
 export function SceneNotices() {
-  const { notice, dismissNotice, deniedRoom } = useScene()
+  const { notice, dismissNotice, deniedRoom, gateNotice } = useScene()
   return (
     <>
       {notice !== null && (
@@ -30,6 +32,11 @@ export function SceneNotices() {
       {deniedRoom !== null && (
         <p role="status" aria-label={DENIED_TEXT} className="border-line bg-surface-raised p-gutter border">
           {DENIED_TEXT}
+        </p>
+      )}
+      {gateNotice !== null && (
+        <p role="status" aria-label={GATE_TEXT} className="border-line bg-surface-raised p-gutter border">
+          {GATE_TEXT}
         </p>
       )}
     </>

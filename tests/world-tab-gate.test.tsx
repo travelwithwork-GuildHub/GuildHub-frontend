@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import type { SceneRef } from '@/world/scenes/registry'
 import { SceneRefProvider } from '@/world/scenes/SceneContext'
-import { IdentityProvider } from '@/identity/IdentityProvider'
+import { IdentityProvider, useIdentity } from '@/identity/IdentityProvider'
 import { OtherTabNotice } from '@/app/world/OtherTabNotice'
 import { WorldGate } from '@/app/world/WorldGate'
 import { claimTabLease, type TabLease } from '@/realtime/tabLease'
@@ -60,6 +60,10 @@ function MountSeq() {
   return <p data-testid="mount-seq">{seq}</p>
 }
 const mountSeq = () => screen.getByTestId('mount-seq').textContent
+function IdentityProbe() {
+  const identity = useIdentity()
+  return <p data-testid="identity">{identity.state}</p>
+}
 const treeInScene = (scene: SceneRef) => (
   <IdentityProvider>
     <SceneRefProvider scene={scene}>
@@ -67,6 +71,7 @@ const treeInScene = (scene: SceneRef) => (
         <OtherTabNotice />
         <LeaseProbe />
         <MountSeq />
+        <IdentityProbe />
       </WorldGate>
     </SceneRefProvider>
   </IdentityProvider>
@@ -155,6 +160,8 @@ describe('登入之後的分頁守衛', () => {
     view.unmount()
     server.reply(200, PROFILE)
     const w = mountInScene({ id: 'hall' })
+    // 等身分問完（`signed-in`）：問完之前 leaseKey 是 null、走「一律放行」那條，LeaseHolder 還沒掛 —— 那時取的序號是假的。
+    await waitFor(() => expect(screen.getByTestId('identity').textContent).toBe('signed-in'))
     await waitFor(() => expect(allowed()).toBe('true'))
     const seqInHall = mountSeq()
     w.rerender(treeInScene({ id: 'room', projectId: 'a0000000-0000-4000-8000-00000000000a' }))

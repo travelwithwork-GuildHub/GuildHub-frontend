@@ -64,6 +64,8 @@ export function SpatialInteraction({ poseRef }: SpatialInteractionProps) {
     const onKey = (e: KeyboardEvent) => {
       // **是 `code` 不是 `key`** —— 讀的是實體鍵位，跟鍵盤配置無關。
       if (e.code !== 'KeyE') return
+      // 按住不放的鍵盤重複事件不算再按一次（`FE-V01-S10`：進房間只開始一次）。
+      if (e.repeat) return
       // 鎖著就不動作（規格 `FE-X06-S05`）：面板開著、或某個文字輸入框有焦點 ——
       // 後者打一個 `e` 字母不該開出一個面板。**也不 `preventDefault`**，那個字要進得了欄位。
       if (inputLockRef.current) return
