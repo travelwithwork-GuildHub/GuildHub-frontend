@@ -56,7 +56,7 @@ src/app/api/**        本地後端：Route Handlers
 REST client 用產的，不要手寫：
 
 ```bash
-npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
+pnpm dlx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
 ```
 
 **大廳的 WebSocket 不需要登入、不需要資料庫。** `./run.sh` 之後直接連得上，

@@ -32,7 +32,7 @@ while IFS=$'\t' read -r added _deleted path; do
   [ "$added" = "-" ] && added=0   # 二進位檔
   case "$path" in
     # 產生物與二進位：不算。它們不是給人逐行讀的。
-    package-lock.json|*.lock|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.woff|*.woff2)
+    pnpm-lock.yaml|*.lock|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.woff|*.woff2)
       generated=$((generated + added)) ;;
     src/api/contract/schema.d.ts|src/api/contract/GENERATED.md|docs/evidence/*/report.json)
       generated=$((generated + added)) ;;

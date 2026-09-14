@@ -32,7 +32,7 @@
 
 1. **REST 的型別用產的**，不手寫：
    ```bash
-   npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
+   pnpm dlx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts
    ```
    手寫的 interface 是複述，會漂。
 

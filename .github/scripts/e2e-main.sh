@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 主幹的瀏覽器安全網：對 `next start` 起來的建置產物跑 `tests/e2e/` 裡**不需要任何服務**的那幾支。
 #
-#   npm run build && bash .github/scripts/e2e-main.sh        （本機；CI 由 .github/workflows/e2e-main.yml 在 push main 時跑）
+#   pnpm run build && bash .github/scripts/e2e-main.sh        （本機；CI 由 .github/workflows/e2e-main.yml 在 push main 時跑）
 #
 # **是安全網，不是閘門**：只在合併進 main 之後跑，不是 required check。存在的理由是
 # 2026-09-13 量到的一個洞 —— 這些腳本已經寫了、也抓得到單元測試抓不到的回歸
@@ -26,7 +26,7 @@ cd "$ROOT"
 OUT="${E2E_OUT:-$(mktemp -d)}"
 mkdir -p "$OUT"
 
-[ -f .next/BUILD_ID ] || { echo "✗ 沒有 .next/BUILD_ID —— 先 npm run build（打的是 next start，不是 next dev）" >&2; exit 2; }
+[ -f .next/BUILD_ID ] || { echo "✗ 沒有 .next/BUILD_ID —— 先 pnpm run build（打的是 next start，不是 next dev）" >&2; exit 2; }
 
 # 隨機 port：不跟本機開著的 dev server（3100）或契約測試撞。
 PORT="$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"

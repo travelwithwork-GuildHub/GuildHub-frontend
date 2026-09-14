@@ -50,10 +50,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # pnpm 版本讀 package.json 的 packageManager 欄（唯一真源，不在這裡重複釘）。
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          cache: npm
+          cache: pnpm
 
       # 分支類別閘門。取代舊的 check-pr-phase.sh。
       #
@@ -62,11 +65,11 @@ jobs:
       # openspec 檔案的 PR 會整個通過。
       #
       # 這一版看分支前綴（封閉列舉），每一類綁一個不看檔案性質的上界。
-      # `npm ci` 要排在 Branch 之前。看起來多裝一次，但 Branch 那一關內部會跑
-      # `npx openspec validate`（check-pr-branch.sh 的 spec/ 與 archive/ 分支），
-      # 沒有 node_modules 的話那次 npx 會去抓網路上的版本 —— **繞過 lockfile**。
+      # `pnpm install --frozen-lockfile` 要排在 Branch 之前。看起來多裝一次，但 Branch 那一關內部會跑
+      # `pnpm exec openspec validate`（check-pr-branch.sh 的 spec/ 與 archive/ 分支），
+      # 沒有 node_modules 的話那次 `pnpm exec` 找不到 bin 會直接紅（不像 npx 會去抓網路上的版本）。
       # 正確性優先於快速失敗。
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       # 🔒 分支名**一定要走 env 中介變數**，不可以把 `${{ github.head_ref }}`
       # 直接插進 `run:`。Actions 是**文字替換**，而 git 收 `chore/$(...)` 這種
@@ -82,25 +85,35 @@ jobs:
 
       # lockfile 的來源檢查。
       #
-      # 為什麼需要：chore/ 的大小上界**刻意排除 package-lock.json**
+      # 為什麼需要：chore/ 的大小上界**刻意排除 pnpm-lock.yaml**
       # （它是機器產生的，人不讀它，算進去的話任何套件更新都會被擋）。
       # 那個排除留下一個洞 —— 一個很小的 package.json diff 可以搭配
       # 一個把 `resolved` 指向非 registry host 的巨大 lockfile 改動。
       #
       # 這一關補那個洞：驗每一筆 resolved 都指向 npm registry、走 https、
       # 有 integrity。它不看大小，也不管 package.json 有沒有動 ——
-      # 所以 `npm audit fix` 這種只動 lockfile 的安全修補不會被誤擋。
+      # 所以 `pnpm audit --fix` 這種只動 lockfile 的安全修補不會被誤擋。
       #
-      # （lockfile 與 package.json 是否一致，上面的 `npm ci` 已經免費驗了 ——
+      # （lockfile 與 package.json 是否一致，上面的 `pnpm install --frozen-lockfile` 已經免費驗了 ——
       # 不一致會直接報錯。所以這裡不必再做一次。）
+      #
+      # 2026-09-14 改 pnpm：`lockfile-lint` 5.x 只認 npm／yarn lockfile，拿掉。
+      # pnpm-lock.yaml 只有在**非 registry** 來源時才會出現 `tarball:`／`repo:`／`commit:`／URL 這種
+      # resolution，registry 套件只記 `integrity`。所以等價的閘就是：這幾種字樣一個都不准有（不掃裸 URL：`deprecated:` 訊息裡會有 https 連結，掃了就假紅）。
+      # `--validate-integrity` 那一半由 `pnpm install --frozen-lockfile` 本身擔（缺 integrity 會裝不起來）。
       - name: Lockfile
-        run: npx lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https --validate-integrity
+        run: |
+          if grep -nE '^\s*(tarball|repo|commit): |resolution: \{.*(tarball|repo|commit):' pnpm-lock.yaml; then
+            echo "✗ pnpm-lock.yaml 有非 registry 來源（上面列出的行）。相依只准來自 npm registry。" >&2
+            exit 1
+          fi
+          echo "✓ pnpm-lock.yaml 全部來自 registry"
 
       # 規格結構檢查。
       #
-      # `npx openspec` 不帶套件名，解析到的是 node_modules/.bin/openspec ——
-      # 也就是 package-lock.json 鎖住的那個版本。**不要寫成
-      # `npx @fission-ai/openspec@x.y.z`**，那會去抓網路上的版本，
+      # `pnpm exec openspec` 不帶套件名，解析到的是 node_modules/.bin/openspec ——
+      # 也就是 pnpm-lock.yaml 鎖住的那個版本。**不要寫成
+      # `pnpm dlx @fission-ai/openspec@x.y.z`**，那會去抓網路上的版本，
       # 就繞過了 lockfile，等於沒鎖。
       #
       # `--strict` 會抓沒有 Scenario 的 requirement、沒有 delta 的 change、
@@ -108,7 +121,7 @@ jobs:
       # 所以 archive/ 分支的閘門會額外再跑一次 —— 讓它在 PR 上就紅，
       # 而不是合併後 main 才爆。
       - name: Spec
-        run: npx openspec validate --all --strict
+        run: pnpm exec openspec validate --all --strict
 
       # 工作分解表自己訂的規則。
       #
@@ -132,7 +145,7 @@ jobs:
         run: bash .github/scripts/test-progress-check.sh
 
       # 分支閘門自己的測試。**它之前不在 CI 裡** —— 有測試、沒有讀者。
-      # 排在 npm ci 之後：這支內部會跑 `npx openspec archive`。
+      # 排在 pnpm install --frozen-lockfile 之後：這支內部會跑 `pnpm exec openspec archive`。
       - name: Branch gate tests
         run: bash .github/scripts/test-check-pr-branch.sh
 
@@ -190,7 +203,7 @@ jobs:
       # 而永遠紅的 CI 等於沒有 CI，團隊很快就會開始無視紅燈。
       #
       # 為什麼現在放回來：FE-X01 的 scaffold（#29）已經把四個 script 換成真的指令，
-      # 乾淨 checkout ＋ npm ci 驗過四個都 rc=0。**放回來的那一刻起，
+      # 乾淨 checkout ＋ pnpm install --frozen-lockfile 驗過四個都 rc=0。**放回來的那一刻起，
       # 前一個 PR 的綠燈不再只代表「治理閘門過了」。**
       #
       # 為什麼排在治理閘門之後：分支類別、lockfile、規格結構、工作分解表這幾關
@@ -208,13 +221,13 @@ jobs:
       # 所以不在這個 PR 處理 —— 它跟「把四關放回去」是兩件事。
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Test
-        run: npm test
+        run: pnpm test
 
       # NEXT_TELEMETRY_DISABLED：CI 不對外回報建置遙測。
       # 這不是效能考量，是「CI 不該在沒有人要求的情況下把資料送出去」。
@@ -234,7 +247,7 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
           NEXT_PUBLIC_APP_ENV: local
-        run: npm run build
+        run: pnpm run build
 
       # 契約測試（規格 FE-O05）：同一組測試對 `internal` 目標跑 —— harness 自己 `next start` 上面 Build 出來的產物、
       # `db:reset` 這個 run 自己的 Postgres（第一次是空的，要 --init）。`guildhub` 那一輪**不在 CI**（沒有真後端，
@@ -246,7 +259,7 @@ jobs:
           INTERNAL_TEST_DATABASE_URL: postgresql://guildhub:guildhub@localhost:5432/guildhub_frontend_test
         run: |
           node scripts/db.mjs reset --init --test
-          npm run test:contract:internal
+          pnpm run test:contract:internal
 
       # 上面那一步的形狀自檢（FE-O05-S15）：解析這個 workflow 的 YAML —— 有 postgres service 的 job 裡有 step 跑
       # test:contract:internal；所有 job 的所有 step 的 run／uses 都沒有 contract-guildhub、run.sh、CONTRACT_TARGET=guildhub。

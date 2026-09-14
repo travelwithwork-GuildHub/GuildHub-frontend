@@ -12,7 +12,7 @@
     "bash .github/scripts/test-"
   ],
   "worktreeRoot": ".claude/worktrees",
-  "installCommand": "npm ci --no-audit --no-fund",
+  "installCommand": "pnpm install --frozen-lockfile",
   "maxRounds": 3,
   "riskDomains": [],
   "outDir": ".local/llm-team",

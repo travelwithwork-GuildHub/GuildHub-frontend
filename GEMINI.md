@@ -11,7 +11,7 @@ Antigravity CLI（agy）進入此 Repository 後：
 
 **權限與安全**：🔴 不准用 `--dangerously-skip-permissions`。破壞性指令閘在全域 `~/.gemini/config/hooks.json`（`setup --check` 驗它有載入）；repo 隨附的 `.agents/hooks.json`（若有）只是 fallback。
 
-**套件管理**：🔴 一律 pnpm（Fergus 2026-09-14 定案，全系統預設）：`pnpm install --frozen-lockfile`、`pnpm test`、`pnpm run <script>`、`pnpm exec openspec validate`；brief 與寫手指令頭不准出現 `npm ci`／`npx`。`package-lock.json` 與 CI 的 `npm ci` 是待遷移的債（先模板 ai-team-starter、後本 repo），兩份 lockfile 同時存在期間動相依要兩份一起更新。
+**套件管理**：🔴 一律 pnpm（Fergus 2026-09-14 定案，全系統預設）：`pnpm install --frozen-lockfile`、`pnpm test`、`pnpm run <script>`、`pnpm exec openspec validate`；brief 與寫手指令頭不准出現 `npm ci`／`npx`。CI 與腳本已全面 pnpm（2026-09-14）；`openspec/specs/` 與 `src/`／`tests/` 註解裡殘留的 `npm run …` 字樣是文字債，另走 chore／openspec 流程改。
 
 **模型**：清單以 `agy models` 為準，本檔不寫死模型 ID。
 
