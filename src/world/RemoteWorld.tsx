@@ -19,8 +19,8 @@ import { PositionSync, type LocalPose } from './PositionSync'
 // ⚠️ **父層統一收訊息、更新兩個容器；子元件不得各自訂閱。**
 // 40 個訂閱者在每則 `pos` 上都會被喚醒一次，而其中 39 個跟自己無關。
 //
-// ⚠️ **只有名單改變時才 setState。** `applyMessage` 回傳的就是那件事，
-// `pos` 一律回 `false` —— 每秒 400 次的位置更新完全不經過 React。
+// ⚠️ **只有低頻 Presence view 改變時才 setState**（成員進出、狀態文字 —— `FE-R10` D3）。
+// `applyMessage` 回傳的就是那件事，`pos` 一律回 `false` —— 每秒 400 次的位置更新完全不經過 React。
 
 const EMPTY_ROSTER: ReadonlyMap<string, RemoteIdentity> = new Map()
 

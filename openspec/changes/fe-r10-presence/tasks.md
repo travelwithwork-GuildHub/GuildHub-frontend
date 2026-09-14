@@ -1,15 +1,24 @@
 ## 1. 規格閘門
 
-- [ ] 1.1 規格已在 PR 上談定並合併進 `main`；以 `openspec validate fe-r10-presence --strict` 通過及 main 上存在本 change 為驗證，未完成前不得寫產品程式碼
+- [x] 1.1 規格已在 PR 上談定並合併進 `main`；以 `openspec validate fe-r10-presence --strict` 通過及 main 上存在本 change 為驗證，未完成前不得寫產品程式碼
+      —— PR #293 於 2026-09-11T17:24Z 合併；`validate --strict` → `Change 'fe-r10-presence' is valid`；
+      `check-pr-branch.sh main feat/fe-r10-presence--status` → `✓ 實作階段：fe-r10-presence（規格已在 main 上）`
 
 ## 2. 遠端狀態文字
 
-- [ ] 2.1 先為 `FE-R10-S01`／`S02` 寫失敗測試，證明 snapshot 與 presence.join 的 `st` 目前會被丟掉
-- [ ] 2.2 將狀態文字納入低頻 roster identity，讓 `FE-R10-S01`／`S02` 通過，並確認既有 `FE-R07`／`FE-R08` 測試仍綠
-- [ ] 2.3 先為 `FE-R10-S03`／`S04` 寫失敗測試，涵蓋指定玩家更新、相同文字不重繪、未知 id 與自己的 id 不建立鬼影
-- [ ] 2.4 處理已驗證的 `status` 訊息並把回傳語意改為低頻 Presence view 是否改變；以 `FE-R10-S03`／`S04` 通過及 `pos` 仍不觸發 roster 重繪驗證
-- [ ] 2.5 先為 `FE-R10-S05`／`S06` 寫清理測試，直接驗證 leave 與新 snapshot 後舊狀態不可再讀
-- [ ] 2.6 完成 leave／snapshot 的狀態清理，讓 `FE-R10-S05`／`S06` 通過，並確認其他玩家的 identity 與 motion 不受影響
+- [x] 2.1 先為 `FE-R10-S01`／`S02` 寫失敗測試，證明 snapshot 與 presence.join 的 `st` 目前會被丟掉
+      —— 實作前 `tests/remote-players.test.ts` 的 S01～S06 六條全紅
+- [x] 2.2 將狀態文字納入低頻 roster identity，讓 `FE-R10-S01`／`S02` 通過，並確認既有 `FE-R07`／`FE-R08` 測試仍綠
+      —— `RemoteIdentity.st`；`remote-players`（22）與 `remote-players-render` 全綠。突變「`identityOf` 丟掉 st」→ S01／S02 紅
+- [x] 2.3 先為 `FE-R10-S03`／`S04` 寫失敗測試，涵蓋指定玩家更新、相同文字不重繪、未知 id 與自己的 id 不建立鬼影
+- [x] 2.4 處理已驗證的 `status` 訊息並把回傳語意改為低頻 Presence view 是否改變；以 `FE-R10-S03`／`S04` 通過及 `pos` 仍不觸發 roster 重繪驗證
+      —— `FE-R07-S01` 仍綠（pos 回 false、名單物件不換）。突變：未知 id 建立新的人 → S04 紅；
+      相同文字也換 Map → S03 紅；改到所有人 → S03 紅；改了卻回 false → S03 紅
+- [x] 2.5 先為 `FE-R10-S05`／`S06` 寫清理測試，直接驗證 leave 與新 snapshot 後舊狀態不可再讀
+      —— S05 直接斷言 leave 之後名單裡沒有他（不靠「再加入之後是空白」，`FE-R08-S11` 的教訓）
+- [x] 2.6 完成 leave／snapshot 的狀態清理，讓 `FE-R10-S05`／`S06` 通過，並確認其他玩家的 identity 與 motion 不受影響
+      —— 狀態放在名單項目裡，leave 移除項目即清掉（design D1）。突變：snapshot 合併舊 st → S06 紅；
+      leave 不移除名單項目 → S05 與 `FE-R07-S04` 紅；leave 連帶換掉其他人的身分物件 → S05 紅
 - [ ] 2.7 先為 `FE-R10-S11` 寫失敗測試，證明目前重複 join 會忽略已在名單的 id 的 payload；改為以新 `st` 更新該 id 的 identity，同時驗證不新增名單筆數、不改變在線人數，且其他玩家不受影響
 
 ## 3. 目前 scene 的在線人數

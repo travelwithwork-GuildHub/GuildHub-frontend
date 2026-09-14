@@ -17,7 +17,7 @@ import { RENDER_DELAY_MS, appendSample, createTrack } from '@/realtime/interpola
 // 用 jsdom ＋ mock 掉 `@react-three/fiber` 的話，`<group>` 會變成 DOM 元素、
 // `root.position` 是 `undefined` —— **那樣測到的不是這條 Scenario，是 mock 的形狀。**
 
-const identity = (id: string): RemoteIdentity => ({ id, name: '訪客', av: 0 })
+const identity = (id: string): RemoteIdentity => ({ id, name: '訪客', av: 0, st: '' })
 
 /** 測試用的時鐘。**元件不自己取時間**，一律用這個。 */
 let clock = 1000

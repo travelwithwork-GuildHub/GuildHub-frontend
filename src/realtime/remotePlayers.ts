@@ -23,6 +23,14 @@ export interface RemoteIdentity {
   readonly name: string
   /** ⚠️ **遠端玩家一律 `0`**（`BE-G03`）。同上。 */
   readonly av: number
+  /**
+   * 目前的狀態文字（`FE-R10`）。**放在名單裡，不另開第三個 per-player 容器**（design D1）——
+   * 它是低頻、看得見的資料，而且 `leave` 移除名單項目時它就跟著消失，沒有「忘了清」的地方。
+   *
+   * ⚠️ **不截斷、不改寫。** 12 code point 的上限是後端擋的（`presence.py` 的
+   * `STATUS_MAX_CHARS`）；這一層照收已驗證的文字。
+   */
+  readonly st: string
 }
 
 /**
@@ -35,7 +43,7 @@ export interface RemoteIdentity {
 export type RemoteMotion = Track
 
 export interface RemotePlayersState {
-  /** 名單。**這個 Map 只在 join / leave 時被換掉。** */
+  /** 名單。**這個 Map 只在它看得見的內容變了時被換掉**（snapshot、join／leave、status）。 */
   roster: ReadonlyMap<string, RemoteIdentity>
   /** 動態。**同一個 Map 被就地改寫，不會被換掉。** */
   motion: Map<string, RemoteMotion>
@@ -46,7 +54,7 @@ export function createRemotePlayersState(): RemotePlayersState {
 }
 
 function identityOf(p: Player): RemoteIdentity {
-  return { id: p.id, name: p.name, av: p.av }
+  return { id: p.id, name: p.name, av: p.av, st: p.st }
 }
 
 /**
@@ -71,7 +79,8 @@ function seedTrack(existing: RemoteMotion | undefined, p: Player, now: number): 
  * 把一個人從**所有**容器裡移除。
  *
  * ⚠️ **之後每新增一份 per-player 的狀態，都要加進這個函式。**
- * `FE-R08` 會加 interpolation buffer、`FE-R10` 會加狀態文字 ——
+ * `FE-R08` 的 interpolation buffer 就是 `motion`；`FE-R10` 的狀態文字刻意放在名單項目裡，
+ * 所以移除名單項目時一起消失，不需要多一行 ——
  * 每多一份就多一個「忘了清」的地方，而忘了清的症狀是
  * **同一個 id 再出現時讀到舊資料**，不是錯誤訊息。
  */
@@ -89,7 +98,8 @@ function removeRemote(state: RemotePlayersState, id: string): boolean {
 /**
  * 套用一則已驗證的訊息。
  *
- * 回傳**名單有沒有變** —— 呼叫端據此決定要不要讓 React 重繪。
+ * 回傳**低頻 Presence view 有沒有變**（成員、或成員看得見的身分資料如狀態文字）——
+ * 呼叫端據此決定要不要讓 React 重繪（`FE-R10` design D3）。
  * `pos` 一律回傳 `false`：那是每秒 400 次的東西。
  *
  * `selfId` 用來把自己排除在遠端玩家之外。**實測 `snapshot` 裡包含自己**
@@ -163,8 +173,21 @@ export function applyMessage(
       return false
     }
 
+    case 'status': {
+      // **只改名單上已經有的人。** 自己從來不在名單裡（`FE-R05` 的結構性保證），
+      // 不認識的 id 也一樣 —— 這裡**不補過濾器**，靠「查不到就不動」擋掉鬼影（`FE-R10-S04`）。
+      const current = state.roster.get(message.id)
+      if (current === undefined) return false
+      // 同樣的文字不換 Map：換 Map 就是換身分，而身分改變就是重繪。
+      if (current.st === message.text) return false
+      const roster = new Map(state.roster)
+      roster.set(message.id, { ...current, st: message.text })
+      state.roster = roster
+      return true
+    }
+
     default:
-      // `hello` / `status` / `chat` / `err` 不屬於這一層。
+      // `hello` / `chat` / `err` 不屬於這一層。
       // **不是錯誤** —— 驗證是 `FE-R02` 做的，這裡只是不關心。
       return false
   }

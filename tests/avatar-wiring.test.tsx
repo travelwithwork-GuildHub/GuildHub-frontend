@@ -29,7 +29,7 @@ async function colorsOf(element: React.ReactElement): Promise<string[]> {
 }
 
 const roster = (av: number): ReadonlyMap<string, RemoteIdentity> =>
-  new Map([['someone', { id: 'someone', name: '別人', av }]])
+  new Map([['someone', { id: 'someone', name: '別人', av, st: '' }]])
 
 /** 動態是空的：`RemotePlayer` 在 `track === undefined` 時保持原位，不會拋錯。 */
 const NO_MOTION: ReadonlyMap<string, RemoteMotion> = new Map()
