@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BoardPanel } from '@/list-panel/BoardPanel'
 import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
-import { PanelUrlSync } from '@/list-panel/PanelUrlSync'
+import { WorldUrlSync } from '@/world/scenes/WorldUrlSync'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
 import type { InteractableRegistry } from '@/world/interaction/registry'
 import { BoardTargets, boardItems } from '@/world/rooms/BoardTargets'
@@ -14,7 +14,7 @@ import { startContractServer, type ContractServer } from './support/contract-ser
 //   Requirement: 互動寫回網址；上一頁與 Escape 等效 —— S06～S11
 //   Requirement: 網址改變時世界不重掛 —— S12 的 jsdom 探針（**輔**；主判準在 `tests/e2e/deep-link.mjs`）
 //
-// 整棵真的 provider 樹 ＋ `PanelUrlSync`，`window.history` 是 jsdom 真的那一個。
+// 整棵真的 provider 樹 ＋ `WorldUrlSync`（原 `PanelUrlSync`，`FE-V01` 之後也管 `room`），`window.history` 是 jsdom 真的那一個。
 // 深連結直達 = 先 `replaceState` 成那個網址再掛載（design〈這一份怎麼驗〉）。
 // **不連任何團隊共用的位址。**
 
@@ -111,7 +111,7 @@ function arriveAt(url: string) {
       <InteractionProvider>
         <WorldProbe sinkRef={sinkRef} />
         <ListPanelProvider>
-          <PanelUrlSync />
+          <WorldUrlSync />
           <MountProbe />
           <BoardTargets />
           <BoardPanel />

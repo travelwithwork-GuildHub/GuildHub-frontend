@@ -15,7 +15,7 @@ import { CLOSED, parsePanelUrl, type PanelUrlState } from './urlState'
 // （`S18`），而那把鎖在互動層；沒有那一層的話這裡直接炸，不會靜默變成「面板開了人還在走」。
 //
 // ⚠️ **起始狀態從網址來**（`FE-B09-S01`～`S05`）：這個 provider 只在 `ssr: false` 的世界裡掛，
-// 掛載那一刻就知道網址。之後網址 → 狀態（popstate）與狀態 → 網址在 `PanelUrlSync`；
+// 掛載那一刻就知道網址。之後網址 → 狀態（popstate）與狀態 → 網址在 `world/scenes/WorldUrlSync`；
 // 這裡只持有狀態，不碰 `history`。
 
 interface ListPanelValue {
