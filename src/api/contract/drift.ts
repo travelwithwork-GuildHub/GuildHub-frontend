@@ -11,7 +11,7 @@ import { ValidationError } from './errors'
 // 產出的那份只被這裡 import，用途是對照。細節見 `GENERATED.md`。
 //
 // ⚠️ **這個哨兵會過期。** 它比對的是**上次產出時**的後端形狀，
-// 沒有人跑 `npm run contract:generate` 的話它永遠是綠的。
+// 沒有人跑 `pnpm run contract:generate` 的話它永遠是綠的。
 // 把它當成即時的後端漂移偵測器是高估它。
 
 /**

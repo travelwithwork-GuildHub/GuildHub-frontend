@@ -1,4 +1,4 @@
-# 可拋棄的資料庫（規格 FE-O04）。只有 Postgres —— 前端的 Route Handlers 用 `npm run dev` 起，不進容器。
+# 可拋棄的資料庫（規格 FE-O04）。只有 Postgres —— 前端的 Route Handlers 用 `pnpm run dev` 起，不進容器。
 #
 #   docker compose up -d
 #   INTERNAL_DATABASE_URL=postgresql://guildhub:guildhub@localhost:5432/guildhub_frontend

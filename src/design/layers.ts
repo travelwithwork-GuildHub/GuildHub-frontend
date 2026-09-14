@@ -3,7 +3,7 @@
 // **為什麼不放進 Tailwind 的 `@theme`**（見 design.md 的 D5）：
 // CSS 自訂屬性取不到時是空字串，`z-index: var(--z-tooltip)` 會靜默退化成
 // 沒有 z-index —— 元件沉到最底層，而且沒有任何東西會告訴你。
-// 這裡改用型別受限的存取，層名打錯在 `npm run typecheck` 就紅。
+// 這裡改用型別受限的存取，層名打錯在 `pnpm run typecheck` 就紅。
 //
 // 實際的整數是任意的，從外部觀察不出差別（design.md 的待答問題）。
 // **有意義的是順序**，而順序有測試釘住。

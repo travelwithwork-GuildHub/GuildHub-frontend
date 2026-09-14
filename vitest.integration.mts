@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 
-// **整合驗證專用的設定。`npm test` 不會跑到這些。**
+// **整合驗證專用的設定。`pnpm test` 不會跑到這些。**
 //
 // 規格 FE-R01 的〈驗證方式〉：V1 與 V3 需要一份**真的後端**，
 // 而 `AGENTS.md`〈測試環境隔離〉第 2 條寫「CI 不提供任何服務」。

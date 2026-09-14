@@ -81,9 +81,9 @@ instance 上**，跨實例要靠 Redis。不接 Redis 的話兩個訪客可能�
 
 ```bash
 # 沒有即時後端
-NEXT_PUBLIC_APP_ENV=production NEXT_PUBLIC_REALTIME_ADAPTER=none npm run build
+NEXT_PUBLIC_APP_ENV=production NEXT_PUBLIC_REALTIME_ADAPTER=none pnpm run build
 npm start          # → http://localhost:3101
 
 # 故意漏一個，確認它真的會紅
-NEXT_PUBLIC_APP_ENV=production npm run build; echo "exit=$?"   # → exit=1
+NEXT_PUBLIC_APP_ENV=production pnpm run build; echo "exit=$?"   # → exit=1
 ```

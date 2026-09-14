@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 
-// **契約測試專用的設定。`npm test` 不會跑到這些。** 規格 FE-O05。
+// **契約測試專用的設定。`pnpm test` 不會跑到這些。** 規格 FE-O05。
 //
 // 同一組測試對兩個目標各跑一次：`CONTRACT_TARGET=internal`（harness 自己起 `next start` ＋ 可拋棄 Postgres）
 // 或 `CONTRACT_TARGET=guildhub`（`scripts/contract-guildhub.mjs` 自己起真後端）。目標的差異只在 `globalSetup`，

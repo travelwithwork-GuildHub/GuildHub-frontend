@@ -1,6 +1,6 @@
 # FE-B01 的瀏覽器證據
 
-`node tests/e2e/board-panel.mjs`（需要 `npm run dev`）產生的。
+`node tests/e2e/board-panel.mjs`（需要 `pnpm run dev`）產生的。
 
 ## ⚠️ 這些截圖證明什麼、不證明什麼
 

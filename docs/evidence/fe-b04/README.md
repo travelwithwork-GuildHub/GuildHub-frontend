@@ -1,6 +1,6 @@
 # FE-B04 的瀏覽器證據
 
-`node tests/e2e/board-panel.mjs`（需要 `npm run dev`）產生的。攔截的回應是腳本偽造的（`page.route`），
+`node tests/e2e/board-panel.mjs`（需要 `pnpm run dev`）產生的。攔截的回應是腳本偽造的（`page.route`），
 證明的是元件行為，**不**證明真 GuildHub 整合。**不連任何團隊共用的位址。**
 
 | 檔案 | 情況 |
