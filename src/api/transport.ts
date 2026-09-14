@@ -142,8 +142,6 @@ type _lacksGetProfilesMe = Expect<'/api/profiles/me' extends PathsWith<'get'> ? 
 type _hasPatchProfilesMe = Expect<'/api/profiles/me' extends PathsWith<'patch'> ? true : false>
 
 interface RequestBase {
-  /** 路徑參數。**會做 URL 編碼** —— 不編碼的話 id 裡的斜線會改變路由。 */
-  params?: Record<string, string>
   /** 已經通過契約驗證的 body。`undefined` 代表不送 body。 */
   body?: unknown
   /**
@@ -181,10 +179,52 @@ interface RequestBase {
  * ⚠️ **把 `path` 改回 `string` 的話，沒有任何測試會紅。**
  * 兩個獨立的審查者都確認過這一點。它是這件事唯一的守門員，
  * 而唯一的守門員被拿掉時不會有人知道 —— 所以這段話寫在這裡。
+ *
+ * `params` 是同一件事的另一半（`WithParams`，規格 `FE-O20`）：路徑對了、鍵名打錯，
+ * `replace` 找不到樣板，送出去的是字面值 `/api/profiles/{profile_id}`。
+ * 這一半有判準（`tests/path-params.test.ts`），拿掉會紅。
  */
 export type RequestSpec = {
-  [M in keyof METHODS]: RequestBase & { method: M; path: PathsWith<METHODS[M]> }
+  [M in keyof METHODS]: {
+    [P in PathsWith<METHODS[M]>]: RequestBase & { method: M; path: P } & WithParams<P>
+  }[PathsWith<METHODS[M]>]
 }[keyof METHODS]
+
+/**
+ * 路徑樣板裡的參數名：每一段 `{name}` 算一個，不限個數，同名算一個鍵。規格 `FE-O20`。
+ *
+ * `{` 到下一個 `}` 之間就是名字，不做其他語法的判定 —— 產出契約的樣板只有這一種寫法。
+ */
+type ParamsOf<P extends string> = P extends `${string}{${infer K}}${infer R}` ? K | ParamsOf<R> : never
+
+/**
+ * `params` 的型別由路徑決定。規格 `FE-O20`。
+ *
+ * 路徑含參數：`params` 必填，鍵要跟參數名**完全相等**——少一個是 TS2345，
+ * 拼錯或多一個是 TS2353（物件字面值的多餘屬性檢查；`operations.ts` 全是字面值，
+ * 先存進變數再傳的超集不會紅，那是 TS 的邊界，規格明寫不宣稱擋得住）。
+ * 路徑沒有參數：只收 `undefined`（repo 沒開 `exactOptionalPropertyTypes`，`params: undefined` 會過，刻意放行）。
+ *
+ * 值**會做 URL 編碼**（`buildRequest`）—— 不編碼的話 id 裡的斜線會改變路由。
+ *
+ * ⚠️ `[ParamsOf<P>] extends [never]` 的方括號不能省：`never` 在條件型別裡會被分配掉，
+ * 無參數路徑那一格會整個消失。
+ */
+type WithParams<P extends string> = [ParamsOf<P>] extends [never]
+  ? { params?: never }
+  : { params: Record<ParamsOf<P>, string> }
+
+/**
+ * `ParamsOf` 自己的哨兵。規格 `FE-O20-S05`。
+ *
+ * 今天產出的契約沒有任何雙參數路徑，所以「第二個參數漏給」寫不成 fixture
+ *（`path` 只收契約裡有的路徑）。這三條釘的是萃取本身：第一條雙參數路徑進契約那天，
+ * 萃取不會只拿到一半。把遞迴拿掉（`? K : never`）第一條會紅。
+ */
+type Eq<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
+type _twoParams = Expect<Eq<ParamsOf<'/a/{x}/b/{y}'>, 'x' | 'y'>>
+type _dupParam = Expect<Eq<ParamsOf<'/{id}/c/{id}'>, 'id'>>
+type _noParam = Expect<Eq<ParamsOf<'/api/me'>, never>>
 
 /**
  * 把 query 物件變成 `?a=1&b=2`。沒有任何項目時回空字串（**不是 `?`**）。
