@@ -53,7 +53,11 @@ export interface SceneValue {
   readonly settleDenied: () => void
   /** 過場中：從哪裡到哪裡、目的地叫什麼。`null` 代表不在過場。 */
   readonly transition: { readonly from: SceneRef; readonly to: SceneRef; readonly title: string | null } | null
-  /** 第幾次願望（每次 `enterRoom`／`returnToHall`／`applyUrl`／失敗回大廳 +1）。覆蓋層靠它知道「新的一場開始了」。 */
+  /**
+   * 過場的代號：第幾次願望（每次 `enterRoom`／`returnToHall`／`applyUrl`／失敗回大廳 +1）。
+   * 逾時計時器帶著排下時的代號，觸發時比對 —— 同一間房連試兩次，舊的 callback 不得打敗新的一場（`S15`）。
+   * 覆蓋層也靠它知道「新的一場開始了」。
+   */
   readonly transitionSeq: number
   /** 最近一次願望的目的地名字（房間標題）；提交之後覆蓋層的最短顯示期間還要用它。 */
   readonly destinationTitle: string | null
@@ -70,7 +74,11 @@ export interface EnterOptions {
   readonly title?: string
 }
 
-export type ConnectionEvent = { readonly kind: 'ready' } | { readonly kind: 'closed'; readonly opened: boolean }
+export type ConnectionEvent =
+  /** 呼叫了 `connect()`（等完舊 socket 的 close 之後）—— 10 秒逾時從這一刻起算（`S06`）。 */
+  | { readonly kind: 'connecting' }
+  | { readonly kind: 'ready' }
+  | { readonly kind: 'closed'; readonly opened: boolean }
 
 export const TRANSITION_TIMEOUT_MS = 10_000
 
@@ -187,12 +195,14 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
 
   // 過場的結束（D3、D4）。**讀最新狀態用 ref**：`reportConnection` 要身分穩定（它在 `RemoteWorld` 的 effect 依賴裡，
   // 換一個就重連），逾時 callback 也要查「現在還在不在那個過場」而不是相信自己沒被取消（`S15`）。
-  const latest = useRef({ transition, scene: resolved.scene, profileId, auto: desired.auto === true })
+  const latest = useRef({ transition, scene: resolved.scene, profileId, auto: desired.auto === true, seq: transitionSeq })
   useEffect(() => {
-    latest.current = { transition, scene: resolved.scene, profileId, auto: desired.auto === true }
+    latest.current = { transition, scene: resolved.scene, profileId, auto: desired.auto === true, seq: transitionSeq }
   })
-  const fail = useCallback((target: SceneRef) => {
+  /** 失敗。`seq` 是排下這個判定時的過場代號：代號不對就是遲到的，忽略。 */
+  const fail = useCallback((seq: number, target: SceneRef) => {
     const { transition, scene, profileId } = latest.current
+    if (seq !== latest.current.seq) return
     if (transition === null || !sameScene(transition.to, target) || !sameScene(scene, target)) return
     if (target.id === 'room') {
       // 握手被拒／逾時：回大廳（replace，不多一層）、通知、**票留著**（連不上跟票失效分不出來）。
@@ -204,30 +214,37 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
     // 回大廳也連不上：過場仍然結束，交給大廳既有的呈現；不再建第三條（`S16`）。
     setCommitted(HALL)
   }, [])
+  // 逾時計時器。**從 `connect()` 那一刻起算**（等舊 socket 的 close 那 ≤1 秒不算，`S06`），帶著當時的代號；
+  // 提交或失敗就清掉 —— 清掉只是省事，防禦在 `fail()` 的代號比對（`S15`：舊 callback 被硬叫也不算數）。
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearTimer = () => {
+    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current)
+    timeoutRef.current = null
+  }
+  useEffect(() => clearTimer, [])
   const reportConnection = useCallback(
     (event: ConnectionEvent, wsScene: string) => {
-      const { transition, scene, auto } = latest.current
+      const { transition, scene, auto, seq } = latest.current
       if (transition === null || sceneOf(scene).wsScene !== wsScene) return
+      if (event.kind === 'connecting') {
+        clearTimer()
+        const target = scene
+        timeoutRef.current = setTimeout(() => fail(seq, target), timeoutMs)
+        return
+      }
       if (event.kind === 'ready') {
+        clearTimer()
         setCommitted(scene)
         if (!auto) setNotice(null) // 使用者要求的、成功進入任何場景都清（`S07`）；失敗後自動回大廳的不算
         return
       }
-      if (!event.opened) fail(scene)
+      if (!event.opened) {
+        clearTimer()
+        fail(seq, scene)
+      }
     },
-    [fail],
+    [fail, timeoutMs],
   )
-  // 逾時：從目標場景的子樹掛載（也就是 `connect()`）起算。取消只是省事，防禦在 `fail()` 的比對。
-  const targetKey = transition === null ? null : sceneOf(transition.to).wsScene
-  useEffect(() => {
-    if (targetKey === null) return undefined
-    // `transition` 物件每次推導都是新的；用 `targetKey` 決定「同一場過場」，避免重排計時器。目標從 ref 讀。
-    const timer = setTimeout(() => {
-      const current = latest.current.transition
-      if (current !== null) fail(current.to)
-    }, timeoutMs)
-    return () => clearTimeout(timer)
-  }, [targetKey, timeoutMs, fail])
 
   const value = useMemo<SceneValue>(
     () => ({

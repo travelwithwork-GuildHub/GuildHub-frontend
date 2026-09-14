@@ -161,11 +161,15 @@ export function RemoteWorld({
     // `cancelled`：等的期間就被卸載（Strict Mode 的第二次 effect、或使用者又換了場景）的話不連 ——
     // 那時 `client.close()` 已經跑過，而一個 idle 的 client 被 `close()` 之後再 `connect()` 會拋錯。
     const gate = closeGateRef?.current ?? null
-    if (gate === null) client.connect()
+    const connect = () => {
+      onConnection?.({ kind: 'connecting' }, scene)
+      client.connect()
+    }
+    if (gate === null) connect()
     else
       void gate
         .then(() => {
-          if (!cancelled) client.connect()
+          if (!cancelled) connect()
         })
         // 走到這裡代表上面那個 `cancelled` 的守衛壞了（卸載後 `connect()` 一個已關的 client 會拋）。
         // 不吞掉：留一行給人看，測試也靠這一行抓突變。

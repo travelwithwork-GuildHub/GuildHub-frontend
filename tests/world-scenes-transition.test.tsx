@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { useEffect, type ReactNode, type RefObject } from 'react'
+import { StrictMode, useEffect, type ReactNode, type RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Identity } from '@/identity/types'
 import { holdRoomToken, heldRoomToken } from '@/world/scenes/roomTokens'
@@ -139,17 +139,19 @@ async function tick(ms: number) {
 }
 
 /** `page.tsx` 的形狀：標題列（按鈕、通知）在 Canvas 外面，`SceneProvider` 包住兩者。 */
-function arriveAt(url: string, timeoutMs?: number) {
+function arriveAt(url: string, { timeoutMs, strict = false }: { timeoutMs?: number; strict?: boolean } = {}) {
   window.history.replaceState(window.history.state, '', url)
   const push = vi.spyOn(window.history, 'pushState')
   const replace = vi.spyOn(window.history, 'replaceState')
   const sinkRef: RefObject<Probe | null> = { current: null }
-  const view = render(
+  const tree = (
     <SceneProvider timeoutMs={timeoutMs}>
       <ProbeSink sinkRef={sinkRef} />
       <WorldCanvas />
-    </SceneProvider>,
+    </SceneProvider>
   )
+  // `S04`：Strict Mode 的開發期雙重 effect 下也只建一條。
+  const view = render(strict ? <StrictMode>{tree}</StrictMode> : tree)
   return {
     view,
     probe: () => sinkRef.current!.scene,
@@ -174,9 +176,9 @@ async function go(delta: number) {
 }
 
 /** 站在大廳、連線 ready、持有票。 */
-async function inHall() {
+async function inHall(options: { strict?: boolean } = {}) {
   holdRoomToken(PROFILE.id, ROOM, 'T')
-  const w = arriveAt('/world')
+  const w = arriveAt('/world', options)
   await flush()
   expect(w.sockets()).toHaveLength(1)
   await act(async () => w.last().ready(['u-1', 'u-2']))
@@ -196,8 +198,9 @@ async function enter(w: ReturnType<typeof arriveAt>) {
 }
 
 describe('進入房間是關掉舊連線再開新的', () => {
-  it('[FE-V01-S04] 舊的先關乾淨、遠端清空、新的帶 scene 與票、Canvas 是同一個節點', async () => {
-    const w = await inHall()
+  it('[FE-V01-S04] 舊的先關乾淨、遠端清空、新的帶 scene 與票、Canvas 是同一個節點（Strict Mode）', async () => {
+    const w = await inHall({ strict: true })
+    expect(w.sockets().filter((s) => s.scene === 'lobby'), 'Strict Mode 下大廳也只建一條').toHaveLength(1)
     const canvas = w.canvas()
     const old = w.last()
     act(() => w.probe().enterRoom(ROOM))
@@ -228,13 +231,21 @@ describe('進入房間是關掉舊連線再開新的', () => {
 })
 
 describe('進不去就回 Guild Hall、說一句話、不重試、票留著', () => {
-  it('[FE-V01-S06] 10 秒沒有 hello 就回大廳；票還在、網址不多一層', async () => {
+  it('[FE-V01-S06] 10 秒沒有 hello 就回大廳（從 connect() 起算，等舊 close 那一段不算）；票還在、網址不多一層', async () => {
     holdRoomToken(PROFILE.id, ROOM, 'T')
     const w = arriveAt('/world?panel=profiles')
     await flush()
     await act(async () => w.last().ready())
     await flush()
-    const fresh = await enter(w)
+    // 舊 socket 的 close 事件 800 ms 才到 → 新連線在那時才 connect()
+    const old = w.last()
+    act(() => w.probe().enterRoom(ROOM))
+    await flush()
+    await tick(800)
+    await act(async () => old.closeEvent(1000))
+    await flush()
+    const fresh = w.last()
+    expect(fresh.scene).toBe(`room:${ROOM}`)
     expect(url()).toBe(`/world?room=${ROOM}`)
     await act(async () => fresh.open())
     await tick(9_900)
@@ -406,6 +417,32 @@ describe('過場只提交一次，遲到的事件不算數', () => {
     expect(w.notice()).toBeNull()
     expect(w.sockets(), '沒有再建').toHaveLength(3)
     expect(url()).toBe('/world')
+  })
+
+  it('[FE-V01-S15] 同一間房連試兩次：第一次的逾時 callback 遲到，不得打敗第二次', async () => {
+    const w = await inHall()
+    const scheduled: (() => void)[] = []
+    const realSetTimeout = globalThis.setTimeout
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((cb: () => void, ms?: number, ...rest: unknown[]) => {
+      if (ms === 10_000) scheduled.push(cb)
+      return (realSetTimeout as unknown as (...a: unknown[]) => unknown)(cb, ms, ...rest)
+    }) as typeof setTimeout)
+    let fresh = await enter(w)
+    expect(scheduled).toHaveLength(1)
+    const stale = scheduled[0]!
+    await act(async () => fresh.closeEvent(1006)) // 第一次被拒
+    await flush()
+    await act(async () => w.last().ready())
+    await flush()
+    act(() => w.probe().dismissNotice())
+    fresh = await enter(w) // 第二次，同一間房，還在過場中
+    expect(w.probe().transition?.to).toEqual({ id: 'room', projectId: ROOM })
+    act(() => stale()) // 第一次的 callback 被硬叫
+    expect(w.probe().transition, '第二次的過場不得被打回大廳').not.toBeNull()
+    expect(w.notice()).toBeNull()
+    await act(async () => fresh.ready())
+    await flush()
+    expect(w.probe().scene).toEqual({ id: 'room', projectId: ROOM })
   })
 
   it('[FE-V01-S15] 帶著別的 scene 參數的事件不算數（ready 不提交、closed 不算失敗）', async () => {
