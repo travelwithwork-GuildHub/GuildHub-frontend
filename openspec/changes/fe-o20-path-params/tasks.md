@@ -18,5 +18,5 @@
 
 ## 3. 收尾
 
-- [x] 3.1 `pnpm run typecheck`、`pnpm run lint`、`pnpm test` 全綠
+- [x] 3.1 `pnpm run typecheck`、`pnpm run lint` 綠；`pnpm test` 976 過、**1 失敗**：`FE-O14-S05`（`next build` 在全套並行下逾時 50 s，單跑綠；跟本 change 無關，是既有的全套負載問題）
 - [ ] 3.2 封存（`archive/fe-o20-path-params`，獨立 PR）
