@@ -49,10 +49,11 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 
 ### Requirement: 進入房間是關掉舊連線再開新的，Canvas 不重掛
 
-進入房間時系統 SHALL 依序：把舊連線關閉並清理完成（`realtime-client`〈一條連線只屬於一個 scene〉—— 含等舊 socket 的 close 事件）、
+進入房間時系統 SHALL 依序：把舊連線關閉並清理完成（`realtime-client`〈一條連線只屬於一個 scene〉—— 含等舊 socket 的 close 事件，上限 1 秒）、
 清空遠端玩家、以 `scene=room:<projectId>&token=<票>` 建立新連線、把本地角色放到房間的出生點、
 碰撞體換成房間配置的、位置同步重置（`FE-R03-S06`）。
-任何時刻 MUST NOT 同時有兩條開著的世界連線 —— **含 React Strict Mode 的開發期雙重 effect**。
+任何時刻 MUST NOT 同時有兩條**尚未呼叫 `close()`** 的世界連線 —— **含 React Strict Mode 的開發期雙重 effect**
+（伺服器那一端何時真的處理完斷線，客戶端證明不了；等 close 事件是降低競態機率，不是證明，見 `realtime-client` 那條）。
 舊連線在關閉之後遲到的任何事件（`open`／`message`／`close`）MUST NOT 影響新場景的狀態。
 
 這一切 SHALL NOT 讓 `<canvas>` 重新掛載（`FE-B09-S12` 的同一條判準：element identity）。
@@ -63,7 +64,7 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 
 - **GIVEN** 在 Guild Hall（包在 `<StrictMode>` 裡掛載），連線 `ready`，畫面上有兩個遠端玩家
 - **WHEN** 以持有的票進入 `room:<id>`
-- **THEN** 舊 socket 的 `close()` SHALL 在新 socket 建立**之前**被呼叫，且新 socket SHALL 在舊 socket 的 `close` 事件送達之後才建立（假 socket 記錄呼叫順序）
+- **THEN** 舊 socket 的 `close()` SHALL 在新 socket 建立**之前**被呼叫，且新 socket SHALL 在舊 socket 的 `close` 事件送達之後才建立（假 socket 在 `close()` 後 50 ms 發 `close` 事件；1 秒上限的那一半是 `FE-V01-S18`）
 - **AND** 對舊 socket 事後再發 `open`、`hello`、`snapshot`（含三個新玩家）、`close`，新場景的遠端玩家名單與過場狀態 SHALL 不變
 - **AND** 新 socket 的位址 SHALL 含 `scene=room:<id>` 與 `token=<票>`；整個過程 `createSocket` 對房間 SHALL 只被呼叫一次（Strict Mode 下也是）
 - **AND** 新連線 `ready` 之前，遠端玩家 SHALL 是零個；`ready` 之後 SHALL 只有新 `snapshot` 裡的人
@@ -75,11 +76,16 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 每一次過場 SHALL 有自己的代號；`ready`、`closed`、逾時計時器、最短顯示計時器 SHALL 都以代號比對，
 不屬於當前過場的一律忽略。過場的完成或失敗 SHALL 只提交一次；提交之後其餘計時器 SHALL 取消。
 
-#### Scenario: [FE-V01-S15] 上一次過場的逾時遲到，不會把這一次打回大廳
+#### Scenario: [FE-V01-S15] 上一次過場的事件遲到，不會把這一次打回大廳
 
-- **GIVEN** 進入 `room:a` 的過場開始後 5 秒（假時鐘），使用者按「回到 Guild Hall」，大廳連線在 1 秒內 `ready`
-- **WHEN** 假時鐘推到第一次過場的 10 秒逾時點
-- **THEN** 場景 SHALL 仍是 `hall`、SHALL 沒有 `role="alert"` 的通知、`createSocket` SHALL 沒有被再呼叫
+- **GIVEN** 進入 `room:a` 的過場開始後 5 秒（假時鐘），房間 socket 還沒 `open`，使用者按「回到 Guild Hall」，大廳連線在 1 秒內 `ready`
+- **WHEN** 之後房間的假 socket 才發 `close`（`code=1006`、從沒 `open` —— 跟握手被拒同形）；假時鐘推到第一次過場的 10 秒逾時點；
+  **並且**測試把第一次過場排下的逾時 callback（從假計時器取得的引用）在大廳 `ready` 之後直接呼叫一次（模擬計時器在被取消前的那一瞬間已經觸發）
+- **THEN** 三件事之後場景 SHALL 都仍是 `hall`、SHALL 沒有 `role="alert"` 的通知、`createSocket` SHALL 沒有被再呼叫、網址 SHALL 是 `/world`
+
+> 這些事件本來就會遲到（socket 的 close 是非同步的；計時器要嘛被取消、要嘛已經在佇列裡）。
+> 直接呼叫舊 callback 是為了讓「取消計時器」不足以讓這條綠 —— 防禦是**代號比對**，不是取消。
+> 突變是「不比對代號」：那時遲到的 close 或 callback 會被當成失敗，多一次大廳重連與一則通知。
 
 ### Requirement: 過場看得見、讀得到，而且不閃
 
@@ -101,12 +107,12 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 
 過場期間移動輸入 SHALL 鎖住（沿用面板開著時那把鎖）；提交之後 SHALL 解鎖。
 
-#### Scenario: [FE-V01-S17] 過場中按住方向鍵，角色不動
+#### Scenario: [FE-V01-S17] 過場中按住方向鍵，角色不動；提交那一刻就解鎖
 
 - **WHEN** 過場進行中（`ready` 還沒到）按住方向鍵並推進幾幀
 - **THEN** 本地角色的位置 SHALL 不變
-- **AND WHEN** `ready` 到了、覆蓋層消失之後再按
-- **THEN** 角色 SHALL 移動
+- **AND WHEN** `ready` 在 1 ms 到了（覆蓋層因 300 ms 最短顯示**還在**）再按
+- **THEN** 角色 SHALL 移動（解鎖跟著提交，不跟著覆蓋層）
 
 ### Requirement: 進不去就回 Guild Hall、說一句話、不重試、票留著
 
@@ -134,10 +140,14 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 - **WHEN** 進入房間，新 socket 在 `open` 之前就 `close`（`code=1006`）
 - **THEN** SHALL 建立 `scene=lobby` 的連線並顯示通知
 - **AND** 跑完所有排程中的計時器之後，對 `room:<id>` 的 `createSocket` SHALL 仍只被呼叫過一次
+- **AND WHEN** 再走到門前按 E（**沒有**關閉通知）
+- **THEN** SHALL 以同一張票再開始一次過場（重試是使用者做的，不是系統做的）；過場開始時那則通知 SHALL 還在
+- **AND WHEN** 第二次也被拒
+- **THEN** `role="alert"` SHALL 恰好一個（被取代，不是疊兩個）
 - **AND WHEN** 使用者關閉通知
 - **THEN** SHALL 沒有 `role="alert"` 的元素
-- **AND WHEN** 再走到門前按 E
-- **THEN** SHALL 以同一張票再開始一次過場（重試是使用者做的，不是系統做的）
+- **AND WHEN** 第三次按 E 且這次 `ready`；接著再讓第四次被拒、然後按「回到 Guild Hall」成功
+- **THEN** 第三次 `ready` 時 SHALL 沒有 alert；第四次之後有一個；回大廳成功後 SHALL 沒有（成功進入任何場景都清）
 
 #### Scenario: [FE-V01-S16] 回大廳也連不上時，不會永久 busy
 
@@ -161,6 +171,14 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 - **THEN** 網址 SHALL 回到 `/world?room=<id>` 並開始進房間的過場（證明按鈕是 `pushState` 不是 `replaceState`／`back()`）；頁面 SHALL 沒有整個重新載入
 - **AND WHEN** 場景是 `hall`
 - **THEN** 那顆按鈕 SHALL 不存在於 DOM
+
+#### Scenario: [FE-V01-S19] 上一頁進到進不去的房：失敗處置一樣，網址不留一層
+
+- **GIVEN** 從 `room:<id>` 按「回到 Guild Hall」回到大廳（紀錄是 `…?room=<id>` → `/world`）
+- **WHEN** 瀏覽器上一頁，這次房間的 socket 在 `open` 之前就 `close`
+- **THEN** SHALL 建立 `scene=lobby` 的連線、顯示通知；網址 SHALL 是 `/world`（`replaceState`）
+- **AND WHEN** 再按瀏覽器上一頁
+- **THEN** 網址 SHALL 是進房間**之前**的那一筆（不是 `?room=<id>`）—— 失敗那一格被 replace 掉了
 
 ### Requirement: 票由前端持有，鍵含身分，不進網址
 

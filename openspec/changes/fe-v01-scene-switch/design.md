@@ -63,7 +63,7 @@ canonical 規則對整段 query 成立（`FE-V01-S08` 列了邊界）：`room` �
 
 - `LocalPlayer` 的物理世界（rapier）裡的靜態碰撞體是配置生成的；換配置＝全部拆掉重建，**跟重掛是同一件事**。加一個「請把碰撞體換掉、把角色搬到新出生點、把節流重置」的 API，是在重刻 unmount／mount
 - `RemoteWorld` 的 effect cleanup **已經**會關連線、清兩個容器（`RemoteWorld.tsx:124-131`）。React 保證同一次 commit 裡所有 cleanup 先於所有新 effect，所以「同步的那一半」（移除監聽器、呼叫 `close()`）由 React 的順序保證
-- **非同步的那一半 React 保證不了**（審查指出）：舊 socket 的 close 幀要到伺服器、伺服器要處理 `disconnect()`。而 `manager.disconnect()` 只查同 scene 的兄弟連線，新連線若已在另一個 scene `join()`，被 `presence.clear()` 的是**新的那個人** —— 連線開著、房間裡沒人看得到他（`realtime-client` delta 寫了證據）。所以新連線要等舊 socket 的 `close` 事件（上限 1 秒）：這是 `RealtimeClient` 的一個小改（`close()` 留一個一次性的 close 監聽器、`closeAndEnter()` 等它或 1 秒），是 `realtime-client` 那條 Requirement 的 MODIFIED，`FE-V01-S18` 驗
+- **非同步的那一半 React 保證不了**（審查指出）：舊 socket 的 close 幀要到伺服器、伺服器要處理 `disconnect()`。而 `manager.disconnect()` 只查同 scene 的兄弟連線，新連線若已在另一個 scene `join()`，被 `presence.clear()` 的是**新的那個人** —— 連線開著、房間裡沒人看得到他（`realtime-client` delta 寫了證據）。所以新連線要等舊 socket 的 `close` 事件（上限 1 秒）：這是 `RealtimeClient` 的一個小改（`close()` 留一個一次性的 close 監聽器、`closeAndEnter()` 等它或 1 秒），是 `realtime-client` 那條 Requirement 的 MODIFIED，`FE-V01-S18` 驗。**它是降機率不是證明**（第二輪 codex 指出：close 事件只代表伺服器傳輸層回了 close 幀，應用層的 `disconnect()` 是否跑完客戶端看不到）—— 規格正文照這樣寫，根治記成 `BE-G`（tasks 6.3）。「任何時刻不得兩條」因此也只能是客戶端的定義：兩條**尚未呼叫 `close()`** 的
 - 過場有代號（transition generation）：`ready`／`closed`／兩個計時器都比對代號，不是當前過場的一律忽略；提交一次、其餘計時器取消（`S15`）。Strict Mode 的雙重 effect 靠既有的 `RemoteWorld` 寫法（建 client 在 effect 內、cleanup 關掉）—— `S04` 包 `<StrictMode>` 跑
 - **物理世界在 `LocalPlayer` 的 effect 裡建**（`LocalPlayer.tsx:76`），在 `SceneSubtree` 裡面 —— 重掛＝舊 rigid body／colliders 全拆、新配置全建（`S04` 驗碰撞體恰好是房間的）
 - `PositionSync` 靠 client 物件身分判斷 session generation（`position-sync` 那條），重掛自然給它一個新的
@@ -147,11 +147,12 @@ onInteract(door) → requestEntry(projectId)
 | 房間分支仍然掛 `ProjectDoors`；或 `useRooms` 在房間裡照樣輪詢 | `S03` |
 | 新 socket 在舊 `close()` 之前建立；或舊監聽器沒移除；或碰撞體沒換；或 Strict Mode 下建了兩條 | `S04` |
 | 新 socket 不等舊 close 事件；或 1 秒上限拿掉 | `S18` |
-| 過場不比對代號（舊逾時把新場景打回去） | `S15` |
+| 過場不比對代號（舊 socket 遲到的 close 被當成失敗） | `S15` |
 | 覆蓋層最短 300 ms 拿掉；或 300 ms 延後了狀態提交 | `S05` |
-| 過場中不鎖輸入 | `S17` |
+| 過場中不鎖輸入；或解鎖跟著覆蓋層而不是跟著提交 | `S17` |
 | 10 秒逾時拿掉；或失敗時網址沒 `replaceState`；或失敗時丟票 | `S06` |
-| 失敗後重試（任何排程中的計時器會再建 socket）；或通知在再按門時就消失 | `S07` |
+| 失敗後重試（任何排程中的計時器會再建 socket）；或通知在再按門時就消失；或第二則疊在第一則上；或成功進入不清通知 | `S07` |
+| popstate 進到被拒的房不 `replaceState` | `S19` |
 | 回大廳失敗時覆蓋層不消失 | `S16` |
 | canonical 少任何一條（未知參數、重複、大寫、順序、`room` 時去面板） | `S08` |
 | 進房間不 `pushState`；或 popstate 不走過場；或面板沒歸零 | `S09` |
