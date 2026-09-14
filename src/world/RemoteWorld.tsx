@@ -50,11 +50,20 @@ export interface RemoteWorldProps {
    * ⚠️ 重連的代價寫在規格 `S05`：其他人可能短暫看到這個人離開又進來。
    */
   generation?: number
+  /**
+   * 連哪個 scene，來自場景註冊表（`FE-V01-S01`）。預設 `lobby`。
+   *
+   * ⚠️ **這裡不寫死 `lobby`，也不自己組 `room:` 字串** —— 形狀由 `sceneOf()` 決定。
+   * 換 scene 是關掉重開（`FE-R01-S05`）：它在 effect 的依賴裡，變了就 cleanup 舊的、建新的。
+   */
+  scene?: string
+  /** 進受密碼保護的房間才要。怎麼拿到它是 `FE-N08`；怎麼持有它是 `FE-V01` 的 `--transition` 那一片。 */
+  token?: string
 }
 
 const monotonicNow = () => performance.now()
 
-export function RemoteWorld({ poseRef, now = monotonicNow, generation = 0 }: RemoteWorldProps) {
+export function RemoteWorld({ poseRef, now = monotonicNow, generation = 0, scene = 'lobby', token }: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
   // **動態不在 React 裡**（每秒 400 次）。這個容器建立一次就不再換掉，
@@ -102,6 +111,8 @@ export function RemoteWorld({ poseRef, now = monotonicNow, generation = 0 }: Rem
     const validate = createMessageValidator(onViolation)
 
     const client = new RealtimeClient({
+      scene,
+      token,
       onMessage: (raw) => {
         const result = validate(raw)
         if (!result.ok) return
@@ -129,7 +140,7 @@ export function RemoteWorld({ poseRef, now = monotonicNow, generation = 0 }: Rem
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now, allowed, generation])
+  }, [state, now, allowed, generation, scene, token])
 
   return (
     <>

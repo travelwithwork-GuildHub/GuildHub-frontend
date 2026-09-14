@@ -2,14 +2,14 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-v01-scene-switch`）
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-v01-scene-switch`）
 
 ## 2. 註冊表與配置（`feat/fe-v01-scene-switch--registry`）
 
-- [ ] 2.1 先寫判準：`tests/world-scenes-registry.test.ts`（`[FE-V01-S01]`）、`tests/world-layout-project-room.test.ts`（`[FE-V01-S02]`，沿用 `world-layout` 的三條檢查）—— 紅，commit
-- [ ] 2.2 `src/world/scenes/registry.ts`（D1）、`src/world/layout/projectRoomLayout.ts` —— 綠
-- [ ] 2.3 `WorldShell`／`LocalPlayer` 改從註冊表讀配置與出生點；`WorldCanvas` 的 Guild Hall 專屬物件收進 `hall` 分支（`[FE-V01-S03]`）
-- [ ] 2.4 突變：`sceneOf` 少 id、少一面牆、房間仍掛門 —— 各自紅，改回來
+- [x] 2.1 先寫判準：`tests/world-scenes-registry.test.ts`（`[FE-V01-S01]`）、`tests/world-layout-project-room.test.ts`（`[FE-V01-S02]`，沿用 `world-layout` 的三條檢查）—— 紅，commit
+- [x] 2.2 `src/world/scenes/registry.ts`（D1）、`src/world/layout/projectRoomLayout.ts` —— 綠
+- [x] 2.3 `WorldShell`／`LocalPlayer` 改從註冊表讀配置與出生點；`WorldCanvas` 的 Guild Hall 專屬物件收進 `hall` 分支（`[FE-V01-S03]`）
+- [x] 2.4 突變：`sceneOf` 少 id、少一面牆、房間仍掛門 —— 各自紅，改回來
 
 ## 2b. 連線等舊 close（`feat/fe-v01-scene-switch--close-ack`）
 
