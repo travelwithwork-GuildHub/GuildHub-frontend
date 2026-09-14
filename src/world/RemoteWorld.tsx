@@ -10,6 +10,8 @@ import type { SceneChatPort } from '@/realtime/sceneChatStore'
 import {
   applyMessage,
   createRemotePlayersState,
+  onlineCountOf,
+  resetRemotePlayers,
   type RemoteIdentity,
   type RemoteMotion,
 } from '@/realtime/remotePlayers'
@@ -82,6 +84,15 @@ export interface RemoteWorldProps {
    * 送出由這裡注入 `client.send` —— chat 模組永遠拿不到 client。**prop 不是 context**（在 `<Canvas>` 裡）。沒給就沒有聊天。
    */
   chat?: SceneChatPort
+  /**
+   * 目前 scene 的在線人數變了（`FE-R10`，design D4）。`null` 是「還沒有初始 snapshot」—— 不是 0。
+   *
+   * ⚠️ **身分要穩定**（例如直接傳 `useState` 的 setter）：它在 effect 的依賴裡，
+   * 每次重繪換一個新函式的話，每一次人數變動都會關掉連線重開。
+   * ⚠️ **它是 prop 不是 context 的回寫**：人數要送到 `<Canvas>` 外面的 DOM（D4），
+   * 資料往外流，而 context 只往內流。
+   */
+  onOnlineCountChange?: (count: number | null) => void
 }
 
 const monotonicNow = () => performance.now()
@@ -95,6 +106,7 @@ export function RemoteWorld({
   closeGateRef,
   onConnection,
   chat,
+  onOnlineCountChange,
 }: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
@@ -145,6 +157,11 @@ export function RemoteWorld({
     let cancelled = false
     // 這條連線在聊天記憶體裡的身分。注入的 sender 只收 `ChatIn`：序列化在這裡、`client.send()` 沒 ready 就拋 `RealtimeError`，不包、不吞。
     let link: ReturnType<SceneChatPort['attach']> | null = null
+    // 在線人數跟著低頻 Presence view 一起通知（`FE-R10` D4）。status 也會走到這裡但人數沒變 ——
+    // **不另外去重**：呼叫端傳的是 `useState` 的 setter，值相同時 React 不會重繪，
+    // 在這裡多記一份「上次通知的值」是驗不到的程式碼。
+    const reportCount = () => onOnlineCountChange?.(onlineCountOf(state))
+
     const client = new RealtimeClient({
       scene,
       token,
@@ -164,6 +181,7 @@ export function RemoteWorld({
         if (applyMessage(state, result.message, client.selfId, now())) {
           // 名單真的變了才重繪。**這是唯一會呼叫 setState 的地方。**
           setRoster(state.roster)
+          reportCount()
         }
       },
     })
@@ -198,10 +216,11 @@ export function RemoteWorld({
         const previous = closeGateRef.current ?? Promise.resolve()
         closeGateRef.current = previous.then(() => acked)
       }
-      // 卸載時把兩個容器都清乾淨 —— 留著的話，重新掛載會先閃出一批舊角色。
-      state.motion.clear()
-      state.roster = new Map()
+      // 卸載時把所有容器清回初始值 —— 留著的話，重新掛載會先閃出一批舊角色，
+      // 或者在新連線的 snapshot 到達之前顯示上一條連線的人數（`FE-R10-S09`）。
+      resetRemotePlayers(state)
       setRoster(EMPTY_ROSTER)
+      reportCount()
     }
     // `state` 是 `useState` 的初始值，身分穩定 —— 列進來只是讓
     // exhaustive-deps 不必被關掉，不會造成重新連線。
@@ -209,7 +228,7 @@ export function RemoteWorld({
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection, chat])
+  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection, chat, onOnlineCountChange])
 
   return (
     <>
