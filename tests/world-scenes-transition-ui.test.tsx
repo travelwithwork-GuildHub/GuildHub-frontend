@@ -359,5 +359,27 @@ describe('深連結', () => {
     expect(url()).toBe('/world')
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByRole('status', { name: /房間密碼/ }).textContent).toContain('走到走廊上它的門前按 E')
+    expect(screen.queryByTestId('scene-transition'), '沒票不是過場：不該有覆蓋層（連淡出的殘影也不該有）').toBeNull()
+  })
+
+  // 深連結旗標只認「代號 0 的過場」；下面三種一開始就在大廳、從沒進過過場，所以覆蓋層一次都不該出現
+  // —— 不然大廳第一次載入會閃 300 ms 的「回到 Guild Hall⋯⋯」（審查要求的負向）。
+  it.each([
+    ['大廳第一次載入', '/world', () => {}],
+    ['訪客直達房間', `/world?room=${ROOM}`, () => (identity.current = { state: 'guest', reason: 'no-session' })],
+    ['身分還沒問完', `/world?room=${ROOM}`, () => (identity.current = { state: 'unknown' })],
+  ])('[FE-V01-S05] %s：從頭到尾沒有覆蓋層', async (_name, at, setup) => {
+    holdRoomToken(PROFILE.id, ROOM, 'T')
+    setup()
+    const w = arriveAt(at)
+    expect(screen.queryByTestId('scene-transition'), '掛載那一刻').toBeNull()
+    await flush()
+    expect(screen.queryByTestId('scene-transition'), '身分推導之後').toBeNull()
+    if (w.sockets().length > 0) {
+      await act(async () => w.last().ready())
+      await tick(OVERLAY_MIN_MS + FADE_MS)
+    }
+    expect(screen.queryByTestId('scene-transition'), 'ready 之後').toBeNull()
+    expect(w.probe().transition).toBeNull()
   })
 })
