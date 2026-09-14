@@ -33,10 +33,10 @@
 
 ## 5. 資格與門（`feat/fe-v01-scene-switch--door`）
 
-- [ ] 5.1 `[FE-V01-S12]`（含 `FE-R06-S02` 的四項）：`WorldGate` 的 `leaseKey` 去掉 `/lobby`；`tabLease.ts`／`WorldLeaseProvider.tsx` 的註解改指 design D6 —— 先紅後綠
-- [ ] 5.2 `tests/world-rooms-press-e.test.tsx`：`FE-W12-S16` 兩條的 GIVEN 補「沒有票」（ID 不變）；新增 `[FE-V01-S10]`／`[FE-V01-S11]` —— 紅，commit
-- [ ] 5.3 `ProjectDoors` 的 `onInteract` → `requestEntry`；`EntryGateProvider` 與預設說明（D7）—— 綠
-- [ ] 5.4 突變：`onInteract` 拿掉、`repeat` 不擋、把 `wsScene` 加進 `leaseKey` —— 紅
+- [x] 5.1 `[FE-V01-S12]`（含 `FE-R06-S02` 的四項）：`WorldGate` 的 `leaseKey` 去掉 `/lobby`；`tabLease.ts`／`WorldLeaseProvider.tsx` 的註解改指 design D6 —— 先紅後綠
+- [x] 5.2 `tests/world-rooms-press-e.test.tsx`（既有兩條 GIVEN 本來就沒有票，斷言不變；新的在 `tests/world-scenes-door*.test.tsx`）：`FE-W12-S16` 兩條的 GIVEN 補「沒有票」（ID 不變）；新增 `[FE-V01-S10]`／`[FE-V01-S11]` —— 紅，commit
+- [x] 5.3 `ProjectDoors` 的 `onInteract` → `requestEntry`；`EntryGateProvider` 與預設說明（D7）—— 綠
+- [x] 5.4 突變：`onInteract` 拿掉、`repeat` 不擋、把 `wsScene` 加進 `leaseKey` —— 紅
 
 ## 6. 瀏覽器與收尾
 
