@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { realtimeAdapter } from '@/config/env'
 import { RealtimeClient } from '@/realtime/client'
+import type { ConnectionEvent } from '@/world/scenes/SceneProvider'
 import { useWorldLease } from '@/realtime/WorldLeaseProvider'
 import { createMessageValidator, type ProtocolViolation } from '@/realtime/protocol'
 import {
@@ -69,6 +70,12 @@ export interface RemoteWorldProps {
    * 沒給的話不等 —— 既有的呼叫端與測試不用改。
    */
   closeGateRef?: RefObject<Promise<void> | null>
+  /**
+   * 連線事件回報（`FE-V01` 的過場：`ready` 提交、`open` 之前就關是失敗）。帶著這條連線的 `scene` 參數，
+   * 收的人自己比對是不是目標場景。**自己在卸載時關的那一次不回報** —— 那不是「連不上」。
+   * ⚠️ 要身分穩定：它在下面 effect 的依賴裡，換一個就重連。
+   */
+  onConnection?: (event: ConnectionEvent, scene: string) => void
 }
 
 const monotonicNow = () => performance.now()
@@ -80,6 +87,7 @@ export function RemoteWorld({
   scene = 'lobby',
   token,
   closeGateRef,
+  onConnection,
 }: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
@@ -127,9 +135,17 @@ export function RemoteWorld({
     }
     const validate = createMessageValidator(onViolation)
 
+    let cancelled = false
     const client = new RealtimeClient({
       scene,
       token,
+      onStateChange: (state) => {
+        if (state === 'ready') onConnection?.({ kind: 'ready' }, scene)
+      },
+      onClosed: (info) => {
+        // 卸載時 `client.close()` 也會發一次（code 1000、`opened` 看情況）—— 那是自己關的，不是連不上。
+        if (!cancelled) onConnection?.({ kind: 'closed', opened: info.opened }, scene)
+      },
       onMessage: (raw) => {
         const result = validate(raw)
         if (!result.ok) return
@@ -144,7 +160,6 @@ export function RemoteWorld({
     // 先等上一棵子樹的連線關乾淨（`FE-V01-S18`），再連。閘門是空的（第一次掛載）就立刻連。
     // `cancelled`：等的期間就被卸載（Strict Mode 的第二次 effect、或使用者又換了場景）的話不連 ——
     // 那時 `client.close()` 已經跑過，而一個 idle 的 client 被 `close()` 之後再 `connect()` 會拋錯。
-    let cancelled = false
     const gate = closeGateRef?.current ?? null
     if (gate === null) client.connect()
     else
@@ -177,7 +192,7 @@ export function RemoteWorld({
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now, allowed, generation, scene, token, closeGateRef])
+  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection])
 
   return (
     <>

@@ -29,6 +29,7 @@ import { sceneOf } from './scenes/registry'
 import { useSceneRef } from './scenes/SceneContext'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
 import { SceneObjects } from './scenes/SceneObjects'
+import { useScene } from './scenes/SceneProvider'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -102,6 +103,8 @@ export default function WorldCanvas() {
   const scene = useSceneRef()
   const hall = scene.id === 'hall'
   const def = sceneOf(scene)
+  // 票與連線事件的回報（`FE-V01` 的過場）。`reportConnection` 身分穩定 —— 它會進 `RemoteWorld` 的 effect 依賴。
+  const { token, reportConnection } = useScene()
 
   // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
   // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
@@ -163,7 +166,14 @@ export default function WorldCanvas() {
               <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} spawn={def.spawn} layout={def.layout} />
               {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
                   WorldCanvas 不知道即時層的存在，也不該知道；連哪個 scene 由註冊表決定（`FE-V01-S01`）。 */}
-              <RemoteWorld poseRef={localPose} generation={generation} scene={def.wsScene} closeGateRef={closeGate} />
+              <RemoteWorld
+                poseRef={localPose}
+                generation={generation}
+                scene={def.wsScene}
+                token={token}
+                closeGateRef={closeGate}
+                onConnection={reportConnection}
+              />
               {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
                   提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
                   那是 FE-W12（W3）。 */}
