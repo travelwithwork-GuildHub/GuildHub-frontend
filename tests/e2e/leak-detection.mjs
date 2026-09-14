@@ -1,7 +1,7 @@
 // FE-W07 的瀏覽器驗收：GPU 資源在反覆進出之後有沒有累積。
 // 規格 `openspec/specs/world-resources/`，Scenario S01～S05。
 //
-// **它不在 CI 裡，也不在 `npm test` 裡** —— 它要起一顆真的瀏覽器。
+// **它不在 CI 裡，也不在 `pnpm test` 裡** —— 它要起一顆真的瀏覽器。
 // 但它**不需要後端也不需要 dev server**：量測台是這支自己起的一個
 // vite server，當次建立當次銷毀，只服務 `tests/e2e/leak-harness/`。
 //

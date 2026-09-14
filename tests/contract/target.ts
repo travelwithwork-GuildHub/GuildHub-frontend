@@ -12,7 +12,7 @@ export function resolveTarget(raw: string | undefined): Target {
   if (raw === 'internal' || raw === 'guildhub') return raw
   throw new Error(
     `CONTRACT_TARGET 必須是 ${TARGETS.map((t) => `'${t}'`).join(' 或 ')}（現在是 ${raw === undefined ? '沒設' : `'${raw}'`}）。` +
-      ' internal：npm run test:contract:internal；guildhub：npm run test:contract:guildhub。',
+      ' internal：pnpm run test:contract:internal；guildhub：pnpm run test:contract:guildhub。',
   )
 }
 

@@ -4,7 +4,7 @@
 // 這正是這條 Scenario 唯一能被證明的方式：CSS 自訂屬性取不到只會回空字串，
 // 只有型別系統擋得住打錯的層名。
 //
-// 這個目錄被主 tsconfig 的 exclude 排除，所以不會讓 `npm run typecheck` 永遠紅。
+// 這個目錄被主 tsconfig 的 exclude 排除，所以不會讓 `pnpm run typecheck` 永遠紅。
 // tests/design-tokens.test.ts 用旁邊那份 tsconfig 對它單獨跑一次 tsc。
 import { layer } from '../../src/design/layers'
 

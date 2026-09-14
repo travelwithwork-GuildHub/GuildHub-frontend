@@ -16,7 +16,7 @@ import path from 'node:path'
 // 對複本跑真的 tsc。
 //
 // ⚠️ **不能改原地的檔案。** 第一版是那樣寫的，結果 `typecheck-negative.test.ts`
-// 的陽性對照紅了 —— 它跑的是整個專案的 `npm run typecheck`，而 vitest
+// 的陽性對照紅了 —— 它跑的是整個專案的 `pnpm run typecheck`，而 vitest
 // 的測試檔是並行的，兩邊撞在一起。
 //
 // 複製**不是**在測試裡重刻一份斷言：複本是執行當下從真檔案讀出來的，

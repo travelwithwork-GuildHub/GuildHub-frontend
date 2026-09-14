@@ -17,7 +17,7 @@
 //
 //   1. 後端（**一定要是自己起的**）：
 //        cd ../GuildHub-backend && .venv/bin/uvicorn app.main:app --port 8000
-//   2. 前端：npm run dev
+//   2. 前端：pnpm run dev
 //   3. node tests/e2e/render-budget.mjs
 //
 //   環境變數：N（其他玩家人數，預設 10）、SECONDS（量幾秒，預設 10）、

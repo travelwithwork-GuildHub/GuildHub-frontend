@@ -1,6 +1,6 @@
 // FE-R08 的瀏覽器驗收：遠端角色在真實瀏覽器裡到底順不順。
 //
-// 這是 tasks.md 第 5 節（design.md 的 V2）。**它不在 CI 裡，也不在 `npm test` 裡** ——
+// 這是 tasks.md 第 5 節（design.md 的 V2）。**它不在 CI 裡，也不在 `pnpm test` 裡** ——
 // 它需要一個本機自己起的後端、一個 dev server 和一顆真的瀏覽器，
 // 而 CI 沒有服務可用（AGENTS.md〈測試環境隔離〉）。
 //
@@ -29,7 +29,7 @@
 //   1. 後端（**一定要是自己起的**，不可以連團隊共用位址）：
 //        cd ../GuildHub-backend && bash run.sh
 //   2. 前端：
-//        npm run dev
+//        pnpm run dev
 //   3. 這支：
 //        node tests/e2e/interpolation-smoothness.mjs
 //

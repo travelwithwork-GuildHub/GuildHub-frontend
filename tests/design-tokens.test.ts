@@ -19,7 +19,7 @@ describe('DOM design token 的單一事實來源', () => {
 
   it('[FE-X01-S07] 未定義的層名讓型別檢查以非零結束，不是回傳 undefined', () => {
     // 這條只有編譯期證明得了。fixture 有自己的 tsconfig，
-    // 並被主 tsconfig 的 exclude 排除 —— 否則 `npm run typecheck` 會因為它永遠紅。
+    // 並被主 tsconfig 的 exclude 排除 —— 否則 `pnpm run typecheck` 會因為它永遠紅。
     let code = 0
     let output = ''
     try {

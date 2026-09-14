@@ -10,7 +10,7 @@ import path from 'node:path'
 // --skipLibCheck` 之類的東西，不會有任何測試變紅。
 //
 // 這裡直接照 Scenario 的字面做：把一個帶型別錯誤的檔案放進 `src/`
-// （主 tsconfig 涵蓋的範圍），跑真正的 `npm run typecheck`，再移除。
+// （主 tsconfig 涵蓋的範圍），跑真正的 `pnpm run typecheck`，再移除。
 //
 // 跟 `tests/type-fixtures/` 那個常駐 fixture 的差別：那一份驗的是
 // **design token 的層名**有沒有被型別約束（`FE-X01-S07`），用的是自己的
@@ -84,7 +84,7 @@ describe('typecheck 真的會擋', () => {
     // 非零離開碼時 `execFileSync` 直接丟錯，而 `error.stdout` 不會被印出來，
     // 所以紅燈長成一句「陽性對照失敗」，**看不到 tsc 抱怨的是哪一個檔案**。
     //
-    // 2026-09-10 這條在完整 `npm test` 下 10 次紅 2 次，而我為了找根因猜了三次
+    // 2026-09-10 這條在完整 `pnpm test` 下 10 次紅 2 次，而我為了找根因猜了三次
     // 全錯（tsbuildinfo 陳舊快取、`next build` 與 typecheck 爭用 `.next/types/`、
     // dev server 重編譯的賽跑），另外跑了 23 次都沒能重現。
     // **查不出來的原因就是這裡沒有留下證據。** 與其繼續猜，不如讓下一次紅燈可診斷。

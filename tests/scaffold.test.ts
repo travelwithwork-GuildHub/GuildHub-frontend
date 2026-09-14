@@ -6,7 +6,7 @@ import path from 'node:path'
 //
 // 這裡只驗**釘得住的東西**：script 名稱與 Node 版本。
 // 「四個指令真的以 0 結束」由 CI 與 tasks.md 6.2 的實際輸出證明，
-// 在測試裡遞迴跑 `npm run build` 是沒有意義的。
+// 在測試裡遞迴跑 `pnpm run build` 是沒有意義的。
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const read = (p: string) => readFileSync(path.join(ROOT, p), 'utf8')
@@ -17,7 +17,7 @@ const pkg = JSON.parse(read('package.json')) as {
 }
 
 describe('工程品質指令', () => {
-  // FE-O10 那個 governance PR 會把 `npm run <name>` 四步加回 ci.yml。
+  // FE-O10 那個 governance PR 會把 `pnpm run <name>` 四步加回 ci.yml。
   // 名稱漂掉的話那個 PR 接不上去，而且不會有任何東西報錯。
   //
   // 只驗「不是佔位」是不夠的：`"lint": "exit 0"` 一樣會通過，

@@ -4,7 +4,7 @@ import { wsUrl } from '@/config/env'
 
 // 規格 FE-R01 的〈驗證方式〉V1 與 V3。**不進 CI。**
 //
-//     npm run test:integration
+//     pnpm run test:integration
 //
 // ⚠️ **要先起後端**，而且只准打自己起的那一份：
 //

@@ -18,7 +18,7 @@
 // 用法（要先起後端與前端）：
 //
 //   cd ../GuildHub-backend && .venv/bin/python -m uvicorn app.main:app --port 8000
-//   npm run dev
+//   pnpm run dev
 //   node tests/e2e/avatar-seen-by-others.mjs
 //
 // ⚠️ 後端的 `run.sh` 是 CRLF，在 macOS 上跑不起來（後端票 `BE-G29`）——

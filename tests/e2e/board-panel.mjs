@@ -14,7 +14,7 @@
 // 面板是 DOM，不在 WebGL 的 back buffer 裡，所以它開著不影響這把尺。
 //
 // 用法：
-//   1. npm run dev
+//   1. pnpm run dev
 //   2. node tests/e2e/board-panel.mjs
 //   環境變數：FRONTEND（預設 http://localhost:3100）、HEADED=1、OUT（截圖目錄）
 
@@ -130,7 +130,7 @@ try {
   }
 
   const response = await page.goto(`${FRONTEND}/world`).catch(() => null)
-  if (response === null) throw new Error(`連不到 ${FRONTEND} —— dev server 起了嗎？（npm run dev）`)
+  if (response === null) throw new Error(`連不到 ${FRONTEND} —— dev server 起了嗎？（pnpm run dev）`)
   await page.waitForSelector('[data-testid="world-loading"]', { state: 'detached', timeout: 30_000 })
   await page.waitForTimeout(1500)
 

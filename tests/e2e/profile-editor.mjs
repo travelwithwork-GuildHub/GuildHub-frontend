@@ -1,7 +1,7 @@
 // `FE-A04` tasks 5.1：真瀏覽器 —— 開面板 → 編輯 → 送出 → 人才看板上自己那張變了。
 // 在 `NEXT_PUBLIC_DATA_ADAPTER=internal` 的 dev server 上跑（本地 Route Handlers ＋ 可拋棄的 Postgres），不攔任何 `/api/*`。
 //
-//   NEXT_PUBLIC_DATA_ADAPTER=internal NEXT_PUBLIC_REALTIME_ADAPTER=none INTERNAL_DATABASE_URL=… npx next dev -p 3103
+//   NEXT_PUBLIC_DATA_ADAPTER=internal NEXT_PUBLIC_REALTIME_ADAPTER=none INTERNAL_DATABASE_URL=… pnpm exec next dev -p 3103
 //   node tests/e2e/profile-editor.mjs
 //
 // **只打本機自己起的 dev server 與可拋棄的資料庫。**

@@ -1,7 +1,7 @@
 // `FE-K01` tasks 5.1：真瀏覽器兩個人互寄 —— A 從人才看板寄信給 B，B 開收件匣看到、回信，A 重開看到回信。
 // 在 `NEXT_PUBLIC_DATA_ADAPTER=internal` 的 dev server 上跑（本地 Route Handlers ＋ 可拋棄的 Postgres），不攔任何 `/api/*`。
 //
-//   NEXT_PUBLIC_DATA_ADAPTER=internal NEXT_PUBLIC_REALTIME_ADAPTER=none INTERNAL_DATABASE_URL=… npx next dev -p 3104
+//   NEXT_PUBLIC_DATA_ADAPTER=internal NEXT_PUBLIC_REALTIME_ADAPTER=none INTERNAL_DATABASE_URL=… pnpm exec next dev -p 3104
 //   FRONTEND=http://localhost:3104 node tests/e2e/inbox.mjs
 //
 // **只打本機自己起的 dev server 與可拋棄的資料庫。**
