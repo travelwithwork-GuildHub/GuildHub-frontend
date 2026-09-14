@@ -6,7 +6,7 @@ import { InteractionProvider, useInteraction } from '@/world/interaction/Interac
 import { holdRoomToken, heldRoomToken } from '@/world/scenes/roomTokens'
 import { SceneProvider, useScene, type SceneValue } from '@/world/scenes/SceneProvider'
 import { SceneNotices } from '@/world/scenes/SceneNotices'
-import { OVERLAY_MIN_MS, SceneTransitionOverlay } from '@/world/scenes/SceneTransitionOverlay'
+import { FADE_MS, OVERLAY_MIN_MS, SceneTransitionOverlay } from '@/world/scenes/SceneTransitionOverlay'
 import { ReturnToHallButton } from '@/world/scenes/ReturnToHallButton'
 import WorldCanvas from '@/world/WorldCanvas'
 
@@ -214,8 +214,16 @@ describe('過場看得見、讀得到、不閃', () => {
     expect(w.overlay(), '1 ms：覆蓋層還在').not.toBeNull()
     await tick(OVERLAY_MIN_MS - 2)
     expect(w.overlay(), '299 ms：還在').not.toBeNull()
+    expect(w.overlay()?.textContent, '提交之後、最短顯示期間，房間名還在').toContain('前往 星際導航')
     await tick(1)
-    expect(w.overlay(), '300 ms：消失').toBeNull()
+    expect(w.overlay(), '300 ms：消失（不再是 status）').toBeNull()
+    // 視覺上還有一層在淡出：沒有 role、aria-hidden、不吃 pointer；淡完卸載
+    const fading = screen.getByTestId('scene-transition')
+    expect(fading.dataset.state).toBe('fading')
+    expect(fading.getAttribute('aria-hidden')).toBe('true')
+    expect(fading.className).toContain('opacity-0')
+    await tick(FADE_MS)
+    expect(screen.queryByTestId('scene-transition'), '淡完才卸載').toBeNull()
 
     // 另一次：ready 在 2 秒才到 → 2 秒時才消失
     act(() => w.probe().returnToHall())
