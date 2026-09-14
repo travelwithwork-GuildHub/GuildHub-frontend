@@ -11,9 +11,9 @@
 ## 指令
 
 ```bash
-npm run db:reset -- --init   # 第一次：資料庫是空的
-npm run db:reset             # 之後：drop schema → 全部 .sql → 標記
-npm run db:seed              # 只套 002_seed.sql（可重複）
+pnpm run db:reset -- --init   # 第一次：資料庫是空的
+pnpm run db:reset             # 之後：drop schema → 全部 .sql → 標記
+pnpm run db:seed              # 只套 002_seed.sql（可重複）
 ```
 
 連線字串：`INTERNAL_DATABASE_URL`（開發）、`INTERNAL_TEST_DATABASE_URL`（測試；**必須是另一個庫**）。

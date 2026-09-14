@@ -1,6 +1,6 @@
 // 即時層替身。規格 `FE-O03`〈即時層替身照 `protocol.py`，怪癖一併複製〉。
 //
-//   npx tsx scripts/realtime-stub.ts        （`npm run realtime:stub`；INTERNAL_REALTIME_PORT 預設 3102，只綁 loopback）
+//   pnpm exec tsx scripts/realtime-stub.ts        （`pnpm run realtime:stub`；INTERNAL_REALTIME_PORT 預設 3102，只綁 loopback）
 //
 // 跟真後端一樣的地方（`app/main.py`、`app/realtime/*`）：
 //   握手：`/ws?scene=lobby` 不驗；`scene=room:<uuid>` 要 `token`；格式不合／token 不對 → **拒絕握手**（HTTP 403，不 accept、不送 err）

@@ -1,6 +1,6 @@
 # FE-X06 的瀏覽器證據
 
-`node tests/e2e/board-panel.mjs`（需要 `npm run dev`）產生的；攔截的回應是腳本偽造的。**不連任何團隊共用的位址。**
+`node tests/e2e/board-panel.mjs`（需要 `pnpm run dev`）產生的；攔截的回應是腳本偽造的。**不連任何團隊共用的位址。**
 
 ```
 [X06-S11] Tab 六次都留在面板內：button:返回 → button:返回 → …
