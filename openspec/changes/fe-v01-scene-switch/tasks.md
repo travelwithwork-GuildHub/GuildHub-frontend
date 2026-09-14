@@ -40,7 +40,7 @@
 
 ## 6. 瀏覽器與收尾
 
-- [ ] 6.1 `tests/e2e/scene-switch.mjs`：`S04` 的 Canvas 同一節點、`S09` 的上一頁不整頁重載、`S14` 的網址不含票（`routeWebSocket` 偽造，只打本機 dev server）
-- [ ] 6.2 `pnpm run typecheck`、`pnpm run lint`、`pnpm test` 的結果如實記在這裡（含任何既有的逾時）
-- [ ] 6.3 `governance/`：`docs/WBS.md` 加一條 `BE-G`（跨 scene 的同一人會被 `disconnect()` 清掉，同根 `BE-G31`），跑 `progress.sh --check`
+- [x] 6.1 `tests/e2e/scene-switch.mjs`：`S04` 的 Canvas 同一節點、`S09` 的上一頁不整頁重載、`S14` 的網址不含票（`routeWebSocket` 偽造，只打本機 dev server）。**它抓到一個 jsdom 沒抓到的**：深連結直達房間的過場沒有覆蓋層（`transitionSeq === 0` 的閘門把它擋掉了）—— 修在 `SceneTransitionOverlay`，jsdom 補 `[FE-V01-S05] 直達房間…`（先紅後綠；拔掉修正會紅）。另一個紅燈是尺：Next.js 的 `__next-route-announcer__` 也是 `role="alert"`，判準改排除它
+- [x] 6.2 2026-09-15：`tsc --noEmit` 0 錯；`eslint .` 0 錯（第一版在 effect 裡 setState 被 `react-hooks/set-state-in-effect` 擋，改成 render 裡調整）；`pnpm test` 135 檔 1050 綠、7 skipped（既有）；e2e 36 項全部符合，對 `NEXT_PUBLIC_APP_ENV=local pnpm run build` ＋ `next start` 跑 4 次全綠（CI 的形狀）。**`next dev` 跑 e2e 不可信**：Turbopack 在 e2e 的多次導覽之後 HMR panic（log 有 `FATAL`），之後同一個 dev server 出來的頁面網址寫不進去，兩輪各 5～6 個假紅 —— e2e 一律打 `next start`。兩位審查者第一輪都退回（網址快照看不到瞬間寫入、固定毫秒走位、旗標缺負向）→ 網址改整條軌跡、走位改門標籤里程計、補三條負向；第二輪 Gemini APPROVE，codex 剩 CI 接線（governance PR 另開）
+- [x] 6.3 `governance/`：`docs/WBS.md` 加一條 `BE-G`（跨 scene 的同一人會被 `disconnect()` 清掉，同根 `BE-G31`），跑 `progress.sh --check` —— `BE-G33`，#415 已合併
 - [ ] 6.4 封存（`archive/fe-v01-scene-switch`，獨立 PR；勾勾要在 archive 之前進 main）

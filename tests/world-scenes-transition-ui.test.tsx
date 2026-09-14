@@ -321,6 +321,27 @@ describe('房間裡隨時回得了 Guild Hall', () => {
 })
 
 describe('深連結', () => {
+  it('[FE-V01-S05] 直達房間的那場過場也有覆蓋層（不是 enterRoom 發起的，也一樣 ≥300 ms、淡出）', async () => {
+    holdRoomToken(PROFILE.id, ROOM, 'T')
+    const w = arriveAt(`/world?room=${ROOM}`)
+    await flush()
+    expect(w.last().scene).toBe(`room:${ROOM}`)
+    expect(w.probe().transition, '過場進行中').not.toBeNull()
+    expect(w.overlay()?.textContent, '瀏覽器 e2e 抓到的：直達房間沒有覆蓋層').toContain('前往')
+    await act(async () => w.last().ready())
+    await tick(1)
+    expect(w.probe().transition, '1 ms：狀態已提交').toBeNull()
+    expect(w.overlay(), '1 ms：覆蓋層還在').not.toBeNull()
+    await tick(OVERLAY_MIN_MS - 1)
+    expect(w.overlay(), '300 ms：消失').toBeNull()
+    await tick(FADE_MS)
+    expect(screen.queryByTestId('scene-transition'), '淡完才卸載').toBeNull()
+    // 之後從房間回大廳是新的一場：新的覆蓋層、新的文字
+    act(() => w.probe().returnToHall())
+    await flush()
+    expect(w.overlay()?.textContent).toContain('回到 Guild Hall')
+  })
+
   it('[FE-V01-S14] 有票直接進；沒票回大廳並說明（status 不是 alert）；票不進網址', async () => {
     holdRoomToken(PROFILE.id, ROOM, 'T')
     const w = arriveAt(`/world?room=${ROOM}`)
@@ -338,5 +359,27 @@ describe('深連結', () => {
     expect(url()).toBe('/world')
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByRole('status', { name: /房間密碼/ }).textContent).toContain('走到走廊上它的門前按 E')
+    expect(screen.queryByTestId('scene-transition'), '沒票不是過場：不該有覆蓋層（連淡出的殘影也不該有）').toBeNull()
+  })
+
+  // 深連結旗標只認「代號 0 的過場」；下面三種一開始就在大廳、從沒進過過場，所以覆蓋層一次都不該出現
+  // —— 不然大廳第一次載入會閃 300 ms 的「回到 Guild Hall⋯⋯」（審查要求的負向）。
+  it.each([
+    ['大廳第一次載入', '/world', () => {}],
+    ['訪客直達房間', `/world?room=${ROOM}`, () => (identity.current = { state: 'guest', reason: 'no-session' })],
+    ['身分還沒問完', `/world?room=${ROOM}`, () => (identity.current = { state: 'unknown' })],
+  ])('[FE-V01-S05] %s：從頭到尾沒有覆蓋層', async (_name, at, setup) => {
+    holdRoomToken(PROFILE.id, ROOM, 'T')
+    setup()
+    const w = arriveAt(at)
+    expect(screen.queryByTestId('scene-transition'), '掛載那一刻').toBeNull()
+    await flush()
+    expect(screen.queryByTestId('scene-transition'), '身分推導之後').toBeNull()
+    if (w.sockets().length > 0) {
+      await act(async () => w.last().ready())
+      await tick(OVERLAY_MIN_MS + FADE_MS)
+    }
+    expect(screen.queryByTestId('scene-transition'), 'ready 之後').toBeNull()
+    expect(w.probe().transition).toBeNull()
   })
 })
