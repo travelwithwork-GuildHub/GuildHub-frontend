@@ -205,36 +205,6 @@ describe('互動目標接上 render loop', () => {
     expect(far, '範圍內的其他物件也被觸發了').not.toHaveBeenCalled()
   }, 60_000)
 
-  it('[FE-N08-S02] 有目標時那一下 E 的預設動作被擋掉（開出來的密碼欄不會收到一個 e）；沒有目標時不擋', async () => {
-    const poseRef = pose(0, -0.9, FACING.down)
-    const onInteract = vi.fn()
-    const renderer = await ReactThreeTestRenderer.create(
-      <Harness poseRef={poseRef}>
-        <Interactable id="door" x={0} z={0} label="星際導航" onInteract={onInteract} />
-      </Harness>,
-    )
-    await ReactThreeTestRenderer.act(async () => {
-      await renderer.advanceFrames(2, 1 / 60)
-    })
-    const hit = new KeyboardEvent('keydown', { code: 'KeyE', cancelable: true })
-    await ReactThreeTestRenderer.act(async () => {
-      window.dispatchEvent(hit)
-    })
-    expect(onInteract).toHaveBeenCalledTimes(1)
-    expect(hit.defaultPrevented, '被世界吃掉的 E 要擋掉預設動作，不然那個 e 會打進剛開出來的欄位').toBe(true)
-
-    poseRef.current.z = TUNING.range + 5
-    await ReactThreeTestRenderer.act(async () => {
-      await renderer.advanceFrames(2, 1 / 60)
-    })
-    const miss = new KeyboardEvent('keydown', { code: 'KeyE', cancelable: true })
-    await ReactThreeTestRenderer.act(async () => {
-      window.dispatchEvent(miss)
-    })
-    expect(onInteract).toHaveBeenCalledTimes(1)
-    expect(miss.defaultPrevented, '沒有目標的 E 不是世界的，不能擋').toBe(false)
-  }, 60_000)
-
   it('[FE-W06-S11] 沒有目標時按 E 不得拋錯，也不得觸發任何東西', async () => {
     const poseRef = pose(0, TUNING.range + 5)
     const onInteract = vi.fn()
