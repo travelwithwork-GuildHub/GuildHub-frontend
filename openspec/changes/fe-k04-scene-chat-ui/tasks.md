@@ -11,11 +11,13 @@
 
 - [x] 2.1 先寫 jsdom：`[FE-K04-S03]`（注入的 `ChatRecord[]`：順序、name、截斷標記只在那一列、body 就是交來的）、`[FE-K04-S04]`（空狀態標記、沒有列；多一則 → 標記消失、恰好一列）、`[FE-K04-S13]`（兩個節點 `textContent` 原字串、沒有子元素、整區沒有 `script`／`img`／`a[href^="javascript"]`）
 - [x] 2.2 `src/chat/SceneChatFeed.tsx`：讀 `useSceneChat().log`；append-only 的列表（不用 `ListPanel`）；每列 `[data-testid="chat-name"]`／`[data-testid="chat-body"]` 純文字節點；`truncated` 標記；空狀態（元件常數，不擴充 `FE-X04`）
-  - 2026-09-15：判準先 commit（紅：元件不存在）再實作。`SceneChatFeed({ log })` 是純呈現（`useSceneChat()` 在 `--world` 的 `SceneChatHud` 接）；`<ol role="log">`（隱含 polite live region）；key 用 index（協定沒 id，尾加頭淘汰）。
-    `ui-ux-pro-max`（`--domain ux`：語意 HTML／ARIA、空狀態要有訊息）。
+  - 2026-09-15：判準先 commit（紅：元件不存在）再實作。`SceneChatFeed({ log })` 是純呈現（`useSceneChat()` 在 `--world` 的 `SceneChatHud` 接）。
+    審查退回四點：`role="log"` 常駐在外層容器（不是有訊息才掛，第一則才會被當 live update）；key 改用 `ChatRecord.seq`（store 跨場景單調遞增的本地序號 ——
+    協定沒訊息 id、`id` 是發言者；index 當 key 會在淘汰第一筆時把每一列改字、live region 全部重念）；`overflow-wrap:anywhere`＋`min-w-0`（`break-words` 壓不低 flex item 的 min-content，2000 字無空白會撐出 HUD）；
+    標記與空狀態要有字、不能 hidden／aria-hidden。`ui-ux-pro-max`（`--domain ux`：語意 HTML／ARIA、空狀態要有訊息）。
 - [x] 2.3 `output-safety` 的具名元件判準加 chat 的兩個節點 —— S13 放在 `tests/scene-chat-feed.test.tsx`（同一個元件的葉測試裡；`output-safety-render.test.tsx` 要起 HTTP server，chat 不需要）
 - [x] 2.4 突變：列表用 `dangerouslySetInnerHTML` → S13 紅＋既有 lint 紅；順序反轉 → S03 紅；`truncated` 全標或不標 → S03 紅；UI 自己再截一次 → S03 紅；空狀態拿掉 → S04 紅
-  - 2026-09-15 結果（`tests/scene-chat-feed.test.tsx`，3 條）：六種全紅（`innerHTML` 同時 eslint 紅）。執行紀錄貼在 PR 留言。
+  - 2026-09-15 結果（`tests/scene-chat-feed.test.tsx`，4 條）：十種全紅（`innerHTML` 同時 eslint 紅；另 index 當 key、`role=log` 只在非空才掛、空狀態沒字、標記 hidden 各自紅）。執行紀錄貼在 PR 留言。
 
 ## 3. 輸入與送出（PR：`--composer`；產品碼 ≤200、測試 ≤250）
 
