@@ -5,14 +5,18 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-r11-realtime-chat`；兩位外部審查）
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-r11-realtime-chat`；兩位外部審查）
 - [ ] 1.2 ADR：chat 只走 `RemoteWorld` 注入的窄介面、不 import client 的值（design D1；邊界狀態、證據照 `docs/adr/README.md`）
 
 ## 2. 記憶體與限制（PR：`--memory`；產品碼 ≤120、測試 ≤150）
 
-- [ ] 2.1 先寫單元：`[FE-R11-S04]`（101 → 100、最舊淘汰；2001 code point → 留 2000 標 truncated、2000 原值）、`[FE-R11-S05]` 的靜態邊界（sceneChat 模組不 import operations／transport、不出現 storage／indexedDB 字樣）、`[FE-R11-S09]`（`LIMITS.chatBody` 是 `{0, UNBOUNDED}`、來源、`ChatIn`／`ChatOut` 的 body 沒有長度 checks（自省）、2001 字與空字串通過）
-- [ ] 2.2 `src/realtime/sceneChat.ts`：純 reducer（append、筆數截斷 100、單則保留 2000 code point＋`truncated`、clear）；`limits.ts` 加 `chatBody` 與來源
-- [ ] 2.3 突變：拿掉筆數截斷 → S04 紅；拿掉單則預算 → S04 紅；`max` 改 2000 或 `min` 改 1 → S09 紅；`ChatIn.body` 加 `.max(10_000_000)` → S09 自省紅
+- [x] 2.1 先寫單元：`[FE-R11-S04]`（101 → 100、最舊淘汰；2001 code point → 留 2000 標 truncated、2000 原值）、`[FE-R11-S05]` 的靜態邊界（sceneChat 模組不 import operations／transport、不出現 storage／indexedDB 字樣）、`[FE-R11-S09]`（`LIMITS.chatBody` 是 `{0, UNBOUNDED}`、來源、`ChatIn`／`ChatOut` 的 body 沒有長度 checks（自省）、2001 字與空字串通過）
+- [x] 2.2 `src/realtime/sceneChat.ts`：純 reducer（append、筆數截斷 100、單則保留 2000 code point＋`truncated`、clear）；`limits.ts` 加 `chatBody` 與來源
+  - 2026-09-15：`appendChat(log, ChatOut): ChatLog`＋`EMPTY_CHAT`（clear 就是回到它）、`CHAT_KEEP`／`CHAT_BODY_BUDGET`；`ws.ts` 補 `export type ChatOut`；
+    `LIMITS.chatBody = {0, UNBOUNDED}`、`LIMIT_SOURCES.chatBody`；`tests/contract/boundaries.ts` 加 `pending`（WS 不走 REST 那張表）。
+- [x] 2.3 突變：拿掉筆數截斷 → S04 紅；拿掉單則預算 → S04 紅；`max` 改 2000 或 `min` 改 1 → S09 紅；`ChatIn.body` 加 `.max(10_000_000)` → S09 自省紅
+  - 2026-09-15 結果（`tests/scene-chat-memory.test.ts`，5 條）：全部如上紅；另外 用 UTF-16 `.length` 截 → S04 emoji 那條紅；原始碼出現 `sessionStorage` → S05 紅；import `@/api/operations` → S05 紅。
+    靜態邊界的尺有對照組（`operations.ts` 的圖到得了 `transport`）。
 
 ## 3. 分派與送出（PR：`--transport`；產品碼 ≤180、測試 ≤200）
 
