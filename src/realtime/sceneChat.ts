@@ -18,6 +18,8 @@ export const CHAT_KEEP = 100
 export const CHAT_BODY_BUDGET = 2000
 
 export interface ChatRecord {
+  /** 這一頁裡單調遞增的本地序號：UI 的 key（協定沒有訊息 id；`id` 是發言者，不唯一）。由持有者（store）給，reducer 不自己數。 */
+  readonly seq: number
   readonly id: string
   readonly name: string
   /** 保存的內文：原值，或前 `CHAT_BODY_BUDGET` 個 code point（那時 `truncated` 是 true）。**沒有 trim、沒有轉義。** */
@@ -39,10 +41,13 @@ function keepCodePoints(s: string, budget: number): { body: string; truncated: b
   return { body: s, truncated: false }
 }
 
-/** 一則通過驗證的 `ChatOut` 進來：建一筆紀錄、超過筆數就淘汰最舊的。**不看內容、不看是不是自己**（回聲照收，design D2）。 */
-export function appendChat(log: ChatLog, message: ChatOut): ChatLog {
+/**
+ * 一則通過驗證的 `ChatOut` 進來：建一筆紀錄、超過筆數就淘汰最舊的。**不看內容、不看是不是自己**（回聲照收，design D2）。
+ * `seq` 由呼叫端給（store 有一個跨場景單調遞增的計數器）；沒給就接在上一筆後面。
+ */
+export function appendChat(log: ChatLog, message: ChatOut, seq: number = (log.at(-1)?.seq ?? -1) + 1): ChatLog {
   const { body, truncated } = keepCodePoints(message.body, CHAT_BODY_BUDGET)
-  const record: ChatRecord = { id: message.id, name: message.name, body, truncated }
+  const record: ChatRecord = { seq, id: message.id, name: message.name, body, truncated }
   const next = log.length >= CHAT_KEEP ? log.slice(log.length - CHAT_KEEP + 1) : log
   return [...next, record]
 }

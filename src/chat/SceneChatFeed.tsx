@@ -19,21 +19,23 @@ export const CHAT_FEED_LABELS = {
 }
 
 export function SceneChatFeed({ log }: { log: ChatLog }) {
+  // `role="log"` 常駐（不是有訊息才掛）：第一則進來時輔助技術才會把它當 live update，而不是連同 live region 一起出現。
   return (
-    <div data-testid="chat-feed" className="flex min-h-0 flex-col gap-1">
+    <div role="log" aria-label={CHAT_FEED_LABELS.log} data-testid="chat-feed" className="flex min-h-0 min-w-0 flex-col gap-1">
       {log.length === 0 ? (
         <p data-testid="chat-empty" className="text-ink-muted text-caption">
           {CHAT_FEED_LABELS.empty}
         </p>
       ) : (
-        <ol role="log" aria-label={CHAT_FEED_LABELS.log} className="m-0 flex list-none flex-col gap-1 p-0">
-          {/* key 用 index：協定沒有訊息 id；列表只會在尾端加、在頭端淘汰，錯位的代價是純文字列重畫一次。 */}
-          {log.map((record, index) => (
-            <li key={index} data-testid="chat-row" className="flex flex-wrap gap-x-2">
-              <span data-testid="chat-name" className="font-semibold">
+        <ol className="m-0 flex min-w-0 list-none flex-col gap-1 p-0">
+          {/* key 是 store 給的本地序號：滿了淘汰第一筆時既有的節點原地不動（index 當 key 會把每一列都改字，live region 全部重念）。 */}
+          {log.map((record) => (
+            <li key={record.seq} data-testid="chat-row" className="flex min-w-0 flex-wrap gap-x-2">
+              <span data-testid="chat-name" className="font-semibold [overflow-wrap:anywhere]">
                 {record.name}
               </span>
-              <span data-testid="chat-body" className="whitespace-pre-wrap break-words">
+              {/* `overflow-wrap:anywhere`（不是 `break-words`）：它會壓低 flex item 的 min-content 寬度，2000 個字的無空白單詞不會把 HUD 撐出容器。 */}
+              <span data-testid="chat-body" className="min-w-0 max-w-full whitespace-pre-wrap [overflow-wrap:anywhere]">
                 {record.body}
               </span>
               {record.truncated && (
