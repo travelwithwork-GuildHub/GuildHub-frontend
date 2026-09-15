@@ -15,7 +15,7 @@ import WorldCanvas from '@/world/WorldCanvas'
 // 規格：openspec/changes/fe-n08-room-entry-gate/specs/room-entry-gate/spec.md
 //   Requirement: 握手失敗後，使用者可以選擇重新輸入密碼；系統仍不丟票 —— S11
 //
-// 整條鏈是正式碼（同 `world-scenes-transition-ui.test.tsx`）：`SceneProvider` → `WorldCanvas` → `RemoteWorld` → `new WebSocket(url)`；
+// 整條鏈是正式碼（同 `world-scenes-transition-ui.test.tsx`）；每條走兩趟以上，全套平行跑時預設 5 秒會逾時（實測）→ 20 秒：`SceneProvider` → `WorldCanvas` → `RemoteWorld` → `new WebSocket(url)`；
 // 通知在 Canvas 外（`page.tsx` 的形狀）、視窗在 `WorldCanvas` 裡；`RoomEntryGateProvider` 包住兩者。換掉的只有第三方邊界與 `LocalPlayer`。
 
 const identity = vi.hoisted(() => ({ current: { state: 'unknown' } as Identity }))
@@ -185,7 +185,7 @@ describe('被拒之後', () => {
     expect(screen.getByRole('dialog', { name: new RegExp(TITLE) })).toBeTruthy()
     expect(field().value).toBe('')
     expect(enterProject).not.toHaveBeenCalled()
-  })
+  }, 20_000)
 
   it.each<[string, () => void, string | null]>([
     ['removeItem 拋', () => void vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('SecurityError') }), 'T'],
@@ -202,7 +202,7 @@ describe('被拒之後', () => {
     vi.restoreAllMocks()
     if (keyAfter !== null) expect(window.sessionStorage.getItem(KEY), '鍵仍是 T').toBe(keyAfter)
     expect(enterProject).not.toHaveBeenCalled()
-  })
+  }, 20_000)
 
   it('[FE-N08-S11] 深連結失敗、清單還沒回來：視窗沒房名但可辨識；清單回來後同一個節點的名稱更新、欄位不變 —— R 排不進走廊也一樣', async () => {
     // R 排在走廊容量之外（前面塞滿 id 更小的房間）：房名要從**完整**清單查，不是走廊那份（審查抓到：用 `doors` 查，冷門房間永遠補不上）。
@@ -233,5 +233,5 @@ describe('被拒之後', () => {
     expect(screen.getByRole('dialog')).toBe(dialog)
     expect(screen.getByRole('dialog', { name: new RegExp(TITLE) })).toBe(dialog)
     expect(field().value).toBe('abc')
-  })
+  }, 20_000)
 })
