@@ -168,7 +168,7 @@ export function RemoteWorld({
       },
     })
     clientRef.current = client
-    link = chat?.attach((input) => client.send(JSON.stringify(input))) ?? null
+    link = chat?.attach((input) => client.send(JSON.stringify(input)), scene) ?? null
     // 先等上一棵子樹的連線關乾淨（`FE-V01-S18`），再連。閘門是空的（第一次掛載）就立刻連。
     // `cancelled`：等的期間就被卸載（Strict Mode 的第二次 effect、或使用者又換了場景）的話不連 ——
     // 那時 `client.close()` 已經跑過，而一個 idle 的 client 被 `close()` 之後再 `connect()` 會拋錯。
