@@ -10,7 +10,7 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
-import { assertLoopback, bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, guardLoopback, hold, ok, overlaysSeen, profile, promptText, uuid, waitForTransition, waitForWorld, walker } from './lib/world.mjs'
+import { HALL_SPAWN, assertLoopback, bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, guardLoopback, hold, lastReportedPosition, ok, overlaysSeen, profile, promptText, uuid, waitForTransition, waitForWorld, walker } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-k04'
@@ -74,6 +74,10 @@ try {
     else bad('[S01] 名字或內容不對', JSON.stringify([names, await rowsText(page)]))
     if ((await page.$$('[role="dialog"]')).length === 0 && (await page.$('[data-testid="interaction-prompt"]')) === null) ok('[S01] 沒有 dialog、沒有互動提示；到此為止沒有按過任何鍵（沒走位、沒按 E）')
     else bad('[S01] 有 dialog 或提示')
+    // 角色還在出生點：看角色**自己回報**的位置（`PositionSync` ready 之後送的 `move` frame），不用里程計（校準本身會走位）
+    const reported = lastReportedPosition(sockets[0])
+    if (reported !== null && Math.hypot(reported.x - HALL_SPAWN.x, reported.z - HALL_SPAWN.z) < 0.5) ok(`[S01] 角色回報的位置在出生點附近（${reported.x.toFixed(2)}, ${reported.z.toFixed(2)}）`)
+    else bad('[S01] 角色不在出生點', JSON.stringify(reported))
     await page.screenshot({ path: path.join(OUT, 'hud-lobby.png') })
     const where = await odometer(page) // 校準：往西走到兩扇門的標籤都看得見（門標籤是量尺）；之後的位移相對它
     const pos0 = await where()
