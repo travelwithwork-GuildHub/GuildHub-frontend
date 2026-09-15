@@ -48,7 +48,12 @@
 
 ## 5. 收尾
 
-- [ ] 5.1 `[FE-R11-S05]` 的 e2e 併入 `FE-K04` 的 `tests/e2e/scene-chat.mjs`，K04 的 tasks 正式引用 `[FE-R11-S05]`（這一層沒有可見面：**這條與 5.4 在 K04 的 e2e 綠之前不得打勾**）
-- [ ] 5.2 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test` 的結果如實記在這裡
-- [ ] 5.3 Google Sheet：`FE-R11` → On-going；Done 等 K04 的 e2e 綠了才打
-- [ ] 5.4 封存（`archive/fe-r11-realtime-chat`）
+- [x] 5.1 `[FE-R11-S05]` 的 e2e 併入 `FE-K04` 的 `tests/e2e/scene-chat.mjs`，K04 的 tasks 正式引用 `[FE-R11-S05]`（這一層沒有可見面：**這條與 5.4 在 K04 的 e2e 綠之前不得打勾**）
+  - 2026-09-16：K04 的 `scene-chat.mjs` S10 段標 `[FE-R11-S05]`（#440；K04 tasks 6.1 引用）：reload 後只回 hello＋snapshot、38 個請求都在 allowlist 內。本機對 `next start` 綠；`e2e-main` 在 ubuntu runner 上 `scene-chat` 121 秒綠（#446）。K04 已封存（#448）。
+- [x] 5.2 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test` 的結果如實記在這裡
+  - 2026-09-16（main `38213f3`）：typecheck 過；eslint 乾淨；`pnpm test` 第一次 148 檔 **9 failed**／1116 passed／7 skipped —— 8 個是 lint／tsc 子行程的逾時（機器 load 8、三個 session 同時在跑；單檔重跑 130～334 秒才跑完），
+    1 個是 `deploy-build-gate` S05 的 `next build` 撞到 `typecheck-negative` 同時放在 `src/` 的探針檔（平行跑的隔離缺口，跟 R11 無關、記著）。把 9 檔單獨重跑：全部通過（103／103）。
+- [x] 5.3 Google Sheet：`FE-R11` → On-going；Done 等 K04 的 e2e 綠了才打
+  - 2026-09-16：On-going（#434 後）→ Done（K04 e2e 在 runner 上綠、K04 封存後）。
+- [x] 5.4 封存（`archive/fe-r11-realtime-chat`）
+  - 2026-09-16：這個 PR 就是那個勾勾；封存接著開。
