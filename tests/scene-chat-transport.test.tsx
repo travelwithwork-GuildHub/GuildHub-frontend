@@ -1,5 +1,5 @@
 import { act, render } from '@testing-library/react'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { useRef, type RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,7 @@ import { RealtimeClient, RealtimeError } from '@/realtime/client'
 import { createSceneChatStore, type SceneChatStore } from '@/realtime/sceneChatStore'
 import type { LocalPose } from '@/world/PositionSync'
 import { RemoteWorld } from '@/world/RemoteWorld'
+import { importGraph, stripComments } from './lib/importGraph'
 import { diagnosticsByFile } from './lib/typeFixtures'
 
 // 規格：openspec/changes/fe-r11-realtime-chat/specs/scene-chat-transport/spec.md
@@ -135,14 +136,14 @@ describe('分派', () => {
     const entries = readdirSync(path.join(root, 'src/realtime')).filter((f) => f.startsWith('sceneChat'))
     expect(entries.length).toBeGreaterThan(1)
     for (const entry of entries) {
-      for (const file of importGraph(path.join(root, 'src/realtime', entry))) {
-        const source = readFileSync(file, 'utf8')
+      const graph = importGraph(path.join(root, 'src/realtime', entry))
+      // import 圖只含 runtime 的邊（`import type` 不留邊）：到得了 `client.ts` 就是 import 了它的值。
+      expect([...graph].map((f) => path.relative(root, f)), `${entry} 的 import 圖到達了 client 的值`).not.toContain('src/realtime/client.ts')
+      for (const file of graph) {
+        const code = stripComments(readFileSync(file, 'utf8'), file)
         const rel = path.relative(root, file)
-        // 型別 import 不算（`import type … from '@/realtime/client'` 在 import 圖上不留邊）；值的 import 一律不准。
-        expect(/^import\s+(?!type\s)[^'"]*from\s*['"](@\/|\.\/|(\.\.\/)+)realtime\/client['"]/m.test(source), `${rel} import 了 client 的值`).toBe(false)
-        expect(/^import\s+(?!type\s)[^'"]*from\s*['"](\.\/|(\.\.\/)+)client['"]/m.test(source), `${rel} import 了 client 的值`).toBe(false)
-        expect(source.includes('createMessageValidator'), `${rel} 碰了驗證器`).toBe(false)
-        expect(source.includes('JSON.parse'), `${rel} 自己 parse raw frame`).toBe(false)
+        expect(code.includes('createMessageValidator'), `${rel} 碰了驗證器`).toBe(false)
+        expect(code.includes('JSON.parse'), `${rel} 自己 parse raw frame`).toBe(false)
       }
     }
     const diags = diagnosticsByFile()
@@ -246,34 +247,3 @@ describe('送出', () => {
     expect(store.getLog().at(-1)?.id).toBe('me')
   })
 })
-
-/** 走 `src/` 的靜態 import 圖（同 `scene-chat-memory.test.ts`）。 */
-function importGraph(entry: string): Set<string> {
-  const root = path.resolve(import.meta.dirname, '..')
-  const isFile = (p: string) => {
-    try {
-      readdirSync(p)
-      return false
-    } catch {
-      return existsSync(p)
-    }
-  }
-  const resolveFrom = (from: string, spec: string): string | null => {
-    const base = spec.startsWith('@/') ? path.join(root, 'src', spec.slice(2)) : spec.startsWith('.') ? path.resolve(path.dirname(from), spec) : null
-    if (base === null) return null
-    for (const c of [base, `${base}.ts`, `${base}.tsx`, path.join(base, 'index.ts'), path.join(base, 'index.tsx')]) if (isFile(c)) return c
-    return null
-  }
-  const seen = new Set<string>()
-  const queue = [entry]
-  while (queue.length > 0) {
-    const file = queue.pop() as string
-    if (seen.has(file)) continue
-    seen.add(file)
-    for (const m of readFileSync(file, 'utf8').matchAll(/(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|import\s*['"]([^'"]+)['"]/g)) {
-      const target = resolveFrom(file, m[1] ?? m[2] ?? m[3] ?? '')
-      if (target !== null) queue.push(target)
-    }
-  }
-  return seen
-}
