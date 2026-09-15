@@ -36,7 +36,7 @@
     Tab 不攔 → S03 紅；關閉不卸載只 hidden（密碼留著）→ S02 三處紅；第二次 needsToken 換 key 重掛 → S01「仍是 ab」紅（只拿掉 provider 的物件同一性 guard 而 key 仍是 projectId 時不紅 —— key 才是防線，guard 只是省 re-render）。
     `ui-ux-pro-max`（`--domain ux`：focus ring 每個控制都要、錯誤放欄位下並 `aria-describedby`、允許貼上／密碼管理員、不用只靠 placeholder 當標籤）：用 `@/design/controls` 的 `FIELD`／`PRIMARY`／`SECONDARY`（已含 focus 樣式）、可見的 `<label>`、`autoComplete="current-password"`；顯示／隱藏密碼的切換沒做（規格沒有，之後要就開 spec）。
 
-## 4. 送出、錯誤、成功進房（PR：`--submit`；產品碼 ≤200、測試 ≤350 —— S15 一條就七段，原估 250 不夠）
+## 4. 送出、錯誤、成功進房（PR：`--submit`；產品碼 ≤200、測試 ≤450 —— 原估 250：S15 一條就七段，審查後又加了兩條排程的判準與 DefaultLane 的身分 harness）
 
 - [x] 4.1 先寫 jsdom：`[FE-N08-S04]`（去重、busy、送出中 Esc 關得掉、晚到結果丟棄、空字串照送、不自動重送）、`[FE-N08-S06]` 的順序（`holdRoomToken` 在 `enterRoom` 之前；用呼叫順序斷言）、`[FE-N08-S14]`（四種 storage 故障＋空字串票 → 不進房、視窗留著、alert 不含「密碼」）、`[FE-N08-S15]`（換房間 → 作廢；關了重開同一間房 → 舊回應作廢；視窗不關、身分 P→Q → 舊輪作廢且 busy 立刻解除、Q 可送；P 舊回應晚到不動 Q 的 busy；P→Q→P → 作廢；登出 → 作廢；視窗都還開著）、`[FE-N08-S08]`～`S10`（403／404×3 種 detail／401／網路／500／422／壞 body；detail 不進 DOM；不存票、不 `enterRoom`）
 - [x] 4.2 `useForm` ＋ `enterProject()`；錯誤分類只看 `kind`（`isForbidden`／`isNotFound` 的寫法照 `identity/session.ts`）；文案在元件常數，不在規格
