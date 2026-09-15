@@ -81,6 +81,12 @@ export const LIMITS = {
   /** `skills` / `needed_skills` 是 `text[]`，數量與每一項的長度都沒有上限。 */
   skillCount: { min: 0, max: UNBOUNDED },
   skillLength: { min: 1, max: UNBOUNDED },
+  /**
+   * WS 聊天內文。**後端只驗「是字串」**（`protocol.py::ChatIn.body: str`）：空字串、全空白、10 MB 都收。
+   * 如實記成 `{0, UNBOUNDED}`（`FE-R11` design D5）——「全空白不送」是 `FE-K04` 的送出規則、
+   * 「單則只保留 2000 code point」是 `sceneChat.ts` 的客戶端預算，兩者都**不是**後端限制，不寫在這裡。`BE-G16` 未解。
+   */
+  chatBody: { min: 0, max: UNBOUNDED },
 } as const
 
 /** 後端 `list_*` 的 offset 翻頁大小。沒有 total、沒有 `has_more`（`BE-G05`）。 */
@@ -107,6 +113,7 @@ export const LIMIT_SOURCES: Record<keyof typeof LIMITS, { source: string; checke
   projectBody: { source: 'sql/001_schema.sql:28（沒有 check）', checkedOn: '2026-09-11' },
   skillCount: { source: 'sql/001_schema.sql skills text[]（沒有 check）', checkedOn: '2026-09-11' },
   skillLength: { source: 'sql/001_schema.sql skills text[]（沒有 check）', checkedOn: '2026-09-11' },
+  chatBody: { source: 'app/realtime/protocol.py::ChatIn.body（str，沒有長度驗證）', checkedOn: '2026-09-15' },
 }
 
 // ─── 長度單位是 Unicode code point：這三個 helper 是唯一算法。規格 `FE-O06`〈長度單位是 Unicode code point〉 ───

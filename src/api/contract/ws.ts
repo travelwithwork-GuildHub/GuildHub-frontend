@@ -175,6 +175,8 @@ export const ServerMessage = z.discriminatedUnion('t', [
 export type Move = z.infer<typeof Move>
 export type StatusIn = z.infer<typeof StatusIn>
 export type ChatIn = z.infer<typeof ChatIn>
+/** 場景聊天的接收端（`FE-R11`）只收這個型別 —— 驗證器產出的物件，不是字串。 */
+export type ChatOut = z.infer<typeof ChatOut>
 export type ClientMessage = z.infer<typeof ClientMessage>
 export type Player = z.infer<typeof Player>
 export type ServerMessage = z.infer<typeof ServerMessage>
