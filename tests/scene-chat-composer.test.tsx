@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { useState } from 'react'
+import { useEffect, useState, type RefObject } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChatIn } from '@/api/contract/ws'
 import { SceneChatComposer, CHAT_COMPOSER_LABELS } from '@/chat/SceneChatComposer'
@@ -20,10 +20,12 @@ const type = (value: string) => fireEvent.change(field(), { target: { value } })
 const pressEnter = (shift = false) => fireEvent.keyDown(field(), { key: 'Enter', shiftKey: shift })
 const rows = () => screen.queryAllByTestId('chat-row')
 
-/** 兩個元件一起掛；`log` 由外面控制（模擬回聲）。 */
-function Harness({ send, initialLog = [] }: { send: (input: ChatIn) => void; initialLog?: ChatRecord[] }) {
-  const [log, setLog] = useState<ChatRecord[]>(initialLog)
-  ;(globalThis as { __echo?: (r: ChatRecord) => void }).__echo = (r) => setLog((prev) => [...prev, r])
+/** 兩個元件一起掛；`log` 由外面控制（模擬回聲）：`echoRef` 只在 effect 裡寫（跟 repo 既有的 ref-prop 模式一樣）。 */
+function Harness({ send, echoRef }: { send: (input: ChatIn) => void; echoRef: RefObject<((r: ChatRecord) => void) | null> }) {
+  const [log, setLog] = useState<ChatRecord[]>([])
+  useEffect(() => {
+    echoRef.current = (r) => setLog((prev) => [...prev, r])
+  }, [echoRef])
   return (
     <div>
       <SceneChatFeed log={log} />
@@ -31,7 +33,11 @@ function Harness({ send, initialLog = [] }: { send: (input: ChatIn) => void; ini
     </div>
   )
 }
-const echo = (r: ChatRecord) => act(() => (globalThis as { __echo?: (r: ChatRecord) => void }).__echo?.(r))
+function mount(send: (input: ChatIn) => void) {
+  const echoRef: RefObject<((r: ChatRecord) => void) | null> = { current: null }
+  render(<Harness send={send} echoRef={echoRef} />)
+  return { echo: (r: ChatRecord) => act(() => echoRef.current?.(r)) }
+}
 
 afterEach(() => {
   cleanup()
@@ -41,7 +47,7 @@ afterEach(() => {
 describe('送出', () => {
   it('[FE-K04-S05] 空與全空白不送、辨識要先輸入；「  哈囉  」原字串送出', () => {
     const send = vi.fn()
-    render(<Harness send={send} />)
+    mount(send)
     fireEvent.click(submitButton())
     type('   ')
     fireEvent.click(submitButton())
@@ -63,7 +69,7 @@ describe('送出', () => {
     const send = vi.fn((_input: ChatIn) => {
       if (!accept) throw error
     })
-    render(<Harness send={send} />)
+    const { echo } = mount(send)
     type('哈囉')
     fireEvent.click(submitButton())
     expect(field().value, '拋了就保留').toBe('哈囉')
@@ -90,7 +96,7 @@ describe('送出', () => {
 
   it('[FE-K04-S07] 沒有 maxlength；2001 個 code point 完整送出', () => {
     const send = vi.fn()
-    render(<Harness send={send} />)
+    mount(send)
     expect(field().hasAttribute('maxlength')).toBe(false)
     const long = '😀字'.repeat(1000) + '尾'
     expect([...long]).toHaveLength(2001)
@@ -101,7 +107,7 @@ describe('送出', () => {
 
   it('[FE-K04-S14] Enter 送、送出控制送、Shift+Enter 換行不送、含換行的 body 原樣', () => {
     const send = vi.fn()
-    render(<Harness send={send} />)
+    mount(send)
     type('一')
     pressEnter()
     expect(send).toHaveBeenCalledTimes(1)
