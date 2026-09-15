@@ -50,6 +50,7 @@ export const BOUNDARY_CASES = {
   projectBody: { pending: 'FE-X05 前端自訂上限（後端沒有 check；min 是前端的規則，不對後端驗）' },
   skillCount: { pending: 'FE-X05（後端 text[] 沒有 check）' },
   skillLength: { pending: 'FE-X05（後端 text[] 沒有 check）' },
+  chatBody: { pending: 'WS 的 chat.body 只驗是字串、沒有上限（FE-R11 design D5；BE-G16 未解），不走 REST 這張表' },
 } satisfies Record<keyof typeof LIMITS, BoundaryCase>
 
 export type Field = keyof typeof BOUNDARY_CASES
