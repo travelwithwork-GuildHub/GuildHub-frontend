@@ -31,6 +31,7 @@ import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
 import { SceneObjects } from './scenes/SceneObjects'
 import { useRequestEntry } from './scenes/EntryGate'
 import { useSceneChatPortIfProvided } from '@/realtime/SceneChatProvider'
+import { SceneChatHud } from '@/chat/SceneChatHud'
 import { RoomPasswordDialog } from './scenes/RoomPasswordDialog'
 import { useScene } from './scenes/SceneProvider'
 import { SceneTransitionOverlay } from './scenes/SceneTransitionOverlay'
@@ -214,6 +215,8 @@ export default function WorldCanvas() {
           <InteractionPrompt />
           {/* 目前 scene 的在線人數（`FE-R10-S07`～`S09`）。兩個場景都有；未就緒時不渲染。 */}
           <OnlineCount count={onlineCount} />
+          {/* 場景聊天（`FE-K04`）：非阻斷的 HUD，靠左下、不遮提示；只看不鎖，輸入框有焦點才鎖（`EditableFocusLock`）。沒 provider 就不畫。 */}
+          <SceneChatHud />
           {/* 看板開出來的清單面板（`FE-B01`）。DOM，`layer('panel')`。 */}
           <BoardPanel />
           {/* 「我的名片」面板（`FE-A04`）：開關在標題列的按鈕，面板在這裡 —— 同一個定位基準、同一把鎖的 provider 底下。 */}

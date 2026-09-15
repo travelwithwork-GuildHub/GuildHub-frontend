@@ -40,7 +40,10 @@ export function fakeRealtime(context, sockets, { refuse = () => false } = {}) {
   return context.routeWebSocket(/\/ws(\?|$)/, async (ws) => {
     const url = new URL(ws.url())
     const scene = url.searchParams.get('scene')
-    sockets.push({ scene, token: url.searchParams.get('token') })
+    // `ws`：之後要「伺服器主動送」的腳本（chat）從這裡拿；`sent`：頁面送給伺服器的 frame（`move` 就是角色自己回報的位置）。只讀 scene／token 的腳本不受影響。
+    const record = { scene, token: url.searchParams.get('token'), ws, sent: [] }
+    ws.onMessage((message) => record.sent.push(String(message)))
+    sockets.push(record)
     if (refuse(scene)) {
       await ws.close({ code: 1006, reason: 'refused' })
       return
@@ -160,7 +163,24 @@ export async function watchCanvas(page, canvas) {
  * 走位。`room`／`decoy`：走廊前兩格的門（相隔剛好一格：`CORRIDOR_SLOTS` z 差 `slotGap`，螢幕上的距離就是「每單位幾個像素」）；
  * `title`：目標門的名字（提示上出現它就是到了）；`out`：迷路時的截圖目錄。
  */
-export function walker({ room, decoy, title, out, slotGap = 2, doorZ = -2, spawn = { x: 0, z: -1 } }) {
+/** 出生點（`world-layout` 的 hall spawn），世界單位。 */
+export const HALL_SPAWN = { x: 0, z: -1 }
+/** 線上座標是像素（`src/world/coords.ts`：`PIXELS_PER_UNIT = 32`，`y` 是世界的 z）。 */
+const PIXELS_PER_UNIT = 32
+/** 最後一筆角色自己回報的位置（`move` frame），換回世界單位；沒有就 null。 */
+export function lastReportedPosition(socket) {
+  for (let i = socket.sent.length - 1; i >= 0; i -= 1) {
+    try {
+      const m = JSON.parse(socket.sent[i])
+      if (m.t === 'move') return { x: m.x / PIXELS_PER_UNIT, z: m.y / PIXELS_PER_UNIT }
+    } catch {
+      /* 不是 JSON 的 frame 不算 */
+    }
+  }
+  return null
+}
+
+export function walker({ room, decoy, title, out, slotGap = 2, doorZ = -2, spawn = HALL_SPAWN }) {
   /**
    * 角色走了多遠，用門標籤量出來。相機跟著角色、正交投影、沒有偏航（`camera.ts`：offset (0, 12, 12)），
    * 所以世界裡的門在螢幕上移動多少，就是角色反向走了多少：x 一單位 = s px，z 一單位 = s/√2 px（俯角 45°）。
