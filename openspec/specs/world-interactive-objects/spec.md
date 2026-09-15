@@ -297,7 +297,7 @@ SLOT_COUNT = floor(走廊深度 / (門的視覺寬度 + 最小間隙))
 
 #### Scenario: [FE-V01-S11] 沒有票時對著門按 E，門會說話
 
-- **GIVEN** 提示正顯示著某一扇門的名字，且沒有那間房的票
+- **GIVEN** 提示正顯示著某一扇門的名字，且沒有那間房的票，且**門禁是預設的**（沒有掛正式的 provider；掛了正式門禁時的行為是 `room-entry-gate` 的 `FE-N08-S01`）
 - **WHEN** 玩家按下 `E`
 - **THEN** SHALL 出現 `role="status"` 的說明，內容是上述那句
 - **AND** SHALL 沒有建立任何新的 socket；網址 SHALL 不變
