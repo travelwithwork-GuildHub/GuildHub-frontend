@@ -6,6 +6,7 @@ import { InboxPanelProvider } from '@/inbox/InboxPanelProvider'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
 import { ReturnToHallButton } from '@/world/scenes/ReturnToHallButton'
+import { RoomEntryGateProvider } from '@/world/scenes/RoomEntryGate'
 import { SceneNotices } from '@/world/scenes/SceneNotices'
 import { SceneProvider } from '@/world/scenes/SceneProvider'
 import { AvatarPicker } from './AvatarPicker'
@@ -31,6 +32,8 @@ export default function WorldPage() {
         <RealtimeGenerationProvider>
         {/* 在哪個場景（`FE-V01`）：從網址與票推導，要身分（`IdentityProvider` 在外面）；世界與網址那一層都在它底下。 */}
         <SceneProvider>
+        {/* 正式門禁（`FE-N08`）：沒票的門開密碼視窗。開關在這裡、視窗在 `WorldCanvas` 裡（鎖與焦點錨在那邊）。 */}
+        <RoomEntryGateProvider>
         <WorldGate>
           <main className="flex h-dvh flex-col">
             {/* ⚠️ **`IdentityBadge` 是 client component，這一頁仍然是同步的
@@ -60,6 +63,7 @@ export default function WorldPage() {
             </div>
           </main>
         </WorldGate>
+        </RoomEntryGateProvider>
         </SceneProvider>
         </RealtimeGenerationProvider>
         </InboxPanelProvider>
