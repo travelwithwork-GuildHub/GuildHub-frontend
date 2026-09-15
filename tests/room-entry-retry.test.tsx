@@ -161,6 +161,8 @@ async function inHall() {
 
 describe('被拒之後', () => {
   it('[FE-N08-S11] 票還在、通知有「重新輸入密碼」；不按就同票再試；按了才丟票、關通知、開含房名的空視窗；之前沒有 /enter', async () => {
+    // 清單裡沒有 R：房名只能來自通知記下的 `title`（第一來源）—— 通知不記房名這裡就紅。
+    listRooms.mockResolvedValue([])
     const w = await inHall()
     const first = await refusedOnce(w)
     expect(first.token).toBe('T')
