@@ -103,8 +103,13 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
         (out) => ({ ok: true as const, out }),
         (cause: unknown) => ({ ok: false as const, cause }),
       )
-      const woken = new Promise<'stale'>((resolve) => waiting.current.add(() => resolve('stale')))
+      let wake = () => {}
+      const woken = new Promise<'stale'>((resolve) => {
+        wake = () => resolve('stale')
+        waiting.current.add(wake)
+      })
       const result = await Promise.race([settled, woken])
+      waiting.current.delete(wake)
       // 作廢的一輪：不存票、不進房、不顯示；也不動新一輪的任何東西 —— 直接 resolve 把 busy 交出去。
       // （回應的 promise 鏈在 microtask 裡跑完、換代號的 effect 在 task 裡，兩者之間插不進「回應已落地、代號才換」—— 所以只看 race 的結果，不另外比計數。）
       if (result === 'stale') return
