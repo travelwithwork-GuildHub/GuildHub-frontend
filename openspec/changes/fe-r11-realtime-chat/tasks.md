@@ -34,9 +34,12 @@
 
 ## 4. 場景 generation（PR：`--scene-generation`；產品碼 ≤120、測試 ≤200）
 
-- [ ] 4.1 先寫 jsdom／單元：`[FE-R11-S06]`（過場中不清、committed 的 wsScene 變了才清）、`[FE-R11-S07]`（握手被拒、自動回大廳的新連線 ready 後訊息還在，且新連線的 chat 進得來）、`[FE-R11-S08]`（保存舊 callback 引用、直接呼叫 → 不進）
-- [ ] 4.2 綁 `SceneProvider.committed` 的 `wsScene`（不是 `RealtimeGenerationProvider.generation`）；`RemoteWorld` 把連線身分帶進 `onMessage`，不是目前連線的不收
-- [ ] 4.3 突變：過場開始就清 → S07 紅；用連線換了當清空條件 → S07 紅；換場景不清 → S06 紅；拿掉連線身分判斷 → S08 紅
+- [x] 4.1 先寫 jsdom／單元：`[FE-R11-S06]`（過場中不清、committed 的 wsScene 變了才清）、`[FE-R11-S07]`（握手被拒、自動回大廳的新連線 ready 後訊息還在，且新連線的 chat 進得來）、`[FE-R11-S08]`（保存舊 callback 引用、直接呼叫 → 不進）
+- [x] 4.2 綁 `SceneProvider.committed` 的 `wsScene`（不是 `RealtimeGenerationProvider.generation`）；`RemoteWorld` 把連線身分帶進 `onMessage`，不是目前連線的不收
+  - 2026-09-15：判準先 commit（S06 紅）再實作。`SceneChatProvider` 讀 `useScene()`：committed ＝ `transition === null ? scene : transition.from` 的 `wsScene`，用 ref 記上一個、變了才 `store.clear()`。
+    連線身分在 `--transport` 那片就有（`attach` 回的 link 綁在 `receive` 閉包裡、`current` 不是就不收）；S08 直接對 store 驗。
+- [x] 4.3 突變：過場開始就清 → S07 紅；用連線換了當清空條件 → S07 紅；換場景不清 → S06 紅；拿掉連線身分判斷 → S08 紅
+  - 2026-09-15 結果（`tests/scene-chat-scene.test.tsx`，3 條）：過場開始就清（committed 改看 `scene`）→ S06＋S07 紅；不清 → S06 紅；attach 就清 → S06＋S07 紅；拿掉 link 比對 → S08 紅。執行紀錄貼在 PR 留言。
 
 ## 5. 收尾
 
