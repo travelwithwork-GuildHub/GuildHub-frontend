@@ -81,6 +81,9 @@ export function SpatialInteraction({ poseRef }: SpatialInteractionProps) {
       // 直接拿快取的 callback 會觸發一個已經不存在的東西。
       const entry = registry.entries.get(id)
       if (entry === undefined) return
+      // 這一下 E 被世界吃掉了：擋掉它的預設動作，`keypress`／`input` 就不會再把一個 `e` 打進**被這一下開出來的**輸入框
+      // （`FE-N08-S02`：密碼視窗開出來時焦點落在密碼欄，瀏覽器驗收看到欄位裡有一個 e）。鎖著的時候在上面就 return 了，不會擋到打字。
+      e.preventDefault()
       entry.onInteract?.()
     }
     window.addEventListener('keydown', onKey)
