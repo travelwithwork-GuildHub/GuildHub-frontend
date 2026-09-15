@@ -28,14 +28,17 @@ DOM 密碼視窗：`role="dialog"`、`aria-modal="true"`、可及名稱含那間
 一次按鍵（含鍵盤重複事件）SHALL 最多開一個視窗、送零次請求。
 正式門禁掛上之後，「輸入密碼的功能還沒開放」那句預設說明 MUST NOT 出現。
 
-> 拔掉什麼會紅：不掛 provider → S01 的視窗不出現、預設說明出現；provider 不帶 `projectId`／`title` → 名稱對不上那扇門。
+> 拔掉什麼會紅：不掛 provider → S01 的視窗不出現、預設說明出現；provider 不帶 `projectId`／`title` → 名稱對不上那扇門；
+> 第二次 `needsToken` 重建視窗或重置表單 → S01 的「仍是 ab」。
 
 #### Scenario: [FE-N08-S01] 對著門按 E，出現這間房的密碼視窗
 
 - **GIVEN** 已登入、`sessionStorage` 沒有「晨光工作室」的票，提示正顯示著那扇門（`FE-W12-S15` 的真實路徑）
-- **WHEN** 按一次 E，並再收到兩次鍵盤重複的 `keydown`
+- **WHEN** 按一次 E
 - **THEN** 頁面 SHALL 恰好有一個 `role="dialog"` 且 `aria-modal="true"` 的視窗，可及名稱含「晨光工作室」
 - **AND** SHALL 沒有 `/enter` 請求、沒有新 socket、網址不變；SHALL 沒有「輸入密碼的功能還沒開放」
+- **AND WHEN** 視窗開著、欄位已輸入「ab」，在**另一個 frame** 再收到一次 `needsToken`（同一扇門；模擬按住 E 的重複事件穿過 `EntryGate` 的去重，或第二次按鍵）
+- **THEN** 頁面仍 SHALL 恰好一個視窗，欄位 SHALL 仍是「ab」（沒有重開、沒有重置）
 - **AND** Canvas SHALL 是同一個節點，Canvas 裡 SHALL 沒有輸入控制
 - → 驗於：jsdom、e2e
 
@@ -111,13 +114,13 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 讀回、**嚴格等於這一次回傳的 `room_token`** 才算存成功（`sessionStorage` 不可用時 `roomTokens.ts` 寫不進去也不拋；舊票殘留時讀回的是舊的），
 **再**呼叫 `enterRoom(projectId, { title })`；「先存後進」是本能力定下的順序義務，用呼叫順序驗。
 視窗 MUST NOT 自己建 WebSocket、MUST NOT 寫網址；成功後視窗 SHALL 關閉。
-讀回不等於本次的票（包括 `room_token` 是空字串）時 SHALL 視同失敗：MUST NOT 呼叫 `enterRoom`、視窗 SHALL 留著、
+讀回不等於本次的票時 SHALL 視同失敗；`room_token` 是空字串時 SHALL 視同失敗（獨立的檢查 —— 空字串存得進去也讀得回來，比對抓不到它）：MUST NOT 呼叫 `enterRoom`、視窗 SHALL 留著、
 SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行證，不說是密碼錯）—— 否則使用者剛輸對密碼就被判成「沒票」留在大廳，或拿舊票去撞握手。
-每一輪送出 SHALL 綁定發出時的 `profileId` 與 `projectId`：視窗關閉、換了目標房間、或身分改變之後，那一輪的結果 SHALL 作廢（不存票、不進房、不顯示）。
+每一輪送出的結果 SHALL 只在「視窗還開著、目標房間沒變、身分沒變」時才被採用；視窗關閉、換了目標房間、或身分改變之後，那一輪的結果 SHALL 作廢（不存票、不進房、不顯示）。
 同一身分、同一分頁已持有那間房的票時，門前按 E SHALL 直接走既有 `enterRoom`，MUST NOT 開視窗、MUST NOT 呼叫 `/enter`。
 
 > 拔掉什麼會紅：反轉兩個呼叫的順序 → S06 的順序斷言；存票時鍵不含身分 → S13 換身分讀到別人的票；有票也開視窗 → S07；
-> 存票不讀回或只檢查非 null → S14 的「舊票殘留」那段仍呼叫 `enterRoom`；結果不綁 profileId／projectId → S15。
+> 存票不讀回或只檢查非 null → S14 的「舊票殘留」那段仍呼叫 `enterRoom`；不作廢關閉前那一輪 → S15 前半；身分改變不作廢 → S15 後半。
 
 #### Scenario: [FE-N08-S06] 密碼對了：票存起來、過場開始、房間連線帶著票、網址沒有票
 
@@ -143,8 +146,8 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **GIVEN** 對房間 A 的 `/enter` 尚未回應
 - **WHEN** 按 Esc 關閉，再對房間 B 的門按 E 開視窗，接著 A 的請求回 `200 { "room_token": "TA" }`
 - **THEN** `sessionStorage` 裡 SHALL 沒有 A 也沒有 B 的票；SHALL 沒有 `enterRoom`；B 的視窗 SHALL 還開著、欄位空白、沒有 alert
-- **AND WHEN** 對 B 送出、尚未回應時身分變成訪客（登出），接著 B 的請求回 `200`
-- **THEN** SHALL 沒有存票、沒有 `enterRoom`；視窗 SHALL 關閉（身分沒了就沒有可存票的鍵）
+- **AND WHEN** 對 B 送出、尚未回應時身分變成訪客（登出；視窗**不**經使用者關閉），接著 B 的請求回 `200 { "room_token": "TB" }`
+- **THEN** SHALL 沒有存票（任何鍵都沒有 TB）、沒有 `enterRoom`、沒有 alert；視窗 SHALL 已關閉（身分沒了就沒有可存票的鍵）
 - → 驗於：jsdom
 
 #### Scenario: [FE-N08-S07] 有票的人回大廳再按 E，直接進、不問密碼
@@ -157,15 +160,16 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 ### Requirement: 失敗回饋可恢復、不猜原因、不回顯後端字串
 
 失敗的分類 SHALL 只看 `toUiError(cause).kind`（`FE-X03-S16`），元件不讀 HTTP status。
-`permission-denied` SHALL 呈現為「密碼不對」：視窗留著、欄位保留、可改可重送。
-`not-found` SHALL 呈現為「這間房目前進不了」，MUST NOT 宣稱是不存在、還沒成軍或已關閉。
-`authentication-required` SHALL 用語彙表的那句（要先登入），MUST NOT 說成密碼錯。
+`permission-denied` SHALL 讓人知道是**密碼沒被接受**（這個端點唯一的 403 來源）：視窗留著、欄位保留、可改可重送。
+`not-found` SHALL 讓人知道**這間房目前進不了**，MUST NOT 宣稱是不存在、還沒成軍或已關閉，也 MUST NOT 說成密碼錯。
+`authentication-required` SHALL 用語彙表 `error-vocabulary` 對應的那句（要先登入），MUST NOT 說成密碼錯。
+文案本身不在規格裡（`config.yaml`：不記錄非契約 UI 文案）；規格守的是分類對得上、不猜原因、不回顯後端字串。
 其他種類（`server-error`、`network-unavailable`、`validation`、`contract-drift`、`unexpected`）SHALL 用語彙表的那句，欄位保留、可人工重試。
 每一種失敗 SHALL 依 `form-conventions`：送出控制上方恰好一個 `role="alert"`、`tabIndex=-1` 並取得焦點。
 後端的 `detail`、Zod 的路徑、例外訊息、票 MUST NOT 出現在 DOM。失敗時 MUST NOT 存票、MUST NOT 呼叫 `enterRoom`、MUST NOT 自動重送。
 
-> 拔掉什麼會紅：把 `detail` 印出來 → S09（三種偽造的 detail 都不能出現）；403 與 404 用同一句 → S08／S09 的文案互相區分；
-> 401 走「密碼不對」 → S10；失敗仍呼叫 `holdRoomToken` → S08。
+> 拔掉什麼會紅：把 `detail` 印出來 → S09（三種偽造的 detail 都不能出現）；403 與 404 用同一個分類 → S08 的「知道是密碼」與 S09 的「不含密碼」互相區分；
+> 401 走密碼分類 → S10；失敗仍呼叫 `holdRoomToken` → S08。
 
 #### Scenario: [FE-N08-S08] 403：密碼不對，留著讓人改
 
@@ -179,8 +183,8 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 #### Scenario: [FE-N08-S09] 404：進不了，但不說是哪一種
 
 - **WHEN** `/enter` 分別回 404，`detail` 偽造成「專案不存在」「房間尚未開啟」「已關閉」三種
-- **THEN** 三次 SHALL 顯示同一句前端受控的「進不了」；三個 detail 字串都 MUST NOT 出現在 DOM
-- **AND** 那句 MUST NOT 含「不存在」「關閉」「成軍」；SHALL 沒有存票、沒有過場
+- **THEN** 三次的 alert 內容 SHALL 完全相同（前端受控、跟 detail 無關）；三個 detail 字串都 MUST NOT 出現在 DOM
+- **AND** 那段內容 MUST NOT 含「不存在」「關閉」「成軍」「密碼」；SHALL 沒有存票、沒有過場
 - → 驗於：jsdom
 
 #### Scenario: [FE-N08-S10] 401 與服務失敗不偽裝成密碼錯
@@ -210,29 +214,30 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **AND WHEN** 不按它，再走到 R 的門前按 E
 - **THEN** 新 socket 的位址 SHALL 仍帶 `token=T`
 - **AND WHEN** 第二次也被拒，使用者啟動「重新輸入密碼」
-- **THEN** P＋R 的鍵 SHALL 被移除；SHALL 沒有 `role="alert"`；SHALL 出現 R 的密碼視窗且欄位空白
+- **THEN** P＋R 的鍵 SHALL 被移除；SHALL 沒有 `role="alert"`；SHALL 出現 R 的密碼視窗，可及名稱含 R 的標題、欄位空白（通知要記得那間房的標題，不只 id）
 - **AND** 在啟動之前，系統 MUST NOT 呼叫 `/enter`、MUST NOT 自己移除那個鍵
 - **AND WHEN** `sessionStorage.removeItem` 拋、使用者啟動「重新輸入密碼」
 - **THEN** SHALL 沒有視窗；通知 SHALL 還在；SHALL 有一句受控說明；那個鍵 SHALL 仍是 T
 - → 驗於：jsdom、e2e（前半）
 
-### Requirement: 本地後端的 enter 與真後端可觀察行為相同，票本地替身收得下
+### Requirement: 本地後端的 enter 在下列語意上與真後端相同，票本地替身收得下
 
 `local` 目標 SHALL 提供 `POST /api/projects/{project_id}/enter`：body 合 `EnterIn`，成功回 `EnterOut`。
-判斷順序 SHALL 照真後端：session 無效 → 401；`password_hash IS NULL`（專案不存在或還沒成軍）→ 404；
-密碼不合 → 403；否則簽票。錯誤形狀 SHALL 走 `internal-backend` 既有的管線（`{ "detail": … }`）。
+判斷順序 SHALL 照真後端：session 無效（沒有、簽章壞、或指向已不存在的名片 —— `FE-O03-S08`）→ 401；`password_hash IS NULL`（專案不存在或還沒成軍）→ 404；
+密碼不合 → 403；否則簽票 —— **不看 `status`**（`closed` 但有 `password_hash` 照樣簽，跟真後端一樣）、不看座位。錯誤形狀 SHALL 走 `internal-backend` 既有的管線（`{ "detail": … }`）。
+「相同」只涵蓋這裡列出的回應分類與下面的 WS 驗票語意；**已知差異**（不承諾相同）：本地票不過期、本地沒有 server-side `room_tokens`（給座位端點用的，`FE-J13` 的事）。
 簽出的票 SHALL 綁房間**與簽出時的身分**：本地即時層替身對 `room:<project_id>` 的握手 SHALL 只在「票的房間＝scene ∧ 票的身分＝握手 cookie 的身分」時接受；
 另一間房、或另一個人拿著這張票 MUST NOT 被接受（跟真後端 `verify()` 同樣的可觀察語意；**本地票不過期**是已知差異，記在 design D7）。
 本地 handler MUST NOT 讀座位、MUST NOT 因座位滿而拒絕。
 `enterProject` 的契約測試 SHALL 對 `local` 與 `guildhub` 兩個目標跑同一份。
 
 > 拔掉什麼會紅：handler 不驗密碼 → S12 的 403 那列；handler 與替身用不同的簽章 → S12 握手那段；票不綁身分 → S12 換 cookie 那段；
-> handler 看座位 → S12 滿座那列；改路徑或 body 欄位名 → S13 兩個目標其中一個紅。
+> handler 看座位 → S12 滿座那列；handler 加 `status === 'active'` 才簽 → S12 的 closed 那列；只驗簽章不查名片 → S12 名片已刪那列；改路徑或 body 欄位名 → S13 兩個目標其中一個紅。
 
 #### Scenario: [FE-N08-S12] 本地 enter 的矩陣與票的效力
 
-- **WHEN** 對本地後端依序：未登入、專案不存在、`recruiting`（沒有 `password_hash`）、`active` 密碼錯、`active` 密碼對
-- **THEN** SHALL 分別得到 401、404、404、403、`200` 且 body 合 `EnterOut`
+- **WHEN** 對本地後端依序：未登入、簽章正確但名片已刪、專案不存在、`recruiting`（沒有 `password_hash`）、`active` 密碼錯、`active` 密碼對、`closed` 但有 `password_hash` 密碼對
+- **THEN** SHALL 分別得到 401、401、404、404、403、`200` 且 body 合 `EnterOut`、`200`
 - **AND** 用那張票、同一個 session cookie 對本地替身開 `scene=room:<同一個 id>` 的 socket SHALL 收到 `hello`；
   對 `scene=room:<另一個 uuid>` SHALL 被拒絕握手；換另一個人的 session cookie 帶同一張票 SHALL 被拒絕握手
 - **AND** 同一個 `active` 專案，在座位表是空的、以及 `seat_count` 格全部被佔滿兩種資料下，密碼正確都 SHALL 回 200
