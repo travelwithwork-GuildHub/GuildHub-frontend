@@ -85,7 +85,9 @@ project 與 user 都要對。本地替身（`scripts/realtime-stub.ts`）今天�
 `roomToken(scene)` 改簽名會動到既有用它算票的測試（`FE-V01` 的 e2e 是偽造 WS，不受影響；契約測試的 ws 那組要跟著改）。
 
 本地 handler 的判斷順序照真後端：session 無效 → 401；`password_hash IS NULL`（不存在或未成軍）→ 404；
-`verifyPassword` 失敗 → 403；否則簽票。本地 session 是無狀態簽章 cookie（`session.ts`），**沒有** server-side
+`verifyPassword` 失敗 → 403；否則簽票。**第二個已知差異**（實作前核對 `deps.get_current_user` 才發現）：真後端只看 session 裡有沒有 `user_id`，**不查名片還在不在**，
+`enter_room` 對已刪名片的 session 照簽（200，而且那張票在真後端的握手也收）；本地走 `handle()` 管線一律 401（`FE-O03-S08` 守的是管線）。
+契約測試兩個目標同一份，所以這一列**不進矩陣** —— 不在共用的檔案裡寫「本地 401」（在真後端會紅），也不把真後端這個洞複製進本地（那是把漏洞規格化）。本地 session 是無狀態簽章 cookie（`session.ts`），**沒有** server-side
 `room_tokens`，也**沒有**座位 API —— 真後端把票另存進 session 是給座位端點用的，那是 `FE-J13` 的事。
 
 ## D8｜Modal 開著就持有世界命令鎖，不只靠輸入框的焦點
