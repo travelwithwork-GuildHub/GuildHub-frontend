@@ -60,6 +60,11 @@ export function SpatialInteraction({ poseRef }: SpatialInteractionProps) {
     setTarget(next)
   })
 
+  // 卸載時清目標（`FE-W06-S15` 的另一半）：換場景是整棵子樹（物件＋這個元件）一起卸載再掛（`WorldCanvas` 的 `key`），
+  // 沒有人會為那些物件發「目標改變」—— 新掛的實例第一幀看到「沒有目標 === 上一幀也沒有」就不通知，
+  // 於是「按 E 進入「某某房」」的提示會跟著人進房間、再跟著回到大廳的出生點（瀏覽器驗收抓到的）。
+  useEffect(() => () => setTarget(NO_TARGET), [setTarget])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // **是 `code` 不是 `key`** —— 讀的是實體鍵位，跟鍵盤配置無關。
