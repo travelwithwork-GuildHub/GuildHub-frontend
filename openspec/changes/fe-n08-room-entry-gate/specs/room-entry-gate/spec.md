@@ -254,7 +254,7 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 `local` 目標 SHALL 提供 `POST /api/projects/{project_id}/enter`：body 合 `EnterIn`，成功回 `EnterOut`。
 判斷順序 SHALL 照真後端：session 無效（沒有、簽章壞）→ 401；`password_hash IS NULL`（專案不存在或還沒成軍）→ 404；
 密碼不合 → 403；否則簽票 —— **不看 `status`**（`closed` 但有 `password_hash` 照樣簽，跟真後端一樣）、不看座位。錯誤形狀 SHALL 走 `internal-backend` 既有的管線（`{ "detail": … }`）。
-「相同」只涵蓋這裡列出的回應分類與下面的 WS 驗票語意；**已知差異**（不承諾相同）：本地票不過期、本地沒有 server-side `room_tokens`（給座位端點用的，`FE-J13` 的事）、**session 指向已不存在的名片**：真後端的 `get_current_user` 不查名片、`enter_room` 對那個 session 照簽 200；本地 SHALL 回 401 且 MUST NOT 簽票（走既有管線）—— 這一列不進兩個目標共用的矩陣，由 `S16` 單獨對本地驗。
+「相同」只涵蓋這裡列出的回應分類與下面的 WS 驗票語意；**已知差異**（不承諾相同）：本地票不過期、本地沒有 server-side `room_tokens`（給座位端點用的，`FE-J13` 的事）、**session 指向已不存在的名片**：真後端的 `get_current_user` 不查名片、`enter_room` 對那個 session 照簽 200；本地 SHALL 回 401、回應 MUST NOT 含票（走既有管線）—— 這一列不進兩個目標共用的矩陣，由 `S16` 單獨對本地驗。
 簽出的票 SHALL 綁房間**與簽出時的身分**：本地即時層替身對 `room:<project_id>` 的握手 SHALL 只在「票的房間＝scene ∧ 票的身分＝握手 cookie 的身分」時接受；
 另一間房、或另一個人拿著這張票 MUST NOT 被接受（跟真後端 `verify()` 同樣的可觀察語意；**本地票不過期**是已知差異，記在 design D7）。
 本地 handler MUST NOT 讀座位、MUST NOT 因座位滿而拒絕。
@@ -284,5 +284,5 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 #### Scenario: [FE-N08-S16] 本地 enter：session 指向已刪的名片 → 401、不簽票
 
 - **WHEN** 對本地 handler 送一個簽章正確、但名片查不到的 session cookie，body 合 `EnterIn`
-- **THEN** SHALL 回 401 `{"detail":"未登入"}`；MUST NOT 查 `password_hash`、MUST NOT 簽票（資料層只收到查名片那一道）
+- **THEN** SHALL 回 401 `{"detail":"未登入"}`，body 裡 SHALL 沒有 `room_token`；MUST NOT 查 `password_hash`（資料層只收到查名片那一道 SQL；簽章是純計算，這裡不宣稱「沒算過」）
 - → 驗於：單元（node、資料層換成記錄 SQL 的假物件；這是本地獨有的義務，不進兩個目標共用的契約檔）
