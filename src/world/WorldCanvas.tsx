@@ -30,6 +30,7 @@ import { useSceneRef } from './scenes/SceneContext'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
 import { SceneObjects } from './scenes/SceneObjects'
 import { useRequestEntry } from './scenes/EntryGate'
+import { useSceneChatPortIfProvided } from '@/realtime/SceneChatProvider'
 import { RoomPasswordDialog } from './scenes/RoomPasswordDialog'
 import { useScene } from './scenes/SceneProvider'
 import { SceneTransitionOverlay } from './scenes/SceneTransitionOverlay'
@@ -110,6 +111,8 @@ export default function WorldCanvas() {
   const { token, reportConnection } = useScene()
   // 對著門按 E（`FE-V01-S10`）：在 Canvas 外面拿動作、當 prop 交給 Canvas 裡的門。
   const requestEntry = useRequestEntry()
+  // 場景聊天的口（`FE-R11`）：context 不跨 R3F 的 renderer 邊界，當 prop 交給 `RemoteWorld`；沒 provider 就沒有聊天。
+  const chat = useSceneChatPortIfProvided()
 
   // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
   // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
@@ -178,6 +181,7 @@ export default function WorldCanvas() {
                 token={token}
                 closeGateRef={closeGate}
                 onConnection={reportConnection}
+                chat={chat}
               />
               {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
                   提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
