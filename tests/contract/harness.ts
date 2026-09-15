@@ -169,9 +169,8 @@ export default async function setup(project: TestProject): Promise<() => Promise
     project.provide('contractDatabaseUrl', assertLoopbackDb(process.env.INTERNAL_TEST_DATABASE_URL))
     // 真後端 17 個端點都在。
     project.provide('contractUnimplemented', [])
-    // 真後端沒有 `/online`，也不把簽票的 secret 給測試：這兩個能力在這一輪不存在（票由 `enter` 簽，那條兩邊都有）。
+    // 真後端沒有 `/online`：這個能力在這一輪不存在（房間的票由 `enter` 簽，那條兩邊都有）。
     project.provide('contractOnlineUrl', null)
-    project.provide('contractRoomSecret', null)
     return recorded
   }
 
@@ -249,9 +248,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
   project.provide('contractWsUrl', `ws://127.0.0.1:${stubPort}/ws`)
   project.provide('contractDatabaseUrl', db.url)
   project.provide('contractOnlineUrl', `http://127.0.0.1:${stubPort}/online`)
-  // 替身簽票的 secret：給「uuid 不合法、但票算對」那條（`FE-O03-S21`）用 —— 替身要因為「不是 uuid」拒絕，不是因為票。
-  // 正常的票由 `POST /api/projects/{id}/enter` 簽（`FE-N08`），測試不自己算。
-  project.provide('contractRoomSecret', CONTRACT_SESSION_SECRET)
+  // 房間的票由 `POST /api/projects/{id}/enter` 簽（`FE-N08`）；測試不自己算票、harness 也不再替它算（ADR 0008：格式是簽發者的事）。
   // 本地版 W2 刻意沒做的端點（`FE-O03-S05`）：測試對這些要求 Next 自己的 404／405、不是本地版假造的 detail。
   // 這是目標的**能力**，不是目標的名字 —— 測試檔仍然不知道自己在打誰。
   // `FE-K01` 把 messages 做出來了，從這張表拿掉。

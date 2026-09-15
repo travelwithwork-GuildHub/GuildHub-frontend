@@ -102,10 +102,6 @@ export function unimplemented(): string[] {
 export function onlineUrl(): string | null {
   return inject('contractOnlineUrl')
 }
-/** 替身簽票用的 secret（給「uuid 不合法但票算對」那條用，`src/server/roomToken.ts` 同一份函式）；真後端的 secret 不給 → null。 */
-export function roomSecret(): string | null {
-  return inject('contractRoomSecret')
-}
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -114,6 +110,5 @@ declare module 'vitest' {
     contractDatabaseUrl: string
     contractUnimplemented: string[]
     contractOnlineUrl: string | null
-    contractRoomSecret: string | null
   }
 }

@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { EnterOut, ProfileOut } from '@/api/contract/rest'
-import { signRoomToken } from '@/server/roomToken'
-import { ContractClient, baseUrl, onlineUrl, roomSecret, wsUrl } from '../client'
+import { EnterOut } from '@/api/contract/rest'
+import { ContractClient, baseUrl, onlineUrl, wsUrl } from '../client'
 import { connect, expectRefused } from './socket'
 
 // 規格：openspec/changes/fe-o03-internal-backend/specs/internal-backend/spec.md
 //   Requirement: 人才與案件清單 —— S22（rooms 的 online_count 來自替身）
-//   Requirement: 即時層替身 —— S21（uuid 不合法：擋的是格式）、S23（/online 數的是活著的連線）
+//   Requirement: 即時層替身 —— S23（/online 數的是活著的連線）
+//   （S21 的三種拒絕在 `lobby.contract.ts`；以前這裡多一條「uuid 不合法但票算對」—— 票的格式現在是簽發者的事（ADR 0008），測試不再自己算票，那條拿掉。）
 //
 // 房間的票由 `POST /api/projects/{id}/enter` 簽（`FE-N08`，兩個目標都有）、綁人：連線要帶同一個 session cookie。
-// S22 另外要「/online 查詢口」、S21 要「替身的 secret」—— 真後端兩個都沒有，所以那個目標 skip（能力是 harness 提供的，這裡仍不知道目標叫什麼）。
+// 票的格式是簽發者 process 內的事（ADR 0008）—— 這裡**不自己算票**，只拿 `enter` 給的。
+// S22 另外要「/online 查詢口」—— 真後端沒有，所以那個目標 skip（能力是 harness 提供的，這裡仍不知道目標叫什麼）。
 
 /** seed 第一間 active 專案（`db/schema/002_seed.sql`；密碼 guild1234）。 */
 const SEED_ROOM = '22222222-0000-4000-8000-0000000000f1'
@@ -47,18 +48,6 @@ describe.skipIf(onlineUrl() === null)('房間人數', () => {
       await a.close()
       await b.close()
     }
-  })
-})
-
-describe.skipIf(roomSecret() === null)('房間的 scene 格式', () => {
-  it('[FE-O03-S21] room 的 uuid 不合法：就算票算對（同一把 secret、綁這個人）也拒絕握手（擋的是格式，不只是票）', async () => {
-    const c = new ContractClient(baseUrl())
-    const me = ProfileOut.parse(await c.login('拿假 uuid 的人'))
-    const bogus = '------------------------------------'
-    const token = signRoomToken(roomSecret() as string, bogus, me.id)
-    const r = await expectRefused(`${wsUrl()}?scene=room:${bogus}&token=${encodeURIComponent(token)}`, { cookie: cookieHeader(c) })
-    expect(r.opened, 'uuid 不合法的 room 竟然連上了').toBe(false)
-    expect(r.messages).toBe(0)
   })
 })
 
