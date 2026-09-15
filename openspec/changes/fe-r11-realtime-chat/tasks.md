@@ -32,14 +32,19 @@
   - 2026-09-15 結果（`tests/scene-chat-transport.test.tsx`，6 條；S02 分兩條）：全部如上紅；另 送出 catch 後 setTimeout 補送 → S02 兩條紅；交複本不交原物件 → S01 紅。
     型別那段：`tests/type-fixtures/scene-chat-{sink,link}-string.ts` 各恰好一則 TS2345（`tests/lib/typeFixtures.ts` 是從 `path-params.test.ts` 抽出的共用 runner）。
 
-## 4. 場景 generation（PR：`--scene-generation`；產品碼 ≤120、測試 ≤200）
+## 4. 場景 generation（PR：`--scene-generation`；產品碼 ≤120、測試 ≤300 —— 原估 200：整條鏈的 harness（FakeSocket＋WorldCanvas）本身 100 行，審查後又加了同一 task 的競態與整合版 S08）
 
 - [x] 4.1 先寫 jsdom／單元：`[FE-R11-S06]`（過場中不清、committed 的 wsScene 變了才清）、`[FE-R11-S07]`（握手被拒、自動回大廳的新連線 ready 後訊息還在，且新連線的 chat 進得來）、`[FE-R11-S08]`（保存舊 callback 引用、直接呼叫 → 不進）
 - [x] 4.2 綁 `SceneProvider.committed` 的 `wsScene`（不是 `RealtimeGenerationProvider.generation`）；`RemoteWorld` 把連線身分帶進 `onMessage`，不是目前連線的不收
-  - 2026-09-15：判準先 commit（S06 紅）再實作。`SceneChatProvider` 讀 `useScene()`：committed ＝ `transition === null ? scene : transition.from` 的 `wsScene`，用 ref 記上一個、變了才 `store.clear()`。
-    連線身分在 `--transport` 那片就有（`attach` 回的 link 綁在 `receive` 閉包裡、`current` 不是就不收）；S08 直接對 store 驗。
+  - 2026-09-15：判準先 commit（S06 紅）再實作。`SceneChatProvider` 讀 `useScene()`：committed ＝ `transition === null ? scene : transition.from` 的 `wsScene`。
+    第一版「committed 變了就 `clear()`」被審查抓到排程縫：新場景的第一則 chat 可能跟 `hello` 在同一個 task 裡到（React 還沒 render 成 committed），clear 會把它一起清掉 ——
+    換 layout effect 也補不上（訊息在 render 之前就到了；判準先 commit 紅了它）。改成**按連線的場景歸檔**：`attach(send, wsScene)`，
+    不是 committed 場景的訊息先放 `pending`，provider 在 layout effect 裡 `store.commit(wsScene)` 接手；那條連線 detach 時它的 pending 丟掉（失敗退回的房間之後再進不會看到舊的）。
+    S08 兩個層次：整合（偷大廳 socket 的 message listener，committed 到房間後直接叫）＋ store 層。
 - [x] 4.3 突變：過場開始就清 → S07 紅；用連線換了當清空條件 → S07 紅；換場景不清 → S06 紅；拿掉連線身分判斷 → S08 紅
-  - 2026-09-15 結果（`tests/scene-chat-scene.test.tsx`，3 條）：過場開始就清（committed 改看 `scene`）→ S06＋S07 紅；不清 → S06 紅；attach 就清 → S06＋S07 紅；拿掉 link 比對 → S08 紅。執行紀錄貼在 PR 留言。
+  - 2026-09-15 結果（`tests/scene-chat-scene.test.tsx`，6 條）：commit 看 `scene` 不看 committed → S06＋S07 紅；不 commit → S06×2＋S08 紅；attach 就換場景 → S06＋S07×2 紅；拿掉 link 比對 → S08（store）紅；
+    commit 時清掉而不是接手 pending → 同一 task 那條 S06 紅；detach 不丟 pending → S07（store）紅；`RemoteWorld` 不帶場景（全歸 lobby）→ S06×2＋S08 紅。
+    **沒有判準區分的**：`useLayoutEffect` 換回 `useEffect` 不紅（歸檔之後時機不影響正確性；留 layout effect 只是少畫一幀舊訊息）。執行紀錄貼在 PR 留言。
 
 ## 5. 收尾
 
