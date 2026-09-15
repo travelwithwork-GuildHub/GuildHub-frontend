@@ -75,11 +75,14 @@
     **瀏覽器抓到兩個 jsdom 看不到的缺陷**：(1) 開視窗的那一下 E 變成一個 `e` 打進剛拿到焦點的密碼欄（`S02` 紅）→ `SpatialInteraction` 吃掉 E 時 `preventDefault`，
     葉判準 `tests/interaction-key-default.test.tsx`（拿掉就紅）；(2) 換場景後「按 E 進入」的提示留在 provider 的 target 裡，跟著人進房再回出生點，在出生點按 E 沒反應（`S07` 紅）
     → `chore/spatial-interaction-clear-target-on-unmount`（#429，`FE-W06-S15` 的另一半）。
-- [ ] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
+- [x] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
+  - 2026-09-15：#431（`governance/e2e-main-room-entry`）。
 - [x] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、契約測試兩個目標的結果如實記在這裡
   - 2026-09-15（`--e2e` 分支，含 #429）：`typecheck` 過；eslint 乾淨；`pnpm test` 第一次 4 檔逾時（`deploy-build-gate` 180 s、`empty-state`／`room-entry-retry`／`world-scenes-transition-ui` 5 s；
     141 個 worker 各 ~5.4 s 啟動的負載），單獨重跑 4 檔 37 條全過（33.9 s）；`room-entry-retry` 每條放寬到 20 秒。
     契約：internal 11 檔 52 passed／10 todo；guildhub 10 檔 49 passed／3 skipped／10 todo（打自己起的本機後端）。
     e2e（`next start`）：`room-entry.mjs` 全部符合；`scene-switch.mjs`（改用 `lib/world.mjs`）全部符合。
-- [ ] 6.4（流程，不對應 Requirement）Google Sheet：`FE-N08` → On-going／Done 各一次
-- [ ] 6.5 封存（`archive/fe-n08-room-entry-gate`；勾勾先用 `feat/fe-n08-room-entry-gate--tasks` 進 main）
+- [x] 6.4（流程，不對應 Requirement）Google Sheet：`FE-N08` → On-going／Done 各一次
+  - 2026-09-15：On-going 45%（#424 後）→ 85%（#430 前）→ Done（瀏覽器層驗過、#431 後）。
+- [x] 6.5 封存（`archive/fe-n08-room-entry-gate`；勾勾先用 `feat/fe-n08-room-entry-gate--tasks` 進 main）
+  - 2026-09-15：這個 PR 就是那個勾勾；封存接著開。
