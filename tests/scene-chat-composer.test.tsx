@@ -93,9 +93,16 @@ describe('送出', () => {
     expect(rows()).toHaveLength(0)
     act(() => vi.runAllTimers())
     expect(send, '不自動重送').toHaveBeenCalledTimes(1)
-    accept = true
+    // 同一內容、沒改字、再送一次又失敗：alert 要再取得焦點（第一次的 alert 還在、message 沒變，只靠 message 變化聚焦會漏）
+    act(() => submitButton().focus())
     fireEvent.click(submitButton())
     expect(send).toHaveBeenCalledTimes(2)
+    expect(alerts()).toHaveLength(1)
+    expect(document.activeElement, '第二次失敗焦點也要在 alert 上').toBe(alerts()[0])
+    expect(field().value).toBe('哈囉')
+    accept = true
+    fireEvent.click(submitButton())
+    expect(send).toHaveBeenCalledTimes(3)
     expect(send).toHaveBeenLastCalledWith({ t: 'chat', body: '哈囉' })
     expect(field().value, '接受了才清空').toBe('')
     expect(alerts()).toHaveLength(0)

@@ -29,8 +29,8 @@ export function SceneChatComposer({ send }: { send: (input: ChatIn) => void }) {
   const [value, setValue] = useState('')
   /** 欄位級：空的（不是 alert）。 */
   const [needInput, setNeedInput] = useState(false)
-  /** 送出級：transport 拒了（alert）。 */
-  const [notSent, setNotSent] = useState(false)
+  /** 送出級：transport 拒了幾次（0 ＝ 沒有 alert）。**用次數不用布林**：同一內容連續失敗兩次，第二次 alert 也要重新取焦點 —— `SubmitError` 只在 message 變時聚焦，用 `key` 讓它每次失敗都重掛（審查抓到的）。 */
+  const [failures, setFailures] = useState(0)
   const hintId = useId()
 
   const submit = () => {
@@ -42,12 +42,12 @@ export function SceneChatComposer({ send }: { send: (input: ChatIn) => void }) {
       send({ t: 'chat', body: value })
     } catch {
       // 拋的是什麼都一樣：沒交給 transport 就保留、說一句受控的話。例外本身不進 DOM。
-      setNotSent(true)
+      setFailures((n) => n + 1)
       return
     }
     setValue('')
     setNeedInput(false)
-    setNotSent(false)
+    setFailures(0)
   }
   const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
@@ -73,7 +73,7 @@ export function SceneChatComposer({ send }: { send: (input: ChatIn) => void }) {
           onChange={(e) => {
             setValue(e.target.value)
             setNeedInput(false)
-            setNotSent(false)
+            setFailures(0)
           }}
           onKeyDown={onKeyDown}
           aria-invalid={needInput || undefined}
@@ -86,7 +86,7 @@ export function SceneChatComposer({ send }: { send: (input: ChatIn) => void }) {
           {CHAT_COMPOSER_LABELS.needInput}
         </p>
       )}
-      <SubmitError message={notSent ? CHAT_COMPOSER_LABELS.notSent : null} />
+      <SubmitError key={failures} message={failures > 0 ? CHAT_COMPOSER_LABELS.notSent : null} />
       <button type="submit" className={PRIMARY}>
         {CHAT_COMPOSER_LABELS.submit}
       </button>
