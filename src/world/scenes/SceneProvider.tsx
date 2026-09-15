@@ -62,7 +62,8 @@ export interface SceneValue {
   /** 最近一次願望的目的地名字（房間標題）；提交之後覆蓋層的最短顯示期間還要用它。 */
   readonly destinationTitle: string | null
   /** 進不去的通知（`S07`）。留到成功進入任何場景、使用者關閉、或被取代。 */
-  readonly notice: { readonly kind: 'failed'; readonly room: string } | null
+  /** 進不去的通知。`title`：`enterRoom` 當時帶的房名（`FE-N08-S11` 重開視窗要用；深連結沒有）。 */
+  readonly notice: { readonly kind: 'failed'; readonly room: string; readonly title?: string } | null
   readonly dismissNotice: () => void
   /** 預設門禁的說明（`S11`）：對著哪間房的門按了 E 但沒有票。下一個願望出現就清。 */
   readonly gateNotice: string | null
@@ -209,20 +210,20 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
 
   // 過場的結束（D3、D4）。**讀最新狀態用 ref**：`reportConnection` 要身分穩定（它在 `RemoteWorld` 的 effect 依賴裡，
   // 換一個就重連），逾時 callback 也要查「現在還在不在那個過場」而不是相信自己沒被取消（`S15`）。
-  const latest = useRef({ transition, scene: resolved.scene, profileId, auto: desired.auto === true, seq: transitionSeq })
+  const latest = useRef({ transition, scene: resolved.scene, profileId, auto: desired.auto === true, seq: transitionSeq, title: desired.title })
   useEffect(() => {
-    latest.current = { transition, scene: resolved.scene, profileId, auto: desired.auto === true, seq: transitionSeq }
+    latest.current = { transition, scene: resolved.scene, profileId, auto: desired.auto === true, seq: transitionSeq, title: desired.title }
   })
   /** 失敗。`seq` 是排下這個判定時的過場代號：代號不對就是遲到的，忽略。 */
   const fail = useCallback((seq: number, target: SceneRef) => {
-    const { transition, scene, profileId } = latest.current
+    const { transition, scene, profileId, title } = latest.current
     if (seq !== latest.current.seq) return
     if (transition === null || !sameScene(transition.to, target) || !sameScene(scene, target)) return
     if (target.id === 'room') {
       // 握手被拒／逾時：回大廳（replace，不多一層）、通知、**票留著**（連不上跟票失效分不出來）。
       setDesired({ ref: HALL, mode: 'replace', forProfile: profileId, auto: true })
       setTransitionSeq((n) => n + 1)
-      setNotice({ kind: 'failed', room: target.projectId })
+      setNotice(title === undefined ? { kind: 'failed', room: target.projectId } : { kind: 'failed', room: target.projectId, title })
       return
     }
     // 回大廳也連不上：過場仍然結束，交給大廳既有的呈現；不再建第三條（`S16`）。
