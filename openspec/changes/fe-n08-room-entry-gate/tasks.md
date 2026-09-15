@@ -31,7 +31,8 @@
 - [x] 3.2 先寫 jsdom：`[FE-N08-S01]`（provider 收到 projectId／title、dialog 語意、一次 E 一個視窗、預設說明不出現）、`[FE-N08-S02]`（Esc、清密碼、焦點回錨、再開是空的）、`[FE-N08-S03]`（焦點在按鈕上世界不動、Tab 不出視窗、關閉只放自己的鎖）
 - [x] 3.3 實作 `RoomEntryGateProvider`（Canvas 外，實作 `EntryGateProvider`）與 `RoomPasswordDialog`：`focusTrap`、`holdInputLock`、`DiscardConfirm` 的 dialog 寫法；不新增 E 監聽
 - [x] 3.4 突變：不掛 provider → S01 紅；視窗不持鎖 → S03 紅；關閉不放鎖 → S03 的「恢復」紅；關閉不清密碼 → S02 紅；焦點丟 `body` → S02 紅
-  - 2026-09-15 結果（`tests/room-entry-modal.test.tsx`，6 條）：needsToken 不接 → 6 條全紅；不持鎖 → S03 紅；鎖不放 → S03「漏在那裡」紅；焦點丟 body → S02 兩條紅；
+  - 2026-09-15 結果（`tests/room-entry-modal.test.tsx`，7 條）：needsToken 不接 → 全紅；`WorldCanvas` 不掛 `<RoomPasswordDialog />` → S01「正式 WorldCanvas 的接線」紅（審查要求：掛真的 `WorldCanvas`）；
+    **`page.tsx` 不掛 provider 在 jsdom 不紅** —— 那是 e2e 的（tasks 6：真的走到門前按 E 出現視窗，少了 provider 只會看到預設說明）；「鎖著按 W 不動、放開會動」同樣是 e2e 的，jsdom 那段恆真的 W/E 斷言已拿掉（兩位審查都抓到）；不持鎖 → S03 紅；鎖不放 → S03「漏在那裡」紅；焦點丟 body → S02 兩條紅；
     Tab 不攔 → S03 紅；關閉不卸載只 hidden（密碼留著）→ S02 三處紅；第二次 needsToken 換 key 重掛 → S01「仍是 ab」紅（只拿掉 provider 的物件同一性 guard 而 key 仍是 projectId 時不紅 —— key 才是防線，guard 只是省 re-render）。
     `ui-ux-pro-max`（`--domain ux`：focus ring 每個控制都要、錯誤放欄位下並 `aria-describedby`、允許貼上／密碼管理員、不用只靠 placeholder 當標籤）：用 `@/design/controls` 的 `FIELD`／`PRIMARY`／`SECONDARY`（已含 focus 樣式）、可見的 `<label>`、`autoComplete="current-password"`；顯示／隱藏密碼的切換沒做（規格沒有，之後要就開 spec）。
 
