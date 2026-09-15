@@ -10,8 +10,8 @@
 
 ## 2. 配置：出口、工位模板、判準（PR：`--layout`；產品碼 ≤180、測試 ≤250）
 
-- [ ] 2.1 先寫單元：`[FE-W16-S01]`（可達性含 8 個站位；門洞放牆要紅）、`[FE-W16-S02]`（門洞可穿、兩段牆不可穿、淨寬明顯大於角色直徑、門廊走不出外層）、`[FE-W16-S03]`（8 個工位、識別字含索引且唯一、純函式、站位互距、W11-S05／S07／S08）、`[FE-W16-S05]`（近端工位與通道入口在畫面內、九個站位視線不被擋、+Z 高物要紅）；`FE-V01-S01`／`S02` 對應的既有測試改成新的斷言 —— 全部先紅
-- [ ] 2.2 `projectRoomLayout.ts`：`BOUNDARY_WALLS` ＋ 內側南牆兩段 ＋ 門洞的 `door` 造型 ＋ `stationAt(seatIndex)` 推導 8 組桌椅與站位 ＋ 通道地毯；`ROOM_SPAWN` 移到門洞內側；門洞、桌距、通道淨寬的數字量了記在 design 補記
+- [ ] 2.1 先寫單元：`[FE-W16-S01]`（可達性含 8 個站位與門廊；門洞放牆 → 門廊不可達）、`[FE-W16-S02]`（封門對照組不可達、淨寬 ≥ 2 倍角色直徑、門廊走不出外層）、`[FE-W16-S03]`（索引集合恰好 0–7、三件齊全、左右分組與由北到南、站位在桌與通道之間、互距 ≥ 2 倍直徑、W11-S05／S07／S08）、`[FE-W16-S05]`（近端工位、通道入口、門洞在畫面內；九個站位視線不被擋；門輪廓 ≥ 角色直徑；視線段上的盒子要紅；門轉向要紅）；`FE-V01-S01`／`S02` 對應的既有測試改成新的斷言 —— 全部先紅
+- [ ] 2.2 `projectRoomLayout.ts`：`BOUNDARY_WALLS` ＋ 內側南牆兩段 ＋ 門洞的 `door` 造型 ＋ `stationAt(seatIndex)` 推導 8 組桌椅與站位 ＋ 通道地毯；`ROOM_SPAWN` 移到門洞內側；門洞淨寬、桌距、通道淨寬量出來之後，若成為判準的數字（S02 的 2 倍、S08 的容差）需要改，**重開 spec PR** 補進 Requirement，不就地改
 - [ ] 2.3 突變：內側南牆做成整面 → S01／S02 紅；兩個工位共用識別字 → S03 紅；工位搬出畫面 → S05 紅
 
 ## 3. 渲染、碰撞、不互動、錨點（PR：`--anchors`；產品碼 ≤200、測試 ≤250）
@@ -22,7 +22,7 @@
 
 ## 4. 瀏覽器與收尾
 
-- [ ] 4.1 `tests/e2e/project-room.mjs`：`[FE-W16-S08]`（`next start`；有票的深連結進房；八個錨點在 Canvas 內且相對位置符合模板；遠端玩家在 seat 0 旁；錨點里程計往北單調前進；朝 seat 1 走會停；繞回通道到 seat 2；Canvas 同一節點；只設步數上限）；里程計函式抽到 `tests/e2e/lib/` 與 `scene-switch.mjs` 共用
+- [ ] 4.1 `tests/e2e/project-room.mjs`：`[FE-W16-S08]`（`next start`；viewport 1280×720、DPR 1；進房前取 Canvas handle；有票的深連結進房；八個錨點在 Canvas 內、相對位置 ≤ 2 px；錨點與地板的像素取樣不同；遠端玩家在 seat 0 旁；錨點里程計往北前進（≤ 1 px 回抖）；朝 seat 1 走先接近再 plateau 5 步；繞回通道到 seat 2 ± 3 px；Canvas 同一 handle；只設步數上限）；里程計函式抽到 `tests/e2e/lib/` 與 `scene-switch.mjs` 共用
 - [ ] 4.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
 - [ ] 4.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 對正式建置跑 3 次的結果如實記在這裡
 - [ ] 4.4 Google Sheet：`FE-W16` → On-going／Done 各一次

@@ -38,8 +38,8 @@ Project Room 的配置與出生點 SHALL 由 `project-room-layout` 提供（外�
 #### Scenario: [FE-V01-S02] 房間的配置通過 world-layout 的判準
 
 - **WHEN** 對 Project Room 的配置跑 `FE-W11-S05`／`S07`／`S08` 的檢查
-- **THEN** SHALL 全部通過；`role: 'boundary'` 的邊界牆 SHALL 恰好四面（外層），其餘項目 SHALL 是 `project-room-layout` 定義的內側南牆、門洞造型、工位與地毯
-- **AND** 註冊表交給物理層的碰撞盒 SHALL 含內側南牆的兩段與八組桌椅（不是只有四面邊界）
+- **THEN** SHALL 全部通過；`role: 'boundary'` 的邊界牆 SHALL 恰好四面（外層）；配置 SHALL 是 `project-room-layout` 提供的那一份（內容由它的規格定義）
+- **AND** 註冊表交給物理層的碰撞盒 SHALL 多於四面邊界（含 `project-room-layout` 的內側南牆與桌椅）
 
 #### Scenario: [FE-V01-S03] 房間裡沒有走廊的門與看板，也不輪詢專案清單
 
