@@ -12,20 +12,21 @@
 併發：適用 —— 訊息可能在場景切換前後晚到；同場景的重連（過場失敗退回、之後的 `FE-R12`）不是換場景。
 持久資料相容性：不適用 —— 不呼叫任何 REST、不用 Web Storage。
 失敗路徑：適用 —— 沒 `ready` 就送、長得像 chat 但不合契約、舊連線的訊息晚到、過場失敗。
-資源政策：後端對 `body` 只要求是字串、沒有大小上限（`BE-G16` 未解）。本能力**不拒收、不丟棄**任何合法訊息（那是後端的契約），
-但保存時有**前端自己的保留預算**（單則 body 超過 2000 code point 只保留前 2000 並標記 `truncated`）——這是客戶端的資源政策，
-不是後端契約、不取代 `BE-G16`；記在 design D5，`FE-O07` 銜接清單列它。
+資源政策：後端對 `body` 只要求是字串、沒有大小上限（`BE-G16` 未解）。**契約層**不因內容或長度拒收任何合法 `ChatOut`；
+**保存層**對每一則都建一筆紀錄，但保存的 `body` 受 2000 code point 的預算限制（超過只留前 2000、標 `truncated`）——這是客戶端的資源政策，
+不是後端契約、不取代 `BE-G16`；`name`／`id` 沒有預算（契約也沒上限），所以有上界的是「保存的 body 總 code point 數」，不是整個記憶體。記在 design D5，`FE-O07` 銜接清單列它。
 名詞：本文的「換場景」指 committed 的 `wsScene` 改變；「連線」指 `RemoteWorld` 建立的一個 `RealtimeClient` 實例
 （`RealtimeGenerationProvider.generation` 是「要求重連」的代數，**不是**場景代號，不拿它當清空條件）。
 測試連線：單元與 jsdom 不連任何服務；e2e 只打 `next start` 的 loopback，WebSocket 用 `routeWebSocket` 偽造，MUST NOT 連任何團隊共用位址。
 
 ## ADDED Requirements
 
-### Requirement: chat 只收驗證過的伺服器訊息、照原值收；送出只走注入的窄介面
+### Requirement: chat 只收驗證過的伺服器訊息、不改內容（預算截斷除外）；送出只走注入的窄介面
 
 系統 SHALL 只把 `realtime-protocol` 驗證成功且 `t === 'chat'` 的 `ChatOut` 交給場景聊天的接收端（sink），而且是**驗證產出的物件**，不是字串；
 驗證失敗的（缺 `name`、`body` 不是字串…）MUST NOT 到達 sink。`name`／`body` 是空字串或全空白的 `ChatOut` 是合法的（後端不驗），
-SHALL **照原值**收進記憶體，MUST NOT trim、清洗、轉成 markup 或丟棄 —— 怎麼呈現是 `FE-K04`（`output-safety` 的具名文字元件）的事。
+sink SHALL 為每一則合法訊息建一筆紀錄，MUST NOT trim、清洗、轉成 markup、因內容拒收 —— 保存的 `body` 唯一的改動是下一條 Requirement 的預算截斷；
+怎麼呈現是 `FE-K04`（`output-safety` 的具名文字元件）的事。
 chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器（靜態邊界）。
 送出 SHALL 組成 `src/api/contract/ws.ts` 的 `ChatIn`（型別層保證形狀，不另加 runtime 驗證），交給 `RemoteWorld` 注入的 sender；sender 底下是 `client.send()`，
 連線不是 `ready` 時 SHALL 拋 `RealtimeError`（不吞、不靜默 return），底層 socket MUST NOT 收到 frame，MUST NOT 排隊、MUST NOT 靜默丟棄、MUST NOT 加進列表。
@@ -62,7 +63,7 @@ chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器�
 - **WHEN** 餵 raw frame `{"t":"chat","id":"x","body":"hi"}`（缺 `name`）與 `{"t":"chat","id":"x","name":"n","body":7}`
 - **THEN** sink SHALL 沒有被呼叫；記憶體 SHALL 不變；下一則合法的 chat frame SHALL 照常進來
 - **AND WHEN** 餵 `name` 是 `""`、`body` 是 `""`、`body` 是 `"   "` 的三則合法 chat，以及 `name` 與 `body` 都是 `<img onerror=…>` 的一則
-- **THEN** 記憶體 SHALL 各新增一則，`name` 與 `body` SHALL 與 frame 裡的**完全相同**（沒有 trim、沒有轉義、沒有丟棄）—— 安全呈現是 `FE-K04` 的具名文字元件
+- **THEN** 記憶體 SHALL 各新增一則，`name` 與 `body` SHALL 與 frame 裡的**完全相同**（都在 2000 以內；沒有 trim、沒有轉義、沒有丟棄）—— 安全呈現是 `FE-K04` 的具名文字元件
 - → 驗於：單元
 
 ### Requirement: 自己的話只在伺服器回聲後出現一次
@@ -84,10 +85,10 @@ chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器�
 ### Requirement: 目前場景最多留 100 筆、每則最多保留 2000 code point；不用 Web Storage、不呼叫 REST
 
 記憶體 SHALL 最多保留 **100 筆**、依接收順序；第 101 筆進來時 SHALL 移除最舊的一筆。
-單則 `body` 超過 **2000 code point** 時 SHALL 只保留前 2000 個並把該則標記 `truncated: true`（保留預算是客戶端的資源政策：100 × 2000 有上界；
-不拒收、不丟棄那則；`FE-K04` 要讓人看得出被截了）；2000 以內 SHALL 原值保存、`truncated: false`。
-`src/realtime/sceneChat*` MUST NOT import `src/api/operations`、`src/api/transport`、任何 storage helper，
-MUST NOT 出現 `localStorage`／`sessionStorage`／`indexedDB`／`caches` 的存取（靜態邊界，`boundaries` lint 的寫法；`FE-K04` 的 UI 模組由 K04 自己的邊界測試涵蓋）；
+單則 `body` 超過 **2000 code point** 時 SHALL 只保留前 2000 個並把該則標記 `truncated: true`（保留預算是客戶端的資源政策：保存的 body 總量 ≤ 100 × 2000 code point；
+那一則仍是一筆紀錄，不丟；`FE-K04` 要讓人看得出被截了）；2000 以內 SHALL 原值保存、`truncated: false`。
+`src/realtime/sceneChat*` 的 import 圖（遞迴）MUST NOT 到達 `src/api/operations`、`src/api/transport`、`src/identity/recoveryKey`、`src/world/scenes/roomTokens` 這些會碰 storage 或 REST 的模組，
+原始碼 MUST NOT 出現 `localStorage`／`sessionStorage`／`indexedDB`／`caches`（靜態邊界，`boundaries` lint 的寫法：查 import 圖，不只掃固定名稱；`FE-K04` 的 UI 模組由 K04 自己的邊界測試涵蓋）；
 重新整理後 SHALL 是空的。
 
 > 拔掉什麼會紅：拿掉筆數截斷 → S04 有 101 筆；拿掉單則預算 → S04 的 2001 字那段 `truncated` 不成立；模組碰 storage／IndexedDB／operations → S05 的靜態邊界；refresh 後有東西 → S05 的列表。
@@ -116,7 +117,8 @@ MUST NOT 出現 `localStorage`／`sessionStorage`／`indexedDB`／`caches` 的�
 **同一個 `wsScene` 的新連線**（過場失敗退回原場景時系統自動建的那條、`FE-R12` 的重連）MUST NOT 清。
 每一則 `ChatOut` SHALL 帶著它來自哪一個連線；不是目前連線（`RemoteWorld` 目前持有的那個 client）的訊息 MUST NOT 加進記憶體。
 
-> 拔掉什麼會紅：過場開始就清 → S07；用連線代替場景當清空條件 → S07 退回大廳那條連線 `ready` 時把大廳清了；不看連線身分 → S08 舊大廳的話出現在房間。
+> 拔掉什麼會紅：過場開始就清 → S07；用連線代替場景當清空條件 → S07 退回大廳那條連線 `ready` 時把大廳清了；換場景不清 → S06 房間裡還看得到大廳的話；
+> 不看連線身分 → S08 舊大廳的話出現在房間。
 
 #### Scenario: [FE-R11-S06] 換場景成功才清
 

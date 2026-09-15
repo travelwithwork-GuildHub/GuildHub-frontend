@@ -20,7 +20,7 @@ WebSocket 契約早就有 `chat`（`src/api/contract/ws.ts` 的 `ChatIn`／`Chat
   - 不落任何 storage；refresh＝空
   - `LIMITS.chatBody = { min: 0, max: UNBOUNDED }` 如實記錄「後端只驗是字串」（`FE-O06` 的慣例），契約 schema 不加長度檢查；「全空白不送」是 `FE-K04` 的規則
   - 保存層有客戶端自己的預算：單則超過 2000 code point 只留前 2000 並標記 `truncated`（資源政策，不是後端契約，不取代 `BE-G16`）
-  - 空字串、全空白、含 HTML 的 body 照原值收；怎麼呈現是 `FE-K04`（`FE-T06` 的具名文字元件）
+  - 空字串、全空白、含 HTML 的 body 不改內容（唯一的改動是預算截斷）；怎麼呈現是 `FE-K04`（`FE-T06` 的具名文字元件）
 - 不改 WebSocket schema、不改 `protocol.py`、不動 `realtime-client`／`realtime-protocol` 的既有 Scenario
 
 ## Non-goals

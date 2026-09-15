@@ -24,7 +24,7 @@
 
 - [ ] 4.1 先寫 jsdom／單元：`[FE-R11-S06]`（過場中不清、committed 的 wsScene 變了才清）、`[FE-R11-S07]`（握手被拒、自動回大廳的新連線 ready 後訊息還在，且新連線的 chat 進得來）、`[FE-R11-S08]`（保存舊 callback 引用、直接呼叫 → 不進）
 - [ ] 4.2 綁 `SceneProvider.committed` 的 `wsScene`（不是 `RealtimeGenerationProvider.generation`）；`RemoteWorld` 把連線身分帶進 `onMessage`，不是目前連線的不收
-- [ ] 4.3 突變：過場開始就清 → S07 紅；用連線換了當清空條件 → S07 紅；拿掉連線身分判斷 → S08 紅
+- [ ] 4.3 突變：過場開始就清 → S07 紅；用連線換了當清空條件 → S07 紅；換場景不清 → S06 紅；拿掉連線身分判斷 → S08 紅
 
 ## 5. 收尾
 
