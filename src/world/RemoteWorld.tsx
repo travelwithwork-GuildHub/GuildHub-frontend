@@ -143,7 +143,7 @@ export function RemoteWorld({
     const validate = createMessageValidator(onViolation)
 
     let cancelled = false
-    // 這條連線在聊天記憶體裡的身分。`send` 走 `client.send()`（沒 ready 就拋 `RealtimeError`），不包、不吞。
+    // 這條連線在聊天記憶體裡的身分。注入的 sender 只收 `ChatIn`：序列化在這裡、`client.send()` 沒 ready 就拋 `RealtimeError`，不包、不吞。
     let link: ReturnType<SceneChatPort['attach']> | null = null
     const client = new RealtimeClient({
       scene,
@@ -168,7 +168,7 @@ export function RemoteWorld({
       },
     })
     clientRef.current = client
-    link = chat?.attach((data) => client.send(data)) ?? null
+    link = chat?.attach((input) => client.send(JSON.stringify(input))) ?? null
     // 先等上一棵子樹的連線關乾淨（`FE-V01-S18`），再連。閘門是空的（第一次掛載）就立刻連。
     // `cancelled`：等的期間就被卸載（Strict Mode 的第二次 effect、或使用者又換了場景）的話不連 ——
     // 那時 `client.close()` 已經跑過，而一個 idle 的 client 被 `close()` 之後再 `connect()` 會拋錯。

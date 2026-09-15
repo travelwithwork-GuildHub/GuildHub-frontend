@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { useRef, type RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ChatOut, ServerMessage } from '@/api/contract/ws'
+import type { ChatIn, ChatOut, ServerMessage } from '@/api/contract/ws'
 import { RealtimeClient, RealtimeError } from '@/realtime/client'
 import { createSceneChatStore, type SceneChatStore } from '@/realtime/sceneChatStore'
 import type { LocalPose } from '@/world/PositionSync'
@@ -90,8 +90,8 @@ async function mountReady(store: SceneChatStore) {
   const sink = vi.fn()
   const attach = store.port.attach
   const spiedPort = {
-    attach: (sendRaw: (d: string) => void) => {
-      const link = attach(sendRaw)
+    attach: (send: (input: ChatIn) => void) => {
+      const link = attach(send)
       return { ...link, receive: (m: ChatOut) => (sink(m), link.receive(m)) }
     },
   }
@@ -188,7 +188,7 @@ describe('送出', () => {
   it('[FE-R11-S02] idle／connecting／open／closed 各自：拋 RealtimeError、socket 沒收到、記憶體不變；之後 ready 也不補送；ready 但 socket.send 拋 → 原樣拋、不排隊', () => {
     const store = createSceneChatStore()
     const client = new RealtimeClient({ scene: 'lobby', onMessage: () => {} })
-    store.port.attach((data) => client.send(data))
+    store.port.attach((input) => client.send(JSON.stringify(input)))
     const sentFrames = () => FakeSocket.instances.flatMap((s) => s.sent)
     const attempt = (label: string) => {
       expect(() => store.send({ t: 'chat', body: label }), label).toThrow(RealtimeError)
@@ -222,7 +222,7 @@ describe('送出', () => {
   it('[FE-R11-S02] closed 之後送：拋、socket 沒收到', () => {
     const store = createSceneChatStore()
     const client = new RealtimeClient({ scene: 'lobby', onMessage: () => {} })
-    store.port.attach((data) => client.send(data))
+    store.port.attach((input) => client.send(JSON.stringify(input)))
     client.connect()
     const socket = FakeSocket.instances[0] as FakeSocket
     socket.open()

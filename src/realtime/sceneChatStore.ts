@@ -5,8 +5,8 @@ import { EMPTY_CHAT, appendChat, type ChatLog } from './sceneChat'
 // 〈自己的話只在伺服器回聲後出現一次〉（design D1、D2）。
 //
 // ⚠️ **這裡不知道 `RealtimeClient` 的存在**（import 邊界，ADR 0009）：連線由 `RemoteWorld` 持有，它每建一條連線就 `attach()` 一次，
-// 拿到**這條連線專屬的** `receive`（連線身分綁在閉包裡：舊連線晚到的訊息不是目前那條的，不收）；送出是 `RemoteWorld` 注入的 `sendRaw`
-// （底下是 `client.send()`：沒 `ready` 就拋 `RealtimeError`，這裡不吞、不排隊、不補送）。
+// 拿到**這條連線專屬的** `receive`（連線身分綁在閉包裡：舊連線晚到的訊息不是目前那條的，不收）；送出是 `RemoteWorld` 注入的、**只收 `ChatIn`** 的 sender
+// （序列化與 `client.send()` 都在 `RemoteWorld` 那邊：沒 `ready` 就拋 `RealtimeError`，這裡不吞、不排隊、不補送）。chat 模組不碰 raw frame 的任何一端。
 // 送出**不** append：後端廣播含自己，回聲是唯一的顯示來源；`receive` 也不因 `id === 自己` 略過。
 // 清空（`clear()`）的時機由 `SceneChatProvider` 看 committed 的場景決定（`--scene-generation` 那一片），這裡只提供動作。
 
@@ -18,8 +18,8 @@ export interface ChatLink {
 }
 
 export interface SceneChatPort {
-  /** `RemoteWorld` 每建一條連線呼叫一次；`sendRaw` 是那條連線的 `client.send`。 */
-  readonly attach: (sendRaw: (data: string) => void) => ChatLink
+  /** `RemoteWorld` 每建一條連線呼叫一次；`send` 是那條連線的、只收 `ChatIn` 的 sender（`RemoteWorld` 包好 `client.send(JSON.stringify(input))`）。 */
+  readonly attach: (send: (input: ChatIn) => void) => ChatLink
 }
 
 export interface SceneChatStore {
@@ -33,12 +33,12 @@ export interface SceneChatStore {
 
 export function createSceneChatStore(): SceneChatStore {
   let log: ChatLog = EMPTY_CHAT
-  let current: { link: ChatLink; sendRaw: (data: string) => void } | null = null
+  let current: { link: ChatLink; send: (input: ChatIn) => void } | null = null
   const listeners = new Set<() => void>()
   const notify = () => {
     for (const l of listeners) l()
   }
-  const attach: SceneChatPort['attach'] = (sendRaw) => {
+  const attach: SceneChatPort['attach'] = (send) => {
     const link: ChatLink = {
       receive: (message) => {
         // 不是目前這條連線的訊息不收（`FE-R11-S08`）：比的是 link 的身分，不是 socket 有沒有關。
@@ -50,7 +50,7 @@ export function createSceneChatStore(): SceneChatStore {
         if (current?.link === link) current = null
       },
     }
-    current = { link, sendRaw }
+    current = { link, send }
     return link
   }
   return {
@@ -65,7 +65,7 @@ export function createSceneChatStore(): SceneChatStore {
     send: (input) => {
       if (current === null) throw new Error('沒有即時連線，聊天訊息送不出去。')
       // 拋就拋出去：`client.send()` 沒 ready 會拋 `RealtimeError`；socket 自己拋也原樣往上。這裡不 catch。
-      current.sendRaw(JSON.stringify(input))
+      current.send(input)
     },
     clear: () => {
       if (log === EMPTY_CHAT) return

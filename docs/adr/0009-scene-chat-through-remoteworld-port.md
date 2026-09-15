@@ -31,7 +31,7 @@ WebSocket 契約早就有 `chat`（`ChatIn`／`ChatOut`），後端照 scene 廣
 選 B。`src/realtime/sceneChat*`：
 - **只收** `realtime-protocol` 驗證產出的 `ChatOut` 物件（`link.receive(message: ChatOut)`；型別層不收字串，fixture 有負向對照）；
 - **不** import `RealtimeClient` 的值（型別可以）、不 import 驗證器、不 `JSON.parse`；
-- 送出只透過 `RemoteWorld` 注入的 `sendRaw`（底下是 `client.send()`：沒 `ready` 拋 `RealtimeError`），這裡不 catch、不排隊、不補送、不 append。
+- 送出只透過 `RemoteWorld` 注入的、**只收 `ChatIn`** 的 sender（`RemoteWorld` 包好 `client.send(JSON.stringify(input))`：沒 `ready` 拋 `RealtimeError`），這裡不序列化、不 catch、不排隊、不補送、不 append。
 
 ## 邊界
 
