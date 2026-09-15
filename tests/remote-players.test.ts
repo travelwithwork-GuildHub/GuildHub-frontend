@@ -56,6 +56,13 @@ const presence = (join: ReturnType<typeof player>[], leave: string[]) =>
 const pos = (...entries: Array<[string, number, number, number]>) =>
   message({ t: 'pos', p: entries })
 const status = (id: string, text: string) => message({ t: 'status', id, text })
+/** 名字、外觀各自不同的玩家 —— 全都是「訪客／0」的話，「把 name／av 重設成預設值」的錯抓不到。 */
+const playerAs = (id: string, over: Partial<ReturnType<typeof player>>) => ({ ...player(id), ...over })
+/**
+ * 剛好 **12 個 code point**、前後各有一個空白的狀態文字（線路上限，`api-contract`）。
+ * 規格：這一層 MUST NOT 再截斷或改寫 —— 用短字或沒有空白的字，`trim()` 與截斷都會存活。
+ */
+const EDGE_TEXT = ' 趕工中 到下午五點半 '
 
 describe('遠端玩家的狀態', () => {
   it('[FE-R07-S01] 收到位置更新時，名單不會改變', () => {
@@ -334,12 +341,13 @@ describe('遠端玩家的狀態文字', () => {
 
     apply(
       state,
-      snapshot(player(SELF, 0, 0, 0, '我自己的'), player('u1', 0, 0, 0, ''), player('u2', 0, 0, 0, '趕工中')),
+      snapshot(player(SELF, 0, 0, 0, '我自己的'), player('u1', 0, 0, 0, ''), player('u2', 0, 0, 0, EDGE_TEXT)),
     )
 
     // 兩個人的值**不同**：寫死成同一個值（例如一律空字串）的實作過不了
     expect(stOf(state, 'u1'), '空白的 st 要原樣保留').toBe('')
-    expect(stOf(state, 'u2'), '非空白的 st 要取自 snapshot').toBe('趕工中')
+    expect([...EDGE_TEXT].length, '前提：測試文字剛好 12 個 code point').toBe(12)
+    expect(stOf(state, 'u2'), '非空白的 st 要原樣取自 snapshot —— 不 trim、不截斷').toBe(EDGE_TEXT)
     expect(state.roster.has(SELF), '自己仍然不會成為遠端玩家').toBe(false)
   })
 
@@ -347,30 +355,47 @@ describe('遠端玩家的狀態文字', () => {
     const state = createRemotePlayersState()
     apply(state, snapshot(player(SELF), player('u1')))
 
-    const changed = apply(state, presence([player('u2', 0, 0, 0, '開會中')], []))
+    const changed = apply(state, presence([player('u2', 0, 0, 0, EDGE_TEXT)], []))
 
     expect(changed).toBe(true)
-    expect(stOf(state, 'u2'), '加入名單的當下就要有 join 帶來的狀態').toBe('開會中')
+    expect(stOf(state, 'u2'), '加入名單的當下就要有 join 帶來的狀態，原樣不改寫').toBe(EDGE_TEXT)
   })
 
   it('[FE-R10-S03] status 只更新指定玩家', () => {
     const state = createRemotePlayersState()
-    apply(state, snapshot(player('u1', 32, 0, 0, '原本一'), player('u2', 64, 0, 0, '原本二')))
+    apply(
+      state,
+      snapshot(
+        playerAs('u1', { x: 32, name: '甲', av: 1, st: '原本一' }),
+        playerAs('u2', { x: 64, name: '乙', av: 0, st: '原本二' }),
+      ),
+    )
     for (let i = 1; i <= 3; i++) {
       clock += 100
       apply(state, pos(['u1', 32 + i * 32, 0, 0], ['u2', 64 + i * 32, 0, 0]))
     }
     const keysBefore = [...state.roster.keys()]
+    const rosterBefore = state.roster
+    const u1Before = state.roster.get('u1')!
     const u2Before = state.roster.get('u2')
     const tracksBefore = new Map(
       [...state.motion].map(([id, t]) => [id, { ref: t, samples: JSON.stringify(t.samples) }]),
     )
     expect(tracksBefore.size, '前提：兩個人都有樣本').toBe(2)
 
-    const changed = apply(state, status('u1', '換了'))
+    const changed = apply(state, status('u1', EDGE_TEXT))
 
     expect(changed, '狀態文字是低頻、看得見的資料 —— 要讓呼叫端重繪').toBe(true)
-    expect(stOf(state, 'u1')).toBe('換了')
+    // ⚠️ **回傳 true 不夠**：呼叫端是 `setRoster(state.roster)`，拿到同一個 Map 時 React 不會重繪（design D1）。
+    expect(state.roster, '要換一個新的名單 Map —— 同一個 Map 不會觸發重繪').not.toBe(rosterBefore)
+    expect(state.roster.get('u1'), '被更新的人要換一個新的身分物件').not.toBe(u1Before)
+    expect(u1Before.st, '舊的身分物件不得被就地改寫').toBe('原本一')
+    expect(state.roster.get('u1'), '只改狀態文字：name／av 保留，文字原樣不 trim、不截斷').toEqual({
+      id: 'u1',
+      name: '甲',
+      av: 1,
+      st: EDGE_TEXT,
+    })
     expect([...state.roster.keys()], '名單成員不變').toEqual(keysBefore)
     expect(state.roster.get('u2'), '另一個人的身分連物件都不換').toBe(u2Before)
     expect(stOf(state, 'u2')).toBe('原本二')
@@ -394,6 +419,7 @@ describe('遠端玩家的狀態文字', () => {
     apply(state, snapshot(player(SELF), player('u1', 32, 0, 0, '在')))
     const rosterBefore = state.roster
     const motionKeysBefore = [...state.motion.keys()]
+    const samplesBefore = JSON.stringify([...state.motion].map(([id, t]) => [id, t.samples]))
     expect(rosterBefore.size, '前提：名單非空').toBe(1)
 
     for (const id of ['nobody', SELF]) {
@@ -405,6 +431,10 @@ describe('遠端玩家的狀態文字', () => {
       expect(state.roster, `${id} 的 status 不該換掉名單`).toBe(rosterBefore)
       expect(state.roster.has(id), `${id} 不該被建立`).toBe(false)
       expect([...state.motion.keys()], `${id} 不該多出樣本容器`).toEqual(motionKeysBefore)
+      expect(
+        JSON.stringify([...state.motion].map(([key, t]) => [key, t.samples])),
+        `${id} 的 status 不該動到任何人的樣本內容（只比 key 的話清空樣本也會綠）`,
+      ).toBe(samplesBefore)
     }
     expect(stOf(state, 'u1'), '名單上的人不受影響').toBe('在')
   })
