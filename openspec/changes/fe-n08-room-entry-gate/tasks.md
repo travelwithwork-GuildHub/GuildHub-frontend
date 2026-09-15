@@ -24,9 +24,9 @@
 
 ## 4. 送出、錯誤、成功進房（PR：`--submit`；產品碼 ≤200、測試 ≤250）
 
-- [ ] 4.1 先寫 jsdom：`[FE-N08-S04]`（去重、busy、送出中 Esc 關得掉、晚到結果丟棄、空字串照送、不自動重送）、`[FE-N08-S06]` 的順序（`holdRoomToken` 在 `enterRoom` 之前；用呼叫順序斷言）、`[FE-N08-S14]`（四種 storage 故障＋空字串票 → 不進房、視窗留著、alert 不含「密碼」）、`[FE-N08-S15]`（換房間 → 作廢；關了重開同一間房 → 舊回應作廢；視窗不關、身分 P→Q → 作廢；P→Q→P → 作廢；登出 → 作廢；視窗都還開著）、`[FE-N08-S08]`～`S10`（403／404×3 種 detail／401／網路／500／422／壞 body；detail 不進 DOM；不存票、不 `enterRoom`）
+- [ ] 4.1 先寫 jsdom：`[FE-N08-S04]`（去重、busy、送出中 Esc 關得掉、晚到結果丟棄、空字串照送、不自動重送）、`[FE-N08-S06]` 的順序（`holdRoomToken` 在 `enterRoom` 之前；用呼叫順序斷言）、`[FE-N08-S14]`（四種 storage 故障＋空字串票 → 不進房、視窗留著、alert 不含「密碼」）、`[FE-N08-S15]`（換房間 → 作廢；關了重開同一間房 → 舊回應作廢；視窗不關、身分 P→Q → 舊輪作廢且 busy 立刻解除、Q 可送；P 舊回應晚到不動 Q 的 busy；P→Q→P → 作廢；登出 → 作廢；視窗都還開著）、`[FE-N08-S08]`～`S10`（403／404×3 種 detail／401／網路／500／422／壞 body；detail 不進 DOM；不存票、不 `enterRoom`）
 - [ ] 4.2 `useForm` ＋ `enterProject()`；錯誤分類只看 `kind`（`isForbidden`／`isNotFound` 的寫法照 `identity/session.ts`）；文案在元件常數，不在規格
-- [ ] 4.3 突變：把 `detail` 印出來 → S09 紅；403 與 404 同一句 → S08／S09 紅；成功分支不清欄位 → S05 紅（e2e）；先 `enterRoom` 再存票 → S06 紅；submit 不去重 → S04 紅；存票不讀回 → S14 紅；關閉後不作廢那一輪 → S04 晚到那段紅
+- [ ] 4.3 突變：把 `detail` 印出來 → S09 紅；403 與 404 同一句 → S08／S09 紅；重開視窗保留上次密碼 → S05 紅（e2e）；反轉存票與 `enterRoom` 的順序 → S06 紅；submit 不去重 → S04 紅；存票不讀回或只驗非 null → S14 紅；關閉後不作廢那一輪 → S04 晚到那段紅；換代號不解除 busy → S15 紅
 
 ## 5. 重新輸入密碼（PR：`--retry`；產品碼 ≤120、測試 ≤150）
 
@@ -36,7 +36,7 @@
 
 ## 6. 瀏覽器與收尾
 
-- [ ] 6.1 `tests/e2e/room-entry.mjs`（`next start` 正式建置、`page.route` 偽造 `/enter`、`routeWebSocket` 偽造房間 socket；走位用 `scene-switch.mjs` 的門標籤里程計）：`S01`（真的按 E 開視窗、Canvas 同一節點）、`S02`（Esc 後 activeElement）、`S05`（密碼不落地：網址軌跡＋storage）、`S06`／`S07`（帶票的連線、網址沒票、回大廳再按 E 不問）、`S08`（403 留著）、`S11`（被拒→同票再試→重新輸入）、`S13` 後半（換身分）
+- [ ] 6.1 `tests/e2e/room-entry.mjs`（`next start` 正式建置、`page.route` 偽造 `/enter`、`routeWebSocket` 偽造房間 socket；走位用 `scene-switch.mjs` 的門標籤里程計）：`S01`（真的按 E 開視窗、Canvas 同一節點）、`S02`（Esc 後 activeElement）、`S05`（密碼不落地：網址軌跡＋storage；同一扇門再開是空的）、`S06`／`S07`（帶票的連線、網址沒票、回大廳再按 E 不問）、`S08`（403 留著）、`S09`（一種 404）、`S10`（401 與網路失敗）、`S11`（被拒→同票再試→重新輸入）、`S13` 後半（換身分）、`S14`（`setItem` 拋）、`S15` 第一段（延遲回應＋Esc＋重開）
 - [ ] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
 - [ ] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、契約測試兩個目標的結果如實記在這裡
 - [ ] 6.4（流程，不對應 Requirement）Google Sheet：`FE-N08` → On-going／Done 各一次
