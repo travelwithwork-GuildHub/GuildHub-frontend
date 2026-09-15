@@ -1,0 +1,41 @@
+# `FE-K04` 場景 chat UI —— 任務
+
+每一片是一個 `feat/fe-k04-scene-chat-ui--<slice>` PR，產品碼（`src/`）≤250 行、手寫合計 ≤800 行。
+**先 commit 紅的判準 → 實作（綠）→ 突變（拔掉防禦要紅，執行紀錄貼 PR 留言）。** 看得見的 tsx 動之前先過 `ui-ux-pro-max`；按鈕用 `@/design/controls`。
+
+## 1. 規格
+
+- [ ] 1.1 規格已在 PR 上談定（`spec/fe-k04-scene-chat-ui`；兩位外部審查）
+
+## 2. 列表與輸出安全（PR：`--feed`；產品碼 ≤180、測試 ≤200）
+
+- [ ] 2.1 先寫 jsdom：`[FE-K04-S03]`（順序、name、截斷標記只在那一列）、`[FE-K04-S04]`（空狀態、沒有列、不含那三個詞）、`[FE-K04-S13]`（兩個節點 `textContent` 原字串、沒有子元素、整區沒有 `script`／`img`／`a[href^="javascript"]`）
+- [ ] 2.2 `src/chat/SceneChatFeed.tsx`：讀 `useSceneChat().log`；append-only 的列表（不用 `ListPanel`）；每列 `[data-testid="chat-name"]`／`[data-testid="chat-body"]` 純文字節點；`truncated` 標記；空狀態（元件常數，不擴充 `FE-X04`）
+- [ ] 2.3 `output-safety` 的具名元件判準加 chat 的兩個節點（`tests/output-safety*.test.tsx` 的 S06 旁邊放 S13）
+- [ ] 2.4 突變：列表用 `dangerouslySetInnerHTML` → S13 紅＋既有 lint 紅；順序反轉 → S03 紅；`truncated` 全標 → S03 紅；空狀態寫「沒有歷史」 → S04 紅
+
+## 3. 輸入與送出（PR：`--composer`；產品碼 ≤200、測試 ≤250）
+
+- [ ] 3.1 先寫 jsdom：`[FE-K04-S05]`（空與全空白不送、辨識要輸入、原字串含首尾空白）、`[FE-K04-S06]`（拋 → 保留、恰好一個 alert 在送出控制之前且取得焦點、沒重送；接受 → `send` 一次、清空、alert 消失、回聲前列表沒有；回聲後恰好一列）、`[FE-K04-S07]`（沒 `maxlength`、2001 code point 完整送）
+- [ ] 3.2 `src/chat/SceneChatComposer.tsx`：`textarea`（Enter 送、Shift+Enter 換行）＋送出控制；`trim()` 空就不送；`send` 沒拋才清空；拋 → 保留、`SubmitError` 風格的 alert（文案在元件常數；不含例外訊息）；不自動重送；不用 `useForm` 的 schema 驗證（沒有規則可驗），但 alert 的位置與焦點照 `form-conventions`
+- [ ] 3.3 突變：送出前 trim → S05 紅；不擋全空白 → S05 紅；拋錯後仍清空 → S06 紅；吞掉例外 → S06 的 alert 紅；送出時本地 append → S06 紅；加 `maxLength={2000}` → S07 紅
+
+## 4. 世界整合（PR：`--world`；產品碼 ≤150、測試 ≤200）
+
+- [ ] 4.1 先寫 jsdom：`[FE-K04-S02]` 的鎖與焦點（chat 區可見 `inputLockRef` 是 false；textarea 焦點 → true；Escape → activeElement 是錨、chat 區還在、值保留）；`[FE-K04-S01]` 的 jsdom 可驗部分（掛在 `WorldCanvas` 裡、沒有 dialog、記憶體有一則就顯示）
+- [ ] 4.2 `WorldCanvas` 掛 `<SceneChatHud />`（`layer('hud')`，焦點錨容器裡、不遮 `InteractionPrompt`）；Escape 在 textarea 裡 → focus 錨（用 `useEscapeLayer` 或 textarea 的 `onKeyDown`，二選一並寫理由）；`ui-ux-pro-max`（`--domain ux`：chat／feed／輸入區的可及性與對比）
+- [ ] 4.3 突變：chat 區可見就 `holdInputLock` → S02 紅；Escape 不回錨 → S02 紅；掛在 `PanelShell` 裡 → S01 紅（有 dialog）
+
+## 5. 捲動（PR：`--scroll`；產品碼 ≤120、測試 ≤150）
+
+- [ ] 5.1 先寫瀏覽器判準（`tests/e2e/scene-chat.mjs` 的 S11／S12 段）：在底部收新訊息 → 最新可見；往上捲 → `scrollTop` 差 ≤1px、出現控制、按了最新可見且控制消失
+- [ ] 5.2 實作底部跟隨、往上讀不搶、「有新訊息」控制；量「底部附近」的閾值 —— 量出來若改變了 S11／S12 的可觀察結果，停下重開 spec PR
+- [ ] 5.3 突變：每則都 `scrollIntoView` → S12 紅；不跟隨 → S11 紅；拿掉控制 → S12 紅
+
+## 6. 瀏覽器與收尾
+
+- [ ] 6.1 `tests/e2e/scene-chat.mjs`（`next start`；`tests/e2e/lib/world.mjs` 的偽造與走位）：`S01`（出生點附近、沒按 E、沒有 dialog、訊息出現）、`S02`（真的按 W 位移、textarea 裡打 w 不動、Escape 回錨、再按 W 會動）、`S08`（走到門前按 E 進房、hello 後只剩房間的）、`S09`（`refuse` 房間握手 → 大廳的話還在）、`S10`（reload、只回 hello＋snapshot、空狀態、請求 allowlist；**正式引用 `[FE-R11-S05]`**）、`S11`／`S12`
+- [ ] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
+- [ ] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 的結果如實記在這裡
+- [ ] 6.4（流程，不對應 Requirement）Google Sheet：`FE-K04` → On-going／Done；`FE-R11` 的 5.1／5.3／5.4 在 S10 綠了之後才動
+- [ ] 6.5 封存（`archive/fe-k04-scene-chat-ui`；勾勾先用 `feat/fe-k04-scene-chat-ui--tasks` 進 main）
