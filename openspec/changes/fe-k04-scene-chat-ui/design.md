@@ -8,7 +8,8 @@
 
 ## D1｜Chat 是可旁觀的非阻斷 DOM HUD，不是面板
 
-放在 `WorldCanvas` 的焦點錨容器裡、`layer('hud')`，跟 `InteractionPrompt`、門標籤同一層；不是 `PanelShell`（那會持世界命令鎖、Escape 層級、focus trap）。
+放在 `WorldCanvas` 的焦點錨容器裡、`layer('hud')`，跟 `InteractionPrompt`、門標籤同一層；不是 `PanelShell`（那會持世界命令鎖、Escape 層級、focus trap），也不掛成 `useEscapeLayer` 的一層（常駐的東西掛成層會永遠是最上層，`FE-X06` 的「Escape 關最上層」就壞了）；
+Escape 在輸入框裡由 textarea 自己的 `onKeyDown` 處理。版面上避開 `InteractionPrompt` 的位置（提示在畫面下方中央；chat 區靠一側、有最大高度、內部捲動）。
 只看不鎖：走路、按 E 開門、看板都照常。焦點進輸入框才鎖（既有 `EditableFocusLock`，不另發明一把）；Escape 在輸入框裡是「離開輸入框、焦點回世界錨」，
 不是關掉 HUD（HUD 沒有關閉狀態 —— 收合是版面問題，量過再說，見待答）。
 代價：螢幕同時承載世界與 chat；用 responsive CSS 處理寬度與行數，不把 chat 變成另一個全頁面板。
@@ -17,7 +18,8 @@
 
 不用 `ListPanel`：chat 沒有分頁、total、has_more、request identity；`FE-X04` 的五種空狀態是給「有後端查詢」的清單的，chat 的空只代表
 「這一頁還沒收到」—— 不能說「沒有歷史」（後端根本沒有歷史可查）、不能說「沒人講過話」（refresh 之前可能有）。控制項、字體、色票沿用 `@/design/controls`。
-`truncated` 的那一則要看得出來（`FE-R11` 把 2000 code point 的保存預算交給 UI 說明）—— 標記是 UI 的字，不進規格。
+`truncated` 的那一則要看得出來（`FE-R11` 把 2000 code point 的保存預算交給 UI 說明）—— 標記是 UI 的字，不進規格；UI 不自己截、不顯示截斷前的內容（那是 transport 的事）。
+空狀態的字：說「這一頁還沒收到訊息」這一類，不說「沒有歷史」「沒有人講過話」—— 前者是事實，後者是後端沒有的資訊；文案由 PR review 守，不進規格。
 
 ## D3｜輸入原值送出，只擋全空白；沒有上限
 
