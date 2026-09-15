@@ -28,7 +28,7 @@ DOM 密碼視窗：`role="dialog"`、`aria-modal="true"`、可及名稱含那間
 一次按鍵（含鍵盤重複事件）SHALL 最多開一個視窗、送零次請求。
 正式門禁掛上之後，「輸入密碼的功能還沒開放」那句預設說明 MUST NOT 出現。
 
-> 拔掉什麼會紅：不掛 provider → S01 的視窗不出現、預設說明出現；provider 不帶 `projectId`／`title` → 名稱對不上那扇門；
+> 拔掉什麼會紅：不掛 provider → S01 的視窗不出現、預設說明出現；provider 不帶 `title` → 可及名稱對不上那扇門；不帶 `projectId` → S04 的送出參數；
 > 第二次 `needsToken` 重建視窗或重置表單 → S01 的「仍是 ab」；把輸入畫進 Canvas → S01 的「Canvas 裡沒有輸入控制」（跟「同一節點」是兩件事）。
 
 #### Scenario: [FE-N08-S01] 對著門按 E，出現這間房的密碼視窗
@@ -82,7 +82,7 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 送出開始 SHALL 立即 busy、送出控制 disabled；請求未完成前的第二次送出 SHALL 被忽略；系統 MUST NOT 自動重送。
 密碼 MUST NOT 寫進網址、`sessionStorage`、`localStorage`、票的儲存；失敗時 SHALL 留在欄位裡，成功或關閉時 SHALL 清掉。
 
-> 拔掉什麼會紅：submit handler 不去重 → S04 呼叫兩次；把密碼放進 storage 或網址 → S05；成功分支不清欄位 → S05 的「同一扇門再開是空的」；
+> 拔掉什麼會紅：submit handler 不去重 → S04 呼叫兩次；把密碼放進 storage 或網址 → S05；重開視窗保留上次密碼（不管實作是清欄位還是重掛）→ S05 的「同一扇門再開是空的」；
 > 加 `.min(1)` → S04 的空字串那段（後端會回 403，前端不能先擋）。
 
 #### Scenario: [FE-N08-S04] 送出中連按只送一次；送出中按 Esc 關得掉、晚到的成功被丟棄；空字串也送
@@ -120,12 +120,13 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 視窗 MUST NOT 自己建 WebSocket、MUST NOT 寫網址；成功後視窗 SHALL 關閉。
 讀回不等於本次的票時 SHALL 視同失敗；`room_token` 是空字串時 SHALL 視同失敗（獨立的檢查 —— 空字串存得進去也讀得回來，比對抓不到它）：MUST NOT 呼叫 `enterRoom`、視窗 SHALL 留著、
 SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行證，不說是密碼錯）—— 否則使用者剛輸對密碼就被判成「沒票」留在大廳，或拿舊票去撞握手。
-每一輪送出的結果 SHALL 只在「視窗還開著、目標房間沒變、身分跟送出時相同」時才被採用；視窗關閉、換了目標房間、或身分改變（換人、登出）之後，
-那一輪的結果 SHALL 作廢（不存票、不進房、不顯示）—— 身分改變**不**關視窗（訪客本來就能開視窗、送出會拿到 401，D2），只是那一輪作廢。
+每一輪送出 SHALL 有自己的代號；結果 SHALL 只在「這一輪還是現行的那一輪」時被採用。下列任一件事發生就換代號、舊的一輪作廢（不存票、不進房、不顯示）：
+視窗關閉（**即使之後重開同一間房**，舊回應也不採用）、目標房間換了、身分改變（換人、登出；**回應到達時的身分跟送出時不同**——中間換了又換回來也算作廢，
+因為代號已經換過）。身分改變**不**關視窗（訪客本來就能開視窗、送出會拿到 401，D2），只是那一輪作廢。
 同一身分、同一分頁已持有那間房的票時，門前按 E SHALL 直接走既有 `enterRoom`，MUST NOT 開視窗、MUST NOT 呼叫 `/enter`。
 
 > 拔掉什麼會紅：反轉兩個呼叫的順序 → S06 的順序斷言；存票時鍵不含身分 → S13 換身分讀到別人的票；有票也開視窗 → S07；
-> 存票不讀回或只檢查非 null → S14 的「舊票殘留」那段仍呼叫 `enterRoom`；不作廢關閉前那一輪 → S15 前半；身分改變不作廢 → S15 後半。
+> 存票不讀回或只檢查非 null → S14 的「舊票殘留」那段仍呼叫 `enterRoom`；只比「現在開著、同房、同人」不比代號 → S15 的「關了重開同一間房」；身分改變不換代號 → S15 的 P→Q→P。
 
 #### Scenario: [FE-N08-S06] 密碼對了：票存起來、過場開始、房間連線帶著票、網址沒有票
 
@@ -151,8 +152,12 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **GIVEN** 對房間 A 的 `/enter` 尚未回應
 - **WHEN** 按 Esc 關閉，再對房間 B 的門按 E 開視窗，接著 A 的請求回 `200 { "room_token": "TA" }`
 - **THEN** `sessionStorage` 裡 SHALL 沒有 A 也沒有 B 的票；SHALL 沒有 `enterRoom`；B 的視窗 SHALL 還開著、欄位空白、沒有 alert
+- **AND WHEN** 對 B 送出、尚未回應時按 Esc 關閉，**再對同一扇 B 的門按 E 重開**（現在：開著、同房、同人），接著剛才那個請求回 `200 { "room_token": "TB0" }`
+- **THEN** SHALL 沒有存票、沒有 `enterRoom`、沒有 alert；重開的視窗 SHALL 還開著、欄位空白（只比「開著、同房、同人」會錯採 —— 要比代號）
 - **AND WHEN** 以 P 的身分對 B 送出、尚未回應時身分變成 Q（視窗**不**關、不重掛），接著 B 的請求回 `200 { "room_token": "TB" }`
-- **THEN** SHALL 沒有存票（P＋B、Q＋B 都沒有 TB）、沒有 `enterRoom`、沒有 alert；視窗 SHALL 還開著（這一段只靠身分比對，關閉的作廢幫不上忙）
+- **THEN** SHALL 沒有存票（P＋B、Q＋B 都沒有 TB）、沒有 `enterRoom`、沒有 alert；視窗 SHALL 還開著（這一段只靠身分，關閉的作廢幫不上忙）
+- **AND WHEN** 以 P 送出、身分變成 Q 又變回 P、接著回 `200 { "room_token": "TB1" }`
+- **THEN** 同樣不採用（代號換過了）
 - **AND WHEN** 再以 Q 送出、尚未回應時登出成訪客，接著回 `200 { "room_token": "TB2" }`
 - **THEN** 同樣沒有存票、沒有 `enterRoom`；視窗 SHALL 還開著
 - → 驗於：jsdom
@@ -212,7 +217,8 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 今天的 `heldRoomToken(): string | null` 分不出後兩種）；只有「確定不在了」才開視窗；「還在」或「無法確認」→ MUST NOT 開視窗、通知 SHALL 留著，
 並 SHALL 顯示受控的一句（這個瀏覽器清不掉通行證）—— 不能一邊開視窗一邊留著一張會被拿去撞握手的舊票。
 視窗的可及名稱 SHALL 含那間房的標題；標題來源依序是：`enterRoom` 當時帶的 `title`、大廳房間清單裡同 `projectId` 的標題；
-兩者都沒有（深連結或上一頁失敗、清單還沒回來）時 SHALL 仍開視窗，名稱不含房名但可辨識是房間密碼視窗。
+兩者都沒有（深連結或上一頁失敗、清單還沒回來）時 SHALL 仍開視窗，名稱不含房名但可辨識是房間密碼視窗；
+視窗開著時清單回來了，名稱 SHALL 更新成含房名（同一個視窗，不重開）。
 
 > 拔掉什麼會紅：系統在失敗時自動丟票 → S11 第一段（票不在了）；動作不丟票 → S11 第二段（視窗開了但票還在，
 > 之後送出成功會覆寫 —— 判準是 `sessionStorage` 那個鍵在啟動後為空）；動作不關通知 → S11 alert 還在。
@@ -229,7 +235,9 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **AND WHEN** `sessionStorage.removeItem` 拋，或 `removeItem` 靜默沒刪、或刪完 `getItem` 拋 —— 三種各一次，使用者啟動「重新輸入密碼」
 - **THEN** 三種都 SHALL 沒有視窗；通知 SHALL 還在；SHALL 有一句受控說明；鍵在的那兩種鍵 SHALL 仍是 T
 - **AND WHEN** 失敗來自深連結（`/world?room=R` 帶票、沒有 `title`）、房間清單還沒回來，使用者啟動「重新輸入密碼」
-- **THEN** SHALL 開視窗，可及名稱 SHALL 可辨識是房間密碼視窗（不含房名）；清單回來後再開一次 SHALL 含房名
+- **THEN** SHALL 開視窗，可及名稱 SHALL 可辨識是房間密碼視窗（不含房名）
+- **AND WHEN** 視窗還開著，`GET /api/rooms` 回來了、裡面有 R 的標題
+- **THEN** 同一個視窗（同一個 DOM 節點）的可及名稱 SHALL 變成含 R 的標題，欄位內容不變
 - → 驗於：jsdom、e2e（前半）
 
 ### Requirement: 本地後端的 enter 在下列語意上與真後端相同，票本地替身收得下
@@ -244,7 +252,7 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 `enterProject` 的契約測試 SHALL 對 `local` 與 `guildhub` 兩個目標跑同一份。
 
 > 拔掉什麼會紅：handler 不驗密碼 → S12 的 403 那列；handler 與替身用不同的簽章 → S12 握手那段；票不綁身分 → S12 換 cookie 那段；
-> handler 看座位 → S12 滿座那列；handler 加 `status === 'active'` 才簽 → S12 的 closed 那列；只驗簽章不查名片 → S12 名片已刪那列；改路徑或 body 欄位名 → S13 兩個目標其中一個紅。
+> handler 看座位 → S12 滿座那列；handler 加 `status === 'active'` 才簽 → S12 的 closed 那列；只驗簽章不查名片 → S12 名片已刪那列；operation 改路徑或 body 欄位名 → S13 兩個目標都紅（兩個後端都不認）。
 
 #### Scenario: [FE-N08-S12] 本地 enter 的矩陣與票的效力
 
@@ -255,10 +263,10 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **AND** 同一個 `active` 專案，在座位表是空的、以及 `seat_count` 格全部被佔滿兩種資料下，密碼正確都 SHALL 回 200
 - → 驗於：單元（契約測試，本機起的可拋棄後端＋替身）
 
-#### Scenario: [FE-N08-S13] 兩個目標同一份契約；換身分讀不到別人的票
+#### Scenario: [FE-N08-S13] 兩個目標呈現同一份契約結果；換身分讀不到別人的票
 
-- **WHEN** 同一份 `enterProject` 契約測試對 `local` 與 `guildhub` 目標各跑一次
-- **THEN** 兩者 SHALL 都送 `POST /api/projects/{project_id}/enter` 帶 `EnterIn`；成功 body SHALL 都通過 `EnterOut`；401／403／404 SHALL 翻譯成同一個 `kind`
+- **WHEN** 對 `local` 與 `guildhub` 目標各執行 enter 的契約測試（tasks 規定是同一個檔案）
+- **THEN** 兩個目標 SHALL 都收到 `POST /api/projects/{project_id}/enter` 帶 `EnterIn`；成功 body SHALL 都通過 `EnterOut`；401／403／404 SHALL 翻譯成同一個 `kind`
 - **AND WHEN** P 經視窗拿到 R 的票後，同一分頁改以 Q 的身分載入 `/world?room=R`
 - **THEN** Q 的第一條連線 MUST NOT 帶 P 的票；場景 SHALL 依 `FE-V01-S14` 回到大廳
 - → 驗於：單元（契約）、e2e（換身分）

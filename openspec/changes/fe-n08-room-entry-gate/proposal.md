@@ -28,10 +28,11 @@ Vercel 上的人永遠進不了房間，`FE-V01` 只有測試進得去。
   - `world-scenes` 的握手失敗通知多一個**使用者發起**的「重新輸入密碼」動作：啟動才丟票、才開 Modal
   - 本地後端補 `POST /api/projects/{project_id}/enter`（`FE-O03` 的 Route Handler ＋ 可拋棄 DB），
     簽出的票本地即時層替身收得下；`local` 與 `guildhub` 兩個目標跑同一份契約測試
-- **既有規格只動一句**：`world-scenes`〈進不去就回 Guild Hall…〉開最小 MODIFIED delta，通知的消失條件多列「使用者從通知啟動重新輸入密碼」，
+- **既有規格只動一句**：`world-scenes`〈進不去就回 Guild Hall…〉開最小 MODIFIED delta，通知的消失條件多列「使用者從通知啟動重新輸入密碼且票已確認丟棄、視窗開啟」，
   其餘正文與 `FE-V01-S06`／`S07`／`S16` 逐字不動（archive 時整條取代，對 diff 要看得到只多那一句）。
   `world-interactive-objects`〈門與看板都註冊進互動系統〉也開最小 MODIFIED：只在 `FE-V01-S11` 的 GIVEN 補上「門禁是預設的」
-  （它本來就是測預設 provider，正文也這樣寫，但 GIVEN 沒寫 —— archive 之後同一個 GIVEN 下一邊要 `role="status"`、一邊要 `role="dialog"` 會打架）；其餘逐字。
+  （它本來就是測預設 provider，正文也這樣寫，但 GIVEN 沒寫 —— archive 之後同一個 GIVEN 下一邊要 `role="status"`、一邊要 `role="dialog"` 會打架）；
+  `FE-W12-S16` 的 GIVEN 原本就有這個前提，逐字不動；其餘逐字。
 
 ## Non-goals
 
