@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { EnterOut } from '@/api/contract/rest'
-import { ContractClient, baseUrl, onlineUrl, wsUrl } from '../client'
+import { ContractClient, baseUrl, onlineUrl, stubProbe, wsUrl } from '../client'
 import { connect, expectRefused } from './socket'
 
 // 規格：openspec/changes/fe-o03-internal-backend/specs/internal-backend/spec.md
 //   Requirement: 人才與案件清單 —— S22（rooms 的 online_count 來自替身）
-//   Requirement: 即時層替身 —— S23（/online 數的是活著的連線）
-//   （S21 的三種拒絕在 `lobby.contract.ts`；以前這裡多一條「uuid 不合法但票算對」—— 票的格式現在是簽發者的事（ADR 0008），測試不再自己算票，那條拿掉。）
+//   Requirement: 即時層替身 —— S21（uuid 不合法、但對它算對的票也拒：擋的是格式）、S23（/online 數的是活著的連線）
+//   （S21 的另外三種拒絕在 `lobby.contract.ts`。）
 //
 // 房間的票由 `POST /api/projects/{id}/enter` 簽（`FE-N08`，兩個目標都有）、綁人：連線要帶同一個 session cookie。
 // 票的格式是簽發者 process 內的事（ADR 0008）—— 這裡**不自己算票**，只拿 `enter` 給的。
@@ -48,6 +48,24 @@ describe.skipIf(onlineUrl() === null)('房間人數', () => {
       await a.close()
       await b.close()
     }
+  })
+})
+
+describe.skipIf(stubProbe() === null)('房間的 scene 格式', () => {
+  it('[FE-O03-S21] uuid 不合法：就算票對它算對、身分也對，仍拒絕握手（對照組：同一把簽法對 seed 房間連得上）', async () => {
+    const probe = stubProbe() as NonNullable<ReturnType<typeof stubProbe>>
+    const headers = { cookie: probe.cookie }
+    // 對照組先：harness 簽的票要真的被替身認 —— 不認的話下面的「被拒」就是恆真（簽法漂了也會被拒）。
+    const ok = await connect(`${wsUrl()}?scene=${probe.valid.scene}&token=${encodeURIComponent(probe.valid.token)}`, headers)
+    try {
+      const hello = await ok.waitFor((m) => m.t === 'hello', 3_000)
+      expect(hello.t === 'hello' && hello.you, '探針的票沒被認出是這個人 —— harness 的簽法跟替身漂了').toBe(probe.id)
+    } finally {
+      await ok.close()
+    }
+    const r = await expectRefused(`${wsUrl()}?scene=${probe.malformed.scene}&token=${encodeURIComponent(probe.malformed.token)}`, headers)
+    expect(r.opened, 'uuid 不合法的 room 竟然連上了（只驗票不驗格式）').toBe(false)
+    expect(r.messages).toBe(0)
   })
 })
 

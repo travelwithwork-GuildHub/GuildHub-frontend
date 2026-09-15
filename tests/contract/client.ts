@@ -103,6 +103,17 @@ export function onlineUrl(): string | null {
   return inject('contractOnlineUrl')
 }
 
+/** 替身的格式探針（`FE-O03-S21`）：一張名片的 cookie，以及替它簽好的「不合法 scene 的票」與「seed 房間的票」；真後端沒有 → null。 */
+export interface StubProbe {
+  id: string
+  cookie: string
+  malformed: { scene: string; token: string }
+  valid: { scene: string; token: string }
+}
+export function stubProbe(): StubProbe | null {
+  return inject('contractStubProbe')
+}
+
 declare module 'vitest' {
   export interface ProvidedContext {
     contractBaseUrl: string
@@ -110,5 +121,6 @@ declare module 'vitest' {
     contractDatabaseUrl: string
     contractUnimplemented: string[]
     contractOnlineUrl: string | null
+    contractStubProbe: StubProbe | null
   }
 }

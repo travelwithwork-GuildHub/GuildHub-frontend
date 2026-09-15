@@ -22,7 +22,7 @@ import http from 'node:http'
 import pg from 'pg'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { ClientMessage, HZ, ServerMessage, type Player } from '../src/api/contract/ws'
-import { roomSceneProject, roomTokenMatches } from '../src/server/roomToken'
+import { roomHandshakeAllowed, roomSceneProject } from '../src/server/roomToken'
 
 const PORT = Number(process.env.INTERNAL_REALTIME_PORT ?? 3102)
 const SECRET = process.env.INTERNAL_SESSION_SECRET ?? 'dev-only-internal-session-secret'
@@ -114,13 +114,6 @@ function sceneShapeOk(scene: string): boolean {
   return scene === 'lobby' || roomSceneProject(scene) !== null
 }
 
-/** 房間要票，而且票要綁**這個人**：先解析出身分才驗得了。大廳不驗。 */
-function ticketOk(scene: string, token: string | null, whoId: string): boolean {
-  const projectId = roomSceneProject(scene)
-  if (projectId === null) return scene === 'lobby'
-  return token !== null && roomTokenMatches(SECRET, token, projectId, whoId)
-}
-
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const scene = url.searchParams.get('scene') ?? 'lobby'
@@ -136,7 +129,8 @@ server.on('upgrade', (req, socket, head) => {
   if (url.pathname !== '/ws' || !sceneShapeOk(scene)) return refuse()
   void identify(req.headers.cookie).then((who) => {
     if (socket.destroyed) return
-    if (!ticketOk(scene, url.searchParams.get('token'), who.id)) return refuse()
+    // 房間要票，而且票要綁**這個人**：先解析出身分才驗得了（裁決在 `roomHandshakeAllowed`，替身不另寫一套）。
+    if (!roomHandshakeAllowed(SECRET, scene, url.searchParams.get('token'), who.id)) return refuse()
     wss.handleUpgrade(req, socket, head, (ws) => {
       const conn: Conn = { ws, scene, moved: false, player: { ...who, x: 0, y: 0, f: 0, st: '' } }
       send(ws, { t: 'hello', you: who.id, hz: HZ })

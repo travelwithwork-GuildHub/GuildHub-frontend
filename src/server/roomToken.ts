@@ -38,3 +38,14 @@ export function roomTokenMatches(secret: string, token: string, projectId: strin
   const expected = Buffer.from(signRoomToken(secret, projectId, profileId))
   return given.length === expected.length && timingSafeEqual(given, expected)
 }
+
+/**
+ * 替身握手的裁決，整個放在一起：`lobby` 不驗；`room:<uuid>` 要格式對（`roomSceneProject`）**而且**票綁這間房、綁這個人；其他 scene 一律拒。
+ * 格式不合的 scene 就算帶著「對它算對的票」也拒（`FE-O03-S21`）—— 替身只呼叫這一個函式，沒有第二套判斷。
+ */
+export function roomHandshakeAllowed(secret: string, scene: string, token: string | null, profileId: string): boolean {
+  if (scene === 'lobby') return true
+  const projectId = roomSceneProject(scene)
+  if (projectId === null) return false
+  return token !== null && roomTokenMatches(secret, token, projectId, profileId)
+}
