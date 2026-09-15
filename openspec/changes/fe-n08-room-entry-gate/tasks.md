@@ -69,7 +69,12 @@
 
 ## 6. 瀏覽器與收尾
 
-- [ ] 6.1 `tests/e2e/room-entry.mjs`（`next start` 正式建置、`page.route` 偽造 `/enter`、`routeWebSocket` 偽造房間 socket；走位用 `scene-switch.mjs` 的門標籤里程計）：`S01`（真的按 E 開視窗、Canvas 同一節點）、`S02`（Esc 後 activeElement）、`S03`（焦點在送出鈕上按 W／E 世界不動、關閉後會動）、`S05`（密碼不落地：網址軌跡＋storage；同一扇門再開是空的）、`S06`／`S07`（帶票的連線、網址沒票、回大廳再按 E 不問）、`S08`（403 留著）、`S09`（一種 404）、`S10`（401 與網路失敗）、`S11`（被拒→同票再試→重新輸入）、`S13` 後半（換身分）、`S14`（`setItem` 拋）、`S15` 第一段（延遲回應＋Esc＋重開）
+- [x] 6.1 `tests/e2e/room-entry.mjs`（`next start` 正式建置、`page.route` 偽造 `/enter`、`routeWebSocket` 偽造房間 socket；走位用 `scene-switch.mjs` 的門標籤里程計）：`S01`（真的按 E 開視窗、Canvas 同一節點）、`S02`（Esc 後 activeElement）、`S03`（焦點在送出鈕上按 W／E 世界不動、關閉後會動）、`S05`（密碼不落地：網址軌跡＋storage；同一扇門再開是空的）、`S06`／`S07`（帶票的連線、網址沒票、回大廳再按 E 不問）、`S08`（403 留著）、`S09`（一種 404）、`S10`（401 與網路失敗）、`S11`（被拒→同票再試→重新輸入）、`S13` 後半（換身分）、`S14`（`setItem` 拋）、`S15` 第一段（延遲回應＋Esc＋重開）
+  - 2026-09-15：`tests/e2e/room-entry.mjs`（三個 context：A 沒票 S01／S02／S03／S08／S09／S10／S15／S06／S05／S07／S13 後半；B 有票、房間握手一律拒 S11；C `setItem` 拋 S14），
+    走位與偽造抽到 `tests/e2e/lib/world.mjs`（`scene-switch.mjs` 改用同一份，本機對 `next start` 跑：全部符合）。對 `next start` 跑 `room-entry.mjs`：**全部符合**（51 項）。
+    **瀏覽器抓到兩個 jsdom 看不到的缺陷**：(1) 開視窗的那一下 E 變成一個 `e` 打進剛拿到焦點的密碼欄（`S02` 紅）→ `SpatialInteraction` 吃掉 E 時 `preventDefault`，
+    葉判準 `tests/interaction-key-default.test.tsx`（拿掉就紅）；(2) 換場景後「按 E 進入」的提示留在 provider 的 target 裡，跟著人進房再回出生點，在出生點按 E 沒反應（`S07` 紅）
+    → `chore/spatial-interaction-clear-target-on-unmount`（#429，`FE-W06-S15` 的另一半）。
 - [ ] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
 - [ ] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、契約測試兩個目標的結果如實記在這裡
 - [ ] 6.4（流程，不對應 Requirement）Google Sheet：`FE-N08` → On-going／Done 各一次
