@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useLayoutEffect, useState, type Context, type ReactNode, type RefObject } from 'react'
+import { flushSync } from 'react-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContractDriftError, HttpError, NetworkError } from '@/api/transport'
 import { VOCABULARY } from '@/errors/uiError'
@@ -318,6 +319,24 @@ describe('送出', () => {
     expect(window.sessionStorage.getItem(keyOf(P, B)), '身分已經是 Q，P 那一輪的回應不能存票').toBeNull()
     expect(calls).toEqual([])
     expect(dialogs()).toHaveLength(1)
+  })
+
+  it('[FE-N08-S15] 回應已經贏了 race、副作用還沒做，身分在同一段 microtask 裡同步 commit 成 Q：仍作廢（要比代號，不能只靠喚醒）', async () => {
+    const { pressE } = mountWorld()
+    pressE(B)
+    const pb = pending()
+    await submit()
+    await act(async () => {
+      pb().okNow('TB-sync')
+      // 回應落地 → 一個 microtask 把它轉成 race 的輸入 → race 選它 → continuation。`flushSync` 排在第一跳之後、continuation 之前：
+      // 那時 race 已經選了回應，喚醒器叫不回它，只剩代號比對。
+      await Promise.resolve()
+      flushSync(() => identity.set(Q))
+    })
+    expect(window.sessionStorage.getItem(keyOf(P, B)), 'race 已選回應、代號卻換了：不能存票').toBeNull()
+    expect(calls).toEqual([])
+    expect(dialogs()).toHaveLength(1)
+    expect(submitButton().disabled).toBe(false)
   })
 })
 

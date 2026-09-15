@@ -81,9 +81,12 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
   // 世界命令鎖：開著就鎖（`S03`）；卸載釋放，釋放冪等、只拿掉自己那一把（別的持有者還在就仍鎖著）。
   useEffect(() => holdInputLock('room-password'), [holdInputLock])
 
-  // 每一輪送出的代號（design D9）就是它自己在 `waiting` 裡的那個喚醒器：換代號＝叫醒還在等的那一輪，讓它作廢、交出 busy。
+  // 每一輪送出的代號（design D9）：`round.current` 是現行的那一輪；換代號＝遞增、並叫醒還在等的那一輪，讓它作廢、交出 busy。
+  // 兩道防線：喚醒器讓等待中的那一輪立刻 resolve；代號比對擋「回應已經贏了 race、副作用還沒做、代號就換了」（同步 render 插在 microtask 之間）。
+  const round = useRef(0)
   const waiting = useRef(new Set<() => void>())
   const invalidate = useCallback(() => {
+    round.current += 1
     for (const wake of waiting.current) wake()
     waiting.current.clear()
   }, [])
@@ -101,6 +104,7 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
     describeError: describeEntryError,
     onSubmit: async ({ password }) => {
       const me = profileId
+      const mine = round.current
       const settled = enterProject(request.projectId, { password }).then(
         (out) => ({ ok: true as const, out }),
         (cause: unknown) => ({ ok: false as const, cause }),
@@ -113,8 +117,7 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
       const result = await Promise.race([settled, woken])
       waiting.current.delete(wake)
       // 作廢的一輪：不存票、不進房、不顯示；也不動新一輪的任何東西 —— 直接 resolve 把 busy 交出去。
-      // （換代號在 layout effect 裡、跟 commit 同步；回應落地後的 microtask 要嘛在 commit 前（那時身分還是送出時的，採用是對的）、要嘛在 commit 後（已被叫醒）。）
-      if (result === 'stale') return
+      if (result === 'stale' || mine !== round.current) return
       if (!result.ok) throw result.cause
       const token = result.out.room_token
       // 先存、讀回**嚴格等於這一張**才算成功（D10）；空字串存得進也讀得回，另外擋。
