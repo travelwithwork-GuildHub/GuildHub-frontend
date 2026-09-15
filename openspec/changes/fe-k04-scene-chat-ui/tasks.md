@@ -34,9 +34,13 @@
 
 ## 4. 世界整合（PR：`--world`；產品碼 ≤150、測試 ≤200）
 
-- [ ] 4.1 先寫 jsdom：`[FE-K04-S02]` 的鎖與焦點（chat 區可見 `inputLockRef` 是 false；textarea 焦點 → true；Escape → activeElement 是錨、chat 區還在、值保留）；`[FE-K04-S01]` 的 jsdom 可驗部分（掛在 `WorldCanvas` 裡、沒有 dialog、記憶體有一則就顯示）
-- [ ] 4.2 `WorldCanvas` 掛 `<SceneChatHud />`（`layer('hud')`，焦點錨容器裡、版面上避開 `InteractionPrompt` 的位置）；Escape 在 textarea 裡 → focus 錨（**textarea 的 `onKeyDown`**，不是 `useEscapeLayer`：常駐 HUD 不是可關閉的層，掛成層會永遠是最上層、破壞 `FE-X06`）；`ui-ux-pro-max`（`--domain ux`：chat／feed／輸入區的可及性與對比）
-- [ ] 4.3 突變：chat 區可見就 `holdInputLock` → S02 紅；Escape 不回錨 → S02 紅；掛在 `PanelShell` 裡 → S01 紅（有 dialog）；chat 區放到提示的位置 → S15 紅（e2e）
+- [x] 4.1 先寫 jsdom：`[FE-K04-S02]` 的鎖與焦點（chat 區可見 `inputLockRef` 是 false；textarea 焦點 → true；Escape → activeElement 是錨、chat 區還在、值保留）；`[FE-K04-S01]` 的 jsdom 可驗部分（掛在 `WorldCanvas` 裡、沒有 dialog、記憶體有一則就顯示）
+- [x] 4.2 `WorldCanvas` 掛 `<SceneChatHud />`（`layer('hud')`，焦點錨容器裡、版面上避開 `InteractionPrompt` 的位置）；Escape 在 textarea 裡 → focus 錨（**textarea 的 `onKeyDown`**，不是 `useEscapeLayer`：常駐 HUD 不是可關閉的層，掛成層會永遠是最上層、破壞 `FE-X06`）；`ui-ux-pro-max`（`--domain ux`：chat／feed／輸入區的可及性與對比）
+- [x] 4.3 突變：chat 區可見就 `holdInputLock` → S02 紅；Escape 不回錨 → S02 紅；掛在 `PanelShell` 裡 → S01 紅（有 dialog）；chat 區放到提示的位置 → S15 紅（e2e）
+  - 2026-09-15：判準先 commit（紅：HUD 不存在）再實作。`SceneChatHud`（`section` `aria-label`、`layer('hud')`、左下、`w-[min(20rem,30vw)]`、`max-h-[40vh]`、列表容器 `overflow-y-auto`）；
+    `useSceneChatIfProvided()`（沒 provider 不畫，`WorldCanvas` 單獨掛的既有測試不動）；Escape 在 composer 的 `onKeyDown`（`onEscape` 由 HUD 給「焦點回錨」；stopPropagation 不往 Escape 層冒）。
+    S02 的鎖在測試的 `InteractionProvider` 底下量（`WorldCanvas` 自己那把外面讀不到），旁邊是正式的 `EditableFocusLock`；HUD 在 `WorldCanvas` 裡由 S01 守。
+    結果（`tests/scene-chat-world.test.tsx`，2 條）：四種全紅（放到提示的位置那種留 e2e）。`ui-ux-pro-max`（`--domain ux`：HUD 蓋在 3D 上的對比 → 背景 `bg-surface/90`＋`backdrop-blur`、文字用 `text-ink`）。執行紀錄貼在 PR 留言。
 
 ## 5. 捲動（PR：`--scroll`；產品碼 ≤120、測試 ≤150）
 
