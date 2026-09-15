@@ -102,9 +102,9 @@ export function unimplemented(): string[] {
 export function onlineUrl(): string | null {
   return inject('contractOnlineUrl')
 }
-/** 一間 seed 房間的 scene 與 token；真後端的 token 由 `enter` 簽發（W4）→ null。 */
-export function roomToken(): { scene: string; token: string; malformed: { scene: string; token: string } } | null {
-  return inject('contractRoomToken')
+/** 替身簽票用的 secret（給「uuid 不合法但票算對」那條用，`src/server/roomToken.ts` 同一份函式）；真後端的 secret 不給 → null。 */
+export function roomSecret(): string | null {
+  return inject('contractRoomSecret')
 }
 
 declare module 'vitest' {
@@ -114,6 +114,6 @@ declare module 'vitest' {
     contractDatabaseUrl: string
     contractUnimplemented: string[]
     contractOnlineUrl: string | null
-    contractRoomToken: { scene: string; token: string; malformed: { scene: string; token: string } } | null
+    contractRoomSecret: string | null
   }
 }

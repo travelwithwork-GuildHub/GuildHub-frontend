@@ -70,10 +70,10 @@ export function connect(url: string, headers: Record<string, string> = {}): Prom
   })
 }
 
-/** 握手被拒的觀察：`open` 沒發生、有 `error`（真後端與替身都是 HTTP 403 收場）。 */
-export async function expectRefused(url: string): Promise<{ opened: boolean; error: string | null; messages: number }> {
+/** 握手被拒的觀察：`open` 沒發生、有 `error`（真後端與替身都是 HTTP 403 收場）。`headers` 給要帶 cookie 的案例（房間的票綁人）。 */
+export async function expectRefused(url: string, headers: Record<string, string> = {}): Promise<{ opened: boolean; error: string | null; messages: number }> {
   return new Promise((resolve) => {
-    const ws = new WebSocket(url)
+    const ws = new WebSocket(url, { headers })
     let opened = false
     let messages = 0
     let error: string | null = null

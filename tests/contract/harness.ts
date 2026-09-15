@@ -7,7 +7,6 @@
 // **不連任何團隊共用的位址；不接受任何既有的程序。**
 
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { createHmac } from 'node:crypto'
 import { rmSync } from 'node:fs'
 import { access } from 'node:fs/promises'
 import { promisify } from 'node:util'
@@ -170,9 +169,9 @@ export default async function setup(project: TestProject): Promise<() => Promise
     project.provide('contractDatabaseUrl', assertLoopbackDb(process.env.INTERNAL_TEST_DATABASE_URL))
     // 真後端 17 個端點都在。
     project.provide('contractUnimplemented', [])
-    // 真後端沒有 `/online`，room token 由 `enter` 簽發（W4）：這兩個能力在這一輪不存在。
+    // 真後端沒有 `/online`，也不把簽票的 secret 給測試：這兩個能力在這一輪不存在（票由 `enter` 簽，那條兩邊都有）。
     project.provide('contractOnlineUrl', null)
-    project.provide('contractRoomToken', null)
+    project.provide('contractRoomSecret', null)
     return recorded
   }
 
@@ -250,14 +249,9 @@ export default async function setup(project: TestProject): Promise<() => Promise
   project.provide('contractWsUrl', `ws://127.0.0.1:${stubPort}/ws`)
   project.provide('contractDatabaseUrl', db.url)
   project.provide('contractOnlineUrl', `http://127.0.0.1:${stubPort}/online`)
-  // seed 第一間 active 專案的房間 token（`HMAC(secret, scene)`，跟替身同一把）—— 給 S22 用。
-  const sign = (scene: string) => createHmac('sha256', CONTRACT_SESSION_SECRET).update(scene).digest('base64url')
-  project.provide('contractRoomToken', {
-    scene: 'room:22222222-0000-4000-8000-0000000000f1',
-    token: sign('room:22222222-0000-4000-8000-0000000000f1'),
-    // 一個 uuid 不合法、但 token 算對的 scene：替身要因為「不是 uuid」拒絕，不是因為 token（只擋 token 的實作會放它進去）。
-    malformed: { scene: 'room:------------------------------------', token: sign('room:------------------------------------') },
-  })
+  // 替身簽票的 secret：給「uuid 不合法、但票算對」那條（`FE-O03-S21`）用 —— 替身要因為「不是 uuid」拒絕，不是因為票。
+  // 正常的票由 `POST /api/projects/{id}/enter` 簽（`FE-N08`），測試不自己算。
+  project.provide('contractRoomSecret', CONTRACT_SESSION_SECRET)
   // 本地版 W2 刻意沒做的端點（`FE-O03-S05`）：測試對這些要求 Next 自己的 404／405、不是本地版假造的 detail。
   // 這是目標的**能力**，不是目標的名字 —— 測試檔仍然不知道自己在打誰。
   // `FE-K01` 把 messages 做出來了，從這張表拿掉。
