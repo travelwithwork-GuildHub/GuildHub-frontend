@@ -30,7 +30,8 @@ Vercel 上的人永遠進不了房間，`FE-V01` 只有測試進得去。
     簽出的票本地即時層替身收得下；`local` 與 `guildhub` 兩個目標跑同一份契約測試
 - **既有規格只動一句**：`world-scenes`〈進不去就回 Guild Hall…〉開最小 MODIFIED delta，通知的消失條件多列「使用者從通知啟動重新輸入密碼」，
   其餘正文與 `FE-V01-S06`／`S07`／`S16` 逐字不動（archive 時整條取代，對 diff 要看得到只多那一句）。
-  `world-interactive-objects` 不動：`FE-W12-S16`／`FE-V01-S11` 測的是「預設門禁」，那個預設 provider 保留。
+  `world-interactive-objects`〈門與看板都註冊進互動系統〉也開最小 MODIFIED：只在 `FE-V01-S11` 的 GIVEN 補上「門禁是預設的」
+  （它本來就是測預設 provider，正文也這樣寫，但 GIVEN 沒寫 —— archive 之後同一個 GIVEN 下一邊要 `role="status"`、一邊要 `role="dialog"` 會打架）；其餘逐字。
 
 ## Non-goals
 

@@ -82,7 +82,7 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 送出開始 SHALL 立即 busy、送出控制 disabled；請求未完成前的第二次送出 SHALL 被忽略；系統 MUST NOT 自動重送。
 密碼 MUST NOT 寫進網址、`sessionStorage`、`localStorage`、票的儲存；失敗時 SHALL 留在欄位裡，成功或關閉時 SHALL 清掉。
 
-> 拔掉什麼會紅：submit handler 不去重 → S04 呼叫兩次；把密碼放進 storage 或網址 → S05；
+> 拔掉什麼會紅：submit handler 不去重 → S04 呼叫兩次；把密碼放進 storage 或網址 → S05；成功分支不清欄位 → S05 的「同一扇門再開是空的」；
 > 加 `.min(1)` → S04 的空字串那段（後端會回 403，前端不能先擋）。
 
 #### Scenario: [FE-N08-S04] 送出中連按只送一次；送出中按 Esc 關得掉、晚到的成功被丟棄；空字串也送
@@ -106,8 +106,10 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 - **THEN** 在每一次 `pushState`／`replaceState` 寫入的網址、每個時點的 `location.href`、`localStorage`、`sessionStorage`
   裡都 MUST NOT 出現 W 或 C
 - **AND** 403 之後欄位 SHALL 仍是 W；成功之後視窗 SHALL 關閉
-- **AND WHEN** 回到大廳後對**另一扇**沒票的門按 E
-- **THEN** 開出來的視窗欄位 SHALL 是空的（成功後的清空是看得到的，不靠卸載）
+- **AND WHEN** 回到大廳後，測試移除 P＋R 的票、再對**同一扇** R 的門按 E
+- **THEN** 開出來的視窗欄位 SHALL 是空的（同一扇門、同一個表單身分 —— 換門建新表單幫不上忙；成功分支不清就紅）
+- **AND WHEN** 再對另一扇沒票的門按 E
+- **THEN** 欄位同樣 SHALL 是空的
 - → 驗於：e2e（網址用 `FE-V01` e2e 的軌跡法，看整條，不看快照）
 
 ### Requirement: 成功先存票再進房；票存不進去就不算成功；有票的人不再被問
