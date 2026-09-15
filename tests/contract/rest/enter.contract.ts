@@ -1,6 +1,8 @@
 import pg from 'pg'
 import { describe, expect, it } from 'vitest'
 import { EnterOut, ProfileOut } from '@/api/contract/rest'
+import { HttpError } from '@/api/transport'
+import { toUiError } from '@/errors/uiError'
 import { ContractClient, baseUrl, databaseUrl, wsUrl } from '../client'
 import { connect, expectRefused } from '../ws/socket'
 
@@ -36,6 +38,8 @@ async function project(owner: string, status: 'recruiting' | 'active' | 'closed'
 }
 
 const enter = (c: ContractClient, id: string, password: string) => c.raw('POST', `/api/projects/${id}/enter`, { body: { password } })
+/** 這個回應經 `send()` 會變成的 `HttpError`，再經 `toUiError` 變成的 `kind`（S13：兩個目標翻成同一個 `kind`）。 */
+const kindOf = (r: { status: number; json: unknown }) => toUiError(new HttpError('enterProject', r.status, (r.json as { detail?: string } | undefined)?.detail ?? null)).kind
 const cookieHeader = (c: ContractClient) => [...c.cookies()].map(([k, v]) => `${k}=${v}`).join('; ')
 const roomUrl = (id: string, token: string) => `${wsUrl()}?scene=room:${id}&token=${encodeURIComponent(token)}`
 
@@ -50,10 +54,12 @@ describe('POST /api/projects/{project_id}/enter', () => {
     const anon = await new ContractClient(baseUrl()).raw('POST', `/api/projects/${active}/enter`, { body: { password: 'guild1234' } })
     expect(anon.status, '未登入').toBe(401)
     expect(anon.json).toEqual({ detail: '未登入' })
+    expect(kindOf(anon)).toBe('authentication-required')
 
     const missing = await enter(c, ZERO, 'guild1234')
     expect(missing.status, '專案不存在').toBe(404)
     expect(missing.json).toEqual({ detail: '專案不存在或房間尚未開啟' })
+    expect(kindOf(missing)).toBe('not-found')
 
     const notReady = await enter(c, recruiting, 'guild1234')
     expect(notReady.status, 'recruiting：沒有 password_hash，跟不存在同一句').toBe(404)
@@ -62,6 +68,7 @@ describe('POST /api/projects/{project_id}/enter', () => {
     const wrong = await enter(c, active, 'not-the-password')
     expect(wrong.status, '密碼錯').toBe(403)
     expect(wrong.json).toEqual({ detail: '房間密碼錯誤' })
+    expect(kindOf(wrong)).toBe('permission-denied')
 
     const ok = await enter(c, active, 'guild1234')
     expect(ok.status, ok.text.slice(0, 200)).toBe(200)
@@ -119,7 +126,7 @@ describe('POST /api/projects/{project_id}/enter', () => {
     expect(nobody.opened, '沒有 cookie（訪客）拿著這張票進了房').toBe(false)
   })
 
-  it('[FE-N08-S13] 兩個目標同一份：body 是 EnterIn（缺 password 是 422）；成功形狀是 EnterOut、沒有多的鍵', async () => {
+  it('[FE-N08-S13] 兩個目標同一份：body 是 EnterIn（缺 password 是 422）；成功形狀是 EnterOut、沒有多的鍵；401／403／404 翻成同一個 kind（上一條的 kindOf）', async () => {
     const c = new ContractClient(baseUrl())
     const me = ProfileOut.parse(await c.login('看形狀的人'))
     const room = await project(me.id, 'active', true)

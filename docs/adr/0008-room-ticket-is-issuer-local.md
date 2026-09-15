@@ -3,8 +3,8 @@
 - **Status**: Accepted
 - **Date**: 2026-09-15
 - **Deciders**: 實作 `FE-N08` 的那個 session；兩位外部審查（規格 PR #421／#423）
-- **邊界狀態**: 已強制
-- **證據**: tests/contract/rest/enter.contract.ts:88、src/server/roomToken.ts:19、scripts/realtime-stub.ts:118、src/world/scenes/roomTokens.ts:9
+- **邊界狀態**: 僅約定
+- **證據**: src/world/scenes/roomTokens.ts:9、src/server/roomToken.ts:19、scripts/realtime-stub.ts:118、tests/contract/rest/enter.contract.ts:88
 
 > `邊界狀態` 與 `證據` 兩欄由 `bash .github/scripts/arch-view.sh` 讀。
 > 三種狀態的意思見 `docs/adr/README.md`。
@@ -50,6 +50,11 @@
 
 突變紀錄（2026-09-15）：替身換一把 secret → 握手那段紅；簽章去掉 `|<profileId>` → 「別人拿著這張票進了房」紅；
 handler 回 `{ token }` → `EnterOut` 那列紅。
+
+**為什麼是「僅約定」不是「已強制」**（審查指出）：契約測試守得住的是「兩個後端的握手語意相同、不依賴票的格式」；
+守不住的是這條邊界的另一半 —— **前端不解析票**、**簽章只在一個模組**。今天有人在 `src/` 寫 `token.split('.')`，或在 handler 裡另刻一份 HMAC，
+沒有任何測試或 lint 會紅。最便宜的升級路：一條 `no-restricted-syntax`（`src/` 裡對 `room_token`／`roomToken` 值呼叫 `split`／`atob`／`Buffer.from`）
+配 `lintText` 的負向測試（做法照 `tests/env-lint-rule.test.ts`），以及一條「`createHmac` 在 `src/` 只准出現在 `session.ts`／`roomToken.ts`／`passwords.ts`」的掃描。
 
 ## 代價
 

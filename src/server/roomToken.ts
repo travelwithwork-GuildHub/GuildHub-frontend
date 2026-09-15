@@ -16,6 +16,18 @@ export function roomScene(projectId: string): string {
   return `room:${projectId}`
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * `room:<uuid>` → 那個 uuid；不是房間的 scene、或 uuid 不合法（`room:----…` 這種 36 個連字號也算不合法）→ `null`。
+ * 替身在**驗票之前**先用它擋格式（`FE-O03-S21`）：格式不合的 scene 不管帶什麼票都拒絕。
+ */
+export function roomSceneProject(scene: string): string | null {
+  if (!scene.startsWith('room:')) return null
+  const id = scene.slice('room:'.length)
+  return UUID.test(id) ? id : null
+}
+
 export function signRoomToken(secret: string, projectId: string, profileId: string): string {
   return createHmac('sha256', secret).update(`${roomScene(projectId)}|${profileId}`).digest('base64url')
 }

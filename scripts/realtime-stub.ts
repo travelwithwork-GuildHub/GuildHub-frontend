@@ -22,7 +22,7 @@ import http from 'node:http'
 import pg from 'pg'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { ClientMessage, HZ, ServerMessage, type Player } from '../src/api/contract/ws'
-import { roomTokenMatches } from '../src/server/roomToken'
+import { roomSceneProject, roomTokenMatches } from '../src/server/roomToken'
 
 const PORT = Number(process.env.INTERNAL_REALTIME_PORT ?? 3102)
 const SECRET = process.env.INTERNAL_SESSION_SECRET ?? 'dev-only-internal-session-secret'
@@ -109,27 +109,33 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ noServer: true })
 
-/** scene 的形狀：`lobby`，或 `room:<uuid>`（真的 uuid，不是「36 個 hex 或連字號」—— 審查抓到 `room:----…` 也會過）。 */
+/** scene 的形狀：`lobby`，或 `room:<uuid>`（真的 uuid，不是「36 個 hex 或連字號」—— 審查抓到 `room:----…` 也會過；判斷在 `roomSceneProject`）。 */
 function sceneShapeOk(scene: string): boolean {
-  return scene === 'lobby' || (scene.startsWith('room:') && UUID.test(scene.slice('room:'.length)))
+  return scene === 'lobby' || roomSceneProject(scene) !== null
 }
 
 /** 房間要票，而且票要綁**這個人**：先解析出身分才驗得了。大廳不驗。 */
 function ticketOk(scene: string, token: string | null, whoId: string): boolean {
-  if (scene === 'lobby') return true
-  return token !== null && roomTokenMatches(SECRET, token, scene.slice('room:'.length), whoId)
+  const projectId = roomSceneProject(scene)
+  if (projectId === null) return scene === 'lobby'
+  return token !== null && roomTokenMatches(SECRET, token, projectId, whoId)
 }
 
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const scene = url.searchParams.get('scene') ?? 'lobby'
+  // 驗票要等 `identify()`（查資料庫）—— 這段非同步期間 client 可能已經斷線：raw socket 沒有 error 監聽會讓 ECONNRESET 炸掉整個替身，
+  // 對已銷毀的 socket `write` 會拋 ERR_STREAM_DESTROYED（審查抓到的）。
+  socket.on('error', () => {})
   const refuse = () => {
     // 真後端：還沒 accept 就 close(1008) → 握手以 HTTP 403 收場，client 只看得到「連不上」，沒有 err。
+    if (socket.destroyed) return
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
     socket.destroy()
   }
   if (url.pathname !== '/ws' || !sceneShapeOk(scene)) return refuse()
   void identify(req.headers.cookie).then((who) => {
+    if (socket.destroyed) return
     if (!ticketOk(scene, url.searchParams.get('token'), who.id)) return refuse()
     wss.handleUpgrade(req, socket, head, (ws) => {
       const conn: Conn = { ws, scene, moved: false, player: { ...who, x: 0, y: 0, f: 0, st: '' } }
