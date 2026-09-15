@@ -238,8 +238,10 @@ export function walker({ room, decoy, title, out, slotGap = 2, doorZ = -2, spawn
    * 再往西到門前（門在角色西邊不到 1.2 單位；互動距離 2），然後往南直到提示上出現這扇門的名字。
    * 每一段都是「量 → 走一小步 → 再量」，只設步數上限。回傳 `{ prompt, pos, where }`（`where` 可以之後再量）。
    */
-  async function approachDoor(page) {
-    const where = await odometer(page)
+  async function approachDoor(page, { where: known = null } = {}) {
+    // 里程計的絕對 z 只在「校準那一刻角色在出生點的 z」時成立（上面的註解）。角色已經走過（不只往西）的話，
+    // 要把先前那次校準的 `where` 傳進來，不能在這裡重新校準 —— 重校會把現在的位置硬定成出生點的 z（審查抓到的）。
+    const where = known ?? (await odometer(page))
     /** 每一步先量再決定往哪走：`steer` 回傳要按的鍵，回傳 null 就是到了。**雙向**：跨過頭就走回來（審查：單向＋單邊不等式會越界）。 */
     const leg = async (label, ms, steer, maxSteps) => {
       for (let i = 0; i < maxSteps; i++) {
