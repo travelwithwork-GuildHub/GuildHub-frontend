@@ -220,8 +220,11 @@ describe('不是目前連線的訊息不收', () => {
     const message: ChatOut = { t: 'chat', id: 'u1', name: '甲', body: '舊大廳的話' }
     oldLink.receive({ ...message, body: '還是舊連線時' })
     expect(store.getLog().map((r) => r.body)).toEqual(['還是舊連線時'])
-    store.clear()
-    const newLink = store.port.attach(() => {}, 'lobby')
+    // 換到房間：舊連線關、房間連線 attach、committed 換成房間
+    oldLink.detach()
+    const newLink = store.port.attach(() => {}, 'room:r')
+    store.commit('room:r')
+    expect(store.getLog()).toEqual([])
     oldLink.receive(message)
     expect(store.getLog(), '舊連線晚到的訊息不得進來').toEqual([])
     newLink.receive({ ...message, body: '新連線的話' })
@@ -230,5 +233,23 @@ describe('不是目前連線的訊息不收', () => {
     newLink.detach()
     newLink.receive({ ...message, body: '關了之後' })
     expect(store.getLog().map((r) => r.body)).toEqual(['新連線的話'])
+  })
+
+  it('[FE-R11-S07] store 層：進房失敗那條連線在 committed 之前收到的訊息，連線關了就丟；之後真的進了那間房不會看到它', () => {
+    const store = createSceneChatStore('lobby')
+    const lobby = store.port.attach(() => {}, 'lobby')
+    lobby.receive({ t: 'chat', id: 'u1', name: '甲', body: '大廳的話' })
+    lobby.detach()
+    const failed = store.port.attach(() => {}, 'room:r')
+    failed.receive({ t: 'chat', id: 'u2', name: '乙', body: '失敗那次漏進來的' })
+    expect(store.getLog().map((r) => r.body), 'committed 還是大廳，房間的先不算數').toEqual(['大廳的話'])
+    failed.detach() // 握手被拒 → RemoteWorld cleanup
+    const lobby2 = store.port.attach(() => {}, 'lobby')
+    store.commit('lobby')
+    expect(store.getLog().map((r) => r.body), '同場景的新連線不清').toEqual(['大廳的話'])
+    lobby2.detach()
+    store.port.attach(() => {}, 'room:r')
+    store.commit('room:r')
+    expect(store.getLog(), '失敗那次的訊息不得在之後出現').toEqual([])
   })
 })

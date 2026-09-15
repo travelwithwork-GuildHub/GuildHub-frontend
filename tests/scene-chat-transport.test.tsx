@@ -90,8 +90,8 @@ async function mountReady(store: SceneChatStore) {
   const sink = vi.fn()
   const attach = store.port.attach
   const spiedPort = {
-    attach: (send: (input: ChatIn) => void) => {
-      const link = attach(send)
+    attach: (send: (input: ChatIn) => void, wsScene: string) => {
+      const link = attach(send, wsScene)
       return { ...link, receive: (m: ChatOut) => (sink(m), link.receive(m)) }
     },
   }
@@ -188,7 +188,7 @@ describe('送出', () => {
   it('[FE-R11-S02] idle／connecting／open／closed 各自：拋 RealtimeError、socket 沒收到、記憶體不變；之後 ready 也不補送；ready 但 socket.send 拋 → 原樣拋、不排隊', () => {
     const store = createSceneChatStore()
     const client = new RealtimeClient({ scene: 'lobby', onMessage: () => {} })
-    store.port.attach((input) => client.send(JSON.stringify(input)))
+    store.port.attach((input) => client.send(JSON.stringify(input)), 'lobby')
     const sentFrames = () => FakeSocket.instances.flatMap((s) => s.sent)
     const attempt = (label: string) => {
       expect(() => store.send({ t: 'chat', body: label }), label).toThrow(RealtimeError)
@@ -222,7 +222,7 @@ describe('送出', () => {
   it('[FE-R11-S02] closed 之後送：拋、socket 沒收到', () => {
     const store = createSceneChatStore()
     const client = new RealtimeClient({ scene: 'lobby', onMessage: () => {} })
-    store.port.attach((input) => client.send(JSON.stringify(input)))
+    store.port.attach((input) => client.send(JSON.stringify(input)), 'lobby')
     client.connect()
     const socket = FakeSocket.instances[0] as FakeSocket
     socket.open()

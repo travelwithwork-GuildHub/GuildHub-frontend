@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ChatIn } from '@/api/contract/ws'
 import type { ChatLog } from './sceneChat'
 import { createSceneChatStore, type SceneChatPort, type SceneChatStore } from './sceneChatStore'
@@ -18,18 +18,17 @@ import { useScene } from '@/world/scenes/SceneProvider'
 //
 // 清空的條件只有一個（design D4）：**committed 的 `wsScene` 改變**。過場中（`transition !== null`）committed 還是舊的，不清；
 // 握手被拒退回、同場景重連 —— committed 沒變，不清。不看連線、不看 `RealtimeGenerationProvider.generation`。
+// 這裡只把 committed 交給 store 的 `commit()`（layout effect，跟 commit 同步）；store 按連線的場景歸檔，所以就算新場景的第一則
+// 在 React render 之前就到了也不會被清掉（見 `sceneChatStore.ts` 檔頭）。
 
 const Ctx = createContext<SceneChatStore | null>(null)
 
 export function SceneChatProvider({ children }: { children: ReactNode }) {
-  const [store] = useState(createSceneChatStore)
   const { scene, transition } = useScene()
   const committed = sceneOf(transition === null ? scene : transition.from).wsScene
-  const previous = useRef(committed)
-  useEffect(() => {
-    if (previous.current === committed) return
-    previous.current = committed
-    store.clear()
+  const [store] = useState(() => createSceneChatStore(committed))
+  useLayoutEffect(() => {
+    store.commit(committed)
   }, [committed, store])
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }
