@@ -1,11 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useState, type Context, type ReactNode, type RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContractDriftError, HttpError, NetworkError } from '@/api/transport'
 import { VOCABULARY } from '@/errors/uiError'
 import type { Identity } from '@/identity/types'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
 import { escapeLayerCount } from '@/world/interaction/escapeLayers'
+import { useIdentity } from '@/identity/IdentityProvider'
 import { useRequestEntry } from '@/world/scenes/EntryGate'
 import { RoomEntryGateProvider } from '@/world/scenes/RoomEntryGate'
 import { ROOM_ENTRY_LABELS, RoomPasswordDialog } from '@/world/scenes/RoomPasswordDialog'
@@ -17,7 +18,9 @@ import { SceneProvider } from '@/world/scenes/SceneProvider'
 //   Requirement: 失敗回饋可恢復、不猜原因、不回顯後端字串 —— S08、S09、S10
 //
 // 接法同 `room-entry-modal.test.tsx`。`enterProject` 是假的（每次由測試決定何時、回什麼）；`enterRoom` 與 `holdRoomToken` 包一層記錄呼叫順序、
-// 底下仍是正式碼；`sessionStorage` 是 jsdom 真的（S14 用 `Storage.prototype` 讓它壞）。身分是可換的外部 store（S15 換身分不重掛視窗）。
+// 底下仍是正式碼；`sessionStorage` 是 jsdom 真的（S14 用 `Storage.prototype` 讓它壞）。
+// 身分走一個測試用的 context（`useState` ＋ 外部 store 通知）：換身分是**非事件的 setState**（DefaultLane），跟正式 `IdentityProvider`
+// 在 fetch 回來時 `adopt` 一樣 —— passive effect 會延到下一個 task；`useSyncExternalStore` 那種 SyncLane 會把 passive 同步 flush，測不到那個縫。
 
 const enterProject = vi.hoisted(() => vi.fn())
 vi.mock('@/api/operations', () => ({ enterProject }))
@@ -37,10 +40,26 @@ const identity = vi.hoisted(() => {
     },
   }
 })
+const holder = vi.hoisted(() => ({ ctx: null as unknown as Context<Identity> }))
 vi.mock('@/identity/IdentityProvider', async () => {
-  const { useSyncExternalStore } = await import('react')
-  return { useIdentity: () => useSyncExternalStore(identity.subscribe, identity.get), useAdoptIdentity: () => vi.fn() }
+  const { createContext, useContext } = await import('react')
+  holder.ctx = createContext<Identity>({ state: 'unknown' })
+  return { useIdentity: () => useContext(holder.ctx), useAdoptIdentity: () => vi.fn() }
 })
+function TestIdentity({ children }: { children: ReactNode }) {
+  const [current, setCurrent] = useState(identity.get)
+  useEffect(() => identity.subscribe(() => setCurrent(identity.get())), [])
+  return <holder.ctx.Provider value={current}>{children}</holder.ctx.Provider>
+}
+/** 排在視窗**之後**的 layout effect：身分 commit 的那一刻要做的事（S15 的「同一個 commit」那條）。 */
+const onIdentityCommit: { current: ((who: Identity) => void) | null } = { current: null }
+function CommitProbe() {
+  const who = useIdentity()
+  useLayoutEffect(() => {
+    onIdentityCommit.current?.(who)
+  }, [who])
+  return null
+}
 vi.mock('@/world/scenes/roomTokens', async (importOriginal) => {
   const orig = await importOriginal<typeof import('@/world/scenes/roomTokens')>()
   return { ...orig, holdRoomToken: (...a: Parameters<typeof orig.holdRoomToken>) => (calls.push(`hold:${a[2]}`), orig.holdRoomToken(...a)) }
@@ -73,16 +92,19 @@ function Grab({ sinkRef }: { sinkRef: RefObject<Grabbed | null> }) {
 function mountWorld() {
   const sinkRef: RefObject<Grabbed | null> = { current: null }
   render(
-    <SceneProvider>
-      <RoomEntryGateProvider>
-        <InteractionProvider>
-          <Grab sinkRef={sinkRef} />
-          <div data-testid="world-canvas-container" data-focus-anchor="world" tabIndex={-1}>
-            <RoomPasswordDialog />
-          </div>
-        </InteractionProvider>
-      </RoomEntryGateProvider>
-    </SceneProvider>,
+    <TestIdentity>
+      <SceneProvider>
+        <RoomEntryGateProvider>
+          <InteractionProvider>
+            <Grab sinkRef={sinkRef} />
+            <div data-testid="world-canvas-container" data-focus-anchor="world" tabIndex={-1}>
+              <RoomPasswordDialog />
+            </div>
+            <CommitProbe />
+          </InteractionProvider>
+        </RoomEntryGateProvider>
+      </SceneProvider>
+    </TestIdentity>,
   )
   const world = () => sinkRef.current as Grabbed
   const pressE = (room = A) => act(() => world().requestEntry(room.projectId, room.title))
@@ -126,6 +148,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  onIdentityCommit.current = null
   vi.restoreAllMocks()
   vi.useRealTimers()
   expect(escapeLayerCount(), 'Escape 層沒清乾淨').toBe(0)
@@ -273,20 +296,28 @@ describe('送出', () => {
     expect(dialogs()).toHaveLength(1)
   })
 
-  it('[FE-N08-S15] 身分改變與回應在同一批 microtask 裡到達（身分先 render 成 Q、回應緊接著落地）：仍作廢', async () => {
+  it('[FE-N08-S15] 回應在「身分已 commit 成 Q、passive effect 還沒 flush」的縫裡落地：仍作廢（換代號要跟 commit 同步）', async () => {
     const { pressE } = mountWorld()
     pressE(B)
     const pb = pending()
     await submit()
-    // 同一個 act：換身分排進 sync render 的 microtask，回應的 promise 鏈排在它後面。換代號要是等 passive effect（下一個 task），回應會先被採用。
-    await act(async () => {
+    // 不用 act：act 會把 render 與 passive effect 一口氣 flush，縫就不見了。真的排程：commit 一個 task、passive 另一個 task，
+    // 中間的 microtask 就是這個縫 —— 回應在視窗之後的 layout effect 裡落地，正好排在那裡。
+    const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    env.IS_REACT_ACT_ENVIRONMENT = false
+    try {
+      onIdentityCommit.current = (who) => {
+        if (who.state === 'signed-in' && who.profile.id === Q.profile.id) pb().okNow('TB-race')
+      }
       identity.set(Q)
-      pb().okNow('TB-race')
-    })
+      await waitFor(() => expect(submitButton().disabled).toBe(false))
+      await waitFor(() => expect(enterProject).toHaveBeenCalledTimes(1))
+    } finally {
+      env.IS_REACT_ACT_ENVIRONMENT = true
+    }
     expect(window.sessionStorage.getItem(keyOf(P, B)), '身分已經是 Q，P 那一輪的回應不能存票').toBeNull()
     expect(calls).toEqual([])
     expect(dialogs()).toHaveLength(1)
-    expect(submitButton().disabled).toBe(false)
   })
 })
 
