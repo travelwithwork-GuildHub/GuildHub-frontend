@@ -172,11 +172,37 @@ try {
     const jump = await page.$(`${HUD} [data-testid="chat-jump-latest"]`)
     if (Math.abs(topAfter - topBefore) <= 1 && jump !== null && !(await lastVisible())) ok(`[S12] 往上讀：位置不動（${topBefore}→${topAfter}）、出現回到最新的控制、最新的一則不在可見區`)
     else bad('[S12] 往上讀時被搶走位置或沒有控制', `scrollTop ${topBefore}→${topAfter} jump=${jump !== null} lastVisible=${await lastVisible()}`)
+    // 控制不蓋住任何可見的列（它在列表下面自己的一列，不是浮在列表上）
+    const jumpBox = await jump?.boundingBox()
+    const covered = await page.$$eval(`${HUD} [data-testid="chat-row"]`, (rows, box) => {
+      const inter = (a, b) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))
+      return rows.map((r) => r.getBoundingClientRect()).filter((r) => inter({ x: r.x, y: r.y, width: r.width, height: r.height }, box) > 0).length
+    }, jumpBox)
+    if (covered === 0) ok('[S12] 回到最新的控制沒有蓋住任何一列')
+    else bad('[S12] 控制蓋住了正在讀的列', `${covered} 列`)
     await page.screenshot({ path: path.join(OUT, 'hud-unseen.png') })
     await jump?.click()
     await page.waitForTimeout(150)
     if ((await lastVisible()) && (await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) === null) ok('[S12] 啟動控制：最新的一則在可見區、控制消失')
     else bad('[S12] 啟動控制之後不對', `lastVisible=${await lastVisible()} jump=${(await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) !== null}`)
+    // S12 的邊界：只往上移一點點、最後一列被切掉一部分（沒有完整在可見區）→ 新訊息也不能把人拉到底
+    await page.evaluate((sel) => {
+      const el = document.querySelector(sel)
+      el.scrollTop = el.scrollHeight - el.clientHeight - 10
+    }, SCROLL)
+    await page.waitForTimeout(100)
+    if (!(await lastVisible())) ok('[S12] 邊界前提：往上 10px，最後一列已經不完整在可見區')
+    else throw new Error('[S12] 往上 10px 之後最後一列仍完整可見 —— 邊界前提不成立')
+    const edgeBefore = await page.$eval(SCROLL, (el) => el.scrollTop)
+    serverChat(sockets, '新人', '邊界時來的')
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="chat-body"]')].some((n) => n.textContent === '邊界時來的'), null, { timeout: 5_000 })
+    await page.waitForTimeout(150)
+    const edgeAfter = await page.$eval(SCROLL, (el) => el.scrollTop)
+    const edgeJump = await page.$(`${HUD} [data-testid="chat-jump-latest"]`)
+    if (Math.abs(edgeAfter - edgeBefore) <= 1 && edgeJump !== null) ok(`[S12] 邊界：最後一列只被切掉一點也不拉到底（${edgeBefore}→${edgeAfter}）、有控制`)
+    else bad('[S12] 邊界：被拉到底或沒有控制', `scrollTop ${edgeBefore}→${edgeAfter} jump=${edgeJump !== null}`)
+    await edgeJump?.click()
+    await page.waitForTimeout(150)
     await (await field(page)).focus()
     await page.keyboard.press('Escape')
 
