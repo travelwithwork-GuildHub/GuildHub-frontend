@@ -10,10 +10,10 @@
 
 ## 2. 本地 enter 與契約（PR：`--local-enter`；產品碼 ≤150、測試 ≤200）
 
-- [ ] 2.1 先寫 `tests/contract/rest/enter.contract.ts`：`[FE-N08-S12]` 的矩陣（401、名片已刪 401、404、404、403、200、closed 有密碼 200）、座位空與滿都 200、票對替身握手（同房同人收、別房拒、別人的 cookie 拒）、`[FE-N08-S13]` 兩個目標同一份 —— 對 `local` 目標先紅
+- [ ] 2.1 先寫 `tests/contract/rest/enter.contract.ts`：`[FE-N08-S12]` 的矩陣（401、404、404、403、200、closed 有密碼 200；名片已刪那列是已知差異，不進矩陣）；另寫 `tests/server-enter.test.ts`：`[FE-N08-S16]`（node、假 db：名片查不到 → 401、body 沒有 `room_token`、沒有第二道 SQL）、座位空與滿都 200、票對替身握手（同房同人收、別房拒、別人的 cookie 拒）、`[FE-N08-S13]` 兩個目標同一份 —— 對 `local` 目標先紅
 - [ ] 2.2 簽章函式抽成兩邊共用的模組（不 import `server-only`）、簽 `room:<uuid>|<profileId>`；`scripts/realtime-stub.ts` 改 import 它、握手改成**先解析 cookie 身分再驗票**，並把「`FE-W16` 把 enter 接上」的筆誤改成 `FE-N08`；既有用 `roomToken(scene)` 算票的測試跟著改
-- [ ] 2.3 `src/app/api/projects/[project_id]/enter/route.ts`：走 `handle()` 管線（它查名片存在，`FE-O03-S08`）→ 401、查 `password_hash`（不看 status）→ 404、`verifyPassword` → 403、簽票（綁 projectId＋profileId）
-- [ ] 2.4 突變：拿掉 `verifyPassword` → 403 那列紅；替身換一把 secret → 握手那段紅；票不綁人 → 換 cookie 那段紅；handler 改回 `{ token }` → `EnterOut` 紅
+- [ ] 2.3 `src/app/api/projects/[project_id]/enter/route.ts`：走 `handle()` 管線（沒有 session、或名片查不到 → 401；後者是跟真後端的已知差異，`S16`）、查 `password_hash`（不看 status）→ 404、`verifyPassword` → 403、簽票（綁 projectId＋profileId）
+- [ ] 2.4 突變：拿掉 `verifyPassword` → 403 那列紅；handler 不走 `handle()`、只 `sessionIdFrom` → S16 紅；替身換一把 secret → 握手那段紅；票不綁人 → 換 cookie 那段紅；handler 改回 `{ token }` → `EnterOut` 紅
 
 ## 3. 視窗、焦點、世界鎖（PR：`--modal`；產品碼 ≤200、測試 ≤200）
 

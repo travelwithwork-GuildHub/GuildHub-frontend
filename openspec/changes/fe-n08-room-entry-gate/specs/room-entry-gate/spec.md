@@ -252,21 +252,22 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 ### Requirement: 本地後端的 enter 在下列語意上與真後端相同，票本地替身收得下
 
 `local` 目標 SHALL 提供 `POST /api/projects/{project_id}/enter`：body 合 `EnterIn`，成功回 `EnterOut`。
-判斷順序 SHALL 照真後端：session 無效（沒有、簽章壞、或指向已不存在的名片 —— `FE-O03-S08`）→ 401；`password_hash IS NULL`（專案不存在或還沒成軍）→ 404；
+判斷順序 SHALL 照真後端：session 無效（沒有、簽章壞）→ 401；`password_hash IS NULL`（專案不存在或還沒成軍）→ 404；
 密碼不合 → 403；否則簽票 —— **不看 `status`**（`closed` 但有 `password_hash` 照樣簽，跟真後端一樣）、不看座位。錯誤形狀 SHALL 走 `internal-backend` 既有的管線（`{ "detail": … }`）。
-「相同」只涵蓋這裡列出的回應分類與下面的 WS 驗票語意；**已知差異**（不承諾相同）：本地票不過期、本地沒有 server-side `room_tokens`（給座位端點用的，`FE-J13` 的事）。
+「相同」只涵蓋這裡列出的回應分類與下面的 WS 驗票語意；**已知差異**（不承諾相同）：本地票不過期、本地沒有 server-side `room_tokens`（給座位端點用的，`FE-J13` 的事）、**session 指向已不存在的名片**：真後端的 `get_current_user` 不查名片、`enter_room` 對那個 session 照簽 200；本地 SHALL 回 401、回應 MUST NOT 含票（走既有管線）—— 這一列不進兩個目標共用的矩陣，由 `S16` 單獨對本地驗。
 簽出的票 SHALL 綁房間**與簽出時的身分**：本地即時層替身對 `room:<project_id>` 的握手 SHALL 只在「票的房間＝scene ∧ 票的身分＝握手 cookie 的身分」時接受；
 另一間房、或另一個人拿著這張票 MUST NOT 被接受（跟真後端 `verify()` 同樣的可觀察語意；**本地票不過期**是已知差異，記在 design D7）。
 本地 handler MUST NOT 讀座位、MUST NOT 因座位滿而拒絕。
 `enterProject` 的契約測試 SHALL 對 `local` 與 `guildhub` 兩個目標跑同一份。
 
 > 拔掉什麼會紅：handler 不驗密碼 → S12 的 403 那列；handler 與替身用不同的簽章 → S12 握手那段；票不綁身分 → S12 換 cookie 那段；
-> handler 看座位 → S12 滿座那列；handler 加 `status === 'active'` 才簽 → S12 的 closed 那列；只驗簽章不查名片 → S12 名片已刪那列；operation 改路徑或 body 欄位名 → S13 兩個目標都紅（兩個後端都不認）。
+> handler 看座位 → S12 滿座那列；handler 加 `status === 'active'` 才簽 → S12 的 closed 那列；operation 改路徑或 body 欄位名 → S13 兩個目標都紅（兩個後端都不認）；
+> handler 繞過 `handle()`、只驗 cookie 簽章不查名片 → S16 紅。
 
 #### Scenario: [FE-N08-S12] 本地 enter 的矩陣與票的效力
 
-- **WHEN** 對本地後端依序：未登入、簽章正確但名片已刪、專案不存在、`recruiting`（沒有 `password_hash`）、`active` 密碼錯、`active` 密碼對、`closed` 但有 `password_hash` 密碼對
-- **THEN** SHALL 分別得到 401、401、404、404、403、`200` 且 body 合 `EnterOut`、`200`
+- **WHEN** 對本地後端依序：未登入、專案不存在、`recruiting`（沒有 `password_hash`）、`active` 密碼錯、`active` 密碼對、`closed` 但有 `password_hash` 密碼對
+- **THEN** SHALL 分別得到 401、404、404、403、`200` 且 body 合 `EnterOut`、`200`
 - **AND** 用那張票、同一個 session cookie 對本地替身開 `scene=room:<同一個 id>` 的 socket SHALL 收到 `hello`；
   對 `scene=room:<另一個 uuid>` SHALL 被拒絕握手；換另一個人的 session cookie 帶同一張票 SHALL 被拒絕握手
 - **AND** 同一個 `active` 專案，在座位表是空的、以及 `seat_count` 格全部被佔滿兩種資料下，密碼正確都 SHALL 回 200
@@ -279,3 +280,9 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **AND WHEN** P 經視窗拿到 R 的票後，同一分頁改以 Q 的身分載入 `/world?room=R`
 - **THEN** Q 的第一條連線 MUST NOT 帶 P 的票；場景 SHALL 依 `FE-V01-S14` 回到大廳
 - → 驗於：單元（契約）、e2e（換身分）
+
+#### Scenario: [FE-N08-S16] 本地 enter：session 指向已刪的名片 → 401、回應不含票
+
+- **WHEN** 對本地 handler 送一個簽章正確、但名片查不到的 session cookie，body 合 `EnterIn`
+- **THEN** SHALL 回 401 `{"detail":"未登入"}`，body 裡 SHALL 沒有 `room_token`；MUST NOT 查 `password_hash`（資料層只收到查名片那一道 SQL；簽章是純計算，這裡不宣稱「沒算過」）
+- → 驗於：單元（node、資料層換成記錄 SQL 的假物件；這是本地獨有的義務，不進兩個目標共用的契約檔）
