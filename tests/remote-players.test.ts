@@ -537,22 +537,37 @@ describe('在線人數的推導', () => {
 
   it('[FE-R10-S11] 重複 join 不建立第二筆，但刷新該 id 的狀態', () => {
     const state = createRemotePlayersState()
-    apply(state, snapshot(player(SELF), player('u1', 0, 0, 0, '忙碌中'), player('u2', 0, 0, 0, '在')))
+    // 名字、外觀各不相同（#405 審查的教訓：全是「訪客／0」時，「刷新時把 name／av 丟掉」抓不到）
+    const u1 = { name: '甲', av: 1 }
+    apply(state, snapshot(player(SELF), playerAs('u1', { ...u1, st: '忙碌中' }), playerAs('u2', { name: '乙', st: '在' })))
     const countBefore = onlineCountOf(state)
+    const rosterBeforeJoin = state.roster
+    const u1Before = state.roster.get('u1')!
     const u2Before = state.roster.get('u2')
     expect(countBefore, '前提：人數已就緒').toBe(3)
 
-    const changed = apply(state, presence([player('u1', 0, 0, 0, '')], []))
+    // ⚠️ join 帶來的 name／av **跟原本一樣**：規格只要求刷新 `st`，沒有規定 name／av 要不要跟著換 ——
+    // 這條不把「不換」寫成義務（那是規格沒寫的行為），只擋「刷新時把它們弄丟」。
+    const changed = apply(state, presence([playerAs('u1', { ...u1, st: '' })], []))
 
     expect(changed, '狀態真的變了 —— 呼叫端要重繪').toBe(true)
-    expect(state.roster.get('u1')?.st, '以 join payload 的 st 為準').toBe('')
+    // ⚠️ **回傳 true 不夠**：呼叫端是 `setRoster(state.roster)`，同一個 Map 不會觸發重繪（design D1）。
+    expect(state.roster, '要換一個新的名單 Map').not.toBe(rosterBeforeJoin)
+    expect(state.roster.get('u1'), '被刷新的人要換一個新的身分物件').not.toBe(u1Before)
+    expect(u1Before.st, '舊的身分物件不得被就地改寫').toBe('忙碌中')
+    expect(state.roster.get('u1'), '以 join payload 的 st 為準，name／av 沒被弄丟').toEqual({ id: 'u1', ...u1, st: '' })
     expect([...state.roster.keys()].filter((id) => id === 'u1'), '名單裡仍然只有這一筆').toHaveLength(1)
     expect(onlineCountOf(state), '在線人數不變').toBe(countBefore)
     expect(state.roster.get('u2'), '其他人的身分連物件都不換').toBe(u2Before)
 
+    // 文字原樣：不 trim、不截斷（這一層 MUST NOT 改寫已驗證的文字）
+    apply(state, presence([playerAs('u1', { ...u1, st: EDGE_TEXT })], []))
+    expect(state.roster.get('u1')?.st, '重複 join 帶來的文字原樣保留').toBe(EDGE_TEXT)
+    apply(state, presence([playerAs('u1', { ...u1, st: '' })], []))
+
     // 同樣內容的重複 join 不該讓 React 重繪
     const rosterBefore = state.roster
-    expect(apply(state, presence([player('u1', 0, 0, 0, '')], []))).toBe(false)
+    expect(apply(state, presence([playerAs('u1', { ...u1, st: '' })], []))).toBe(false)
     expect(state.roster, '內容相同就不換 Map').toBe(rosterBefore)
   })
 })
