@@ -12,8 +12,9 @@
 併發：適用 —— 訊息可能在場景切換前後晚到；同場景的重連（過場失敗退回、之後的 `FE-R12`）不是換場景。
 持久資料相容性：不適用 —— 不呼叫任何 REST、不用 Web Storage。
 失敗路徑：適用 —— 沒 `ready` 就送、長得像 chat 但不合契約、舊連線的訊息晚到、過場失敗。
-已接受的風險：後端對 `body` 只要求是字串、沒有大小上限（`BE-G16`），一則巨大的合法訊息會佔前端記憶體 —— **本能力不在前端擋**
-（那會掩蓋後端的缺口，也會讓各客戶端各自發明上限）；記在 design D5，`FE-O07` 銜接清單列它。
+資源政策：後端對 `body` 只要求是字串、沒有大小上限（`BE-G16` 未解）。本能力**不拒收、不丟棄**任何合法訊息（那是後端的契約），
+但保存時有**前端自己的保留預算**（單則 body 超過 2000 code point 只保留前 2000 並標記 `truncated`）——這是客戶端的資源政策，
+不是後端契約、不取代 `BE-G16`；記在 design D5，`FE-O07` 銜接清單列它。
 名詞：本文的「換場景」指 committed 的 `wsScene` 改變；「連線」指 `RemoteWorld` 建立的一個 `RealtimeClient` 實例
 （`RealtimeGenerationProvider.generation` 是「要求重連」的代數，**不是**場景代號，不拿它當清空條件）。
 測試連線：單元與 jsdom 不連任何服務；e2e 只打 `next start` 的 loopback，WebSocket 用 `routeWebSocket` 偽造，MUST NOT 連任何團隊共用位址。
@@ -32,13 +33,16 @@ chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器�
 > 拔掉什麼會紅：分派器把 `status` 也餵給 sink → S01 的 sink 呼叫次數；sink 收到字串或 chat 模組 import 驗證器 → S01 的 spy／靜態邊界；
 > 驗證失敗也餵 sink → S10；sink 對空字串 trim 或丟棄 → S10 的照原值那段；沒 ready 時排隊 → S02。
 
-#### Scenario: [FE-R11-S01] 只有驗證器產出的那個 chat 物件到達 sink，其他訊息一次都不到
+#### Scenario: [FE-R11-S01] 只有驗證器產出的那個 chat 物件到達 sink，其他驗證成功的訊息一次都不到
 
-- **GIVEN** 從 `RemoteWorld` 的 raw `onMessage` 入口進，驗證器換成假的：對 `chat` frame 回一個**有唯一身分的** `ChatOut` 物件 M；chat 的 sink 是 spy
+- **GIVEN** 從 `RemoteWorld` 的 raw `onMessage` 入口進，驗證器換成假的：**四則都回驗證成功**——`chat` 回一個有唯一身分的 `ChatOut` 物件 M，
+  `status`／`pos`／`presence` 各回自己型別的合法 sentinel；chat 的 sink 是 spy
 - **WHEN** 依序餵 raw frame：`status`、`chat`、`pos`、`presence`
-- **THEN** sink SHALL 恰好被呼叫一次，參數 SHALL `toBe(M)`（同一個 reference，不是欄位相等的複本 —— 自己 parse 再建物件會紅）
+- **THEN** sink SHALL 恰好被呼叫一次，參數 SHALL `toBe(M)`（同一個 reference，不是欄位相等的複本 —— 自己 parse 再建物件會紅；
+  另外三則驗證成功卻沒進 sink，證明分流看的是 `t === 'chat'`）
 - **AND** 記憶體 SHALL 只新增那一則
-- **AND** `src/realtime/sceneChat*` 的靜態 import 圖 SHALL 不含 `RealtimeClient` 的值、`createMessageValidator`、`JSON.parse`（既有 `boundaries` lint 的寫法）
+- **AND** `src/realtime/sceneChat*` 的靜態 import 圖 SHALL 不含 `RealtimeClient` 的值、`createMessageValidator`、`JSON.parse`（既有 `boundaries` lint 的寫法）；
+  sink 與 chat 模組的公開 API 的參數型別 SHALL 是 `ChatOut`（型別測試：傳 `string` 不編譯）
 - → 驗於：單元
 
 #### Scenario: [FE-R11-S02] 沒 ready 就送：拋錯、socket 沒收到、不補送
@@ -48,6 +52,8 @@ chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器�
 - **THEN** sender SHALL `toThrow(RealtimeError)`（吞掉或靜默 return 都紅）；底層 socket 的 `send` SHALL 沒有被呼叫；記憶體 SHALL 不變
 - **AND WHEN** 之後 `state` 變成 `ready`，再跑完所有排程中的計時器
 - **THEN** socket 的 `send` SHALL 仍沒有被呼叫（那則沒有被補送）
+- **AND WHEN** `state` 是 `ready` 但底層 socket 的 `send` 拋錯
+- **THEN** sender SHALL 原樣拋出（不吞）；記憶體 SHALL 不變、SHALL 沒有排隊、之後 SHALL 沒有補送
 - → 驗於：單元
 
 #### Scenario: [FE-R11-S10] 長得像 chat 但不合契約：不到 sink；空字串與危險字串照原值收
@@ -75,18 +81,23 @@ chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器�
 - **THEN** 記憶體 SHALL 恰好一筆「哈囉」
 - → 驗於：單元
 
-### Requirement: 目前場景最多留 100 筆，不用 Web Storage、不呼叫 REST
+### Requirement: 目前場景最多留 100 筆、每則最多保留 2000 code point；不用 Web Storage、不呼叫 REST
 
 記憶體 SHALL 最多保留 **100 筆**、依接收順序；第 101 筆進來時 SHALL 移除最舊的一筆。
-chat 的模組（`src/realtime/sceneChat*` 與 `FE-K04` 之後的 UI）MUST NOT import `src/api/operations`、`src/api/transport`、任何 storage helper，
-MUST NOT 出現 `localStorage`／`sessionStorage`／`indexedDB`／`caches` 的存取（靜態邊界，`boundaries` lint 的寫法）；重新整理後 SHALL 是空的。
+單則 `body` 超過 **2000 code point** 時 SHALL 只保留前 2000 個並把該則標記 `truncated: true`（保留預算是客戶端的資源政策：100 × 2000 有上界；
+不拒收、不丟棄那則；`FE-K04` 要讓人看得出被截了）；2000 以內 SHALL 原值保存、`truncated: false`。
+`src/realtime/sceneChat*` MUST NOT import `src/api/operations`、`src/api/transport`、任何 storage helper，
+MUST NOT 出現 `localStorage`／`sessionStorage`／`indexedDB`／`caches` 的存取（靜態邊界，`boundaries` lint 的寫法；`FE-K04` 的 UI 模組由 K04 自己的邊界測試涵蓋）；
+重新整理後 SHALL 是空的。
 
-> 拔掉什麼會紅：拿掉截斷 → S04 有 101 筆；模組碰 storage／IndexedDB／operations → S05 的靜態邊界；refresh 後有東西 → S05 的列表。
+> 拔掉什麼會紅：拿掉筆數截斷 → S04 有 101 筆；拿掉單則預算 → S04 的 2001 字那段 `truncated` 不成立；模組碰 storage／IndexedDB／operations → S05 的靜態邊界；refresh 後有東西 → S05 的列表。
 
-#### Scenario: [FE-R11-S04] 第 101 筆淘汰最舊的
+#### Scenario: [FE-R11-S04] 第 101 筆淘汰最舊的；超長的一則只留 2000 並標記
 
 - **WHEN** 依序收到編號 1～101 的合法 chat
 - **THEN** 記憶體 SHALL 恰好 100 筆；第一筆是 2、最後一筆是 101
+- **AND WHEN** 收到一則 `body` 是 2001 個 code point（含 emoji，用 code point 數）的 chat，以及一則剛好 2000 個的
+- **THEN** 前者保存的 `body` SHALL 是前 2000 個 code point、`truncated` SHALL 是 `true`；後者 SHALL 原值、`truncated` 是 `false`
 - → 驗於：單元
 
 #### Scenario: [FE-R11-S05] 重新整理後沒有歷史
@@ -95,8 +106,8 @@ MUST NOT 出現 `localStorage`／`sessionStorage`／`indexedDB`／`caches` 的�
 - **WHEN** 重新載入頁面、重新連線，偽造的伺服器還沒送任何新的 `ChatOut`
 - **THEN** 列表 SHALL 是空的
 - **AND** 靜態邊界：`src/realtime/sceneChat*` 的 import 圖與原始碼 SHALL 不含 `src/api/operations`、`src/api/transport`、`localStorage`、`sessionStorage`、`indexedDB`、`caches`
-- **AND** 整段期間的請求清單（`page.on('request')`）SHALL 是既有 allowlist 的子集（`/api/me`、`/api/rooms`、`/api/profiles/*`、Next 的靜態資源、`/ws`）——
-  多出任何一條就紅（不靠「跟 chat 有關」的語意判斷）
+- **AND** 整段期間的請求清單（`page.on('request')`）SHALL 沒有 allowlist（`/api/me`、`/api/rooms`、`/api/profiles/*`、Next 的靜態資源、`/ws`）以外的請求
+  （這只證明「沒有多出來的請求」；chat 不碰 REST 由上面的靜態邊界證明）
 - → 驗於：單元（靜態邊界）、e2e（隨 `FE-K04` 的 UI 一起跑，K04 的 e2e 正式引用這個 ID；記憶體的可觀察形式是列表）
 
 ### Requirement: committed 的場景換了才清空；同場景重連不清；不是目前連線的訊息不收
@@ -132,17 +143,19 @@ MUST NOT 出現 `localStorage`／`sessionStorage`／`indexedDB`／`caches` 的�
 - **THEN** 房間的記憶體 SHALL 不變
 - → 驗於：單元（`FE-V01-S15` 的寫法）
 
-### Requirement: `LIMITS` 如實記錄 chat body 沒有後端限制；前端不發明上限
+### Requirement: `LIMITS` 如實記錄 chat body 沒有後端限制；契約 schema 不加任何長度檢查
 
 `src/api/contract/limits.ts` SHALL 有 `chatBody: { min: 0, max: UNBOUNDED }`（後端的事實：空字串也收），`LIMIT_SOURCES` 指向 `app/realtime/protocol.py::ChatIn.body`。
-「全空白不送」是 `FE-K04` 的送出規則（trim 後至少一個 code point），MUST NOT 偽裝成後端限制寫進 `LIMITS`。
-`ChatIn` schema MUST NOT 套用 Inbox（`messageBody`）的上限；一段超過 2000 code point 的字串與空字串都 SHALL 通過 `ChatIn`。
+「全空白不送」是 `FE-K04` 的送出規則（trim 後至少一個 code point），MUST NOT 偽裝成後端限制寫進 `LIMITS`；
+上一條的 2000 保留預算是客戶端的資源政策，MUST NOT 寫進 `LIMITS` 或 `ChatIn`。
+`ChatIn.body` 與 `ChatOut.body` 的 Zod schema MUST NOT 有任何長度檢查（沒有 `min`／`max`／`length`）—— 用 schema 自省驗，不是用一個有限樣本猜「無上限」。
 
-> 拔掉什麼會紅：`max` 改成 2000 或 `min` 改成 1 → S09；`ChatIn` 加 `.max()`／`.min(1)` → S09 那兩段。
+> 拔掉什麼會紅：`max` 改成 2000 或 `min` 改成 1 → S09；`ChatIn`／`ChatOut` 的 `body` 加任何 `.min()`／`.max()`（不管數字多大）→ S09 的自省那段。
 
 #### Scenario: [FE-R11-S09] chat 無上限不是遺漏，也不是 Inbox 的上限
 
 - **WHEN** 檢查 `LIMITS.chatBody` 與 `LIMIT_SOURCES.chatBody`
 - **THEN** `min` SHALL 是 0、`max` SHALL 是 `UNBOUNDED`；來源 SHALL 指向 `protocol.py::ChatIn.body`
-- **AND** 2001 個 code point 的 body 與 `""` 都 SHALL 通過 `ChatIn.safeParse`
+- **AND** `ChatIn.shape.body` 與 `ChatOut.shape.body` 的 Zod 長度 checks SHALL 是空的（自省 `_def.checks` 沒有 `min`／`max`／`length`）
+- **AND** 2001 個 code point 的 body 與 `""` 都 SHALL 通過 `ChatIn.safeParse`（對照）
 - → 驗於：單元
