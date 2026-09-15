@@ -6,6 +6,7 @@ import { RealtimeClient } from '@/realtime/client'
 import type { ConnectionEvent } from '@/world/scenes/SceneProvider'
 import { useWorldLease } from '@/realtime/WorldLeaseProvider'
 import { createMessageValidator, type ProtocolViolation } from '@/realtime/protocol'
+import type { SceneChatPort } from '@/realtime/sceneChatStore'
 import {
   applyMessage,
   createRemotePlayersState,
@@ -76,6 +77,11 @@ export interface RemoteWorldProps {
    * ⚠️ 要身分穩定：它在下面 effect 的依賴裡，換一個就重連。
    */
   onConnection?: (event: ConnectionEvent, scene: string) => void
+  /**
+   * 場景聊天的口（`FE-R11`，design D1）：每建一條連線 `attach()` 一次，驗證成功的 `chat` 交給那條連線專屬的 `receive`；
+   * 送出由這裡注入 `client.send` —— chat 模組永遠拿不到 client。**prop 不是 context**（在 `<Canvas>` 裡）。沒給就沒有聊天。
+   */
+  chat?: SceneChatPort
 }
 
 const monotonicNow = () => performance.now()
@@ -88,6 +94,7 @@ export function RemoteWorld({
   token,
   closeGateRef,
   onConnection,
+  chat,
 }: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
@@ -136,6 +143,8 @@ export function RemoteWorld({
     const validate = createMessageValidator(onViolation)
 
     let cancelled = false
+    // 這條連線在聊天記憶體裡的身分。注入的 sender 只收 `ChatIn`：序列化在這裡、`client.send()` 沒 ready 就拋 `RealtimeError`，不包、不吞。
+    let link: ReturnType<SceneChatPort['attach']> | null = null
     const client = new RealtimeClient({
       scene,
       token,
@@ -149,6 +158,8 @@ export function RemoteWorld({
       onMessage: (raw) => {
         const result = validate(raw)
         if (!result.ok) return
+        // 聊天只分流 `t === 'chat'`，交的是驗證器產出的那個物件（`FE-R11-S01`）；自己的回聲也交（D2）。
+        if (result.message.t === 'chat') link?.receive(result.message)
         // `selfId` 用來把自己排除在遠端玩家之外 —— `snapshot` 裡包含自己。
         if (applyMessage(state, result.message, client.selfId, now())) {
           // 名單真的變了才重繪。**這是唯一會呼叫 setState 的地方。**
@@ -157,6 +168,7 @@ export function RemoteWorld({
       },
     })
     clientRef.current = client
+    link = chat?.attach((input) => client.send(JSON.stringify(input))) ?? null
     // 先等上一棵子樹的連線關乾淨（`FE-V01-S18`），再連。閘門是空的（第一次掛載）就立刻連。
     // `cancelled`：等的期間就被卸載（Strict Mode 的第二次 effect、或使用者又換了場景）的話不連 ——
     // 那時 `client.close()` 已經跑過，而一個 idle 的 client 被 `close()` 之後再 `connect()` 會拋錯。
@@ -178,6 +190,7 @@ export function RemoteWorld({
     return () => {
       cancelled = true
       clientRef.current = null
+      link?.detach()
       const acked = client.close()
       // ⚠️ **接在前一個閘門後面，不是蓋掉它。** 連換兩次（A→B→C）時 B 可能還沒等到 A 的 ack 就卸載了：
       // B 自己沒有 socket，`close()` 立刻解決 —— 直接放進去的話 C 會立刻連，A 的 ack 就被跳過了。
@@ -196,7 +209,7 @@ export function RemoteWorld({
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection])
+  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection, chat])
 
   return (
     <>
