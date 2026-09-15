@@ -63,8 +63,7 @@ try {
     if (response === null) throw new Error(`連不到 ${FRONTEND} —— server 起了嗎？（next start）`)
     await waitForWorld(page)
 
-    // S01：站在出生點、沒碰任何東西，別人講的話就出現；沒有 dialog；沒有按 E（里程計：還在出生點附近）
-    const where = await odometer(page) // 校準會往西走幾小步（門標籤是量尺），之後的位移相對它
+    // S01：剛載入、**這支腳本到這裡還沒按過任何鍵**（里程計的校準會往西走幾小步，所以校準放在 S01 之後），別人講的話就出現；沒有 dialog、沒有提示
     if ((await page.$(HUD)) !== null && (await emptyVisible(page))) ok('[S01] 剛進大廳：chat 區在、空狀態在')
     else bad('[S01] chat 區或空狀態不在')
     serverChat(sockets, '阿福', '早安')
@@ -73,12 +72,11 @@ try {
     const names = await page.$$eval('[data-testid="chat-name"]', (n) => n.map((x) => x.textContent))
     if (names[0] === '阿福' && (await rowsText(page))[0] === '早安') ok('[S01] 顯示發言者與 body')
     else bad('[S01] 名字或內容不對', JSON.stringify([names, await rowsText(page)]))
-    if ((await page.$$('[role="dialog"]')).length === 0 && (await page.$('[data-testid="interaction-prompt"]')) === null) ok('[S01] 沒有 dialog、沒有互動提示（沒走到任何東西前面）')
+    if ((await page.$$('[role="dialog"]')).length === 0 && (await page.$('[data-testid="interaction-prompt"]')) === null) ok('[S01] 沒有 dialog、沒有互動提示；到此為止沒有按過任何鍵（沒走位、沒按 E）')
     else bad('[S01] 有 dialog 或提示')
-    const pos0 = await where()
-    if (Math.hypot(pos0.dx, pos0.dz) < 0.2) ok('[S01] 角色還在校準點附近（沒走位、沒按 E）')
-    else bad('[S01] 角色動了', JSON.stringify(pos0))
     await page.screenshot({ path: path.join(OUT, 'hud-lobby.png') })
+    const where = await odometer(page) // 校準：往西走到兩扇門的標籤都看得見（門標籤是量尺）；之後的位移相對它
+    const pos0 = await where()
 
     // S02：只看不鎖；打字不走路；Escape 回錨；離開後會動
     await hold(page, 'KeyW', 300)
@@ -110,7 +108,10 @@ try {
 
     // S15：撐滿 chat 區（30 則多行）、走到門前、提示出現：兩個 viewport 都不相交
     for (let i = 0; i < 30; i += 1) serverChat(sockets, `人${i}`, `第 ${i} 則\n第二行\n第三行 ${'很長的一段字'.repeat(6)}`)
-    await waitRows(page, 31)
+    if (!(await waitRows(page, 31))) throw new Error('[S15] 31 列沒有全部畫出來 —— 撐不滿就量不到「撐滿也不遮」')
+    const overflowing = await page.$eval(`${HUD} [data-testid="chat-scroll"]`, (el) => el.scrollHeight > el.clientHeight)
+    if (overflowing) ok('[S15] 30 則多行把列表撐到會捲動（HUD 已到最大高度）')
+    else throw new Error('[S15] 列表沒有溢出 —— HUD 沒被撐滿，交集 0 會是假綠')
     for (const viewport of [
       { width: 1280, height: 720 },
       { width: 1024, height: 640 },
@@ -168,15 +169,23 @@ try {
     const requests = []
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
     guardLoopback(context)
-    context.on('request', (r) => requests.push(r.url()))
+    // 收集範圍：**應用程式發出的請求**。不算的三種都不是應用程式的程式碼發的：document 導覽本身（`page.goto`／`reload`）、
+    // 瀏覽器自動抓的 `/favicon.ico`（repo 沒有這個檔，Next 回 404）、`data:` URL（沒有伺服器）。其餘一律要在 FE-R11-S05 的 allowlist 內。
+    context.on('request', (r) => {
+      const url = new URL(r.url())
+      if (r.resourceType() === 'document') return
+      if (url.protocol === 'data:') return
+      if (url.pathname === '/favicon.ico' && r.resourceType() === 'other') return
+      requests.push(r.url())
+    })
     await fakeRealtime(context, sockets)
     const page = await context.newPage()
     await fakeRest(page, { current: P }, ROOMS)
     await page.goto(`${FRONTEND}/world`)
     await waitForWorld(page)
     for (const body of ['一', '二', '三']) serverChat(sockets, '阿福', body)
-    await waitRows(page, 3)
-    ok('[S10] refresh 前：三則在畫面上')
+    if ((await waitRows(page, 3)) && JSON.stringify(await rowsText(page)) === JSON.stringify(['一', '二', '三'])) ok('[S10] refresh 前：一、二、三在畫面上')
+    else throw new Error(`[S10] refresh 前的三則沒有出現：${JSON.stringify(await rowsText(page))} —— 之後的「refresh 後是空的」會是假綠`)
     await page.reload()
     await waitForWorld(page)
     // 偽造的伺服器只回 hello＋snapshot（`fakeRealtime` 本來就只送這兩則），不重送 chat
@@ -187,9 +196,9 @@ try {
     const allowed = (u) => {
       const url = new URL(u)
       const p = url.pathname
-      // 照 R11 原文：`/api/me`、`/api/rooms`、`/api/profiles/*`、Next 的靜態資源、`/ws`；再加這個 document 自己（`/world`）與 favicon。
-      // 不放行整個 ws:／wss: 協定（那會讓 `/ws` 形同虛設）、不放行 `/api/profiles` 根路徑（審查抓到）。
-      return p === '/api/me' || p === '/api/rooms' || p.startsWith('/api/profiles/') || p === '/ws' || p.startsWith('/_next/') || p === '/world' || p === '/favicon.ico' || url.protocol === 'data:'
+      // 照 R11 原文的封閉集合：`/api/me`、`/api/rooms`、`/api/profiles/*`、Next 的靜態資源（`/_next/`）、`/ws`。
+      // 不放行整個 ws:／wss: 協定（那會讓 `/ws` 形同虛設）、不放行 `/api/profiles` 根路徑、不放行 document／favicon／data:（那些在收集範圍就排除了，理由在上面）。
+      return p === '/api/me' || p === '/api/rooms' || p.startsWith('/api/profiles/') || p === '/ws' || p.startsWith('/_next/')
     }
     const outside = [...new Set(requests.filter((u) => !allowed(u)))]
     if (outside.length === 0) ok(`[FE-R11-S05] 整段期間 ${requests.length} 個請求都在 allowlist 內`)
