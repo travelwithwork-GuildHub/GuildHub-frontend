@@ -281,7 +281,7 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **THEN** Q 的第一條連線 MUST NOT 帶 P 的票；場景 SHALL 依 `FE-V01-S14` 回到大廳
 - → 驗於：單元（契約）、e2e（換身分）
 
-#### Scenario: [FE-N08-S16] 本地 enter：session 指向已刪的名片 → 401、不簽票
+#### Scenario: [FE-N08-S16] 本地 enter：session 指向已刪的名片 → 401、回應不含票
 
 - **WHEN** 對本地 handler 送一個簽章正確、但名片查不到的 session cookie，body 合 `EnterIn`
 - **THEN** SHALL 回 401 `{"detail":"未登入"}`，body 裡 SHALL 沒有 `room_token`；MUST NOT 查 `password_hash`（資料層只收到查名片那一道 SQL；簽章是純計算，這裡不宣稱「沒算過」）
