@@ -180,7 +180,12 @@ try {
     await (await field(page)).focus()
     await page.keyboard.press('Escape')
 
-    // S08：進房（hello 之後 committed）→ 大廳的話不見；房間送一則 → 只剩它
+    // S08：進房（hello 之後 committed）→ 大廳的話不見；房間送一則 → 只剩它。
+    // 進房前先把大廳的列表捲到頂（「往上讀過」）：新場景要從底部開始跟隨，不能把上一個場景的捲動狀態帶過去。
+    await page.evaluate((sel) => {
+      document.querySelector(sel).scrollTop = 0
+    }, SCROLL)
+    await page.waitForTimeout(100)
     let since = await overlaysSeen(page)
     await page.keyboard.press('KeyE')
     await waitForTransition(page, '按 E 進房間', since, 'S08')
@@ -192,6 +197,12 @@ try {
     await waitRows(page, 1)
     if (JSON.stringify(await rowsText(page)) === JSON.stringify(['房間訊息'])) ok('[S08] 房間送一則：只顯示它')
     else bad('[S08] 房間的列表不對', JSON.stringify(await rowsText(page)))
+    // 新場景從底部開始跟隨（S11 在換場景之後也成立）：房間再送 30 則多行 → 最新的一則在可見區、沒有「回到最新」
+    for (let i = 0; i < 30; i += 1) serverChat(sockets, `房${i}`, `房間第 ${i} 則\n第二行`)
+    await waitRows(page, 31)
+    await page.waitForTimeout(150)
+    if ((await lastVisible()) && (await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) === null) ok('[S11] 換場景之後：新場景從底部開始跟隨（上一個場景往上讀過也一樣）')
+    else bad('[S11] 換場景之後沒有從底部開始跟隨', `lastVisible=${await lastVisible()} jump=${(await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) !== null}`)
 
     // S09：回大廳（有一則）→ 再進房被拒 → 自動回大廳 → 那則還在
     since = await overlaysSeen(page)
