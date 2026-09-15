@@ -12,8 +12,8 @@
 併發：適用 —— 訊息可能在場景切換前後晚到；同場景的重連（過場失敗退回、之後的 `FE-R12`）不是換場景。
 持久資料相容性：不適用 —— 不呼叫任何 REST、不用 Web Storage。
 失敗路徑：適用 —— 沒 `ready` 就送、長得像 chat 但不合契約、舊連線的訊息晚到、過場失敗。
-已接受的風險：後端對 `body` 沒有大小上限（`BE-G16`），一則巨大的合法訊息會佔前端記憶體 —— **本能力不在前端擋**（那會掩蓋後端的缺口，
-也會讓 `realtime-protocol` 的「合法訊息一律交付」變假）；記在 design D5，`FE-O07` 銜接清單列它。
+已接受的風險：後端對 `body` 只要求是字串、沒有大小上限（`BE-G16`），一則巨大的合法訊息會佔前端記憶體 —— **本能力不在前端擋**
+（那會掩蓋後端的缺口，也會讓各客戶端各自發明上限）；記在 design D5，`FE-O07` 銜接清單列它。
 名詞：本文的「換場景」指 committed 的 `wsScene` 改變；「連線」指 `RemoteWorld` 建立的一個 `RealtimeClient` 實例
 （`RealtimeGenerationProvider.generation` 是「要求重連」的代數，**不是**場景代號，不拿它當清空條件）。
 測試連線：單元與 jsdom 不連任何服務；e2e 只打 `next start` 的 loopback，WebSocket 用 `routeWebSocket` 偽造，MUST NOT 連任何團隊共用位址。
@@ -26,36 +26,37 @@
 驗證失敗的（缺 `name`、`body` 不是字串…）MUST NOT 到達 sink。`name`／`body` 是空字串或全空白的 `ChatOut` 是合法的（後端不驗），
 SHALL **照原值**收進記憶體，MUST NOT trim、清洗、轉成 markup 或丟棄 —— 怎麼呈現是 `FE-K04`（`output-safety` 的具名文字元件）的事。
 chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器（靜態邊界）。
-送出 SHALL 組成 `src/api/contract/ws.ts` 的 `ChatIn`，交給 `RemoteWorld` 注入的 sender；sender 底下是 `client.send()`，
-連線不是 `ready` 時 SHALL 拋錯，底層 socket MUST NOT 收到 frame，MUST NOT 排隊、MUST NOT 靜默丟棄、MUST NOT 加進列表。
+送出 SHALL 組成 `src/api/contract/ws.ts` 的 `ChatIn`（型別層保證形狀，不另加 runtime 驗證），交給 `RemoteWorld` 注入的 sender；sender 底下是 `client.send()`，
+連線不是 `ready` 時 SHALL 拋 `RealtimeError`（不吞、不靜默 return），底層 socket MUST NOT 收到 frame，MUST NOT 排隊、MUST NOT 靜默丟棄、MUST NOT 加進列表。
 
 > 拔掉什麼會紅：分派器把 `status` 也餵給 sink → S01 的 sink 呼叫次數；sink 收到字串或 chat 模組 import 驗證器 → S01 的 spy／靜態邊界；
 > 驗證失敗也餵 sink → S10；sink 對空字串 trim 或丟棄 → S10 的照原值那段；沒 ready 時排隊 → S02。
 
-#### Scenario: [FE-R11-S01] 只有驗證過的 chat 物件到達 sink，其他訊息一次都不到
+#### Scenario: [FE-R11-S01] 只有驗證器產出的那個 chat 物件到達 sink，其他訊息一次都不到
 
-- **GIVEN** chat 的 sink 是一個 spy
-- **WHEN** 分派器依序收到驗證成功的 `status`、`chat`、`pos`、`presence`
-- **THEN** sink SHALL 恰好被呼叫一次，參數 SHALL 是驗證器產出的那個 `ChatOut` 物件（`id`／`name`／`body` 相等，且 `typeof !== 'string'`）
+- **GIVEN** 從 `RemoteWorld` 的 raw `onMessage` 入口進，驗證器換成假的：對 `chat` frame 回一個**有唯一身分的** `ChatOut` 物件 M；chat 的 sink 是 spy
+- **WHEN** 依序餵 raw frame：`status`、`chat`、`pos`、`presence`
+- **THEN** sink SHALL 恰好被呼叫一次，參數 SHALL `toBe(M)`（同一個 reference，不是欄位相等的複本 —— 自己 parse 再建物件會紅）
 - **AND** 記憶體 SHALL 只新增那一則
-- **AND** `src/realtime/sceneChat*` 的靜態 import 圖 SHALL 不含 `RealtimeClient` 的值與 `createMessageValidator`（既有 `boundaries` lint 的寫法）
+- **AND** `src/realtime/sceneChat*` 的靜態 import 圖 SHALL 不含 `RealtimeClient` 的值、`createMessageValidator`、`JSON.parse`（既有 `boundaries` lint 的寫法）
 - → 驗於：單元
 
 #### Scenario: [FE-R11-S02] 沒 ready 就送：拋錯、socket 沒收到、不補送
 
-- **GIVEN** 假的 `RealtimeClient`，其 `state` 是 `connecting` 或 `open`
+- **GIVEN** 假的 `RealtimeClient`，`state` 分別是 `idle`、`connecting`、`open`、`closed`（四個 case 各跑一次）
 - **WHEN** 透過注入的 sender 送出 chat
-- **THEN** sender SHALL 拋 `RealtimeError`；底層 socket 的 `send` SHALL 沒有被呼叫；記憶體 SHALL 不變
+- **THEN** sender SHALL `toThrow(RealtimeError)`（吞掉或靜默 return 都紅）；底層 socket 的 `send` SHALL 沒有被呼叫；記憶體 SHALL 不變
 - **AND WHEN** 之後 `state` 變成 `ready`，再跑完所有排程中的計時器
 - **THEN** socket 的 `send` SHALL 仍沒有被呼叫（那則沒有被補送）
 - → 驗於：單元
 
-#### Scenario: [FE-R11-S10] 長得像 chat 但不合契約：不到 sink；空字串照原值收
+#### Scenario: [FE-R11-S10] 長得像 chat 但不合契約：不到 sink；空字串與危險字串照原值收
 
-- **WHEN** 分派器收到 `{"t":"chat","id":"x","body":"hi"}`（缺 `name`）與 `{"t":"chat","id":"x","name":"n","body":7}`
-- **THEN** sink SHALL 沒有被呼叫；記憶體 SHALL 不變；下一則合法的 chat SHALL 照常進來
-- **AND WHEN** 收到 `name` 是 `""`、`body` 是 `""`、`body` 是 `"   "` 的三則合法 chat，以及一則 `body` 是 `<img onerror=…>` 的
-- **THEN** 記憶體 SHALL 各新增一則，值 SHALL 與收到的**完全相同**（沒有 trim、沒有轉義、沒有丟棄）
+- **GIVEN** 從 `RemoteWorld` 的 raw `onMessage` 入口進，用**正式的**驗證器與分派（不是直接呼叫 typed dispatcher）
+- **WHEN** 餵 raw frame `{"t":"chat","id":"x","body":"hi"}`（缺 `name`）與 `{"t":"chat","id":"x","name":"n","body":7}`
+- **THEN** sink SHALL 沒有被呼叫；記憶體 SHALL 不變；下一則合法的 chat frame SHALL 照常進來
+- **AND WHEN** 餵 `name` 是 `""`、`body` 是 `""`、`body` 是 `"   "` 的三則合法 chat，以及 `name` 與 `body` 都是 `<img onerror=…>` 的一則
+- **THEN** 記憶體 SHALL 各新增一則，`name` 與 `body` SHALL 與 frame 裡的**完全相同**（沒有 trim、沒有轉義、沒有丟棄）—— 安全呈現是 `FE-K04` 的具名文字元件
 - → 驗於：單元
 
 ### Requirement: 自己的話只在伺服器回聲後出現一次
@@ -77,9 +78,10 @@ chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器�
 ### Requirement: 目前場景最多留 100 筆，不用 Web Storage、不呼叫 REST
 
 記憶體 SHALL 最多保留 **100 筆**、依接收順序；第 101 筆進來時 SHALL 移除最舊的一筆。
-系統 MUST NOT 為 chat 呼叫任何 REST、MUST NOT 使用 `localStorage`／`sessionStorage`／IndexedDB；重新整理後 SHALL 是空的。
+chat 的模組（`src/realtime/sceneChat*` 與 `FE-K04` 之後的 UI）MUST NOT import `src/api/operations`、`src/api/transport`、任何 storage helper，
+MUST NOT 出現 `localStorage`／`sessionStorage`／`indexedDB`／`caches` 的存取（靜態邊界，`boundaries` lint 的寫法）；重新整理後 SHALL 是空的。
 
-> 拔掉什麼會紅：拿掉截斷 → S04 有 101 筆；寫進 storage → S05 的 `setItem` spy；為 chat 打 REST → S05 的請求清單。
+> 拔掉什麼會紅：拿掉截斷 → S04 有 101 筆；模組碰 storage／IndexedDB／operations → S05 的靜態邊界；refresh 後有東西 → S05 的列表。
 
 #### Scenario: [FE-R11-S04] 第 101 筆淘汰最舊的
 
@@ -92,9 +94,10 @@ chat 模組 MUST NOT import `RealtimeClient` 的值、MUST NOT import 驗證器�
 - **GIVEN** 這一頁已收到數筆 chat（偽造的伺服器送的）
 - **WHEN** 重新載入頁面、重新連線，偽造的伺服器還沒送任何新的 `ChatOut`
 - **THEN** 列表 SHALL 是空的
-- **AND** 從第一次載入起，`Storage.prototype.setItem`／`removeItem` 的每一次呼叫（init script 包起來記錄）SHALL 沒有任何一次的 key 或 value 含 chat 的 body；
-  整段期間的 REST 請求清單 SHALL 沒有任何一條跟 chat 有關（只有既有的 `/api/me`、`/api/rooms` 這類）
-- → 驗於：e2e（隨 `FE-K04` 的 UI 一起跑，K04 的 e2e 正式引用這個 ID；記憶體的可觀察形式是列表）
+- **AND** 靜態邊界：`src/realtime/sceneChat*` 的 import 圖與原始碼 SHALL 不含 `src/api/operations`、`src/api/transport`、`localStorage`、`sessionStorage`、`indexedDB`、`caches`
+- **AND** 整段期間的請求清單（`page.on('request')`）SHALL 是既有 allowlist 的子集（`/api/me`、`/api/rooms`、`/api/profiles/*`、Next 的靜態資源、`/ws`）——
+  多出任何一條就紅（不靠「跟 chat 有關」的語意判斷）
+- → 驗於：單元（靜態邊界）、e2e（隨 `FE-K04` 的 UI 一起跑，K04 的 e2e 正式引用這個 ID；記憶體的可觀察形式是列表）
 
 ### Requirement: committed 的場景換了才清空；同場景重連不清；不是目前連線的訊息不收
 

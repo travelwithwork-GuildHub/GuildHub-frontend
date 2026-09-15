@@ -16,7 +16,7 @@ WebSocket 契約早就有 `chat`（`src/api/contract/ws.ts` 的 `ChatIn`／`Chat
   - 只收 `realtime-protocol` 驗證成功的 `ChatOut`；送出只透過 `RemoteWorld` 注入的窄介面（`ChatIn`），不 import client 的值
   - 自己的話**只**在伺服器回聲後出現一次（後端廣播含自己，所以不做本地回聲、也不做去重）
   - 目前場景最多留 **100 筆**、依接收順序；第 101 筆淘汰最舊
-  - 新場景 **committed** 才清空；過場失敗不清；舊 generation 晚到的訊息不進新場景
+  - committed 的場景**換了**才清空；過場失敗退回、同場景重連不清；**舊連線**晚到的訊息不進新場景
   - 不落任何 storage；refresh＝空
   - `LIMITS.chatBody = { min: 0, max: UNBOUNDED }` 如實記錄「後端什麼都沒驗」（`FE-O06` 的慣例），前端**不**發明上限；「全空白不送」是 `FE-K04` 的規則
   - 空字串、全空白、含 HTML 的 body 照原值收；怎麼呈現是 `FE-K04`（`FE-T06` 的具名文字元件）

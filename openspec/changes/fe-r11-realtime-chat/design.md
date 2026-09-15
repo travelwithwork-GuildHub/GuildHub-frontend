@@ -33,13 +33,14 @@
 名詞不混用：`RealtimeGenerationProvider.generation` 是「要求重連」的代數（`FE-R06` 多分頁用），不是場景代號、不是連線身分。
 代價：過場覆蓋層底下舊訊息還在 —— 覆蓋層已遮住畫面，而且 `FE-K04` 的 UI 在過場期間本來就鎖著。
 
-## D5｜chat 長度：如實記錄後端「什麼都沒驗」，前端不發明上限、也不在傳輸層擋
+## D5｜chat 長度：如實記錄後端「只驗是字串」，前端不發明上限、也不在傳輸層擋
 
-`protocol.py` 的 `ChatIn.body: str` 沒有驗證 —— 空字串、全空白、10 MB 都是合法的。`limits.ts` 的慣例是「後端完全沒有上限的欄位記成 `UNBOUNDED`，不是省略」
+`protocol.py` 的 `ChatIn.body: str` 只要求是字串，沒有長度或內容限制 —— 空字串、全空白、10 MB 都是合法的。`limits.ts` 的慣例是「後端完全沒有上限的欄位記成 `UNBOUNDED`，不是省略」
 （`projectTitle`／`projectBody` 同樣處理）。所以 `LIMITS.chatBody = { min: 0, max: UNBOUNDED }`：第一版寫 `min: 1` 是把 UI 的規則偽裝成後端事實，
 而且 `min: 1` 也推不出「全空白不送」（一個空格長度就是 1）—— 審查者指出的；「trim 後至少一個 code point」是 `FE-K04` 的送出規則。
 **巨大訊息的風險明文接受**：100 筆 × 無上限＝理論上可以撐爆前端記憶體。不在前端擋：擋了就是在掩蓋後端沒有 rate limit／大小上限的缺口（`BE-G16`），
-也會讓 `realtime-protocol`「合法訊息一律交付」變假 —— 要擋得先改協定（那是 MODIFIED `realtime-protocol` 的事，不是偷塞進 R11）。`FE-O07` 銜接清單列它。
+而且不同客戶端會各自發明不同的上限。（`realtime-protocol` 保證的是驗證器對合法訊息回成功，不保證每個下游都要保存 —— R11 選擇照收是自己的決定，不是它的義務。）
+要擋得先改協定，再談前端。`FE-O07` 銜接清單列它。
 
 ## 待答問題
 

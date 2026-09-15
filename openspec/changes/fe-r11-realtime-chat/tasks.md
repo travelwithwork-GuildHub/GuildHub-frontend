@@ -10,13 +10,13 @@
 
 ## 2. 記憶體與限制（PR：`--memory`；產品碼 ≤120、測試 ≤150）
 
-- [ ] 2.1 先寫單元：`[FE-R11-S04]`（101 → 100、最舊淘汰）、`[FE-R11-S09]`（`LIMITS.chatBody` 是 `{0, UNBOUNDED}`、來源、2001 字與空字串通過 `ChatIn`）
+- [ ] 2.1 先寫單元：`[FE-R11-S04]`（101 → 100、最舊淘汰）、`[FE-R11-S05]` 的靜態邊界（sceneChat 模組不 import operations／transport、不出現 storage／indexedDB 字樣）、`[FE-R11-S09]`（`LIMITS.chatBody` 是 `{0, UNBOUNDED}`、來源、2001 字與空字串通過 `ChatIn`）
 - [ ] 2.2 `src/realtime/sceneChat.ts`：純 reducer（append、截斷 100、clear）；`limits.ts` 加 `chatBody` 與來源
 - [ ] 2.3 突變：拿掉截斷 → S04 紅；`max` 改 2000 或 `min` 改 1 → S09 紅
 
 ## 3. 分派與送出（PR：`--transport`；產品碼 ≤180、測試 ≤200）
 
-- [ ] 3.1 先寫單元：`[FE-R11-S01]`（sink spy 恰好一次、參數是物件；靜態邊界 lint）、`[FE-R11-S10]`（缺 name／body 非字串不到 sink；空字串、全空白、HTML 照原值）、`[FE-R11-S02]`（假 client 非 ready → 拋 `RealtimeError`、socket.send 沒被叫、不補送）、`[FE-R11-S03]`（送出不 append、回聲後恰好一筆、`id === me` 不略過）
+- [ ] 3.1 先寫單元：`[FE-R11-S01]`（從 raw `onMessage` 進、假驗證器回 sentinel、sink `toBe` 同一 reference；靜態邊界 lint）、`[FE-R11-S10]`（正式驗證器＋分派：缺 name／body 非字串不到 sink；空字串、全空白、HTML 的 name 與 body 照原值）、`[FE-R11-S02]`（四個非 ready 狀態各一 case → `toThrow(RealtimeError)`、socket.send 沒被叫、不補送）、`[FE-R11-S03]`（送出不 append、回聲後恰好一筆、`id === me` 不略過）
 - [ ] 3.2 `RemoteWorld`：驗證後的 `ChatOut` 分派給 chat；注入 `send(chatIn)` port（包 `client.send(JSON.stringify(...))`）；用 context 暴露給 Canvas 外
 - [ ] 3.3 突變：送出時 append → S03 紅；`id === selfId` 略過 → S03 紅；status 也餵 sink → S01 紅；sink 裡 trim → S10 紅；驗證失敗也餵 → S10 紅
 
