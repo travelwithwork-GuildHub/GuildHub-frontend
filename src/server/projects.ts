@@ -37,6 +37,12 @@ export async function projectById(id: string): Promise<ProjectRow | null> {
   return r.rows[0] ?? null
 }
 
+/** 房間密碼的雜湊；專案不存在、或還沒成軍（`password_hash` 是 NULL）都是 `null` —— 真後端 `enter_room` 對兩者同一句 404。 */
+export async function projectPasswordHash(id: string): Promise<string | null> {
+  const r = await db().query<{ password_hash: string | null }>('select password_hash from projects where id = $1', [id])
+  return r.rows[0]?.password_hash ?? null
+}
+
 /** 走廊：成軍中（active）的專案就是門，最多 12 個門位（`rooms.py` 的 `DOOR_SLOTS`）。 */
 export async function activeRooms(): Promise<Array<{ project_id: string; title: string }>> {
   const r = await db().query<{ project_id: string; title: string }>(
