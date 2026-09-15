@@ -20,7 +20,7 @@
 - [ ] 3.1（流程，不對應 Requirement）動 tsx 之前先過 `ui-ux-pro-max`（`--domain` 表單／對話框；按鈕用 `@/design/controls`）
 - [ ] 3.2 先寫 jsdom：`[FE-N08-S01]`（provider 收到 projectId／title、dialog 語意、一次 E 一個視窗、預設說明不出現）、`[FE-N08-S02]`（Esc、清密碼、焦點回錨、再開是空的）、`[FE-N08-S03]`（焦點在按鈕上世界不動、Tab 不出視窗、關閉只放自己的鎖）
 - [ ] 3.3 實作 `RoomEntryGateProvider`（Canvas 外，實作 `EntryGateProvider`）與 `RoomPasswordDialog`：`focusTrap`、`holdInputLock`、`DiscardConfirm` 的 dialog 寫法；不新增 E 監聽
-- [ ] 3.4 突變：不掛 provider → S01 紅；視窗不持鎖 → S03 紅；關閉不清密碼 → S02 紅；焦點丟 `body` → S02 紅
+- [ ] 3.4 突變：不掛 provider → S01 紅；視窗不持鎖 → S03 紅；關閉不放鎖 → S03 的「恢復」紅；關閉不清密碼 → S02 紅；焦點丟 `body` → S02 紅
 
 ## 4. 送出、錯誤、成功進房（PR：`--submit`；產品碼 ≤200、測試 ≤250）
 
@@ -36,7 +36,7 @@
 
 ## 6. 瀏覽器與收尾
 
-- [ ] 6.1 `tests/e2e/room-entry.mjs`（`next start` 正式建置、`page.route` 偽造 `/enter`、`routeWebSocket` 偽造房間 socket；走位用 `scene-switch.mjs` 的門標籤里程計）：`S01`（真的按 E 開視窗、Canvas 同一節點）、`S02`（Esc 後 activeElement）、`S05`（密碼不落地：網址軌跡＋storage；同一扇門再開是空的）、`S06`／`S07`（帶票的連線、網址沒票、回大廳再按 E 不問）、`S08`（403 留著）、`S09`（一種 404）、`S10`（401 與網路失敗）、`S11`（被拒→同票再試→重新輸入）、`S13` 後半（換身分）、`S14`（`setItem` 拋）、`S15` 第一段（延遲回應＋Esc＋重開）
+- [ ] 6.1 `tests/e2e/room-entry.mjs`（`next start` 正式建置、`page.route` 偽造 `/enter`、`routeWebSocket` 偽造房間 socket；走位用 `scene-switch.mjs` 的門標籤里程計）：`S01`（真的按 E 開視窗、Canvas 同一節點）、`S02`（Esc 後 activeElement）、`S03`（焦點在送出鈕上按 W／E 世界不動、關閉後會動）、`S05`（密碼不落地：網址軌跡＋storage；同一扇門再開是空的）、`S06`／`S07`（帶票的連線、網址沒票、回大廳再按 E 不問）、`S08`（403 留著）、`S09`（一種 404）、`S10`（401 與網路失敗）、`S11`（被拒→同票再試→重新輸入）、`S13` 後半（換身分）、`S14`（`setItem` 拋）、`S15` 第一段（延遲回應＋Esc＋重開）
 - [ ] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
 - [ ] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、契約測試兩個目標的結果如實記在這裡
 - [ ] 6.4（流程，不對應 Requirement）Google Sheet：`FE-N08` → On-going／Done 各一次
