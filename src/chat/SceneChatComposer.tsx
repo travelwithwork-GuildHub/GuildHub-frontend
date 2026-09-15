@@ -15,7 +15,7 @@ import { SubmitError } from '@/forms/SubmitError'
 // `send` 同步回來沒拋才清空；拋了（沒連線、沒 ready、socket 拋）就保留輸入、`SubmitError`（`role="alert"`、在送出控制之前、取焦點）說一句受控的話 ——
 // 不印例外訊息、不自動重送（節流是 `FE-X11` 的事，之後包在 `send` 外面，被節流也是「沒交給 transport」→ 同一條保留的路）。
 // 兩種提示都在使用者再動鍵盤（`onChange`）時清掉 —— 提示是給「上一次送出」的，不該掛到下一次。
-// Enter 送、Shift+Enter 交給瀏覽器換行（不 preventDefault）。Escape 離開輸入框是 `--world` 那片接的（焦點回世界錨）。
+// Enter 送、Shift+Enter 交給瀏覽器換行（不 preventDefault）。Escape → `onEscape`（HUD 給「焦點回世界錨」；沒給就交給上層）。
 // ⚠️ 這裡的字是元件常數，不是規格。
 
 export const CHAT_COMPOSER_LABELS = {
@@ -25,7 +25,7 @@ export const CHAT_COMPOSER_LABELS = {
   notSent: '沒送出去 —— 現在還連不上，等一下再試。',
 }
 
-export function SceneChatComposer({ send }: { send: (input: ChatIn) => void }) {
+export function SceneChatComposer({ send, onEscape }: { send: (input: ChatIn) => void; onEscape?: () => void }) {
   const [value, setValue] = useState('')
   /** 欄位級：空的（不是 alert）。 */
   const [needInput, setNeedInput] = useState(false)
@@ -50,7 +50,15 @@ export function SceneChatComposer({ send }: { send: (input: ChatIn) => void }) {
     setFailures(0)
   }
   const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+    if (e.nativeEvent.isComposing) return
+    // Escape：離開輸入框（HUD 給的是「焦點回世界錨」）。不關 HUD、不清值、不導覽 —— 這裡就處理掉，不讓它往上冒到 Escape 層級。
+    if (e.key === 'Escape' && onEscape !== undefined) {
+      e.preventDefault()
+      e.stopPropagation()
+      onEscape()
+      return
+    }
+    if (e.key !== 'Enter' || e.shiftKey) return
     e.preventDefault()
     submit()
   }
