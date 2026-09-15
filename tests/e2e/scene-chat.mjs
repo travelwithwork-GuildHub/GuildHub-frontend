@@ -122,7 +122,8 @@ try {
     ]) {
       await page.setViewportSize(viewport)
       await page.waitForTimeout(300)
-      if (viewport.width === 1280) await approachDoor(page)
+      // 角色在 S02 往北走過了：沿用 S01 的校準（那時 z 還是出生點的），不重校（重校會把 z 定錯）
+      if (viewport.width === 1280) await approachDoor(page, { where })
       const prompt = await page.$('[data-testid="interaction-prompt"]')
       const hudBox = await (await page.$(HUD)).boundingBox()
       const promptBox = prompt === null ? null : await prompt.boundingBox()
@@ -173,9 +174,10 @@ try {
     if (Math.abs(topAfter - topBefore) <= 1 && jump !== null && !(await lastVisible())) ok(`[S12] 往上讀：位置不動（${topBefore}→${topAfter}）、出現回到最新的控制、最新的一則不在可見區`)
     else bad('[S12] 往上讀時被搶走位置或沒有控制', `scrollTop ${topBefore}→${topAfter} jump=${jump !== null} lastVisible=${await lastVisible()}`)
     // 控制不蓋住任何可見的列（它在列表下面自己的一列，不是浮在列表上）
-    const jumpBox = await jump?.boundingBox()
+    const jumpBox = jump === null ? null : await jump.boundingBox()
     // 只看**可見的**列（跟捲動容器的可見區有交集的）：被捲到下面、被 overflow 裁掉的列在 DOM 上還有 rect，但使用者看不到它們。
-    const covered = await page.$$eval(`${HUD} [data-testid="chat-row"]`, (rows, box) => {
+    // 控制沒出現（上一項已紅）就不量：把 null 丟進 `$$eval` 會在瀏覽器裡 TypeError、整支腳本當掉，後面的判準全部沒跑（審查抓到的）。
+    const covered = jumpBox === null ? null : await page.$$eval(`${HUD} [data-testid="chat-row"]`, (rows, box) => {
       const rect = (r) => ({ x: r.x, y: r.y, width: r.width, height: r.height })
       const inter = (a, b) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))
       const view = rect(document.querySelector('[data-testid="chat-scroll"]').getBoundingClientRect())
@@ -191,6 +193,7 @@ try {
         .filter((r) => inter(r, box) > 0).length
     }, jumpBox)
     if (covered === 0) ok('[S12] 回到最新的控制沒有蓋住任何一列')
+    else if (covered === null) bad('[S12] 沒有控制可量「蓋不蓋住列」')
     else bad('[S12] 控制蓋住了正在讀的列', `${covered} 列`)
     await page.screenshot({ path: path.join(OUT, 'hud-unseen.png') })
     await jump?.click()
