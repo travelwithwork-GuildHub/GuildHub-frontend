@@ -40,7 +40,8 @@ export function fakeRealtime(context, sockets, { refuse = () => false } = {}) {
   return context.routeWebSocket(/\/ws(\?|$)/, async (ws) => {
     const url = new URL(ws.url())
     const scene = url.searchParams.get('scene')
-    sockets.push({ scene, token: url.searchParams.get('token') })
+    // `ws`：之後要「伺服器主動送」的腳本（chat）從這裡拿；只讀 scene／token 的腳本不受影響。
+    sockets.push({ scene, token: url.searchParams.get('token'), ws })
     if (refuse(scene)) {
       await ws.close({ code: 1006, reason: 'refused' })
       return

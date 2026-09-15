@@ -50,7 +50,9 @@
 
 ## 6. 瀏覽器與收尾
 
-- [ ] 6.1 `tests/e2e/scene-chat.mjs`（`next start`；`tests/e2e/lib/world.mjs` 的偽造與走位）：`S01`（出生點附近、沒按 E、沒有 dialog、訊息出現）、`S02`（真的按 W 位移、textarea 裡打 w 不動、Escape 回錨、再按 W 會動）、`S15`（30 則多行訊息、兩個 viewport、chat 區與提示的 rect 交集 0）、`S08`（走到門前按 E 進房、hello 後只剩房間的）、`S09`（`refuse` 房間握手 → 大廳的話還在）、`S10`（reload、只回 hello＋snapshot、空狀態）＋同一段標 `[FE-R11-S05]` 並照它原文驗請求 allowlist（`/api/me`、`/api/rooms`、`/api/profiles/*`、靜態資源、`/ws`）—— **若 `/world` 載入必然打別的端點，先開 `spec/fe-r11-realtime-chat` PR 修 allowlist，不在這裡放寬**、`S11`／`S12`
+- [ ] 6.1（S11／S12 在 `--scroll` 之後補）`tests/e2e/scene-chat.mjs`（`next start`；`tests/e2e/lib/world.mjs` 的偽造與走位）：`S01`（出生點附近、沒按 E、沒有 dialog、訊息出現）、`S02`（真的按 W 位移、textarea 裡打 w 不動、Escape 回錨、再按 W 會動）、`S15`（30 則多行訊息、兩個 viewport、chat 區與提示的 rect 交集 0）、`S08`（走到門前按 E 進房、hello 後只剩房間的）、`S09`（`refuse` 房間握手 → 大廳的話還在）、`S10`（reload、只回 hello＋snapshot、空狀態）＋同一段標 `[FE-R11-S05]` 並照它原文驗請求 allowlist（`/api/me`、`/api/rooms`、`/api/profiles/*`、靜態資源、`/ws`）—— **若 `/world` 載入必然打別的端點，先開 `spec/fe-r11-realtime-chat` PR 修 allowlist，不在這裡放寬**、`S11`／`S12`
+  - 2026-09-15（`--world`）：S01／S02／S15（1280×720 與 1024×640 都不相交：chat 區 320×288／307×256）／S08／S09／S10＋`[FE-R11-S05]`（38 個請求都在 allowlist 內；`/world` 載入只打 `/api/me`、`/api/rooms`）對 `next start` 全部符合。
+    `lib/world.mjs` 的 socket 紀錄多帶 `ws`（伺服器主動送 chat 用）。S11／S12 在 `--scroll` 補。
 - [ ] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
 - [ ] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 的結果如實記在這裡；`FE-R11` 的 5.1 在 S10 綠了之後才勾
 - [ ] 6.4 封存（`archive/fe-k04-scene-chat-ui`；勾勾先用 `feat/fe-k04-scene-chat-ui--tasks` 進 main）
