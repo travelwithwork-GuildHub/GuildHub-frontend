@@ -161,6 +161,20 @@ describe('committed 的場景換了才清', () => {
     expect(w.bodies()).toEqual(['房間的話'])
   })
 
+  it('[FE-R11-S06] 房間的 hello 與第一則 chat 在同一個 task 裡到（React 還沒 render 成 committed）：那一則是房間的，不得被清掉', async () => {
+    // 真的 WebSocket：hello 之後的下一則 message 是另一個 task，React 排程的 render 不保證排在它前面 —— 清空不能只靠 effect 的時機。
+    const w = await inHall()
+    await act(async () => w.last().chat('大廳的話'))
+    const room = await enterRoom(w)
+    await act(async () => {
+      room.ready()
+      room.chat('房間第一句')
+    })
+    await flush()
+    expect(w.probe().scene.transition).toBeNull()
+    expect(w.bodies(), '大廳的清掉、房間的留下').toEqual(['房間第一句'])
+  })
+
   it('[FE-R11-S07] 進房握手被拒、自動回大廳、新的大廳連線 ready：訊息還在；新連線的 chat 進得來 → 兩則', async () => {
     const w = await inHall()
     await act(async () => w.last().chat('大廳的話'))
@@ -182,14 +196,32 @@ describe('committed 的場景換了才清', () => {
 })
 
 describe('不是目前連線的訊息不收', () => {
-  it('[FE-R11-S08] 保存舊連線的 receive，attach 了新連線之後直接呼叫它：記憶體不變', () => {
+  it('[FE-R11-S08] 保存大廳那條 socket 的 message listener（就是 RemoteWorld 給 client 的 onMessage 那條路），committed 到房間後直接呼叫它：房間的記憶體不變；目前連線的照收（對照）', async () => {
+    const w = await inHall()
+    const lobby = w.last()
+    // 舊連線的 callback 引用：不是透過已關閉的假 socket 發事件，是直接叫它。
+    const oldListeners = [...(lobby.listeners.get('message') ?? [])]
+    expect(oldListeners.length).toBeGreaterThan(0)
+    const room = await enterRoom(w)
+    await act(async () => room.ready())
+    await flush()
+    expect(w.bodies()).toEqual([])
+    await act(async () => {
+      for (const l of oldListeners) l({ data: JSON.stringify({ t: 'chat', id: 'u1', name: '甲', body: '舊大廳的話' }) })
+    })
+    expect(w.bodies(), '舊連線晚到的訊息不得進房間').toEqual([])
+    await act(async () => room.chat('房間的話'))
+    expect(w.bodies()).toEqual(['房間的話'])
+  })
+
+  it('[FE-R11-S08] store 層：保存舊連線的 receive，attach 了新連線之後直接呼叫它：記憶體不變', () => {
     const store = createSceneChatStore()
-    const oldLink = store.port.attach(() => {})
+    const oldLink = store.port.attach(() => {}, 'lobby')
     const message: ChatOut = { t: 'chat', id: 'u1', name: '甲', body: '舊大廳的話' }
     oldLink.receive({ ...message, body: '還是舊連線時' })
     expect(store.getLog().map((r) => r.body)).toEqual(['還是舊連線時'])
     store.clear()
-    const newLink = store.port.attach(() => {})
+    const newLink = store.port.attach(() => {}, 'lobby')
     oldLink.receive(message)
     expect(store.getLog(), '舊連線晚到的訊息不得進來').toEqual([])
     newLink.receive({ ...message, body: '新連線的話' })
