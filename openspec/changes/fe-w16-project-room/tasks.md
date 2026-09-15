@@ -6,7 +6,8 @@
 ## 1. 規格
 
 - [ ] 1.1 規格已在 PR 上談定（`spec/fe-w16-project-room`；兩位外部審查）
-- [ ] 1.2 動 tsx／視覺之前先過 `ui-ux-pro-max`（`--domain` 3D 場景構圖與地毯色；輸出不進版控）
+- [ ] 1.2（流程，不對應 Requirement）動 tsx／視覺之前先過 `ui-ux-pro-max`（`--domain` 3D 場景構圖與地毯色；輸出不進版控）
+- [ ] 1.3（流程，不對應 Requirement）ADR：錨點的 render loop → DOM 邊界、八格固定容量歸 J13（design D5 補記）
 
 ## 2. 配置：出口、工位模板、判準（PR：`--layout`；產品碼 ≤180、測試 ≤250）
 
@@ -18,11 +19,11 @@
 
 - [ ] 3.1 先寫 jsdom：`[FE-W16-S04]`（8 桌 8 椅各一渲染物件與碰撞盒、刪一張兩邊同時消失）、`[FE-W16-S07]`（真實目標選擇路徑；註冊表沒有桌椅；E 沒有請求）、`[FE-W16-S06]`（room 8 個錨點、hall 0 個）
 - [ ] 3.2 `SeatAnchorProjector`（照 `DoorLabelProjector`／`labelProjection.ts`；`aria-hidden`、`data-seat-index`、無內容）掛進 `SceneObjects` 的 `room` 分支；錨點 DOM 在 Canvas 外
-- [ ] 3.3 突變：桌子註冊 `Interactable` → S07 紅；不掛投影器 → S06 紅；JSX 另畫一張桌 → S04 紅
+- [ ] 3.3 突變：桌子註冊 `Interactable` → S07 紅；錨點在 hall 也掛、座標 NaN → S06 紅；JSX 另畫一張桌 → S04 紅（不掛投影器是 S08 的事，e2e 那片再拔）
 
 ## 4. 瀏覽器與收尾
 
-- [ ] 4.1 `tests/e2e/project-room.mjs`：`[FE-W16-S08]`（`next start`；viewport 1280×720、DPR 1；進房前取 Canvas handle；有票的深連結進房；八個錨點在 Canvas 內、相對位置 ≤ 2 px；錨點與地板的像素取樣不同；遠端玩家在 seat 0 旁；錨點里程計往北前進（≤ 1 px 回抖）；朝 seat 1 走先接近再 plateau 5 步；繞回通道到 seat 2 ± 3 px；Canvas 同一 handle；只設步數上限）；里程計函式抽到 `tests/e2e/lib/` 與 `scene-switch.mjs` 共用
+- [ ] 4.1 `tests/e2e/project-room.mjs`：`[FE-W16-S08]`（`next start`；viewport 1280×720、DPR 1；進房前取 Canvas handle；有票的深連結進房；近端錨點在 Canvas 內、畫面內的錨點相對位置 ≤ 2 px；桌面方塊像素 ≥ 60% 與地板色距 > 40；遠端玩家在 seat 0 旁；錨點里程計往北前進（≤ 1 px 回抖）、通道中點八個錨點都在；朝 seat 1 走先連續 3 步 ≥ 2 px 再 plateau 5 步；繞回通道到 seat 2 ± 3 px；Canvas 同一 handle；只設步數上限）；突變：拿掉桌面 mesh → 像素那段紅；不掛投影器 → 里程計那段紅；里程計函式抽到 `tests/e2e/lib/` 與 `scene-switch.mjs` 共用
 - [ ] 4.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
 - [ ] 4.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 對正式建置跑 3 次的結果如實記在這裡
 - [ ] 4.4 Google Sheet：`FE-W16` → On-going／Done 各一次
