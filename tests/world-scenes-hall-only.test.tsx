@@ -208,7 +208,7 @@ describe('useRooms 的 enabled 來回切', () => {
       await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 2 + 10)
     })
     expect(listRooms.mock.calls.length, '停用後還在輪詢').toBe(before)
-    expect(hook.result.current).toEqual({ status: 'loading', doors: [], hidden: 0 })
+    expect(hook.result.current).toEqual({ status: 'loading', doors: [], hidden: 0, all: [] })
 
     listRooms.mockReturnValue(new Promise(() => {})) // 這次永遠不回 —— 看回應到之前交出什麼
     hook.rerender({ enabled: true })

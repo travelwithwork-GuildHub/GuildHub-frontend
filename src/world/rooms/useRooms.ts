@@ -37,6 +37,11 @@ export type RoomsStatus =
 
 export interface RoomsView extends RoomDoors {
   readonly status: RoomsStatus
+  /**
+   * 清單**全部**的房間（去重、未截斷）。走廊只畫 `doors`；要「依 `projectId` 查標題」的地方（`FE-N08-S11` 重開視窗補房名）
+   * 用這一份 —— 排不進走廊的房間也在大廳清單裡（審查抓到：用 `doors` 查，冷門房間永遠補不上房名）。
+   */
+  readonly all: readonly RoomDoorOut[]
 }
 
 const EMPTY: readonly RoomDoorOut[] = []
@@ -137,8 +142,8 @@ export function useRooms(capacity: number, enabled = true): RoomsView {
 
   // 停用時交出空的 `loading`：是**推導**不是 setState —— 狀態留著，下次啟用先有東西可畫。
   if (!enabled) return DISABLED
-  const { doors, hidden } = doorsFor(rooms, capacity)
-  return { status, doors, hidden }
+  const { doors, hidden, all } = doorsFor(rooms, capacity)
+  return { status, doors, hidden, all }
 }
 
-const DISABLED: RoomsView = { status: 'loading', doors: EMPTY, hidden: 0 }
+const DISABLED: RoomsView = { status: 'loading', doors: EMPTY, hidden: 0, all: EMPTY }

@@ -8,7 +8,7 @@
 //    「一個身分一條連線」靠分頁資格（`multi-tab`），不靠票不共享。
 // ⚠️ **不解析票的內容**：那是後端的格式，只在它的 process 裡有意義。過期與否由握手告訴我們。
 //
-// 誰寫進去：`FE-N08` 的 `enter` 成功時。今天只有測試會寫。
+// 誰寫進去：`FE-N08` 的 `enter` 成功時（`RoomPasswordDialog`）。誰丟：使用者按「重新輸入密碼」（`SceneNotices`）—— 系統自己不丟。
 
 const PREFIX = 'guildhub.roomToken.'
 
@@ -34,6 +34,14 @@ export function heldRoomToken(profileId: string, projectId: string): string | nu
   return withStorage(null, (storage) => storage.getItem(keyOf(profileId, projectId)))
 }
 
-export function dropRoomToken(profileId: string, projectId: string): void {
-  withStorage(undefined, (storage) => storage.removeItem(keyOf(profileId, projectId)))
+/** 丟票的結果（`FE-N08-S11`）：「還在」與「無法確認」都不能當成「不在了」—— 那會一邊開視窗一邊留著一張會被拿去撞握手的舊票。 */
+export type DropResult = 'dropped' | 'held' | 'unknown'
+
+export function dropRoomToken(profileId: string, projectId: string): DropResult {
+  const key = keyOf(profileId, projectId)
+  return withStorage<DropResult>('unknown', (storage) => {
+    storage.removeItem(key)
+    // `removeItem` 靜默沒刪（配額／私隱模式的怪行為）→ 讀回來確認；讀回也拋 → 無法確認。
+    return storage.getItem(key) === null ? 'dropped' : 'held'
+  })
 }

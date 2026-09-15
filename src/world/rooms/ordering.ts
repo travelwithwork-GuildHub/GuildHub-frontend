@@ -11,6 +11,8 @@ export interface RoomDoors {
   readonly doors: readonly RoomDoorOut[]
   /** 排不下的數量。**要說出來**（規格 `FE-W12-S05`：不得靜默截斷）。 */
   readonly hidden: number
+  /** 去重後的全部（含排不下的），**已排序**。查標題用它，不用 `doors`。 */
+  readonly all: readonly RoomDoorOut[]
 }
 
 /**
@@ -38,6 +40,7 @@ export function doorsFor(rooms: readonly RoomDoorOut[], capacity: number): RoomD
   return {
     doors: sorted.slice(0, Math.max(0, capacity)),
     hidden: Math.max(0, unique.length - Math.max(0, capacity)),
+    all: sorted,
   }
 }
 

@@ -82,6 +82,7 @@ describe('B：背景輪詢不得反覆打擾螢幕閱讀器', () => {
     status: 'ready',
     doors: [A],
     hidden: 0,
+    all: [A],
     ...over,
   })
 

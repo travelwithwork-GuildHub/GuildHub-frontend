@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { z } from 'zod'
+import type { RoomDoorOut } from '@/api/contract/rest'
 import { enterProject } from '@/api/operations'
 import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
 import { layer } from '@/design/layers'
@@ -61,15 +62,20 @@ function describeEntryError(cause: unknown): string | null {
   return null
 }
 
-export function RoomPasswordDialog() {
+/**
+ * @param rooms 大廳的房間清單（`useRooms().all` —— **不是** `doors`，那份被走廊容量截斷過，冷門房間不在裡面）：視窗名稱的第二個來源（`S11`）——
+ *   深連結失敗後重開沒有 `title`，清單裡找得到就用；清單晚點回來也更新（同一個視窗、不重掛：`title` 是 prop，不是 key）。
+ */
+export function RoomPasswordDialog({ rooms = [] }: { rooms?: readonly RoomDoorOut[] }) {
   const gate = useRoomEntryGateIfProvided()
   if (gate === null || gate.request === null) return null
   const { request, close } = gate
+  const title = request.title ?? rooms.find((r) => r.project_id === request.projectId)?.title ?? null
   // `key`：換一間房就是另一個表單（欄位重來、焦點重新落在密碼欄）；同一間房再叫一次不換 key、不重掛（`S01`）。
-  return <OpenDialog key={request.projectId} request={request} onClose={close} />
+  return <OpenDialog key={request.projectId} request={request} title={title} onClose={close} />
 }
 
-function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: () => void }) {
+function OpenDialog({ request, title, onClose }: { request: RoomEntryRequest; title: string | null; onClose: () => void }) {
   const { holdInputLock } = useInteraction()
   const { enterRoom } = useScene()
   const identity = useIdentity()
@@ -124,7 +130,7 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
       if (token === '' || me === null) throw new TicketNotHeldError()
       holdRoomToken(me, request.projectId, token)
       if (heldRoomToken(me, request.projectId) !== token) throw new TicketNotHeldError()
-      enterRoom(request.projectId, request.title === null ? {} : { title: request.title })
+      enterRoom(request.projectId, title === null ? {} : { title })
       closeDialog()
     },
   })
@@ -166,7 +172,7 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
       className="bg-surface-raised border-control-edge text-ink absolute top-1/2 left-1/2 flex w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-gutter rounded border p-gutter"
     >
       <h2 id={titleId} className="text-title">
-        {ROOM_ENTRY_LABELS.title(request.title)}
+        {ROOM_ENTRY_LABELS.title(title)}
       </h2>
       <p id={descriptionId}>{ROOM_ENTRY_LABELS.description}</p>
       <form className={FORM} onSubmit={onSubmit} noValidate>

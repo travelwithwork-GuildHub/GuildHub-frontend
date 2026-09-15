@@ -16,6 +16,7 @@ const view = (over: Partial<RoomsView>): RoomsView => ({
   status: 'ready',
   doors: [ROOM],
   hidden: 0,
+  all: [ROOM],
   ...over,
 })
 
