@@ -324,8 +324,9 @@ try {
     since = await overlaysSeen(page)
     await pressE(page)
     await waitForTransition(page, '同票再試', since, 'S11')
-    const second = sockets.at(-1)
-    if (sockets.filter((s) => s.scene === `room:${ROOM}`).length === 2 && second?.token === TOKEN && enter.calls.length === 0) ok('[S11] 不按：同一張票再試、沒有 /enter')
+    // 被拒之後客戶端自動回大廳（又一條 lobby socket），所以看的是**最後一條房間的** socket。
+    const roomSockets = sockets.filter((s) => s.scene === `room:${ROOM}`)
+    if (roomSockets.length === 2 && roomSockets.at(-1)?.token === TOKEN && enter.calls.length === 0) ok('[S11] 不按：同一張票再試、沒有 /enter')
     else bad('[S11] 不按的重試不對', `sockets=${JSON.stringify(sockets)} enter=${enter.calls.length}`)
     await page.waitForSelector(NOTICE, { timeout: 5_000 }).catch(() => null)
     // 按：丟票、關通知、開含房名的空視窗
