@@ -88,7 +88,7 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
       <form className={FORM} onSubmit={(e) => e.preventDefault()} noValidate>
         <label className={FIELD_LABEL}>
           {ROOM_ENTRY_LABELS.password}
-          <input ref={field} type="password" autoComplete="current-password" className={FIELD} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input ref={field} name="password" type="password" autoComplete="current-password" className={FIELD} value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
         <div className="flex gap-gutter">
           <button type="submit" className={PRIMARY}>
