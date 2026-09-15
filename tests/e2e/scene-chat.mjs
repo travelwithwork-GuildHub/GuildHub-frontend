@@ -187,7 +187,9 @@ try {
     const allowed = (u) => {
       const url = new URL(u)
       const p = url.pathname
-      return p === '/api/me' || p === '/api/rooms' || p.startsWith('/api/profiles/') || p === '/api/profiles' || p === '/ws' || p.startsWith('/_next/') || p === '/world' || p === '/favicon.ico' || url.protocol === 'data:' || url.protocol === 'ws:' || url.protocol === 'wss:'
+      // 照 R11 原文：`/api/me`、`/api/rooms`、`/api/profiles/*`、Next 的靜態資源、`/ws`；再加這個 document 自己（`/world`）與 favicon。
+      // 不放行整個 ws:／wss: 協定（那會讓 `/ws` 形同虛設）、不放行 `/api/profiles` 根路徑（審查抓到）。
+      return p === '/api/me' || p === '/api/rooms' || p.startsWith('/api/profiles/') || p === '/ws' || p.startsWith('/_next/') || p === '/world' || p === '/favicon.ico' || url.protocol === 'data:'
     }
     const outside = [...new Set(requests.filter((u) => !allowed(u)))]
     if (outside.length === 0) ok(`[FE-R11-S05] 整段期間 ${requests.length} 個請求都在 allowlist 內`)
