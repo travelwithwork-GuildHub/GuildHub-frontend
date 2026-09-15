@@ -145,6 +145,44 @@ describe('互動目標接上 render loop', () => {
     expect(seen.at(-1), '物件卸載之後還是目標').toBeNull()
   }, 60_000)
 
+  it('[FE-W06-S15] 整棵子樹（物件＋SpatialInteraction）一起卸載再掛：目標要被清掉，新實例第一幀沒目標也不能留著舊的', async () => {
+    // `WorldCanvas` 換場景就是這個形狀：`key` 讓物件與 `SpatialInteraction` 同時卸載，接著掛一棵新的（房間裡沒有門）。
+    const poseRef = pose(0, 1)
+    const seen: Array<string | null> = []
+    const controlsRef: RefObject<{ remove?: () => void }> = { current: {} }
+
+    const renderer = await ReactThreeTestRenderer.create(
+      <InteractionProvider>
+        <Removable controlsRef={controlsRef}>
+          <SpatialInteraction poseRef={poseRef} />
+          <Interactable id="door" x={0} z={0} label="星際導航" />
+        </Removable>
+        <Spy onValue={(id) => seen.push(id)} />
+      </InteractionProvider>,
+    )
+    await ReactThreeTestRenderer.act(async () => {
+      await renderer.advanceFrames(2, 1 / 60)
+    })
+    expect(seen.at(-1)).toBe('door')
+
+    await ReactThreeTestRenderer.act(async () => {
+      controlsRef.current.remove?.()
+    })
+    expect(seen.at(-1), '整棵子樹卸載之後提示還指著門').toBeNull()
+
+    // 新的一棵：沒有任何物件。第一幀「沒有目標」跟上一幀（新實例的初始值）一樣 —— 靠的是卸載時清掉，不是這一幀通知。
+    await ReactThreeTestRenderer.act(async () => {
+      await renderer.update(
+        <InteractionProvider>
+          <SpatialInteraction poseRef={poseRef} />
+          <Spy onValue={(id) => seen.push(id)} />
+        </InteractionProvider>,
+      )
+      await renderer.advanceFrames(2, 1 / 60)
+    })
+    expect(seen.at(-1), '換了一棵沒有物件的子樹，舊的目標還在').toBeNull()
+  }, 60_000)
+
   it('[FE-W06-S10] 按 E 只觸發目前的目標', async () => {
     const poseRef = pose(0, -0.9, FACING.down)
     const near = vi.fn()
