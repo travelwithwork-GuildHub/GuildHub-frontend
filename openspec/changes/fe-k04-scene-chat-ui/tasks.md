@@ -21,9 +21,16 @@
 
 ## 3. 輸入與送出（PR：`--composer`；產品碼 ≤200、測試 ≤250）
 
-- [ ] 3.1 先寫 jsdom：`[FE-K04-S05]`（空與全空白不送、辨識要輸入、原字串含首尾空白）、`[FE-K04-S06]`（兩種 cause 各一：拋 → 保留、恰好一個 alert 在送出控制之前且取得焦點、不含例外訊息、跑完計時器沒重送；接受 → `send` 一次、清空、alert 消失、回聲前列表沒有；回聲後恰好一列）、`[FE-K04-S07]`（沒 `maxlength`、2001 code point 完整送）、`[FE-K04-S14]`（Enter 送、控制送、Shift+Enter 換行不送、含換行的 body 原樣）
-- [ ] 3.2 `src/chat/SceneChatComposer.tsx`：`textarea`（Enter 送、Shift+Enter 換行）＋送出控制；`trim()` 空就不送；`send` 沒拋才清空；拋 → 保留、`SubmitError` 風格的 alert（文案在元件常數；不含例外訊息）；不自動重送；不用 `useForm` 的 schema 驗證（沒有規則可驗），但 alert 的位置與焦點照 `form-conventions`
-- [ ] 3.3 突變：送出前 trim → S05 紅；不擋全空白 → S05 紅；拋錯後仍清空 → S06 紅；吞掉例外、或只接 `RealtimeError` → S06 紅；alert 印例外訊息 → S06 紅；送出時本地 append → S06 紅；加 `maxLength={2000}` → S07 紅；Enter 不送或 Shift+Enter 也送 → S14 紅
+- [x] 3.1 先寫 jsdom：`[FE-K04-S05]`（空與全空白不送、辨識要輸入、原字串含首尾空白）、`[FE-K04-S06]`（兩種 cause 各一：拋 → 保留、恰好一個 alert 在送出控制之前且取得焦點、不含例外訊息、跑完計時器沒重送；接受 → `send` 一次、清空、alert 消失、回聲前列表沒有；回聲後恰好一列）、`[FE-K04-S07]`（沒 `maxlength`、2001 code point 完整送）、`[FE-K04-S14]`（Enter 送、控制送、Shift+Enter 換行不送、含換行的 body 原樣）
+- [x] 3.2 `src/chat/SceneChatComposer.tsx`：`textarea`（Enter 送、Shift+Enter 換行）＋送出控制；`trim()` 空就不送；`send` 沒拋才清空；拋 → 保留、`SubmitError` 風格的 alert（文案在元件常數；不含例外訊息）；不自動重送；不用 `useForm` 的 schema 驗證（沒有規則可驗），但 alert 的位置與焦點照 `form-conventions`
+  - 2026-09-15：判準先 commit（紅：元件不存在）再實作。`send` 注入；直接用 `SubmitError`；Enter 看 `nativeEvent.isComposing`（IME 組字中的 Enter 不送）；Shift+Enter 不 preventDefault（瀏覽器自己插換行）。
+    `ui-ux-pro-max`（`--domain ux`：可見 label、不用 placeholder 當 label）。Escape 回錨在 `--world`。
+    審查退回：空輸入改成**欄位級**提示（`aria-invalid`＋`aria-describedby` 掛在欄位下、不是 alert、不搶焦點 —— chat 是高頻操作，空的 Enter 不該把人拉走）；
+    `SubmitError` 只給 transport 失敗；兩種提示在 `onChange` 時清掉；alert 要有字；IME 組字中的 Enter 不送有判準。
+    第 3 輪（codex）：同一內容連續失敗兩次，第二次 alert 也要取焦點 —— `SubmitError` 只在 message 變時聚焦，改用失敗次數當 `key` 重掛；拿掉 key 就紅。
+- [x] 3.3 突變：送出前 trim → S05 紅；不擋全空白 → S05 紅；拋錯後仍清空 → S06 紅；吞掉例外、或只接 `RealtimeError` → S06 紅；alert 印例外訊息 → S06 紅；送出時本地 append → S06 紅；加 `maxLength={2000}` → S07 紅；Enter 不送或 Shift+Enter 也送 → S14 紅
+  - 2026-09-15 結果（`tests/scene-chat-composer.test.tsx`，5 條）：十三種全紅（「本地 append」第一版突變不真實 —— 加的 li 沒有 `chat-row` 標記；改成元件自己畫一列 pending 才紅；
+    第 2 輪加：空的當 alert、打字不清提示、組字中 Enter 也送）。執行紀錄貼在 PR 留言。
 
 ## 4. 世界整合（PR：`--world`；產品碼 ≤150、測試 ≤200）
 
