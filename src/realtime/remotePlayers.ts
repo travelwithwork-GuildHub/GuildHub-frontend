@@ -47,10 +47,34 @@ export interface RemotePlayersState {
   roster: ReadonlyMap<string, RemoteIdentity>
   /** 動態。**同一個 Map 被就地改寫，不會被換掉。** */
   motion: Map<string, RemoteMotion>
+  /** 這條連線的初始 snapshot 到了沒（`FE-R10` D2）。沒到之前人數是「還不知道」，不是 0。 */
+  ready: boolean
 }
 
 export function createRemotePlayersState(): RemotePlayersState {
-  return { roster: new Map(), motion: new Map() }
+  return { roster: new Map(), motion: new Map(), ready: false }
+}
+
+/**
+ * 目前 scene 的在線人數（`FE-R10`，design D2）。**初始 snapshot 到達之前是 `null`，不是 0** ——
+ * 0 會被讀成「真的沒有人」，而那時只是還不知道。
+ *
+ * ⚠️ **不是累加器，是推導。** 權威名單排除自己（`FE-R05`），snapshot 依協定包含自己，
+ * 所以人數是 `roster.size + 1`。重複 join、未知 leave 都已經由名單本身去重 ——
+ * 另開一個計數器的話，每一種都要各校正一次，最後就是一份會跟名單漂移的真相。
+ */
+export function onlineCountOf(state: RemotePlayersState): number | null {
+  return state.ready ? state.roster.size + 1 : null
+}
+
+/**
+ * 換連線或卸載時把**所有**低頻與高頻狀態清回初始值（`FE-R10-S09` 的資料那一半）。
+ * 留著 `ready` 的話，新連線的 snapshot 到達之前會顯示上一條連線的人數。
+ */
+export function resetRemotePlayers(state: RemotePlayersState): void {
+  state.motion.clear()
+  state.roster = new Map()
+  state.ready = false
 }
 
 function identityOf(p: Player): RemoteIdentity {
@@ -123,6 +147,8 @@ export function applyMessage(
         state.motion.set(p.id, seedTrack(undefined, p, now))
       }
       state.roster = roster
+      // 這條連線有了權威基準線 —— 人數從這一刻起才有意義（`FE-R10` D2）。
+      state.ready = true
       return true
     }
 
@@ -144,12 +170,26 @@ export function applyMessage(
         state.motion.set(p.id, seedTrack(state.motion.get(p.id), p, now))
       }
 
-      // **名單只在真的多了人時才換掉。** 重複的 `join` 不該讓 React 重繪 ——
-      // 換一個新的 Map 就是換身分，而身分改變就是重繪。
-      const fresh = joining.filter((p) => !state.roster.has(p.id))
-      if (fresh.length > 0) {
-        const roster = new Map(state.roster)
-        for (const p of fresh) roster.set(p.id, identityOf(p))
+      // **名單只在看得見的內容真的變了時才換掉。** 換一個新的 Map 就是換身分，而身分改變就是重繪。
+      //
+      // 兩種會變的情況：
+      //   新的人                            → 加一筆
+      //   已在名單、但 join 帶來不同的 `st` → 只刷新 `st`（`FE-R10-S11`）
+      // 後者是真的會發生的：後端 `presence.join()` 對同一個 `user_id` 重建 `Player`，`st` 回到空字串，
+      // 並把這則 join 廣播給其他人。不刷新的話，第三方會一直看到後端早就沒有的舊狀態。
+      // ⚠️ **只刷新 `st`**：`name`／`av` 在重複 join 時要不要跟著換，規格沒有寫到，維持原本的行為。
+      let roster: Map<string, RemoteIdentity> | null = null
+      for (const p of joining) {
+        const current = (roster ?? state.roster).get(p.id)
+        if (current === undefined) {
+          roster ??= new Map(state.roster)
+          roster.set(p.id, identityOf(p))
+        } else if (current.st !== p.st) {
+          roster ??= new Map(state.roster)
+          roster.set(p.id, { ...current, st: p.st })
+        }
+      }
+      if (roster !== null) {
         state.roster = roster
         changed = true
       }

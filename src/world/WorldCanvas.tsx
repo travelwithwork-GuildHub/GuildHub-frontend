@@ -35,6 +35,7 @@ import { SceneChatHud } from '@/chat/SceneChatHud'
 import { RoomPasswordDialog } from './scenes/RoomPasswordDialog'
 import { useScene } from './scenes/SceneProvider'
 import { SceneTransitionOverlay } from './scenes/SceneTransitionOverlay'
+import { OnlineCount } from './OnlineCount'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -103,6 +104,11 @@ export default function WorldCanvas() {
   // 換場景的閘門（`FE-V01-S18`）：舊子樹的 `RemoteWorld` 卸載時放進「舊 socket 關乾淨了」的 promise，
   // 新子樹的等它再連。**跨兩次掛載**，所以住在 Canvas 外面這一層。
   const closeGate = useRef<Promise<void> | null>(null)
+  // 目前 scene 的在線人數（`FE-R10`，design D4）。**`null` ＝ 還沒有初始 snapshot**，不是 0。
+  // 算的是 Canvas 裡的 `RemoteWorld`，顯示在 Canvas 外面（DOM）—— 所以狀態住在這一層。
+  // ⚠️ 傳給 `RemoteWorld` 的是 `setOnlineCount` 本身：React 保證 setter 身分穩定，
+  // 它在那個 effect 的依賴裡。包一層 inline 箭頭函式的話，每次人數變動都會重連。
+  const [onlineCount, setOnlineCount] = useState<number | null>(null)
 
   // 現在在哪個場景（`FE-V01`）。渲染的配置、出生點、只屬於大廳的東西都從註冊表推導 —— 不各自 `if`。
   const scene = useSceneRef()
@@ -183,6 +189,7 @@ export default function WorldCanvas() {
                 closeGateRef={closeGate}
                 onConnection={reportConnection}
                 chat={chat}
+                onOnlineCountChange={setOnlineCount}
               />
               {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
                   提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
@@ -206,6 +213,8 @@ export default function WorldCanvas() {
           <SceneTransitionOverlay />
           {/* 規格 FE-W06-S13：提示在 Canvas **外面** */}
           <InteractionPrompt />
+          {/* 目前 scene 的在線人數（`FE-R10-S07`～`S09`）。兩個場景都有；未就緒時不渲染。 */}
+          <OnlineCount count={onlineCount} />
           {/* 場景聊天（`FE-K04`）：非阻斷的 HUD，靠左下、不遮提示；只看不鎖，輸入框有焦點才鎖（`EditableFocusLock`）。沒 provider 就不畫。 */}
           <SceneChatHud />
           {/* 看板開出來的清單面板（`FE-B01`）。DOM，`layer('panel')`。 */}

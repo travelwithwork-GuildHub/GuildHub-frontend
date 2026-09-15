@@ -25,14 +25,28 @@
 - [x] 2.6 完成 leave／snapshot 的狀態清理，讓 `FE-R10-S05`／`S06` 通過，並確認其他玩家的 identity 與 motion 不受影響
       —— 狀態放在名單項目裡，leave 移除項目即清掉（design D1）。突變：snapshot 合併舊 st → S06 紅；
       leave 不移除名單項目 → S05 與 `FE-R07-S04` 紅；leave 連帶換掉其他人的身分物件 → S05 紅
-- [ ] 2.7 先為 `FE-R10-S11` 寫失敗測試，證明目前重複 join 會忽略已在名單的 id 的 payload；改為以新 `st` 更新該 id 的 identity，同時驗證不新增名單筆數、不改變在線人數，且其他玩家不受影響
+- [x] 2.7 先為 `FE-R10-S11` 寫失敗測試，證明目前重複 join 會忽略已在名單的 id 的 payload；改為以新 `st` 更新該 id 的 identity，同時驗證不新增名單筆數、不改變在線人數，且其他玩家不受影響
+      —— 實作前紅在「狀態真的變了 —— 呼叫端要重繪」（`st` 被忽略）。只刷新 `st`；`name`／`av` 規格沒寫，維持原行為。
+      突變：重複 join 忽略 st → S11 紅；內容相同也換 Map → S11 紅；
+      套用 #405 審查的突變類型：就地改舊物件不換 Map、換 Map 但沿用被改過的物件、刷新時丟掉 name／av、刷新時 trim → S11 紅。
+      「刷新時改用 join 帶來的 name」刻意不釘（規格只要求 `st`，測試讓 payload 的 name／av 與原本相同）
 
 ## 3. 目前 scene 的在線人數
 
-- [ ] 3.1 先為 `FE-R10-S07`／`S08` 寫失敗測試，證明初始人數包含自己，新 id 會增加、同一 id 的重複 join 不會增加，且只有有效 leave 會減少人數
-- [ ] 3.2 以 snapshot-ready 與遠端 roster 推導 distinct player id 數 `roster.size + 1`，讓 `FE-R10-S07`／`S08` 通過，不新增獨立累加器
-- [ ] 3.3 先為 `FE-R10-S09` 寫失敗測試，涵蓋卸載、換連線以及新 snapshot 到達前不顯示任何人數數字
-- [ ] 3.4 以穩定 callback 把低頻人數送到 Canvas 外的 DOM 顯示，讓 `FE-R10-S09` 通過，並驗證單純更新人數不會建立新的 WebSocket client generation
+- [x] 3.1 先為 `FE-R10-S07`／`S08` 寫失敗測試，證明初始人數包含自己，新 id 會增加、同一 id 的重複 join 不會增加，且只有有效 leave 會減少人數
+      —— `tests/online-count.test.tsx` 掛整個 `WorldCanvas`，`RemoteWorld → RealtimeClient → WebSocket` 是正式碼（只換全域 WebSocket）；
+      實作前三條都紅在「畫面上沒有人數」。推導另有資料層測試（不掛 Scenario ID：THEN 是「顯示的」人數）
+- [x] 3.2 以 snapshot-ready 與遠端 roster 推導 distinct player id 數 `roster.size + 1`，讓 `FE-R10-S07`／`S08` 通過，不新增獨立累加器
+      —— `onlineCountOf`／`resetRemotePlayers`。突變：少了 +1、未就緒回 0、snapshot 沒設 ready、join 也設 ready → 紅
+- [x] 3.3 先為 `FE-R10-S09` 寫失敗測試，涵蓋卸載、換連線以及新 snapshot 到達前不顯示任何人數數字
+      —— 換場景（`FE-V01` 的 key 重掛）→ 等舊 close（`FE-V01-S18`）→ hello → 早到的 join → snapshot，每一步斷言畫面上沒有任何「N 人在線」。
+      slice 2 審查後補：①「同一個元件換連線」路徑（`generation` 加一，state 沿用、不重掛）→ hello → 早到的 join，
+      突變「cleanup 不清 ready 但直接通知 null」只有這條會紅；②「沒有人數」改成人數元素不存在，且「在線」前後都沒有數字，
+      突變「null 時渲染『在線 0 人』」→ S07／S09 紅
+- [x] 3.4 以穩定 callback 把低頻人數送到 Canvas 外的 DOM 顯示，讓 `FE-R10-S09` 通過，並驗證單純更新人數不會建立新的 WebSocket client generation
+      —— `WorldCanvas` 直接傳 `useState` setter；`S08` 斷言整段只有一條 WebSocket。突變：inline 箭頭函式、cleanup 不通知、
+      cleanup 不重設 ready、名單變動不通知、不渲染、顯示遠端數、多算十個人 → 紅。畫面過 ui-ux-pro-max（ux／react），
+      截圖（dev server ＋ 偽造 REST／`/ws`）抓到文案在 800×600 被首次進入提示卡壓住 → 縮短並在窄於 md 時放左下角
 
 ## 4. 雙瀏覽器姓名驗收
 
