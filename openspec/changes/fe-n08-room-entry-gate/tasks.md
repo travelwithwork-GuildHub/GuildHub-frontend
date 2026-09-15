@@ -14,7 +14,7 @@
 - [x] 2.2 簽章函式抽成兩邊共用的模組（不 import `server-only`）、簽 `room:<uuid>|<profileId>`；`scripts/realtime-stub.ts` 改 import 它、握手改成**先解析 cookie 身分再驗票**，並把「`FE-W16` 把 enter 接上」的筆誤改成 `FE-N08`；既有用 `roomToken(scene)` 算票的測試跟著改
 - [x] 2.3 `src/app/api/projects/[project_id]/enter/route.ts`：走 `handle()` 管線（沒有 session、或名片查不到 → 401；後者是跟真後端的已知差異，`S16`）、查 `password_hash`（不看 status）→ 404、`verifyPassword` → 403、簽票（綁 projectId＋profileId）
 - [x] 2.4 突變：拿掉 `verifyPassword` → 403 那列紅；handler 不走 `handle()`、只 `sessionIdFrom` → S16 紅；替身換一把 secret → 握手那段紅；票不綁人 → 換 cookie 那段紅；handler 改回 `{ token }` → `EnterOut` 紅
-  - 2026-09-15 結果：`internal` 目標 52 passed／10 todo（enter 3 條、rooms S21／S22 都跑）；`guildhub` 目標（wrapper 自起真後端）49 passed／3 skipped（S21／S22／S23：真後端沒有 `/online`、不給 secret）。
+  - 2026-09-15 結果：`internal` 目標 51 passed／10 todo（enter 3 條、rooms S22 用 `enter` 拿票）；`guildhub` 目標（wrapper 自起真後端）49 passed／2 skipped（S22／S23：真後端沒有 `/online`）。rooms 裡「uuid 不合法但票算對」那條拿掉：契約檔不得引用 `src/server`（`FE-O05-S02`），而票的格式是簽發者的事（ADR 0008）；S21 的三種拒絕仍在 `lobby.contract.ts`。
     突變全紅：拿掉 `verifyPassword` → 403 兩列紅（含空字串密碼）；回 `{ token }` → `EnterOut` 四處紅；替身換 secret → 握手兩條紅；簽章去掉 `|<profileId>` → 「別人拿著這張票進了房」紅；
     `auth: 'none'` → S16 紅（403 而不是 401）；handler 加 `status = 'active'` → closed 那列紅；handler 看座位 → 滿座那列紅。
     ⚠️ 突變改了 `src/` 之後要**重新 `next build`** 才算數（契約測試打的是 `next start`）；第一輪沒重建，紅在錯的地方。
