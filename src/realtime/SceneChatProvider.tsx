@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useLayoutEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ChatIn } from '@/api/contract/ws'
-import type { ChatLog } from './sceneChat'
+import { EMPTY_CHAT, type ChatLog } from './sceneChat'
 import { createSceneChatStore, type SceneChatPort, type SceneChatStore } from './sceneChatStore'
 import { sceneOf } from '@/world/scenes/registry'
 import { useScene } from '@/world/scenes/SceneProvider'
@@ -39,6 +39,16 @@ export function useSceneChat(): { readonly log: ChatLog; readonly send: (input: 
   if (store === null) throw new Error('useSceneChat 必須在 <SceneChatProvider> 底下使用。')
   const log = useSyncExternalStore(store.subscribe, store.getLog, store.getLog)
   return { log, send: store.send }
+}
+
+const NO_STORE = { subscribe: () => () => {}, getLog: () => EMPTY_CHAT }
+
+/** `SceneChatHud` 用：沒有 provider（單獨掛 `WorldCanvas` 的測試、預覽）回 `null`、什麼都不畫；有的話跟 `useSceneChat()` 一樣訂閱 log。 */
+export function useSceneChatIfProvided(): { readonly log: ChatLog; readonly send: (input: ChatIn) => void } | null {
+  const store = useContext(Ctx)
+  const source = store ?? NO_STORE
+  const log = useSyncExternalStore(source.subscribe, source.getLog, source.getLog)
+  return store === null ? null : { log, send: store.send }
 }
 
 /** `WorldCanvas` 用：交給 `RemoteWorld` 的 port（穩定的物件；不訂閱 log）；沒有 provider 就是 `undefined`（沒有聊天）。 */
