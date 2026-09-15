@@ -174,9 +174,21 @@ try {
     else bad('[S12] 往上讀時被搶走位置或沒有控制', `scrollTop ${topBefore}→${topAfter} jump=${jump !== null} lastVisible=${await lastVisible()}`)
     // 控制不蓋住任何可見的列（它在列表下面自己的一列，不是浮在列表上）
     const jumpBox = await jump?.boundingBox()
+    // 只看**可見的**列（跟捲動容器的可見區有交集的）：被捲到下面、被 overflow 裁掉的列在 DOM 上還有 rect，但使用者看不到它們。
     const covered = await page.$$eval(`${HUD} [data-testid="chat-row"]`, (rows, box) => {
+      const rect = (r) => ({ x: r.x, y: r.y, width: r.width, height: r.height })
       const inter = (a, b) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))
-      return rows.map((r) => r.getBoundingClientRect()).filter((r) => inter({ x: r.x, y: r.y, width: r.width, height: r.height }, box) > 0).length
+      const view = rect(document.querySelector('[data-testid="chat-scroll"]').getBoundingClientRect())
+      // 列的 rect 先裁到捲動容器的可見區（被 overflow 切掉的部分使用者看不到，也不會被「蓋住」）
+      const clip = (r) => {
+        const x = Math.max(r.x, view.x)
+        const y = Math.max(r.y, view.y)
+        return { x, y, width: Math.max(0, Math.min(r.x + r.width, view.x + view.width) - x), height: Math.max(0, Math.min(r.y + r.height, view.y + view.height) - y) }
+      }
+      return rows
+        .map((r) => clip(rect(r.getBoundingClientRect())))
+        .filter((r) => r.width > 0 && r.height > 0)
+        .filter((r) => inter(r, box) > 0).length
     }, jumpBox)
     if (covered === 0) ok('[S12] 回到最新的控制沒有蓋住任何一列')
     else bad('[S12] 控制蓋住了正在讀的列', `${covered} 列`)
