@@ -9,6 +9,21 @@ import path from 'node:path'
 export const uuid = (n) => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`
 export const profile = (n, display_name) => ({ id: uuid(n), display_name, avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-14T00:00:00Z' })
 
+/**
+ * 只打本機。`FRONTEND` 不是 loopback 就不跑；context 裡任何一個請求打到別的主機都算紅 —— 「REST 全部偽造」是意圖，這個是機器上的保證。
+ */
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
+export function assertLoopback(frontend) {
+  const host = new URL(frontend).hostname
+  if (!LOOPBACK.has(host)) throw new Error(`FRONTEND 必須是本機（localhost／127.0.0.1／::1），不是 ${host} —— 這些腳本不打任何共用位址`)
+}
+export function guardLoopback(context) {
+  context.on('request', (request) => {
+    const host = new URL(request.url()).hostname
+    if (!LOOPBACK.has(host) && !request.url().startsWith('data:')) bad('打到了本機以外的位址', request.url())
+  })
+}
+
 let failures = 0
 export const ok = (l) => console.log(`✅ ${l}`)
 export const bad = (l, d = '') => {

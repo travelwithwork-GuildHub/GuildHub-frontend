@@ -13,20 +13,22 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
-import { bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, hold, ok, overlaysSeen, profile, promptText, traceUrls, uuid, waitForTransition, waitForWorld, walker, watchCanvas } from './lib/world.mjs'
+import { assertLoopback, bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, guardLoopback, hold, ok, overlaysSeen, profile, promptText, traceUrls, uuid, waitForTransition, waitForWorld, walker, watchCanvas } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-n08'
 const HEADED = process.env.HEADED === '1'
+assertLoopback(FRONTEND)
 
 const P = profile(31, '人才丙')
 const Q = profile(32, '人才丁')
 const ROOM = uuid(1)
 const ROOM_TITLE = '星際導航'
 const DECOY = uuid(2)
+const DECOY_TITLE = '深海探勘'
 const ROOMS = [
   { project_id: ROOM, title: ROOM_TITLE, online_count: 3 },
-  { project_id: DECOY, title: '深海探勘', online_count: 1 },
+  { project_id: DECOY, title: DECOY_TITLE, online_count: 1 },
 ]
 const TOKEN = 'e2e-ticket-N08-must-never-appear-in-url'
 /** 兩個一眼認得出來的密碼：W 會被拒、C 會成功。S05 要的是它們從不出現在網址與 storage 裡。 */
@@ -52,6 +54,32 @@ const NOTICE = '[role="alert"]:not(#__next-route-announcer__):not(#__next-route-
 const waitDialog = (page, state) => page.waitForSelector(DIALOG, { state, timeout: 5_000 }).then(() => true).catch(() => false)
 const waitSubmitError = (page) => page.waitForSelector(`${DIALOG} [data-testid="submit-error"]`, { timeout: 5_000 }).then(() => true).catch(() => false)
 const storageDump = (page) => page.evaluate(() => JSON.stringify({ s: { ...sessionStorage }, l: { ...localStorage } }))
+/**
+ * storage 的**完整寫入軌跡**（不是快照）：快照看不到「403 之後先寫進去、成功時再刪掉」。每個 document 一開始就把 `setItem`／`removeItem` 包起來，
+ * 每一次寫入的 key＋value 都記下來；判準是整條軌跡裡都沒有密碼。
+ */
+function traceStorage(context) {
+  return context.addInitScript(() => {
+    window.__guildhubStorageWrites = []
+    for (const method of ['setItem', 'removeItem']) {
+      const original = Storage.prototype[method]
+      Storage.prototype[method] = function (key, value) {
+        window.__guildhubStorageWrites.push(`${this === sessionStorage ? 'session' : 'local'}.${method}(${String(key)}=${value === undefined ? '' : String(value)})`)
+        return original.apply(this, arguments)
+      }
+    }
+  })
+}
+const storageWrites = (page) => page.evaluate(() => window.__guildhubStorageWrites ?? [])
+/** 從 R 的門前往南走到 DECOY 的門前（相隔一格）。 */
+async function walkToDecoy(page) {
+  for (let i = 0; i < 30; i++) {
+    const prompt = await promptText(page)
+    if (prompt !== null && prompt.includes(DECOY_TITLE)) return
+    await hold(page, 'KeyS', 120)
+  }
+  throw new Error('往南走了 30 步還沒到第二扇門前')
+}
 const heldToken = (page, key) => page.evaluate((k) => sessionStorage.getItem(k), key)
 
 /** `/enter` 的偽造：`enter.current(route, body)` 決定每一次的回應；每一次都記進 `enter.calls`。 */
@@ -95,7 +123,9 @@ try {
     const urls = []
     const me = { current: P }
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+    guardLoopback(context)
     await traceUrls(context, urls)
+    await traceStorage(context)
     await countOverlays(context)
     await fakeRealtime(context, sockets)
     const page = await context.newPage()
@@ -123,14 +153,26 @@ try {
     else bad('[S01] 密碼欄不對', `inCanvas=${inCanvas}`)
     if (enter.calls.length === 0 && sockets.length === 1) ok('[S01] 開視窗沒有請求、沒有新 socket')
     else bad('[S01] 開視窗就有請求或 socket', `enter=${enter.calls.length} sockets=${JSON.stringify(sockets)}`)
+    const modal = await page.$eval(DIALOG, (d) => d.getAttribute('aria-modal'))
+    if (modal === 'true') ok('[S01] aria-modal="true"')
+    else bad('[S01] 沒有 aria-modal', String(modal))
+    await expectUrl(page, '[S01] 開視窗網址不變', '/world')
+    const gateText = await page.$('[role="status"][aria-label*="還沒開放"]')
+    if (gateText === null) ok('[S01] 預設那句「還沒開放」的說明沒有出現（正式門禁接上了）')
+    else bad('[S01] 預設說明還在', (await gateText.textContent()) ?? '')
     await sameCanvas('S01', '開視窗之後')
     await page.screenshot({ path: path.join(OUT, 'dialog-open.png') })
 
     // S02
     await typePassword(page, 'abc')
+    const beforeEsc = { url: await page.evaluate(() => location.href), sockets: sockets.length, enter: enter.calls.length, overlays: await overlaysSeen(page) }
     await page.keyboard.press('Escape')
     if (await waitDialog(page, 'detached')) ok('[S02] Esc 關閉視窗')
     else bad('[S02] Esc 沒有關閉視窗')
+    await page.waitForTimeout(300)
+    const afterEsc = { url: await page.evaluate(() => location.href), sockets: sockets.length, enter: enter.calls.length, overlays: await overlaysSeen(page) }
+    if (JSON.stringify(beforeEsc) === JSON.stringify(afterEsc)) ok('[S02] 同一次 Esc 沒有觸發門、沒有導覽、沒有請求、沒有過場')
+    else bad('[S02] Esc 有副作用', `${JSON.stringify(beforeEsc)} → ${JSON.stringify(afterEsc)}`)
     let active = await activeDescriptor(page)
     if (active.includes('[anchor]')) ok(`[S02] 關閉後焦點在世界焦點錨（${active}）`)
     else bad('[S02] 關閉後焦點不在世界焦點錨', active)
@@ -163,7 +205,7 @@ try {
     await waitDialog(page, 'detached')
     await hold(page, 'KeyW', 300)
     const released = await where()
-    const movedAfter = Math.hypot(released.dx - before.dx, released.dz - before.dz)
+    const movedAfter = Math.hypot(released.dx - after.dx, released.dz - after.dz)
     if (movedAfter > 0.3) ok(`[S03] 關閉後按 W 會動（位移 ${movedAfter.toFixed(2)}）`)
     else bad('[S03] 關閉後按 W 不會動', `位移 ${movedAfter.toFixed(2)}`)
     await backToDoor(page)
@@ -186,6 +228,18 @@ try {
     else bad('[S08] 焦點不在 alert 上', active)
     if (sockets.length === 1 && (await heldToken(page, tokenKey(P.id))) === null) ok('[S08] 沒有新 socket、沒有存票')
     else bad('[S08] 403 之後有 socket 或票', JSON.stringify(sockets))
+    const writesAfter403 = (await storageWrites(page)).filter((w) => w.includes(WRONG))
+    if (writesAfter403.length === 0) ok('[S05] 403 之後 storage 的寫入軌跡沒有那個密碼')
+    else bad('[S05] 403 之後密碼被寫進 storage', writesAfter403.join('\n   '))
+    // 改一個字再送出：是人發起的第二個請求，帶改過的密碼
+    const callsBeforeEdit = enter.calls.length
+    await typePassword(page, `${WRONG}2`)
+    await clickSubmit(page)
+    await page.waitForTimeout(400)
+    if (enter.calls.length === callsBeforeEdit + 1 && enter.calls.at(-1)?.password === `${WRONG}2`) ok('[S08] 改一個字再送出：第二個請求、帶改過的密碼')
+    else bad('[S08] 改一個字再送出不對', `calls=${enter.calls.length - callsBeforeEdit} last=${JSON.stringify(enter.calls.at(-1))}`)
+    await page.waitForSelector(`${DIALOG} [data-testid="submit-error"]`, { timeout: 5_000 }).catch(() => {})
+    text = (await submitError(page)) ?? ''
 
     // S09：一種 404
     enter.current = (route) => json(route, 404, { detail: '專案不存在' })
@@ -207,7 +261,7 @@ try {
     await clickSubmit(page)
     await page.waitForFunction((sel, prev) => (document.querySelector(sel)?.textContent ?? '') !== prev, `${DIALOG} [data-testid="submit-error"]`, text).catch(() => {})
     text = (await submitError(page)) ?? ''
-    if (text !== '' && !text.includes('密碼') && (await submitDisabled(page)) === false && (await fieldValue(page)) === WRONG) ok(`[S10] 網路失敗：alert、送出鈕恢復可按、欄位保留：「${text}」`)
+    if (text !== '' && !text.includes('密碼') && (await submitDisabled(page)) === false && (await fieldValue(page)) === `${WRONG}2`) ok(`[S10] 網路失敗：alert、送出鈕恢復可按、欄位保留：「${text}」`)
     else bad('[S10] 網路失敗之後的狀態不對', `alert=「${text}」 disabled=${await submitDisabled(page)} value=${await fieldValue(page)}`)
 
     // S15 第一段：延遲回應、Esc、重開同一扇門、晚到的 200 不採用
@@ -275,21 +329,35 @@ try {
     await waitDialog(page, 'visible')
     if ((await fieldValue(page)) === '') ok('[S05] 拿掉票、同一扇門再開：欄位是空的（成功那次的密碼沒留下）')
     else bad('[S05] 同一扇門再開欄位不是空的', String(await fieldValue(page)))
+    await page.keyboard.press('Escape')
+    await waitDialog(page, 'detached')
+    await walkToDecoy(page)
+    await page.keyboard.press('KeyE')
+    await waitDialog(page, 'visible')
+    const decoyName = await dialogName(page)
+    if (decoyName?.includes(DECOY_TITLE) && (await fieldValue(page)) === '') ok('[S05] 另一扇沒票的門：視窗換成那間房、欄位是空的')
+    else bad('[S05] 另一扇門的視窗不對', `name=${decoyName} value=${await fieldValue(page)}`)
+    await page.keyboard.press('Escape')
+    await waitDialog(page, 'detached')
     const leaksEnd = urls.filter((u) => u.includes(TOKEN) || u.includes(WRONG) || u.includes(CORRECT))
     const dumpEnd = await storageDump(page)
-    if (leaksEnd.length === 0 && !dumpEnd.includes(WRONG) && !dumpEnd.includes(CORRECT)) ok(`[S05] 整條軌跡 ${urls.length} 次網址寫入都沒有票與密碼`)
-    else bad('[S05] 整條軌跡有密碼或票', leaksEnd.join('\n   '))
+    const writesEnd = (await storageWrites(page)).filter((w) => w.includes(WRONG) || w.includes(CORRECT))
+    if (leaksEnd.length === 0 && !dumpEnd.includes(WRONG) && !dumpEnd.includes(CORRECT) && writesEnd.length === 0) ok(`[S05] 整條軌跡 ${urls.length} 次網址寫入、${(await storageWrites(page)).length} 次 storage 寫入都沒有密碼與票`)
+    else bad('[S05] 整條軌跡有密碼或票', [...leaksEnd, ...writesEnd].join('\n   '))
 
-    // S13 後半：換成 Q（同一個分頁、同一個 sessionStorage）。先讓 P 再拿一張票，Q 讀不到它。
+    // S13 後半：換成 Q（同一個分頁、同一個 sessionStorage、P 的票還躺在裡面），深連結直達 R：第一條 socket 不能帶 P 的票、要回落大廳。
     await page.evaluate(([k, t]) => sessionStorage.setItem(k, t), [tokenKey(P.id), TOKEN])
     me.current = Q
     sockets.length = 0
     const callsQ = enter.calls.length
-    await page.goto(`${FRONTEND}/world`)
+    await page.goto(`${FRONTEND}/world?room=${ROOM}`)
     await waitForWorld(page)
+    await expectUrl(page, '[S13] Q 沒有票：深連結回落 /world', '/world')
+    if (sockets.length >= 1 && sockets[0].scene === 'lobby' && sockets[0].token === null && sockets.every((s) => s.scene === 'lobby')) ok('[S13] Q 的第一條 socket 是 lobby、沒有票（P 的票沒被讀到）')
+    else bad('[S13] Q 的 socket 不對', JSON.stringify(sockets))
     await approachDoor(page)
     await pressE(page)
-    if ((await waitDialog(page, 'visible')) && sockets.every((s) => s.scene === 'lobby') && enter.calls.length === callsQ) ok('[S13] 換成 Q：P 的票讀不到，按 E 開的是視窗、沒有房間連線')
+    if ((await waitDialog(page, 'visible')) && sockets.every((s) => s.scene === 'lobby') && enter.calls.length === callsQ) ok('[S13] 換成 Q：按 E 開的是視窗、沒有房間連線、沒有 /enter')
     else bad('[S13] 換成 Q 之後不對', `dialog=${(await dialog(page)) !== null} sockets=${JSON.stringify(sockets)}`)
     await page.screenshot({ path: path.join(OUT, 'q-asked.png') })
     await context.close()
@@ -299,6 +367,7 @@ try {
   {
     const sockets = []
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+    guardLoopback(context)
     await context.addInitScript(([key, token]) => sessionStorage.setItem(key, token), [tokenKey(P.id), TOKEN])
     await countOverlays(context)
     await fakeRealtime(context, sockets, { refuse: (scene) => scene?.startsWith('room:') ?? false })
@@ -345,9 +414,13 @@ try {
   {
     const sockets = []
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+    guardLoopback(context)
+    // 只讓 sessionStorage 壞（票在那裡）；localStorage 照常 —— 免得框架自己的寫入變成無關的假紅。
     await context.addInitScript(() => {
-      Storage.prototype.setItem = function () {
-        throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+      const original = Storage.prototype.setItem
+      Storage.prototype.setItem = function (key, value) {
+        if (this === sessionStorage) throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+        return original.call(this, key, value)
       }
     })
     await fakeRealtime(context, sockets)
@@ -366,8 +439,10 @@ try {
     else bad('[S14] setItem 拋之後沒有 alert')
     const text = (await submitError(page)) ?? ''
     await page.waitForTimeout(500)
-    if (!text.includes('密碼') && (await dialog(page)) !== null && sockets.every((s) => s.scene === 'lobby')) ok(`[S14] 視窗留著、沒有房間連線、alert 不說密碼：「${text}」`)
-    else bad('[S14] setItem 拋之後的狀態不對', `alert=「${text}」 dialog=${(await dialog(page)) !== null} sockets=${JSON.stringify(sockets)}`)
+    const tokenInDom = await page.evaluate((t) => document.body.textContent?.includes(t) ?? false, TOKEN)
+    if (text !== '' && !text.includes('密碼') && (await dialog(page)) !== null && sockets.every((s) => s.scene === 'lobby') && !tokenInDom) ok(`[S14] 視窗留著、沒有房間連線、alert 不說密碼、票不在 DOM：「${text}」`)
+    else bad('[S14] setItem 拋之後的狀態不對', `alert=「${text}」 dialog=${(await dialog(page)) !== null} sockets=${JSON.stringify(sockets)} tokenInDom=${tokenInDom}`)
+    await expectUrl(page, '[S14] 網址不變', '/world')
     await page.screenshot({ path: path.join(OUT, 'ticket-not-held.png') })
     await context.close()
   }

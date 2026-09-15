@@ -28,11 +28,12 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
-import { bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, ok, overlaysSeen, profile, traceUrls, uuid, waitForTransition, waitForWorld, walker, watchCanvas } from './lib/world.mjs'
+import { assertLoopback, bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, guardLoopback, ok, overlaysSeen, profile, traceUrls, uuid, waitForTransition, waitForWorld, walker, watchCanvas } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-v01'
 const HEADED = process.env.HEADED === '1'
+assertLoopback(FRONTEND)
 
 const P = profile(21, '人才甲')
 const Q = profile(22, '人才乙')
@@ -64,6 +65,7 @@ try {
   {
     const sockets = []
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+    guardLoopback(context)
     await context.addInitScript(([key, token]) => sessionStorage.setItem(key, token), [tokenKey(P.id), TOKEN])
     await countOverlays(context)
     await fakeRealtime(context, sockets)
@@ -121,6 +123,7 @@ try {
     const urls = []
     const me = { current: P }
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+    guardLoopback(context)
     await context.addInitScript(([key, token]) => sessionStorage.setItem(key, token), [tokenKey(P.id), TOKEN])
     await traceUrls(context, urls)
     await countOverlays(context)
