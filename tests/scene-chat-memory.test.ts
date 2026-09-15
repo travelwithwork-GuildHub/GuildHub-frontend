@@ -1,15 +1,16 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LIMITS, LIMIT_SOURCES, UNBOUNDED } from '@/api/contract/limits'
 import { ChatIn, ChatOut } from '@/api/contract/ws'
 import { CHAT_BODY_BUDGET, CHAT_KEEP, EMPTY_CHAT, appendChat } from '@/realtime/sceneChat'
+import { importGraph, importSpecifiers, stripComments } from './lib/importGraph'
 
 // 規格：openspec/changes/fe-r11-realtime-chat/specs/scene-chat-transport/spec.md
 //   Requirement: 目前場景最多留 100 筆、每則最多保留 2000 code point；不用 Web Storage、不呼叫 REST —— S04、S05（靜態邊界那段；列表的可觀察形式在 K04 的 e2e）
 //   Requirement: `LIMITS` 如實記錄 chat body 沒有後端限制；契約 schema 不加任何長度檢查 —— S09
 //
-// **不連任何外部服務。** reducer 是純函式；靜態邊界直接讀 `src/` 的原始碼走 import 圖。
+// **不連任何外部服務。** reducer 是純函式；靜態邊界用 TypeScript 的 AST 走 `src/` 的 import 圖（`tests/lib/importGraph.ts`）。
 
 const chat = (n: number, body = `訊息 ${n}`): ChatOut => ({ t: 'chat', id: `u-${n}`, name: `人 ${n}`, body })
 
@@ -45,44 +46,6 @@ describe('記憶體', () => {
   })
 })
 
-/** 走 `src/` 的靜態 import 圖（`@/` 別名與相對路徑；`.ts`／`.tsx`；含 `export … from` 與 `import type`）。 */
-function importGraph(entry: string): Set<string> {
-  const root = path.resolve(import.meta.dirname, '..')
-  const resolveFrom = (from: string, spec: string): string | null => {
-    let base: string
-    if (spec.startsWith('@/')) base = path.join(root, 'src', spec.slice(2))
-    else if (spec.startsWith('.')) base = path.resolve(path.dirname(from), spec)
-    else return null // 套件
-    for (const candidate of [base, `${base}.ts`, `${base}.tsx`, path.join(base, 'index.ts'), path.join(base, 'index.tsx')]) {
-      if (existsSync(candidate) && !readdirSafe(candidate)) return candidate
-    }
-    return null
-  }
-  const seen = new Set<string>()
-  const queue = [entry]
-  while (queue.length > 0) {
-    const file = queue.pop() as string
-    if (seen.has(file)) continue
-    seen.add(file)
-    const source = readFileSync(file, 'utf8')
-    for (const m of source.matchAll(/(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|import\s*['"]([^'"]+)['"]/g)) {
-      const spec = m[1] ?? m[2] ?? m[3]
-      if (spec === undefined) continue
-      const target = resolveFrom(file, spec)
-      if (target !== null) queue.push(target)
-    }
-  }
-  return seen
-}
-const readdirSafe = (p: string): boolean => {
-  try {
-    readdirSync(p)
-    return true
-  } catch {
-    return false
-  }
-}
-
 describe('靜態邊界', () => {
   const root = path.resolve(import.meta.dirname, '..')
   const entries = readdirSync(path.join(root, 'src/realtime')).filter((f) => f.startsWith('sceneChat')).map((f) => path.join(root, 'src/realtime', f))
@@ -95,15 +58,33 @@ describe('靜態邊界', () => {
       expect(graph, `${path.relative(root, entry)} 的 import 圖`).toContain(path.relative(root, entry))
       for (const bad of forbidden) expect(graph.some((f) => f.startsWith(bad)), `${path.relative(root, entry)} 的 import 圖到達了 ${bad}`).toBe(false)
       for (const file of importGraph(entry)) {
-        const source = readFileSync(file, 'utf8')
-        for (const word of ['localStorage', 'sessionStorage', 'indexedDB', 'caches']) expect(source.includes(word), `${path.relative(root, file)} 出現了 ${word}`).toBe(false)
+        // 註解不算（規格說的是原始碼；一句「不用 localStorage」的註解不該讓它紅）。
+        const code = stripComments(readFileSync(file, 'utf8'), file)
+        for (const word of ['localStorage', 'sessionStorage', 'indexedDB', 'caches']) expect(code.includes(word), `${path.relative(root, file)} 出現了 ${word}`).toBe(false)
       }
     }
   })
 
-  it('靜態邊界的尺本身不是恆真：一個真的碰 REST 的模組會被抓到（對照組）', () => {
+  it('靜態邊界的尺本身不是恆真：一個真的碰 REST 的模組會被抓到；require／import = require／import() 都算、import type 與註解不算（對照組）', () => {
     const graph = [...importGraph(path.join(root, 'src/api/operations.ts'))].map((f) => path.relative(root, f))
     expect(graph.some((f) => f.startsWith('src/api/transport'))).toBe(true)
+    const specs = importSpecifiers(
+      [
+        "import { a } from '@/api/operations'",
+        "import type { T } from '@/only-type'",
+        "import { type U, v } from '@/mixed'",
+        "export * from './re-export'",
+        "export type { W } from './type-re-export'",
+        "import eq = require('./import-equals')",
+        "const r = require('./cjs')",
+        "const d = await import('./dynamic')",
+        "// import { z } from '@/in-comment'",
+        "const s = \"import { y } from '@/in-string'\"",
+      ].join('\n'),
+    )
+    expect(specs).toEqual(['@/api/operations', '@/mixed', './re-export', './import-equals', './cjs', './dynamic'])
+    expect(stripComments("const a = 1 // sessionStorage\n/* localStorage */ const b = 2")).not.toMatch(/sessionStorage|localStorage/)
+    expect(stripComments("const k = 'sessionStorage'")).toContain('sessionStorage')
   })
 })
 

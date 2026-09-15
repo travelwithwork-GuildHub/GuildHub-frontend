@@ -29,22 +29,12 @@ export type ChatLog = readonly ChatRecord[]
 
 export const EMPTY_CHAT: ChatLog = []
 
-/** 按 code point 截（`.length` 數的是 UTF-16 code unit，emoji 會被切成半個）。 */
+/** 按 code point 截（`.length` 數的是 UTF-16 code unit，emoji 會被切成半個）。單次迭代：最多收 `budget` 個，第 `budget + 1` 個一出現就截、不再往下走。 */
 function keepCodePoints(s: string, budget: number): { body: string; truncated: boolean } {
-  let count = 0
+  const kept: string[] = []
   for (const ch of s) {
-    count += 1
-    if (count > budget) {
-      // 走到第 budget+1 個 code point 才知道超過：截到它之前。
-      let out = ''
-      let n = 0
-      for (const c of s) {
-        if (n === budget) break
-        out += c
-        n += 1
-      }
-      return { body: out, truncated: true }
-    }
+    if (kept.length === budget) return { body: kept.join(''), truncated: true }
+    kept.push(ch)
   }
   return { body: s, truncated: false }
 }
