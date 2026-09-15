@@ -37,7 +37,9 @@ const identity = vi.hoisted(() => {
     },
     subscribe: (f: () => void) => {
       subs.add(f)
-      return () => subs.delete(f)
+      return () => {
+        subs.delete(f)
+      }
     },
   }
 })
