@@ -22,7 +22,9 @@ set -euo pipefail
 # scene-switch（#416）就是那種寫法：門標籤當里程計、每一小步量一次、只設步數上限；本機對 next start 跑 4 次全綠。
 # room-entry（`FE-N08`，#430）跟 scene-switch 同一套走位（`tests/e2e/lib/world.mjs`），REST 與 WebSocket 全部偽造；
 # 本機對 next start 跑 3 次全綠。它抓到過兩個單元測試看不到的缺陷（開視窗的 E 打進欄位、換場景後提示殘留）—— 這是它進來的理由。
-SCRIPTS=(avatar-picker avatar-pixels control-contrast rooms-fixture scene-switch room-entry)
+# scene-chat（`FE-K04`＋`FE-R11-S05`，#440／#441）同一套零件（`lib/world.mjs`）、同樣全部偽造（兩個 context：走位＋chat、以及「只打 loopback」的 allowlist）；
+# 本機對 next start 連跑 3 次全綠（63／61／69 秒）。
+SCRIPTS=(avatar-picker avatar-pixels control-contrast rooms-fixture scene-switch room-entry scene-chat)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
