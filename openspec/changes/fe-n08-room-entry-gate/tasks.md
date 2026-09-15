@@ -58,10 +58,12 @@
 - [x] 5.2 `SceneNotices` 的 alert 加「重新輸入密碼」（那句話不變；`SECONDARY`）；`SceneProvider` 的失敗通知多記 `title`；`roomTokens.ts` 的 drop 回報三態；接 drop → 三態判斷 → `dismissNotice` → `needsToken(projectId, title ?? 清單查到的 ?? null)`
   - 2026-09-15：`dropRoomToken(): 'dropped' | 'held' | 'unknown'`（刪完讀回確認）；通知 `title?: string`（沒帶就沒有 —— `world-scenes-transition.test.tsx` 的六個 `toEqual` 補上 `title`，兩條沒帶 title 的照舊）；
     「重新輸入密碼」只在有正式門禁（provider）時出現；丟不掉 → 通知留著、多一句 `DROP_FAILED_TEXT`（跟著那一則通知的物件同一性）；訪客沒鍵可丟、直接開。
-    清單那個來源：`WorldCanvas` 把 `rooms.doors` 交給 `<RoomPasswordDialog doors>`，`title = request.title ?? doors 裡的 ?? null`，是 prop 不是 key → 清單回來同一個節點更新。
+    清單那個來源：`useRooms()` 多交出 `all`（去重、未截斷；`doorsFor` 一起算），`WorldCanvas` 把 `rooms.all` 交給 `<RoomPasswordDialog rooms>`，
+    `title = request.title ?? 清單裡的 ?? null`，是 prop 不是 key → 清單回來同一個節點更新。**不用 `doors`**：那份被走廊容量截斷，冷門房間永遠補不上房名（兩位審查都抓到）；
+    判準是「R 排在容量之外」那條（改回 `doors` 就紅）。
     `ui-ux-pro-max`（`--domain ux`：error recovery 要有明確的下一步、`role=alert`）：按鈕 `SECONDARY` ＋ `min-h-11`。
 - [x] 5.3 突變：失敗時自動 `dropRoomToken` → S11 第一段紅；動作不丟票 → S11 鍵仍在紅；`world-scenes-transition-ui.test.tsx` 的 `FE-V01-S07` 全綠不動
-  - 2026-09-15 結果（`tests/room-entry-retry.test.tsx`，5 條）：失敗時自動丟票 → S11 三條＋`FE-V01-S06`／`S07`／`S15` 紅；動作不丟票 → S11 四條紅；不關通知 → S11 紅；
+  - 2026-09-15 結果（`tests/room-entry-retry.test.tsx`，5 條；深連結那條的 R 排在走廊容量之外）：失敗時自動丟票 → S11 三條＋`FE-V01-S06`／`S07`／`S15` 紅；動作不丟票 → S11 四條紅；不關通知 → S11 紅；
     無視三態（一律開）→ 三種故障紅；drop 不讀回 → 「靜默沒刪」「getItem 拋」紅；通知不記 title → S11 第一條（清單留空）＋ V01 兩條紅；`WorldCanvas` 不傳 `doors` → 深連結那條紅；
     把 title 放進 key（重掛）→ 深連結那條「同一個節點」紅。`FE-V01-S07`（ui）全綠不動。
 
