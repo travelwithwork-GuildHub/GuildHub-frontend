@@ -23,17 +23,23 @@
 100 是產品決定（旁觀「最近在聊什麼」，不是歷史），寫進 Requirement。順序＝通過驗證的接收順序（沒有時間戳、沒有 id，
 不發明排序）。淘汰從最舊端。不進任何 storage。
 
-## D4｜清空由 committed 場景驅動，過場開始不先清
+## D4｜清空看 committed 的 `wsScene` 有沒有變；訊息的歸屬看連線
 
-`FE-V01`：`transition = resolved.scene ≠ committed`；握手失敗會回到原場景。過場開始就清的話，失敗回來的人大廳訊息沒了。
-所以綁 `committed` 與 generation：新場景 committed 時一次清空；每個 `onMessage` 捕捉自己的 generation，過期的不提交。
+`FE-V01`：`transition = resolved.scene ≠ committed`；握手失敗會回到原場景，**而且系統會自動建一條新的大廳連線**。
+過場開始就清 → 失敗回來的人大廳訊息沒了；用「連線換了」當清空條件 → 退回大廳那條新連線 `ready` 時也會把大廳清掉（審查者抓到的）。
+所以清空條件只有一個：committed 的 `wsScene` 改變。同場景的重連（退回、`FE-R12`）不清。
+訊息的歸屬另外看連線：`RemoteWorld` 每次建 client 時把「這條連線」的身分帶進 `onMessage`，不是目前那條的不收 ——
+這是 `world-scenes`「舊連線遲到的任何訊息不得影響新場景」落到 chat 這個消費者，不是新語意。
+名詞不混用：`RealtimeGenerationProvider.generation` 是「要求重連」的代數（`FE-R06` 多分頁用），不是場景代號、不是連線身分。
 代價：過場覆蓋層底下舊訊息還在 —— 覆蓋層已遮住畫面，而且 `FE-K04` 的 UI 在過場期間本來就鎖著。
 
-## D5｜chat 長度：記錄後端沒有上限，前端不發明一個
+## D5｜chat 長度：如實記錄後端「什麼都沒驗」，前端不發明上限、也不在傳輸層擋
 
-`protocol.py` 的 `ChatIn.body: str` 沒有驗證；`limits.ts` 的慣例是「後端完全沒有上限的欄位記成 `UNBOUNDED`，不是省略」
-（`projectTitle`／`projectBody` 同樣處理）。`LIMITS.chatBody = { min: 1, max: UNBOUNDED }`，來源指向 `protocol.py::ChatIn.body`。
-`min: 1` 是「全空白不送」的依據（`FE-K04` 用）。要上限先改後端，不在 UI 造一個看似安全的數字（`BE-G16`）。
+`protocol.py` 的 `ChatIn.body: str` 沒有驗證 —— 空字串、全空白、10 MB 都是合法的。`limits.ts` 的慣例是「後端完全沒有上限的欄位記成 `UNBOUNDED`，不是省略」
+（`projectTitle`／`projectBody` 同樣處理）。所以 `LIMITS.chatBody = { min: 0, max: UNBOUNDED }`：第一版寫 `min: 1` 是把 UI 的規則偽裝成後端事實，
+而且 `min: 1` 也推不出「全空白不送」（一個空格長度就是 1）—— 審查者指出的；「trim 後至少一個 code point」是 `FE-K04` 的送出規則。
+**巨大訊息的風險明文接受**：100 筆 × 無上限＝理論上可以撐爆前端記憶體。不在前端擋：擋了就是在掩蓋後端沒有 rate limit／大小上限的缺口（`BE-G16`），
+也會讓 `realtime-protocol`「合法訊息一律交付」變假 —— 要擋得先改協定（那是 MODIFIED `realtime-protocol` 的事，不是偷塞進 R11）。`FE-O07` 銜接清單列它。
 
 ## 待答問題
 
