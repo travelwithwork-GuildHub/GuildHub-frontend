@@ -16,9 +16,10 @@ Canvas 元件不 import 表單、沒有第二個 E 監聽、`FE-W12-S16`／`FE-V
 
 ## D2｜成功的順序固定：先存票，再請求進房；Modal 不碰連線與網址
 
-`enterProject(projectId, { password })` → `holdRoomToken(profileId, projectId, room_token)` → `enterRoom(projectId, { title })` → 關 Modal。
-**順序不能反**：`SceneProvider` 的 `resolved.scene` 只在「desired 是房間 ∧ 身分已解析 ∧ 持有票」時才是房間，
-先 `enterRoom()` 會被判成沒票留在大廳（`SceneProvider.tsx` 的註解就是這句）。
+`enterProject(projectId, { password })` → `holdRoomToken(profileId, projectId, room_token)` → 讀回確認 → `enterRoom(projectId, { title })` → 關 Modal。
+**順序是本能力定的義務，不是既有程式的保證**：`SceneProvider` 的 `resolved.scene` 只在「desired 是房間 ∧ 身分已解析 ∧ 持有票」時才是房間；
+在同一個同步 handler 裡先 `enterRoom()` 再存票，React 多半要到 handler 結束才 render，`resolved` 那時可能已經讀到票 —— 「反過來一定進不去」不成立，
+所以不拿它當理由。理由是：存票是進房的前提，把前提放在後面靠的是 React 的批次行為，那是實作細節；判準用呼叫順序 spy。
 WebSocket、網址、過場都是 `SceneProvider`／`WorldUrlSync` 的事，Modal 一個都不做。
 
 `profileId` 從身分 context 拿（`{state:'signed-in', profile}`）；沒登入的人按 E 一樣開 Modal，
@@ -73,10 +74,13 @@ project 與 user 都要對。本地替身（`scripts/realtime-stub.ts`）今天�
 **不綁人、不過期**，註解寫「`FE-W16` 把 enter 接上之後由它簽發（同一把）」（筆誤，是 `FE-N08`）。
 
 決定：本地 handler 與替身**共用同一個簽章函式**（抽成一個不 import `server-only` 的模組，兩邊 import 它；
-替身用 `tsx` 跑，`server-only` 在 Next 之外會拋）。**不**把格式改成真後端那種：
-前端的契約只觀察「本地簽的票本地替身收、錯房間的票不收」，票的格式是各自後端 process 內的事（`roomTokens.ts` 檔頭）。
-代價：本地票不綁人、不過期 —— `FE-R12` 要測「票過期後重連」時得用替身的旋鈕，不是等時間。這是**系統邊界**的決定
-（票只在簽發者的 process 內有意義；前端不解析），要補 ADR。
+替身用 `tsx` 跑，`server-only` 在 Next 之外會拋），簽的是 `HMAC(secret, "room:<uuid>|<profileId>")` —— **綁房間也綁人**：
+替身握手時已經在讀 session cookie 取身分（名字、外觀），驗票時多比一個欄位而已。審查者指出「本地不綁人」是安全語意的可觀察差異
+（P 的票給 Q，本地收、真後端拒），跟「兩個目標可觀察行為相同」矛盾 —— 所以綁。
+**不**把格式改成真後端那種 base64url 三段式：前端的契約只觀察「同房同人收、換房或換人拒」，票的格式是各自後端 process 內的事（`roomTokens.ts` 檔頭）。
+**已知差異**：本地票不過期（真後端 8 小時）—— `FE-R12` 要測「票過期後重連」時得用替身的旋鈕，不是等時間；契約測試不得宣稱涵蓋過期。
+這是**系統邊界**的決定（票只在簽發者的 process 內有意義；前端不解析），要補 ADR。
+`roomToken(scene)` 改簽名會動到既有用它算票的測試（`FE-V01` 的 e2e 是偽造 WS，不受影響；契約測試的 ws 那組要跟著改）。
 
 本地 handler 的判斷順序照真後端：session 無效 → 401；`password_hash IS NULL`（不存在或未成軍）→ 404；
 `verifyPassword` 失敗 → 403；否則簽票。本地 session 是無狀態簽章 cookie（`session.ts`），**沒有** server-side
@@ -93,14 +97,18 @@ project 與 user 都要對。本地替身（`scripts/realtime-stub.ts`）今天�
 
 視窗持有世界命令鎖（D8），所以「送出中不能關」等於「一個卡住的請求把人鎖在視窗裡，連走路都不行」——
 審查者退回了第一版的這個決定。改成：任何時候都能 Esc／關閉；關閉時記下「這一輪已作廢」（generation），
-晚到的成功不存票、不 `enterRoom`、不重開視窗，晚到的失敗不顯示。不用 `AbortSignal`：取消 fetch 不代表後端沒簽票
-（真後端還會把票寫進 session），丟棄結果就夠了。代價：使用者關掉之後後端可能已經簽了一張他拿不到的票 —— 無害，再送一次就好。
+晚到的成功不存票、不 `enterRoom`、不重開視窗，晚到的失敗不顯示。generation 綁三樣：請求本身、發出時的 `projectId`、發出時的 `profileId` ——
+關了再開另一扇門、或中途登出，舊結果都作廢（S15）。不用 `AbortSignal`：取消 fetch 不代表後端沒簽票。
+**副作用要誠實記**：真後端成功時已把票寫進 server session（給座位端點用），前端丟棄結果只是「不採用」，不是「沒發生」——
+今天沒有讀得回來的端點，所以看不到；`FE-J13` 接座位時要知道這件事。
 
 ## D10｜存票要讀回確認
 
 `roomTokens.ts` 的 `withStorage` 在 `sessionStorage` 不可用時吞掉例外、不拋（`FE-V01` 的決定：票只是可用性）。
 但門禁這一步「存不進去」的後果是 `resolved.scene` 判成沒票 → 使用者剛輸對密碼卻留在大廳，看到的是「這間房需要房間密碼」——
-像門壞了。所以存完要 `heldRoomToken()` 讀回；讀不回就當失敗，視窗留著、說清楚是瀏覽器存不了通行證。不改 `roomTokens.ts` 的 API。
+像門壞了。所以存完要 `heldRoomToken()` 讀回，而且要**嚴格等於這一次的票**：只檢查非 null 的話，「原本有舊票、這次寫失敗」會拿舊票去撞握手，
+然後把票失效呈現成連不上。讀回不對就當失敗，視窗留著、說清楚是瀏覽器存不了通行證。`dropRoomToken` 對稱處理：丟完讀回還在就不開視窗。
+不改 `roomTokens.ts` 的 API。
 
 ## 待答問題
 

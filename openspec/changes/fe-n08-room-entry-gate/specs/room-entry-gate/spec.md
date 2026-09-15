@@ -98,40 +98,53 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 
 #### Scenario: [FE-N08-S05] 密碼不落地：整條流程的網址與 storage 都沒有它
 
-- **GIVEN** 以一個唯一字串當密碼
-- **WHEN** 依序：送出並收到 403、改字後送出成功、進房、按「回到 Guild Hall」
+- **GIVEN** 兩個唯一字串 W（會被拒的）與 C（會成功的）
+- **WHEN** 依序：以 W 送出並收到 403、改成 C 送出成功、進房、按「回到 Guild Hall」
 - **THEN** 在每一次 `pushState`／`replaceState` 寫入的網址、每個時點的 `location.href`、`localStorage`、`sessionStorage`
-  裡都 MUST NOT 出現那個字串
-- **AND** 403 之後欄位 SHALL 仍是那個字串；成功之後視窗 SHALL 關閉且欄位 SHALL 清空
+  裡都 MUST NOT 出現 W 或 C
+- **AND** 403 之後欄位 SHALL 仍是 W；成功之後視窗 SHALL 關閉且欄位 SHALL 清空
 - → 驗於：e2e（網址用 `FE-V01` e2e 的軌跡法，看整條，不看快照）
 
 ### Requirement: 成功先存票再進房；票存不進去就不算成功；有票的人不再被問
 
-`enterProject` 成功後，系統 SHALL 先以 `holdRoomToken(profileId, projectId, room_token)` 存票，並 SHALL 讀回確認票真的在
-（`sessionStorage` 不可用時 `roomTokens.ts` 寫不進去也不拋），**再**呼叫 `enterRoom(projectId, { title })`；
+`enterProject` 成功後，系統 SHALL 先以 `holdRoomToken(profileId, projectId, room_token)` 存票，並 SHALL 以 `heldRoomToken(profileId, projectId)`
+讀回、**嚴格等於這一次回傳的 `room_token`** 才算存成功（`sessionStorage` 不可用時 `roomTokens.ts` 寫不進去也不拋；舊票殘留時讀回的是舊的），
+**再**呼叫 `enterRoom(projectId, { title })`；「先存後進」是本能力定下的順序義務，用呼叫順序驗。
 視窗 MUST NOT 自己建 WebSocket、MUST NOT 寫網址；成功後視窗 SHALL 關閉。
-票讀不回來時 SHALL 視同失敗：MUST NOT 呼叫 `enterRoom`、視窗 SHALL 留著、SHALL 顯示一則受控的 `role="alert"`
-（說這個瀏覽器存不了通行證，不說是密碼錯）—— 否則使用者剛輸對密碼就被判成「沒票」留在大廳，看起來像門壞了。
+讀回不等於本次的票（包括 `room_token` 是空字串）時 SHALL 視同失敗：MUST NOT 呼叫 `enterRoom`、視窗 SHALL 留著、
+SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行證，不說是密碼錯）—— 否則使用者剛輸對密碼就被判成「沒票」留在大廳，或拿舊票去撞握手。
+每一輪送出 SHALL 綁定發出時的 `profileId` 與 `projectId`：視窗關閉、換了目標房間、或身分改變之後，那一輪的結果 SHALL 作廢（不存票、不進房、不顯示）。
 同一身分、同一分頁已持有那間房的票時，門前按 E SHALL 直接走既有 `enterRoom`，MUST NOT 開視窗、MUST NOT 呼叫 `/enter`。
 
-> 拔掉什麼會紅：先 `enterRoom` 再存票 → S06 沒有房間連線（`resolved.scene` 判成沒票）；
-> 存票時鍵不含身分 → S13 換身分讀到別人的票；有票也開視窗 → S07；存票不讀回確認 → S14 仍呼叫 `enterRoom`。
+> 拔掉什麼會紅：反轉兩個呼叫的順序 → S06 的順序斷言；存票時鍵不含身分 → S13 換身分讀到別人的票；有票也開視窗 → S07；
+> 存票不讀回或只檢查非 null → S14 的「舊票殘留」那段仍呼叫 `enterRoom`；結果不綁 profileId／projectId → S15。
 
 #### Scenario: [FE-N08-S06] 密碼對了：票存起來、過場開始、房間連線帶著票、網址沒有票
 
 - **GIVEN** 已登入為 P，沒有房間 R 的票
 - **WHEN** 在 R 的視窗送出密碼，`/enter` 回 `200 { "room_token": "T" }`
-- **THEN** `sessionStorage` 裡 P＋R 的鍵 SHALL 是 T；接著 SHALL 開始進入 R 的過場（覆蓋層出現）
+- **THEN** `holdRoomToken(P, R, "T")` SHALL 在 `enterRoom(R, …)` 之前被呼叫（順序 spy）；`sessionStorage` 裡 P＋R 的鍵 SHALL 是 T；接著 SHALL 開始進入 R 的過場（覆蓋層出現）
 - **AND** 新 socket 的位址 SHALL 含 `scene=room:R` 與 `token=T`；每一次寫入的網址 MUST NOT 含 T
 - **AND** 視窗 SHALL 關閉
 - → 驗於：jsdom（順序）、e2e（連線與網址）
 
-#### Scenario: [FE-N08-S14] 票存不進去：不進房、視窗留著、說的不是密碼錯
+#### Scenario: [FE-N08-S14] 票存不進去或讀回不是這次的票：不進房、視窗留著、說的不是密碼錯
 
-- **GIVEN** `sessionStorage` 的 `setItem` 會拋（配額滿或被停用）
-- **WHEN** `/enter` 回 `200 { "room_token": "T" }`
-- **THEN** SHALL 沒有 `enterRoom`、沒有新 socket、網址不變；視窗 SHALL 還開著
+- **WHEN** `/enter` 回 `200 { "room_token": "T" }`，而 `sessionStorage` 分別是：`setItem` 拋；`setItem` 靜默沒寫、`getItem` 回 `null`；
+  原本已有舊票 `OLD`、`setItem` 失敗、`getItem` 仍回 `OLD`；`setItem` 成功但 `getItem` 拋
+- **THEN** 四種都 SHALL 沒有 `enterRoom`、沒有新 socket、網址不變；視窗 SHALL 還開著
 - **AND** 送出控制之前 SHALL 恰好一個 `role="alert"`，內容 MUST NOT 含「密碼」；T MUST NOT 出現在 DOM
+- **AND WHEN** `/enter` 回 `200 { "room_token": "" }`
+- **THEN** SHALL 視同失敗（同上），MUST NOT 把空字串存成票
+- → 驗於：jsdom
+
+#### Scenario: [FE-N08-S15] 送出中換了房間或身分：晚到的結果作廢
+
+- **GIVEN** 對房間 A 的 `/enter` 尚未回應
+- **WHEN** 按 Esc 關閉，再對房間 B 的門按 E 開視窗，接著 A 的請求回 `200 { "room_token": "TA" }`
+- **THEN** `sessionStorage` 裡 SHALL 沒有 A 也沒有 B 的票；SHALL 沒有 `enterRoom`；B 的視窗 SHALL 還開著、欄位空白、沒有 alert
+- **AND WHEN** 對 B 送出、尚未回應時身分變成訪客（登出），接著 B 的請求回 `200`
+- **THEN** SHALL 沒有存票、沒有 `enterRoom`；視窗 SHALL 關閉（身分沒了就沒有可存票的鍵）
 - → 驗於：jsdom
 
 #### Scenario: [FE-N08-S07] 有票的人回大廳再按 E，直接進、不問密碼
@@ -184,6 +197,8 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 `world-scenes` 的失敗通知（那句話、留存、取代、系統不重試、系統不丟票）全部維持。通知 SHALL 另提供一個
 「重新輸入密碼」動作。只有使用者啟動它時，系統 SHALL：丟棄**這個身分**對**那間房**的票 → 關閉通知 → 開啟那間房的密碼視窗（欄位空白）。
 沒有啟動時，票 SHALL 還在，再走到門前按 E SHALL 用同一張票再試（`FE-V01-S07`）。
+丟票也要讀回確認：`dropRoomToken` 之後 `heldRoomToken` 仍讀得到票（storage 不可用）時，MUST NOT 開視窗、通知 SHALL 留著，
+並 SHALL 顯示受控的一句（這個瀏覽器清不掉通行證）—— 不能一邊開視窗一邊留著一張會被拿去撞握手的舊票。
 
 > 拔掉什麼會紅：系統在失敗時自動丟票 → S11 第一段（票不在了）；動作不丟票 → S11 第二段（視窗開了但票還在，
 > 之後送出成功會覆寫 —— 判準是 `sessionStorage` 那個鍵在啟動後為空）；動作不關通知 → S11 alert 還在。
@@ -197,26 +212,30 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 - **AND WHEN** 第二次也被拒，使用者啟動「重新輸入密碼」
 - **THEN** P＋R 的鍵 SHALL 被移除；SHALL 沒有 `role="alert"`；SHALL 出現 R 的密碼視窗且欄位空白
 - **AND** 在啟動之前，系統 MUST NOT 呼叫 `/enter`、MUST NOT 自己移除那個鍵
-- → 驗於：jsdom、e2e
+- **AND WHEN** `sessionStorage.removeItem` 拋、使用者啟動「重新輸入密碼」
+- **THEN** SHALL 沒有視窗；通知 SHALL 還在；SHALL 有一句受控說明；那個鍵 SHALL 仍是 T
+- → 驗於：jsdom、e2e（前半）
 
 ### Requirement: 本地後端的 enter 與真後端可觀察行為相同，票本地替身收得下
 
 `local` 目標 SHALL 提供 `POST /api/projects/{project_id}/enter`：body 合 `EnterIn`，成功回 `EnterOut`。
 判斷順序 SHALL 照真後端：session 無效 → 401；`password_hash IS NULL`（專案不存在或還沒成軍）→ 404；
 密碼不合 → 403；否則簽票。錯誤形狀 SHALL 走 `internal-backend` 既有的管線（`{ "detail": … }`）。
-簽出的票 SHALL 被本地即時層替身對 `room:<project_id>` 的握手接受；對另一間房 MUST NOT 被接受。
+簽出的票 SHALL 綁房間**與簽出時的身分**：本地即時層替身對 `room:<project_id>` 的握手 SHALL 只在「票的房間＝scene ∧ 票的身分＝握手 cookie 的身分」時接受；
+另一間房、或另一個人拿著這張票 MUST NOT 被接受（跟真後端 `verify()` 同樣的可觀察語意；**本地票不過期**是已知差異，記在 design D7）。
 本地 handler MUST NOT 讀座位、MUST NOT 因座位滿而拒絕。
 `enterProject` 的契約測試 SHALL 對 `local` 與 `guildhub` 兩個目標跑同一份。
 
-> 拔掉什麼會紅：handler 不驗密碼 → S12 的 403 那列；handler 與替身用不同的簽章 → S12 握手那段；
-> 改路徑或 body 欄位名 → S13 兩個目標其中一個紅。
+> 拔掉什麼會紅：handler 不驗密碼 → S12 的 403 那列；handler 與替身用不同的簽章 → S12 握手那段；票不綁身分 → S12 換 cookie 那段；
+> handler 看座位 → S12 滿座那列；改路徑或 body 欄位名 → S13 兩個目標其中一個紅。
 
 #### Scenario: [FE-N08-S12] 本地 enter 的矩陣與票的效力
 
 - **WHEN** 對本地後端依序：未登入、專案不存在、`recruiting`（沒有 `password_hash`）、`active` 密碼錯、`active` 密碼對
 - **THEN** SHALL 分別得到 401、404、404、403、`200` 且 body 合 `EnterOut`
-- **AND** 用那張票對本地替身開 `scene=room:<同一個 id>` 的 socket SHALL 收到 `hello`；對 `scene=room:<另一個 uuid>` SHALL 被拒絕握手
-- **AND** 座位的狀態 MUST NOT 影響以上任何結果
+- **AND** 用那張票、同一個 session cookie 對本地替身開 `scene=room:<同一個 id>` 的 socket SHALL 收到 `hello`；
+  對 `scene=room:<另一個 uuid>` SHALL 被拒絕握手；換另一個人的 session cookie 帶同一張票 SHALL 被拒絕握手
+- **AND** 同一個 `active` 專案，在座位表是空的、以及 `seat_count` 格全部被佔滿兩種資料下，密碼正確都 SHALL 回 200
 - → 驗於：單元（契約測試，本機起的可拋棄後端＋替身）
 
 #### Scenario: [FE-N08-S13] 兩個目標同一份契約；換身分讀不到別人的票
