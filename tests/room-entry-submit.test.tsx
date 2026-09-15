@@ -90,11 +90,15 @@ function mountWorld() {
 }
 /** 一個由測試決定何時、怎麼結束的 `/enter`。 */
 function pending() {
-  let settle!: { ok: (token: string) => Promise<void>; fail: (cause: unknown) => Promise<void> }
+  let settle!: { ok: (token: string) => Promise<void>; okNow: (token: string) => void; fail: (cause: unknown) => Promise<void> }
   enterProject.mockImplementationOnce(
     () =>
       new Promise((resolve, reject) => {
-        settle = { ok: (room_token) => act(async () => resolve({ room_token })), fail: (cause) => act(async () => reject(cause)) }
+        settle = {
+          ok: (room_token) => act(async () => resolve({ room_token })),
+          okNow: (room_token) => resolve({ room_token }),
+          fail: (cause) => act(async () => reject(cause)),
+        }
       }),
   )
   return () => settle
@@ -267,6 +271,22 @@ describe('送出', () => {
     expect(calls).toEqual([])
     expect(window.sessionStorage.length).toBe(0)
     expect(dialogs()).toHaveLength(1)
+  })
+
+  it('[FE-N08-S15] 身分改變與回應在同一批 microtask 裡到達（身分先 render 成 Q、回應緊接著落地）：仍作廢', async () => {
+    const { pressE } = mountWorld()
+    pressE(B)
+    const pb = pending()
+    await submit()
+    // 同一個 act：換身分排進 sync render 的 microtask，回應的 promise 鏈排在它後面。換代號要是等 passive effect（下一個 task），回應會先被採用。
+    await act(async () => {
+      identity.set(Q)
+      pb().okNow('TB-race')
+    })
+    expect(window.sessionStorage.getItem(keyOf(P, B)), '身分已經是 Q，P 那一輪的回應不能存票').toBeNull()
+    expect(calls).toEqual([])
+    expect(dialogs()).toHaveLength(1)
+    expect(submitButton().disabled).toBe(false)
   })
 })
 

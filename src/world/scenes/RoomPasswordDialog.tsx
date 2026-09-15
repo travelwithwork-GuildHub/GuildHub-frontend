@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { z } from 'zod'
 import { enterProject } from '@/api/operations'
 import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
@@ -88,8 +88,10 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
     waiting.current.clear()
   }, [])
   // 身分改變（換人、登出、P→Q→P）→ 換代號；視窗不關（訪客本來就能開，D2）。卸載（關閉、換房）→ 換代號。
-  useEffect(() => invalidate, [invalidate])
-  useEffect(() => {
+  // ⚠️ **layout effect，不是 passive effect**：passive 在 commit 之後另一個 task 才 flush，回應的 microtask 可以插在「身分已經 render 成 Q」
+  // 與「還沒換代號」之間 —— 那時 race 會選到回應、P 那一輪被錯採（審查抓到的）。layout effect 在 commit 裡同步跑，插不進去。
+  useLayoutEffect(() => invalidate, [invalidate])
+  useLayoutEffect(() => {
     invalidate()
   }, [profileId, invalidate])
 
@@ -111,7 +113,7 @@ function OpenDialog({ request, onClose }: { request: RoomEntryRequest; onClose: 
       const result = await Promise.race([settled, woken])
       waiting.current.delete(wake)
       // 作廢的一輪：不存票、不進房、不顯示；也不動新一輪的任何東西 —— 直接 resolve 把 busy 交出去。
-      // （回應的 promise 鏈在 microtask 裡跑完、換代號的 effect 在 task 裡，兩者之間插不進「回應已落地、代號才換」—— 所以只看 race 的結果，不另外比計數。）
+      // （換代號在 layout effect 裡、跟 commit 同步；回應落地後的 microtask 要嘛在 commit 前（那時身分還是送出時的，採用是對的）、要嘛在 commit 後（已被叫醒）。）
       if (result === 'stale') return
       if (!result.ok) throw result.cause
       const token = result.out.room_token
