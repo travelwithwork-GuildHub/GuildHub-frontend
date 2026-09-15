@@ -43,6 +43,8 @@ export interface SceneChatStore {
 export function createSceneChatStore(initialScene = 'lobby'): SceneChatStore {
   let committed = initialScene
   let log: ChatLog = EMPTY_CHAT
+  // 跨場景單調遞增：換場景後新列表的 key 不會跟舊列表撞（撞了 React 會把舊節點改字、live region 重念）。
+  let seq = 0
   const pending = new Map<string, ChatLog>()
   let current: { link: ChatLink; send: (input: ChatIn) => void; scene: string } | null = null
   const listeners = new Set<() => void>()
@@ -54,11 +56,13 @@ export function createSceneChatStore(initialScene = 'lobby'): SceneChatStore {
       receive: (message) => {
         // 不是目前這條連線的訊息不收（`FE-R11-S08`）：比的是 link 的身分，不是 socket 有沒有關。
         if (current?.link !== link) return
+        const next = seq
+        seq += 1
         if (wsScene === committed) {
-          log = appendChat(log, message)
+          log = appendChat(log, message, next)
           notify()
         } else {
-          pending.set(wsScene, appendChat(pending.get(wsScene) ?? EMPTY_CHAT, message))
+          pending.set(wsScene, appendChat(pending.get(wsScene) ?? EMPTY_CHAT, message, next))
         }
       },
       detach: () => {
