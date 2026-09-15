@@ -208,7 +208,7 @@ export default function WorldCanvas() {
           {/* 收件匣面板（`FE-K01`）：同一個位置、同一把鎖的 provider 底下；開關與資料在 page.tsx 的 InboxPanelProvider。 */}
           <InboxPanel />
           {/* 房間密碼視窗（`FE-N08`）：沒票的門按 E 開；同一把鎖、同一個焦點錨。開關在 page.tsx 的 RoomEntryGateProvider。 */}
-          <RoomPasswordDialog doors={rooms.doors} />
+          <RoomPasswordDialog rooms={rooms.all} />
           {/* 規格 FE-W12-S02／S03／S04／S05：走廊的門「為什麼不在那裡」。
               **一切正常時它什麼都不顯示** —— 見下面那條禁令。 */}
           {/* 規格 `FE-W12-S09`：名稱與在線數**常態可見**。

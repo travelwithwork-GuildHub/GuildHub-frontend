@@ -8,6 +8,8 @@ import { ROOM_ENTRY_LABELS } from '@/world/scenes/RoomPasswordDialog'
 import { DROP_FAILED_TEXT, REENTER_LABEL, SceneNotices } from '@/world/scenes/SceneNotices'
 import { SceneProvider, useScene, type SceneValue } from '@/world/scenes/SceneProvider'
 import { holdRoomToken } from '@/world/scenes/roomTokens'
+import { doorsFor } from '@/world/rooms/ordering'
+import { CORRIDOR_SLOTS } from '@/world/rooms/slots'
 import WorldCanvas from '@/world/WorldCanvas'
 
 // 規格：openspec/changes/fe-n08-room-entry-gate/specs/room-entry-gate/spec.md
@@ -202,7 +204,11 @@ describe('被拒之後', () => {
     expect(enterProject).not.toHaveBeenCalled()
   })
 
-  it('[FE-N08-S11] 深連結失敗、清單還沒回來：視窗沒房名但可辨識；清單回來後同一個節點的名稱更新、欄位不變', async () => {
+  it('[FE-N08-S11] 深連結失敗、清單還沒回來：視窗沒房名但可辨識；清單回來後同一個節點的名稱更新、欄位不變 —— R 排不進走廊也一樣', async () => {
+    // R 排在走廊容量之外（前面塞滿 id 更小的房間）：房名要從**完整**清單查，不是走廊那份（審查抓到：用 `doors` 查，冷門房間永遠補不上）。
+    const fillers = Array.from({ length: CORRIDOR_SLOTS.length }, (_, i) => ({ project_id: `0000000${i.toString(16)}-0000-4000-8000-000000000000`, title: `填位 ${i}`, online_count: 0 }))
+    const list = [...fillers, { project_id: ROOM, title: TITLE, online_count: 1 }]
+    expect(doorsFor(list, CORRIDOR_SLOTS.length).doors.some((d) => d.project_id === ROOM), 'fixture：R 要排不進走廊').toBe(false)
     let giveRooms: (rooms: unknown) => void = () => {}
     listRooms.mockImplementation(() => new Promise((resolve) => (giveRooms = resolve)))
     holdRoomToken(PROFILE.id, ROOM, 'T')
@@ -222,7 +228,7 @@ describe('被拒之後', () => {
     expect(screen.getByRole('dialog', { name: ROOM_ENTRY_LABELS.title(null) })).toBe(dialog)
     expect(dialog.textContent).not.toContain(TITLE)
     fireEvent.change(field(), { target: { value: 'abc' } })
-    await act(async () => giveRooms([{ project_id: ROOM, title: TITLE, online_count: 1 }]))
+    await act(async () => giveRooms(list))
     await flush()
     expect(screen.getByRole('dialog')).toBe(dialog)
     expect(screen.getByRole('dialog', { name: new RegExp(TITLE) })).toBe(dialog)

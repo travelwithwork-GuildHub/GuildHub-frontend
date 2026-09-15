@@ -63,14 +63,14 @@ function describeEntryError(cause: unknown): string | null {
 }
 
 /**
- * @param doors 大廳的房間清單（`useRooms().doors`）：視窗名稱的第二個來源（`S11`）—— 深連結失敗後重開沒有 `title`，清單裡找得到就用；
- *   清單晚點回來也更新（同一個視窗、不重掛：`title` 是 prop，不是 key）。
+ * @param rooms 大廳的房間清單（`useRooms().all` —— **不是** `doors`，那份被走廊容量截斷過，冷門房間不在裡面）：視窗名稱的第二個來源（`S11`）——
+ *   深連結失敗後重開沒有 `title`，清單裡找得到就用；清單晚點回來也更新（同一個視窗、不重掛：`title` 是 prop，不是 key）。
  */
-export function RoomPasswordDialog({ doors = [] }: { doors?: readonly RoomDoorOut[] }) {
+export function RoomPasswordDialog({ rooms = [] }: { rooms?: readonly RoomDoorOut[] }) {
   const gate = useRoomEntryGateIfProvided()
   if (gate === null || gate.request === null) return null
   const { request, close } = gate
-  const title = request.title ?? doors.find((d) => d.project_id === request.projectId)?.title ?? null
+  const title = request.title ?? rooms.find((r) => r.project_id === request.projectId)?.title ?? null
   // `key`：換一間房就是另一個表單（欄位重來、焦點重新落在密碼欄）；同一間房再叫一次不換 key、不重掛（`S01`）。
   return <OpenDialog key={request.projectId} request={request} title={title} onClose={close} />
 }
