@@ -275,8 +275,12 @@ try {
     await pressE(page)
     await waitDialog(page, 'visible')
     if (release === null) throw new Error('S15：/enter 沒有被攔到')
+    // 等的是「回應已經到頁面」這個可觀察的事（fulfill 的 route 也會發 response 事件），不是固定毫秒（runner 慢就假綠）；
+    // 到達後的處理在同一個 task 的 microtask 裡跑完，下一個 Playwright 往返一定在它之後 —— 100 ms 只是保險。
+    const staleArrived = page.waitForResponse((r) => /\/api\/projects\/[^/]+\/enter$/.test(r.url()), { timeout: 5_000 })
     release()
-    await page.waitForTimeout(800)
+    await staleArrived
+    await page.waitForTimeout(100)
     if ((await dialog(page)) !== null && (await fieldValue(page)) === '' && sockets.length === 1 && (await heldToken(page, tokenKey(P.id))) === null && (await submitError(page)) === null)
       ok('[S15] 晚到的 200：沒有存票、沒有房間連線、重開的視窗還開著且空白、沒有 alert')
     else bad('[S15] 晚到的 200 被採用了', `dialog=${(await dialog(page)) !== null} value=${await fieldValue(page)} sockets=${JSON.stringify(sockets)} token=${await heldToken(page, tokenKey(P.id))} alert=${await submitError(page)}`)
