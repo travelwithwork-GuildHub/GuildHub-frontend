@@ -61,8 +61,10 @@
 - [x] 6.1 `tests/e2e/scene-chat.mjs`（`next start`；`tests/e2e/lib/world.mjs` 的偽造與走位）：`S01`（出生點附近、沒按 E、沒有 dialog、訊息出現）、`S02`（真的按 W 位移、textarea 裡打 w 不動、Escape 回錨、再按 W 會動）、`S15`（30 則多行訊息、兩個 viewport、chat 區與提示的 rect 交集 0）、`S08`（走到門前按 E 進房、hello 後只剩房間的）、`S09`（`refuse` 房間握手 → 大廳的話還在）、`S10`（reload、只回 hello＋snapshot、空狀態）＋同一段標 `[FE-R11-S05]` 並照它原文驗請求 allowlist（`/api/me`、`/api/rooms`、`/api/profiles/*`、靜態資源、`/ws`）—— **若 `/world` 載入必然打別的端點，先開 `spec/fe-r11-realtime-chat` PR 修 allowlist，不在這裡放寬**、`S11`／`S12`
   - 2026-09-15（`--world`）：S01／S02／S15（1280×720 與 1024×640 都不相交：chat 區 320×288／307×256）／S08／S09／S10＋`[FE-R11-S05]`（38 個請求都在 allowlist 內；`/world` 載入只打 `/api/me`、`/api/rooms`）對 `next start` 全部符合。
     `lib/world.mjs` 的 socket 紀錄多帶 `ws`（伺服器主動送 chat 用）。S11／S12 在 `--scroll` 補上：對 `next start` 跑兩次全部符合（27 項）；`room-entry.mjs`、`scene-switch.mjs` 也重跑（lib 改了）全部符合。
-- [ ] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
+- [x] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
+  - 2026-09-16：#446（`governance/e2e-main-scene-chat`，接替 #444 —— rebase 後重推把原 PR 關掉了）。runner 上整支 7/7 綠、scene-chat 121 秒（本機 60 秒）；前置 #445 修了 S15 的里程計校準與 S12 的回報方式（雙審抓到）。
 - [x] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 的結果如實記在這裡；`FE-R11` 的 5.1 在 S10 綠了之後才勾
   - 2026-09-15（`--scroll` 分支）：typecheck 過；eslint 乾淨；`pnpm test` 147 檔 1116 passed／7 skipped（一次全綠，沒有逾時）；契約 internal 52 passed／11 todo、guildhub 49 passed／3 skipped／11 todo；
     e2e `scene-chat.mjs` 27 項全部符合（兩次）。
-- [ ] 6.4 封存（`archive/fe-k04-scene-chat-ui`；勾勾先用 `feat/fe-k04-scene-chat-ui--tasks` 進 main）
+- [x] 6.4 封存（`archive/fe-k04-scene-chat-ui`；勾勾先用 `feat/fe-k04-scene-chat-ui--tasks` 進 main）
+  - 2026-09-16：這個 PR 就是那個勾勾；封存接著開。Sheet `FE-K04`：On-going 85% → Done（瀏覽器層驗過、#446 後）。
