@@ -46,7 +46,7 @@
 - [x] 3.4 以穩定 callback 把低頻人數送到 Canvas 外的 DOM 顯示，讓 `FE-R10-S09` 通過，並驗證單純更新人數不會建立新的 WebSocket client generation
       —— `WorldCanvas` 直接傳 `useState` setter；`S08` 斷言整段只有一條 WebSocket。突變：inline 箭頭函式、cleanup 不通知、
       cleanup 不重設 ready、名單變動不通知、不渲染、顯示遠端數、多算十個人 → 紅。畫面過 ui-ux-pro-max（ux／react），
-      截圖（dev server ＋ 偽造 REST／`/ws`）抓到文案在 800×600 被首次進入提示卡壓住 → 縮短並在窄於 md 時放左下角
+      截圖（dev server ＋ 偽造 REST／`/ws`）抓到文案在 800×600 被首次進入提示卡壓住 → 縮短並在窄於 md 時放左下角；合併後量到窄視窗跟 `FE-K04` 的聊天區（固定左下角）重疊，改回一律左上角
 
 ## 4. 雙瀏覽器姓名驗收
 

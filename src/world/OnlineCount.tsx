@@ -17,8 +17,9 @@ import { layer } from '@/design/layers'
 // - 左上角：上方正中是走廊提示、下方正中是互動提示、右側是面板 —— 那三個位置都有人了
 // - **字要短**：截圖量到「這個場景有 3 人在線（含你）」在 800×600 會被首次進入的提示卡壓住
 //   （框寬 211px；卡片置中約 370px）。拿掉「這個場景有」（以及後來的「含你」）之後，會撞到的視窗寬度從約 825px 降到約 640px 以下（量的是含「含你」的版本，拿掉後框更窄）
-// - **窄於 `md`（768px）時放左下角**：640×480 仍然被那張卡片壓住。左下角只在互動提示剛好出現、
-//   而且視窗窄於約 600px 時才可能碰到它 —— 比「常駐被壓住半截」好
+// - **一律左上角，不分寬窄**：原本窄於 `md`（768px）時放左下角，但場景聊天（`FE-K04` 的 `SceneChatHud`）
+//   固定在左下角 —— 截圖量到 767×600、640×480 人數框整個被聊天區蓋住。聊天從底部往上長、最高半個畫面，
+//   碰不到左上角。代價：窄於約 580px 時人數框一角會被首次進入的提示卡壓住（只對訪客、可關閉）
 export function OnlineCount({ count }: { count: number | null }) {
   if (count === null) return null
   return (
@@ -27,7 +28,7 @@ export function OnlineCount({ count }: { count: number | null }) {
       role="status"
       aria-atomic="true"
       style={{ zIndex: layer('hud') }}
-      className="border-line bg-surface text-ink text-caption pointer-events-none absolute bottom-gutter left-gutter border px-gutter py-2 md:top-gutter md:bottom-auto"
+      className="border-line bg-surface text-ink text-caption pointer-events-none absolute top-gutter left-gutter border px-gutter py-2"
     >
       {`${count} 人在線`}
     </div>
