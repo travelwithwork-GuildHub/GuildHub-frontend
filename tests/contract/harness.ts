@@ -170,9 +170,9 @@ export default async function setup(project: TestProject): Promise<() => Promise
     project.provide('contractDatabaseUrl', assertLoopbackDb(process.env.INTERNAL_TEST_DATABASE_URL))
     // 真後端 17 個端點都在。
     project.provide('contractUnimplemented', [])
-    // 真後端沒有 `/online`，room token 由 `enter` 簽發（W4）：這兩個能力在這一輪不存在。
+    // 真後端沒有 `/online`、也不給替身的探針：這兩個能力在這一輪不存在（房間的票由 `enter` 簽，那條兩邊都有）。
     project.provide('contractOnlineUrl', null)
-    project.provide('contractRoomToken', null)
+    project.provide('contractStubProbe', null)
     return recorded
   }
 
@@ -250,14 +250,11 @@ export default async function setup(project: TestProject): Promise<() => Promise
   project.provide('contractWsUrl', `ws://127.0.0.1:${stubPort}/ws`)
   project.provide('contractDatabaseUrl', db.url)
   project.provide('contractOnlineUrl', `http://127.0.0.1:${stubPort}/online`)
-  // seed 第一間 active 專案的房間 token（`HMAC(secret, scene)`，跟替身同一把）—— 給 S22 用。
-  const sign = (scene: string) => createHmac('sha256', CONTRACT_SESSION_SECRET).update(scene).digest('base64url')
-  project.provide('contractRoomToken', {
-    scene: 'room:22222222-0000-4000-8000-0000000000f1',
-    token: sign('room:22222222-0000-4000-8000-0000000000f1'),
-    // 一個 uuid 不合法、但 token 算對的 scene：替身要因為「不是 uuid」拒絕，不是因為 token（只擋 token 的實作會放它進去）。
-    malformed: { scene: 'room:------------------------------------', token: sign('room:------------------------------------') },
-  })
+  // 房間的票由 `POST /api/projects/{id}/enter` 簽（`FE-N08`）；測試不自己算票（ADR 0008：格式是簽發者的事）。
+  // **唯一的例外**是替身的格式探針（`FE-O03-S21`）：「uuid 不合法、但對它算對的票」只有拿著 secret 才做得出來，`enter` 簽不出來。
+  // 這裡替一個剛登入的名片簽兩張：一張給不合法的 scene（要被拒）、一張給 seed 的房間（**要連得上** —— 它是對照組：
+  // 這一行的簽法要是跟 `src/server/roomToken.ts` 漂了，對照組先紅，不會讓「被拒」變成恆真）。
+  project.provide('contractStubProbe', await stubProbe(base, CONTRACT_SESSION_SECRET))
   // 本地版 W2 刻意沒做的端點（`FE-O03-S05`）：測試對這些要求 Next 自己的 404／405、不是本地版假造的 detail。
   // 這是目標的**能力**，不是目標的名字 —— 測試檔仍然不知道自己在打誰。
   // `FE-K01` 把 messages 做出來了，從這張表拿掉。
@@ -267,6 +264,21 @@ export default async function setup(project: TestProject): Promise<() => Promise
     await stop(stub)
     await recorded()
   }
+}
+
+/** 登入一張名片、替它簽兩張票（見上面的說明）。簽法＝`HMAC(secret, "room:<id>|<profileId>")`，跟 `src/server/roomToken.ts` 同一條（這裡不能 import 它，`FE-O05-S02`）。 */
+async function stubProbe(base: string, secret: string) {
+  const r = await fetch(`${base}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nickname: '替身格式探針' }) })
+  if (r.status !== 200) throw new Error(`探針登入失敗：${r.status}`)
+  const id = ((await r.json()) as { id: string }).id
+  const cookie = r.headers
+    .getSetCookie()
+    .map((line) => line.split(';')[0] ?? '')
+    .join('; ')
+  const sign = (scene: string) => createHmac('sha256', secret).update(`${scene}|${id}`).digest('base64url')
+  const malformed = 'room:------------------------------------'
+  const valid = 'room:22222222-0000-4000-8000-0000000000f1'
+  return { id, cookie, malformed: { scene: malformed, token: sign(malformed) }, valid: { scene: valid, token: sign(valid) } }
 }
 
 /** 等某個子程序的輸出出現某段字（替身印出它聽的位址）；先退出就失敗。 */

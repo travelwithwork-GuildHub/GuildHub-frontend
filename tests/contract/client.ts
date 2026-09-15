@@ -102,9 +102,16 @@ export function unimplemented(): string[] {
 export function onlineUrl(): string | null {
   return inject('contractOnlineUrl')
 }
-/** 一間 seed 房間的 scene 與 token；真後端的 token 由 `enter` 簽發（W4）→ null。 */
-export function roomToken(): { scene: string; token: string; malformed: { scene: string; token: string } } | null {
-  return inject('contractRoomToken')
+
+/** 替身的格式探針（`FE-O03-S21`）：一張名片的 cookie，以及替它簽好的「不合法 scene 的票」與「seed 房間的票」；真後端沒有 → null。 */
+export interface StubProbe {
+  id: string
+  cookie: string
+  malformed: { scene: string; token: string }
+  valid: { scene: string; token: string }
+}
+export function stubProbe(): StubProbe | null {
+  return inject('contractStubProbe')
 }
 
 declare module 'vitest' {
@@ -114,6 +121,6 @@ declare module 'vitest' {
     contractDatabaseUrl: string
     contractUnimplemented: string[]
     contractOnlineUrl: string | null
-    contractRoomToken: { scene: string; token: string; malformed: { scene: string; token: string } } | null
+    contractStubProbe: StubProbe | null
   }
 }

@@ -5,15 +5,25 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-n08-room-entry-gate`；兩位外部審查）
-- [ ] 1.2（流程，不對應 Requirement）ADR：票只在簽發者的 process 內有意義、本地與真後端各自簽（design D7；邊界狀態、證據照 `docs/adr/README.md`）
+- [x] 1.1 規格已在 PR 上談定（#421；已刪名片那列的已知差異與 S16 在 #423）（`spec/fe-n08-room-entry-gate`；兩位外部審查）
+- [x] 1.2（流程，不對應 Requirement）ADR（`docs/adr/0008-room-ticket-is-issuer-local.md`）：票只在簽發者的 process 內有意義、本地與真後端各自簽（design D7；邊界狀態、證據照 `docs/adr/README.md`）
 
 ## 2. 本地 enter 與契約（PR：`--local-enter`；產品碼 ≤150、測試 ≤200）
 
-- [ ] 2.1 先寫 `tests/contract/rest/enter.contract.ts`：`[FE-N08-S12]` 的矩陣（401、404、404、403、200、closed 有密碼 200；名片已刪那列是已知差異，不進矩陣）；另寫 `tests/server-enter.test.ts`：`[FE-N08-S16]`（node、假 db：名片查不到 → 401、body 沒有 `room_token`、沒有第二道 SQL）、座位空與滿都 200、票對替身握手（同房同人收、別房拒、別人的 cookie 拒）、`[FE-N08-S13]` 兩個目標同一份 —— 對 `local` 目標先紅
-- [ ] 2.2 簽章函式抽成兩邊共用的模組（不 import `server-only`）、簽 `room:<uuid>|<profileId>`；`scripts/realtime-stub.ts` 改 import 它、握手改成**先解析 cookie 身分再驗票**，並把「`FE-W16` 把 enter 接上」的筆誤改成 `FE-N08`；既有用 `roomToken(scene)` 算票的測試跟著改
-- [ ] 2.3 `src/app/api/projects/[project_id]/enter/route.ts`：走 `handle()` 管線（沒有 session、或名片查不到 → 401；後者是跟真後端的已知差異，`S16`）、查 `password_hash`（不看 status）→ 404、`verifyPassword` → 403、簽票（綁 projectId＋profileId）
-- [ ] 2.4 突變：拿掉 `verifyPassword` → 403 那列紅；handler 不走 `handle()`、只 `sessionIdFrom` → S16 紅；替身換一把 secret → 握手那段紅；票不綁人 → 換 cookie 那段紅；handler 改回 `{ token }` → `EnterOut` 紅
+- [x] 2.1 先寫 `tests/contract/rest/enter.contract.ts`：`[FE-N08-S12]` 的矩陣（401、404、404、403、200、closed 有密碼 200；名片已刪那列是已知差異，不進矩陣）；另寫 `tests/server-enter.test.ts`：`[FE-N08-S16]`（node、假 db：名片查不到 → 401、body 沒有 `room_token`、沒有第二道 SQL）、座位空與滿都 200、票對替身握手（同房同人收、別房拒、別人的 cookie 拒）、`[FE-N08-S13]` 兩個目標同一份 —— 對 `local` 目標先紅
+- [x] 2.2 簽章函式抽成兩邊共用的模組（不 import `server-only`）、簽 `room:<uuid>|<profileId>`；`scripts/realtime-stub.ts` 改 import 它、握手改成**先解析 cookie 身分再驗票**，並把「`FE-W16` 把 enter 接上」的筆誤改成 `FE-N08`；既有用 `roomToken(scene)` 算票的測試跟著改
+- [x] 2.3 `src/app/api/projects/[project_id]/enter/route.ts`：走 `handle()` 管線（沒有 session、或名片查不到 → 401；後者是跟真後端的已知差異，`S16`）、查 `password_hash`（不看 status）→ 404、`verifyPassword` → 403、簽票（綁 projectId＋profileId）
+- [x] 2.4 突變：拿掉 `verifyPassword` → 403 那列紅；handler 不走 `handle()`、只 `sessionIdFrom` → S16 紅；替身換一把 secret → 握手那段紅；票不綁人 → 換 cookie 那段紅；handler 改回 `{ token }` → `EnterOut` 紅
+  - 2026-09-15 結果：`internal` 目標 51 passed／10 todo（enter 3 條、rooms S22 用 `enter` 拿票）；`guildhub` 目標（wrapper 自起真後端）49 passed／2 skipped（S22／S23：真後端沒有 `/online`）。rooms 裡「uuid 不合法但票算對」那條拿掉：契約檔不得引用 `src/server`（`FE-O05-S02`），而票的格式是簽發者的事（ADR 0008）；S21 的三種拒絕仍在 `lobby.contract.ts`。
+    突變全紅：拿掉 `verifyPassword` → 403 兩列紅（含空字串密碼）；回 `{ token }` → `EnterOut` 四處紅；替身換 secret → 握手兩條紅；簽章去掉 `|<profileId>` → 「別人拿著這張票進了房」紅；
+    `auth: 'none'` → S16 紅（403 而不是 401）；handler 加 `status = 'active'` → closed 那列紅；handler 看座位 → 滿座那列紅。
+    ⚠️ 突變改了 `src/` 之後要**重新 `next build`** 才算數（契約測試打的是 `next start`）；第一輪沒重建，紅在錯的地方。
+    審查後補：`tests/room-token-sign.test.ts`（簽章綁房也綁人；`roomSceneProject` 對不合法 uuid 回 null —— 替身在驗票前先用它擋格式，契約檔手上沒有票所以由這裡守）、S13 對 401／403／404 斷言 `toUiError(...).kind`、
+    替身在 `identify()` 期間 client 斷線的防護（`socket.on('error')`、`destroyed` 就不 `write`）；ADR 0008 邊界狀態改「僅約定」（契約守不住「前端不解析」與「簽章只有一份」）。
+    突變：`roomSceneProject` 不驗 uuid → 那條單元紅；403 改 400 → S12 兩列紅。
+    第二輪審查後：替身的裁決集中成 `roomHandshakeAllowed`（替身只呼叫它）；harness 對 `internal` 給一個「探針」（登入一張名片、用同一把 secret 簽「不合法 scene 的票」與「seed 房間的票」），
+    `rooms.contract.ts` 的 S21 經替身握手驗「uuid 不合法但票算對也拒」，對照組（seed 房間連得上、`hello.you` 是那個人）擋 harness 簽法漂掉的恆真。
+    突變：裁決只看 `room:` 前綴 → S21 紅；harness 簽法改 `:` → 對照組紅（403）。internal 52 passed。
 
 ## 3. 視窗、焦點、世界鎖（PR：`--modal`；產品碼 ≤200、測試 ≤200）
 

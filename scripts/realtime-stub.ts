@@ -5,6 +5,8 @@
 // 跟真後端一樣的地方（`app/main.py`、`app/realtime/*`）：
 //   握手：`/ws?scene=lobby` 不驗；`scene=room:<uuid>` 要 `token`；格式不合／token 不對 → **拒絕握手**（HTTP 403，不 accept、不送 err）
 //   身分：讀同一個簽章 cookie（`session`），名片在 → name／av；沒有或無效 → 新的 uuid、「訪客」、0（**不拒絕**）
+//   票綁人：房間的票由本地 `enter` 簽（`src/server/roomToken.ts`，同一把 secret），綁房間也綁身分 —— 所以**先解析 cookie 的身分、再驗票**；
+//   訪客或別人拿著這張票 → 拒絕（真後端 `verify()` 同樣的可觀察語意；規格 `FE-N08`）
 //   連上：`hello`（hz 10）→ `snapshot`；其他人收到 `presence.join`
 //   `move` 10 Hz 合併成 `pos` 廣播給**所有人（含自己）**；沒有人動就**不送**（不是空陣列）
 //   `status` 廣播 `{t,id,text}`；超過 12 個 code point → 靜默丟；`chat` 廣播 `{t,id,name,body}`
@@ -20,6 +22,7 @@ import http from 'node:http'
 import pg from 'pg'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { ClientMessage, HZ, ServerMessage, type Player } from '../src/api/contract/ws'
+import { roomHandshakeAllowed } from '../src/server/roomToken'
 
 const PORT = Number(process.env.INTERNAL_REALTIME_PORT ?? 3102)
 const SECRET = process.env.INTERNAL_SESSION_SECRET ?? 'dev-only-internal-session-secret'
@@ -36,11 +39,6 @@ function safeEqual(a: string, b: string): boolean {
   const x = Buffer.from(a)
   const y = Buffer.from(b)
   return x.length === y.length && timingSafeEqual(x, y)
-}
-
-/** 房間的 token：`HMAC(secret, "room:<uuid>")`。今天只有測試會算；`FE-W16` 把 `enter` 接上之後由它簽發（同一把）。 */
-export function roomToken(scene: string): string {
-  return hmac(scene)
 }
 
 /** 從 cookie 取身分；沒有或無效 → 訪客。**不拒絕**（真後端亦然）。 */
@@ -111,23 +109,24 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ noServer: true })
 
-function sceneAllowed(scene: string, token: string | null): boolean {
-  if (scene === 'lobby') return true
-  // `room:<uuid>`：真的 uuid，不是「36 個 hex 或連字號」（審查抓到 `room:----…` 也會過）。
-  if (!scene.startsWith('room:') || !UUID.test(scene.slice('room:'.length))) return false
-  return token !== null && safeEqual(token, roomToken(scene))
-}
-
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const scene = url.searchParams.get('scene') ?? 'lobby'
-  if (url.pathname !== '/ws' || !sceneAllowed(scene, url.searchParams.get('token'))) {
+  // 驗票要等 `identify()`（查資料庫）—— 這段非同步期間 client 可能已經斷線：raw socket 沒有 error 監聽會讓 ECONNRESET 炸掉整個替身，
+  // 對已銷毀的 socket `write` 會拋 ERR_STREAM_DESTROYED（審查抓到的）。
+  socket.on('error', () => {})
+  const refuse = () => {
     // 真後端：還沒 accept 就 close(1008) → 握手以 HTTP 403 收場，client 只看得到「連不上」，沒有 err。
+    if (socket.destroyed) return
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
     socket.destroy()
-    return
   }
+  if (url.pathname !== '/ws') return refuse()
   void identify(req.headers.cookie).then((who) => {
+    if (socket.destroyed) return
+    // 握手的裁決**只有這一處**（`roomHandshakeAllowed`，替身不另寫一套）：scene 格式（`room:<真的 uuid>`，不是「36 個 hex 或連字號」——
+    // 審查抓到 `room:----…` 也會過）、票綁房間、票綁**這個人** —— 所以先解析出身分才裁決。
+    if (!roomHandshakeAllowed(SECRET, scene, url.searchParams.get('token'), who.id)) return refuse()
     wss.handleUpgrade(req, socket, head, (ws) => {
       const conn: Conn = { ws, scene, moved: false, player: { ...who, x: 0, y: 0, f: 0, st: '' } }
       send(ws, { t: 'hello', you: who.id, hz: HZ })
