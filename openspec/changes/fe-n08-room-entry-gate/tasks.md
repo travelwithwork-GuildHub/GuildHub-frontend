@@ -24,14 +24,14 @@
 
 ## 4. 送出、錯誤、成功進房（PR：`--submit`；產品碼 ≤200、測試 ≤250）
 
-- [ ] 4.1 先寫 jsdom：`[FE-N08-S04]`（去重、busy、送出中 Esc 關得掉、晚到結果丟棄、空字串照送、不自動重送）、`[FE-N08-S06]` 的順序、（`holdRoomToken` 在 `enterRoom` 之前；用呼叫順序斷言）、`[FE-N08-S14]`（四種 storage 故障＋空字串票 → 不進房、視窗留著、alert 不含「密碼」）、`[FE-N08-S15]`（換房間、登出 → 晚到結果作廢）、`[FE-N08-S08]`～`S10`（403／404×3 種 detail／401／網路／500／422／壞 body；detail 不進 DOM；不存票、不 `enterRoom`）
+- [ ] 4.1 先寫 jsdom：`[FE-N08-S04]`（去重、busy、送出中 Esc 關得掉、晚到結果丟棄、空字串照送、不自動重送）、`[FE-N08-S06]` 的順序（`holdRoomToken` 在 `enterRoom` 之前；用呼叫順序斷言）、`[FE-N08-S14]`（四種 storage 故障＋空字串票 → 不進房、視窗留著、alert 不含「密碼」）、`[FE-N08-S15]`（換房間 → 作廢；視窗不關、身分 P→Q → 作廢；登出 → 作廢；視窗都還開著）、`[FE-N08-S08]`～`S10`（403／404×3 種 detail／401／網路／500／422／壞 body；detail 不進 DOM；不存票、不 `enterRoom`）
 - [ ] 4.2 `useForm` ＋ `enterProject()`；錯誤分類只看 `kind`（`isForbidden`／`isNotFound` 的寫法照 `identity/session.ts`）；文案在元件常數，不在規格
 - [ ] 4.3 突變：把 `detail` 印出來 → S09 紅；403 與 404 同一句 → S08／S09 紅；先 `enterRoom` 再存票 → S06 紅；submit 不去重 → S04 紅；存票不讀回 → S14 紅；關閉後不作廢那一輪 → S04 晚到那段紅
 
 ## 5. 重新輸入密碼（PR：`--retry`；產品碼 ≤120、測試 ≤150）
 
-- [ ] 5.1 先寫 jsdom：`[FE-N08-S11]`（被拒後票還在；不按就同票再試；按了才 `dropRoomToken`、關通知、開空視窗；啟動前沒有 `/enter`；`removeItem` 拋 → 不開視窗、通知留著）；`world-scenes-transition-ui.test.tsx` 的 `FE-V01-S07` 加「啟動重新輸入密碼 → alert 消失」
-- [ ] 5.2 `SceneNotices` 的 alert 加「重新輸入密碼」（那句話不變；`SECONDARY`）；`SceneProvider` 的失敗通知多記 `title`；接 `dropRoomToken` → 讀回確認 → `dismissNotice` → `needsToken(projectId, title)`
+- [ ] 5.1 先寫 jsdom：`[FE-N08-S11]`（被拒後票還在；不按就同票再試；按了才 drop、確認不在了才關通知開空視窗、可及名稱含房名；啟動前沒有 `/enter`；drop 三種故障 → 不開視窗、通知留著；深連結沒 title → 無房名的視窗，清單回來後有）；`world-scenes-transition-ui.test.tsx` 的 `FE-V01-S07` 加「啟動重新輸入密碼 → alert 消失」
+- [ ] 5.2 `SceneNotices` 的 alert 加「重新輸入密碼」（那句話不變；`SECONDARY`）；`SceneProvider` 的失敗通知多記 `title`；`roomTokens.ts` 的 drop 回報三態；接 drop → 三態判斷 → `dismissNotice` → `needsToken(projectId, title ?? 清單查到的 ?? null)`
 - [ ] 5.3 突變：失敗時自動 `dropRoomToken` → S11 第一段紅；動作不丟票 → S11 鍵仍在紅；`world-scenes-transition-ui.test.tsx` 的 `FE-V01-S07` 全綠不動
 
 ## 6. 瀏覽器與收尾

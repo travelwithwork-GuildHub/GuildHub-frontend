@@ -29,7 +29,7 @@ DOM 密碼視窗：`role="dialog"`、`aria-modal="true"`、可及名稱含那間
 正式門禁掛上之後，「輸入密碼的功能還沒開放」那句預設說明 MUST NOT 出現。
 
 > 拔掉什麼會紅：不掛 provider → S01 的視窗不出現、預設說明出現；provider 不帶 `projectId`／`title` → 名稱對不上那扇門；
-> 第二次 `needsToken` 重建視窗或重置表單 → S01 的「仍是 ab」。
+> 第二次 `needsToken` 重建視窗或重置表單 → S01 的「仍是 ab」；把輸入畫進 Canvas → S01 的「Canvas 裡沒有輸入控制」（跟「同一節點」是兩件事）。
 
 #### Scenario: [FE-N08-S01] 對著門按 E，出現這間房的密碼視窗
 
@@ -105,7 +105,9 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 - **WHEN** 依序：以 W 送出並收到 403、改成 C 送出成功、進房、按「回到 Guild Hall」
 - **THEN** 在每一次 `pushState`／`replaceState` 寫入的網址、每個時點的 `location.href`、`localStorage`、`sessionStorage`
   裡都 MUST NOT 出現 W 或 C
-- **AND** 403 之後欄位 SHALL 仍是 W；成功之後視窗 SHALL 關閉且欄位 SHALL 清空
+- **AND** 403 之後欄位 SHALL 仍是 W；成功之後視窗 SHALL 關閉
+- **AND WHEN** 回到大廳後對**另一扇**沒票的門按 E
+- **THEN** 開出來的視窗欄位 SHALL 是空的（成功後的清空是看得到的，不靠卸載）
 - → 驗於：e2e（網址用 `FE-V01` e2e 的軌跡法，看整條，不看快照）
 
 ### Requirement: 成功先存票再進房；票存不進去就不算成功；有票的人不再被問
@@ -116,7 +118,8 @@ MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人�
 視窗 MUST NOT 自己建 WebSocket、MUST NOT 寫網址；成功後視窗 SHALL 關閉。
 讀回不等於本次的票時 SHALL 視同失敗；`room_token` 是空字串時 SHALL 視同失敗（獨立的檢查 —— 空字串存得進去也讀得回來，比對抓不到它）：MUST NOT 呼叫 `enterRoom`、視窗 SHALL 留著、
 SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行證，不說是密碼錯）—— 否則使用者剛輸對密碼就被判成「沒票」留在大廳，或拿舊票去撞握手。
-每一輪送出的結果 SHALL 只在「視窗還開著、目標房間沒變、身分沒變」時才被採用；視窗關閉、換了目標房間、或身分改變之後，那一輪的結果 SHALL 作廢（不存票、不進房、不顯示）。
+每一輪送出的結果 SHALL 只在「視窗還開著、目標房間沒變、身分跟送出時相同」時才被採用；視窗關閉、換了目標房間、或身分改變（換人、登出）之後，
+那一輪的結果 SHALL 作廢（不存票、不進房、不顯示）—— 身分改變**不**關視窗（訪客本來就能開視窗、送出會拿到 401，D2），只是那一輪作廢。
 同一身分、同一分頁已持有那間房的票時，門前按 E SHALL 直接走既有 `enterRoom`，MUST NOT 開視窗、MUST NOT 呼叫 `/enter`。
 
 > 拔掉什麼會紅：反轉兩個呼叫的順序 → S06 的順序斷言；存票時鍵不含身分 → S13 換身分讀到別人的票；有票也開視窗 → S07；
@@ -146,8 +149,10 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **GIVEN** 對房間 A 的 `/enter` 尚未回應
 - **WHEN** 按 Esc 關閉，再對房間 B 的門按 E 開視窗，接著 A 的請求回 `200 { "room_token": "TA" }`
 - **THEN** `sessionStorage` 裡 SHALL 沒有 A 也沒有 B 的票；SHALL 沒有 `enterRoom`；B 的視窗 SHALL 還開著、欄位空白、沒有 alert
-- **AND WHEN** 對 B 送出、尚未回應時身分變成訪客（登出；視窗**不**經使用者關閉），接著 B 的請求回 `200 { "room_token": "TB" }`
-- **THEN** SHALL 沒有存票（任何鍵都沒有 TB）、沒有 `enterRoom`、沒有 alert；視窗 SHALL 已關閉（身分沒了就沒有可存票的鍵）
+- **AND WHEN** 以 P 的身分對 B 送出、尚未回應時身分變成 Q（視窗**不**關、不重掛），接著 B 的請求回 `200 { "room_token": "TB" }`
+- **THEN** SHALL 沒有存票（P＋B、Q＋B 都沒有 TB）、沒有 `enterRoom`、沒有 alert；視窗 SHALL 還開著（這一段只靠身分比對，關閉的作廢幫不上忙）
+- **AND WHEN** 再以 Q 送出、尚未回應時登出成訪客，接著回 `200 { "room_token": "TB2" }`
+- **THEN** 同樣沒有存票、沒有 `enterRoom`；視窗 SHALL 還開著
 - → 驗於：jsdom
 
 #### Scenario: [FE-N08-S07] 有票的人回大廳再按 E，直接進、不問密碼
@@ -201,8 +206,11 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 `world-scenes` 的失敗通知（那句話、留存、取代、系統不重試、系統不丟票）全部維持。通知 SHALL 另提供一個
 「重新輸入密碼」動作。只有使用者啟動它時，系統 SHALL：丟棄**這個身分**對**那間房**的票 → 關閉通知 → 開啟那間房的密碼視窗（欄位空白）。
 沒有啟動時，票 SHALL 還在，再走到門前按 E SHALL 用同一張票再試（`FE-V01-S07`）。
-丟票也要讀回確認：`dropRoomToken` 之後 `heldRoomToken` 仍讀得到票（storage 不可用）時，MUST NOT 開視窗、通知 SHALL 留著，
+丟票也要確認：丟票的結果 SHALL 分成「確定不在了」「還在」「無法確認（storage 讀不到）」三種（`roomTokens.ts` 的 drop 要能回報，
+今天的 `heldRoomToken(): string | null` 分不出後兩種）；只有「確定不在了」才開視窗；「還在」或「無法確認」→ MUST NOT 開視窗、通知 SHALL 留著，
 並 SHALL 顯示受控的一句（這個瀏覽器清不掉通行證）—— 不能一邊開視窗一邊留著一張會被拿去撞握手的舊票。
+視窗的可及名稱 SHALL 含那間房的標題；標題來源依序是：`enterRoom` 當時帶的 `title`、大廳房間清單裡同 `projectId` 的標題；
+兩者都沒有（深連結或上一頁失敗、清單還沒回來）時 SHALL 仍開視窗，名稱不含房名但可辨識是房間密碼視窗。
 
 > 拔掉什麼會紅：系統在失敗時自動丟票 → S11 第一段（票不在了）；動作不丟票 → S11 第二段（視窗開了但票還在，
 > 之後送出成功會覆寫 —— 判準是 `sessionStorage` 那個鍵在啟動後為空）；動作不關通知 → S11 alert 還在。
@@ -216,8 +224,10 @@ SHALL 顯示一則受控的 `role="alert"`（說這個瀏覽器存不了通行�
 - **AND WHEN** 第二次也被拒，使用者啟動「重新輸入密碼」
 - **THEN** P＋R 的鍵 SHALL 被移除；SHALL 沒有 `role="alert"`；SHALL 出現 R 的密碼視窗，可及名稱含 R 的標題、欄位空白（通知要記得那間房的標題，不只 id）
 - **AND** 在啟動之前，系統 MUST NOT 呼叫 `/enter`、MUST NOT 自己移除那個鍵
-- **AND WHEN** `sessionStorage.removeItem` 拋、使用者啟動「重新輸入密碼」
-- **THEN** SHALL 沒有視窗；通知 SHALL 還在；SHALL 有一句受控說明；那個鍵 SHALL 仍是 T
+- **AND WHEN** `sessionStorage.removeItem` 拋，或 `removeItem` 靜默沒刪、或刪完 `getItem` 拋 —— 三種各一次，使用者啟動「重新輸入密碼」
+- **THEN** 三種都 SHALL 沒有視窗；通知 SHALL 還在；SHALL 有一句受控說明；鍵在的那兩種鍵 SHALL 仍是 T
+- **AND WHEN** 失敗來自深連結（`/world?room=R` 帶票、沒有 `title`）、房間清單還沒回來，使用者啟動「重新輸入密碼」
+- **THEN** SHALL 開視窗，可及名稱 SHALL 可辨識是房間密碼視窗（不含房名）；清單回來後再開一次 SHALL 含房名
 - → 驗於：jsdom、e2e（前半）
 
 ### Requirement: 本地後端的 enter 在下列語意上與真後端相同，票本地替身收得下

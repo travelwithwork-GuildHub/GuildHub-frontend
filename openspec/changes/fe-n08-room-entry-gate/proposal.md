@@ -28,9 +28,9 @@ Vercel 上的人永遠進不了房間，`FE-V01` 只有測試進得去。
   - `world-scenes` 的握手失敗通知多一個**使用者發起**的「重新輸入密碼」動作：啟動才丟票、才開 Modal
   - 本地後端補 `POST /api/projects/{project_id}/enter`（`FE-O03` 的 Route Handler ＋ 可拋棄 DB），
     簽出的票本地即時層替身收得下；`local` 與 `guildhub` 兩個目標跑同一份契約測試
-- **不改任何既有 Scenario**：`FE-W12-S16`／`FE-V01-S11` 測的是「預設門禁」，那個預設 provider 保留；
-  `FE-V01-S06`／`S07`／`S16` 的義務（回大廳、固定語彙、系統不重試、系統不丟票）全部維持，
-  「重新輸入密碼」是加在通知上的**額外**動作，不改那句話。
+- **既有規格只動一句**：`world-scenes`〈進不去就回 Guild Hall…〉開最小 MODIFIED delta，通知的消失條件多列「使用者從通知啟動重新輸入密碼」，
+  其餘正文與 `FE-V01-S06`／`S07`／`S16` 逐字不動（archive 時整條取代，對 diff 要看得到只多那一句）。
+  `world-interactive-objects` 不動：`FE-W12-S16`／`FE-V01-S11` 測的是「預設門禁」，那個預設 provider 保留。
 
 ## Non-goals
 
