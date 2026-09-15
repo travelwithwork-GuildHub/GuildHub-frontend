@@ -24,9 +24,9 @@
 
 ## 4. 送出、錯誤、成功進房（PR：`--submit`；產品碼 ≤200、測試 ≤250）
 
-- [ ] 4.1 先寫 jsdom：`[FE-N08-S04]`（去重、busy、空字串照送、不自動重送）、`[FE-N08-S06]` 的順序（`holdRoomToken` 在 `enterRoom` 之前；用呼叫順序斷言）、`[FE-N08-S08]`～`S10`（403／404×3 種 detail／401／網路／500／422／壞 body；detail 不進 DOM；不存票、不 `enterRoom`）
+- [ ] 4.1 先寫 jsdom：`[FE-N08-S04]`（去重、busy、送出中 Esc 關得掉、晚到結果丟棄、空字串照送、不自動重送）、`[FE-N08-S06]` 的順序、（`holdRoomToken` 在 `enterRoom` 之前；用呼叫順序斷言）、`[FE-N08-S14]`（`setItem` 拋 → 不進房、視窗留著、alert 不含「密碼」）、`[FE-N08-S08]`～`S10`（403／404×3 種 detail／401／網路／500／422／壞 body；detail 不進 DOM；不存票、不 `enterRoom`）
 - [ ] 4.2 `useForm` ＋ `enterProject()`；錯誤分類只看 `kind`（`isForbidden`／`isNotFound` 的寫法照 `identity/session.ts`）；文案在元件常數，不在規格
-- [ ] 4.3 突變：把 `detail` 印出來 → S09 紅；403 與 404 同一句 → S08／S09 紅；先 `enterRoom` 再存票 → S06 紅；submit 不去重 → S04 紅
+- [ ] 4.3 突變：把 `detail` 印出來 → S09 紅；403 與 404 同一句 → S08／S09 紅；先 `enterRoom` 再存票 → S06 紅；submit 不去重 → S04 紅；存票不讀回 → S14 紅；關閉後不作廢那一輪 → S04 晚到那段紅
 
 ## 5. 重新輸入密碼（PR：`--retry`；產品碼 ≤120、測試 ≤150）
 

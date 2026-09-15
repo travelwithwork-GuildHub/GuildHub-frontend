@@ -43,12 +43,13 @@ DOM 密碼視窗：`role="dialog"`、`aria-modal="true"`、可及名稱含那間
 
 視窗開啟期間，系統 SHALL 持有世界命令鎖（`holdInputLock` 那把可合成的鎖）：焦點落在視窗裡**任何**控制上，
 移動鍵與 E 都 MUST NOT 動到世界。焦點 SHALL 一開始就在密碼欄；Tab／Shift+Tab SHALL 留在視窗內。
-不在送出中時，Esc 或關閉控制 SHALL 只關這一層視窗、清掉當次密碼、把焦點放回世界焦點錨（不是 `body`），
-MUST NOT 觸發門或其他底層動作。關閉後這把鎖 SHALL 釋放；別的持有者還在時世界 SHALL 仍鎖著。
-送出中（請求未完成）Esc 與關閉 SHALL 無效。
+Esc 或關閉控制 SHALL 只關這一層視窗、清掉當次密碼、把焦點放回世界焦點錨（不是 `body`），
+MUST NOT 觸發門或其他底層動作 —— **送出中也可以關**（人不能被一個卡住的請求鎖在視窗裡）；
+關掉之後那個請求的結果 SHALL 被丟棄：不存票、不 `enterRoom`、不重開視窗、不顯示錯誤。
+關閉後這把鎖 SHALL 釋放；別的持有者還在時世界 SHALL 仍鎖著。
 
 > 拔掉什麼會紅：視窗不持鎖 → S03（焦點在按鈕上按 W 世界會動）；關閉不清密碼 → S02 再開時欄位不空；
-> 關閉時焦點丟到 `body` → S02；busy 時允許關閉 → S04。
+> 關閉時焦點丟到 `body` → S02；busy 時 Esc 無效或晚到的成功仍進房 → S04。
 
 #### Scenario: [FE-N08-S02] Esc 關閉、清密碼、焦點回世界錨；再按 E 是空白的
 
@@ -81,13 +82,17 @@ MUST NOT 觸發門或其他底層動作。關閉後這把鎖 SHALL 釋放；別�
 > 拔掉什麼會紅：submit handler 不去重 → S04 呼叫兩次；把密碼放進 storage 或網址 → S05；
 > 加 `.min(1)` → S04 的空字串那段（後端會回 403，前端不能先擋）。
 
-#### Scenario: [FE-N08-S04] 送出中連按只送一次；空字串也送
+#### Scenario: [FE-N08-S04] 送出中連按只送一次；送出中按 Esc 關得掉、晚到的成功被丟棄；空字串也送
 
 - **GIVEN** 視窗開著，密碼欄是「abc」
 - **WHEN** 按送出，`/enter` 尚未回應時再按送出與 Enter 各一次
 - **THEN** `enterProject` SHALL 只被呼叫一次，參數是這扇門的 `projectId` 與 `{ password: 'abc' }`
 - **AND** 送出控制 SHALL disabled；跑完所有排程中的計時器後 SHALL 沒有第二次呼叫
-- **AND WHEN** 密碼欄清空後送出
+- **AND WHEN** 請求仍未回應時按 Esc
+- **THEN** 視窗 SHALL 關閉、焦點 SHALL 回世界焦點錨、世界命令鎖 SHALL 釋放
+- **AND WHEN** 那個請求接著回 `200 { "room_token": "T" }`
+- **THEN** `sessionStorage` SHALL 沒有 T、SHALL 沒有 `enterRoom`、視窗 SHALL 仍關著、SHALL 沒有 `role="alert"`
+- **AND WHEN** 再開視窗，密碼欄清空後送出
 - **THEN** `enterProject` SHALL 以 `{ password: '' }` 被呼叫（前端不擋，後端回 403 走 S08）
 - → 驗於：jsdom
 
@@ -100,14 +105,17 @@ MUST NOT 觸發門或其他底層動作。關閉後這把鎖 SHALL 釋放；別�
 - **AND** 403 之後欄位 SHALL 仍是那個字串；成功之後視窗 SHALL 關閉且欄位 SHALL 清空
 - → 驗於：e2e（網址用 `FE-V01` e2e 的軌跡法，看整條，不看快照）
 
-### Requirement: 成功先存票再進房；有票的人不再被問
+### Requirement: 成功先存票再進房；票存不進去就不算成功；有票的人不再被問
 
-`enterProject` 成功後，系統 SHALL 先以 `holdRoomToken(profileId, projectId, room_token)` 存票，**再**呼叫
-`enterRoom(projectId, { title })`；視窗 MUST NOT 自己建 WebSocket、MUST NOT 寫網址；成功後視窗 SHALL 關閉。
+`enterProject` 成功後，系統 SHALL 先以 `holdRoomToken(profileId, projectId, room_token)` 存票，並 SHALL 讀回確認票真的在
+（`sessionStorage` 不可用時 `roomTokens.ts` 寫不進去也不拋），**再**呼叫 `enterRoom(projectId, { title })`；
+視窗 MUST NOT 自己建 WebSocket、MUST NOT 寫網址；成功後視窗 SHALL 關閉。
+票讀不回來時 SHALL 視同失敗：MUST NOT 呼叫 `enterRoom`、視窗 SHALL 留著、SHALL 顯示一則受控的 `role="alert"`
+（說這個瀏覽器存不了通行證，不說是密碼錯）—— 否則使用者剛輸對密碼就被判成「沒票」留在大廳，看起來像門壞了。
 同一身分、同一分頁已持有那間房的票時，門前按 E SHALL 直接走既有 `enterRoom`，MUST NOT 開視窗、MUST NOT 呼叫 `/enter`。
 
 > 拔掉什麼會紅：先 `enterRoom` 再存票 → S06 沒有房間連線（`resolved.scene` 判成沒票）；
-> 存票時鍵不含身分 → S13 換身分讀到別人的票；有票也開視窗 → S07。
+> 存票時鍵不含身分 → S13 換身分讀到別人的票；有票也開視窗 → S07；存票不讀回確認 → S14 仍呼叫 `enterRoom`。
 
 #### Scenario: [FE-N08-S06] 密碼對了：票存起來、過場開始、房間連線帶著票、網址沒有票
 
@@ -117,6 +125,14 @@ MUST NOT 觸發門或其他底層動作。關閉後這把鎖 SHALL 釋放；別�
 - **AND** 新 socket 的位址 SHALL 含 `scene=room:R` 與 `token=T`；每一次寫入的網址 MUST NOT 含 T
 - **AND** 視窗 SHALL 關閉
 - → 驗於：jsdom（順序）、e2e（連線與網址）
+
+#### Scenario: [FE-N08-S14] 票存不進去：不進房、視窗留著、說的不是密碼錯
+
+- **GIVEN** `sessionStorage` 的 `setItem` 會拋（配額滿或被停用）
+- **WHEN** `/enter` 回 `200 { "room_token": "T" }`
+- **THEN** SHALL 沒有 `enterRoom`、沒有新 socket、網址不變；視窗 SHALL 還開著
+- **AND** 送出控制之前 SHALL 恰好一個 `role="alert"`，內容 MUST NOT 含「密碼」；T MUST NOT 出現在 DOM
+- → 驗於：jsdom
 
 #### Scenario: [FE-N08-S07] 有票的人回大廳再按 E，直接進、不問密碼
 
