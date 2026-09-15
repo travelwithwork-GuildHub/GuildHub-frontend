@@ -1,9 +1,11 @@
 'use client'
 
-import { createContext, useContext, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { ChatIn } from '@/api/contract/ws'
 import type { ChatLog } from './sceneChat'
 import { createSceneChatStore, type SceneChatPort, type SceneChatStore } from './sceneChatStore'
+import { sceneOf } from '@/world/scenes/registry'
+import { useScene } from '@/world/scenes/SceneProvider'
 
 // 場景聊天在 React 裡的出口。規格 `FE-R11`（design D1）。
 //
@@ -13,11 +15,22 @@ import { createSceneChatStore, type SceneChatPort, type SceneChatStore } from '.
 //
 // ⚠️ context 裡放的是**穩定的 store**，不是 log：訂閱 log 的 `useSyncExternalStore` 在 `useSceneChat()` 裡 —— 只有讀列表的 UI 才隨訊息重繪，
 // 拿 port 的 `WorldCanvas`（包著 `<Canvas>`）不會每一則訊息都被拖著重繪（審查抓到的）。
+//
+// 清空的條件只有一個（design D4）：**committed 的 `wsScene` 改變**。過場中（`transition !== null`）committed 還是舊的，不清；
+// 握手被拒退回、同場景重連 —— committed 沒變，不清。不看連線、不看 `RealtimeGenerationProvider.generation`。
 
 const Ctx = createContext<SceneChatStore | null>(null)
 
 export function SceneChatProvider({ children }: { children: ReactNode }) {
   const [store] = useState(createSceneChatStore)
+  const { scene, transition } = useScene()
+  const committed = sceneOf(transition === null ? scene : transition.from).wsScene
+  const previous = useRef(committed)
+  useEffect(() => {
+    if (previous.current === committed) return
+    previous.current = committed
+    store.clear()
+  }, [committed, store])
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }
 
