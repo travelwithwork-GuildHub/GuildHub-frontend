@@ -89,7 +89,7 @@ describe('送出', () => {
     expect(field().value, '接受了才清空').toBe('')
     expect(alerts()).toHaveLength(0)
     expect(rows(), '回聲前列表不出現').toHaveLength(0)
-    echo({ id: 'me', name: '我', body: '哈囉', truncated: false })
+    echo({ seq: 0, id: 'me', name: '我', body: '哈囉', truncated: false })
     expect(rows()).toHaveLength(1)
     expect(rows()[0]?.textContent).toContain('哈囉')
   })
