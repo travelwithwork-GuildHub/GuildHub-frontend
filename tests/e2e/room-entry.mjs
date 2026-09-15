@@ -279,11 +279,16 @@ try {
     // 到達後的處理在同一個 task 的 microtask 裡跑完，下一個 Playwright 往返一定在它之後 —— 100 ms 只是保險。
     const staleArrived = page.waitForResponse((r) => /\/api\/projects\/[^/]+\/enter$/.test(r.url()), { timeout: 5_000 })
     release()
-    await staleArrived
-    await page.waitForTimeout(100)
-    if ((await dialog(page)) !== null && (await fieldValue(page)) === '' && sockets.length === 1 && (await heldToken(page, tokenKey(P.id))) === null && (await submitError(page)) === null)
-      ok('[S15] 晚到的 200：沒有存票、沒有房間連線、重開的視窗還開著且空白、沒有 alert')
-    else bad('[S15] 晚到的 200 被採用了', `dialog=${(await dialog(page)) !== null} value=${await fieldValue(page)} sockets=${JSON.stringify(sockets)} token=${await heldToken(page, tokenKey(P.id))} alert=${await submitError(page)}`)
+    await (await staleArrived).finished() // body 也送完了；接下來只剩頁面裡 json() 與 microtask
+    // 「沒有被採用」是一個不會發生的事，量法是：body 送完之後連續一段時間每個時點都沒有發生（不是等一個固定毫秒再看一次）。
+    let adopted = null
+    for (let i = 0; i < 8 && adopted === null; i++) {
+      await page.waitForTimeout(100)
+      const state = { dialog: (await dialog(page)) !== null, value: await fieldValue(page), sockets: sockets.length, token: await heldToken(page, tokenKey(P.id)), alert: await submitError(page) }
+      if (!(state.dialog && state.value === '' && state.sockets === 1 && state.token === null && state.alert === null)) adopted = state
+    }
+    if (adopted === null) ok('[S15] 晚到的 200（body 送完後 800 ms 內每 100 ms 看一次）：沒有存票、沒有房間連線、重開的視窗還開著且空白、沒有 alert')
+    else bad('[S15] 晚到的 200 被採用了', JSON.stringify(adopted))
 
     // S06／S05：正確密碼 → 存票、過場、房間連線帶票；網址與 storage 都沒有密碼與票
     enter.current = (route, body) => (body.password === CORRECT ? json(route, 200, { room_token: TOKEN }) : json(route, 403, { detail: '房間密碼錯誤' }))
