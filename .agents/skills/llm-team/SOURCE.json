@@ -1,8 +1,8 @@
 {
-  "version": "1.2",
-  "sourceCommit": "616aa765143bec88248333c1ae48eedfdc275c45",
+  "version": "1.7.1",
+  "sourceCommit": "c0a641b5e34f9c6b89e2c16e9a1531df75799c30",
   "sourceDirty": false,
-  "exportedAt": "2026-09-14T09:28:33.909Z",
+  "exportedAt": "2026-09-15T23:25:48.469Z",
   "files": [
     "lib.mjs",
     "write.mjs",
@@ -11,6 +11,10 @@
     "setup.mjs",
     "llm-team.test.mjs",
     "ticket.test.mjs",
+    "batch.mjs",
+    "batch.test.mjs",
+    "usage.mjs",
+    "usage.test.mjs",
     "export.mjs",
     "export.test.mjs",
     "agy-pretooluse.sh",
