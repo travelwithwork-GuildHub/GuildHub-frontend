@@ -134,7 +134,96 @@ try {
     await page.setViewportSize({ width: 1280, height: 720 })
     await page.waitForTimeout(300)
 
-    // S08：進房（hello 之後 committed）→ 大廳的話不見；房間送一則 → 只剩它
+    // S11／S12：列表已經會捲動（30 則）。在底部 → 新的一則可見；往上捲 → 位置不動、出現控制、按了最新可見且控制消失
+    const SCROLL = `${HUD} [data-testid="chat-scroll"]`
+    const lastVisible = () =>
+      page.$eval(SCROLL, (el) => {
+        const rows = el.querySelectorAll('[data-testid="chat-row"]')
+        const last = rows[rows.length - 1]
+        if (!last) return false
+        const a = last.getBoundingClientRect()
+        const b = el.getBoundingClientRect()
+        return a.top >= b.top - 0.5 && a.bottom <= b.bottom + 0.5
+      })
+    const scrollable = await page.$eval(SCROLL, (el) => el.scrollHeight > el.clientHeight + 10)
+    if (scrollable) ok('[S11] 列表已經長到會捲動')
+    else throw new Error('[S11] 列表沒有長到會捲動 —— 判準的前提不成立，往下跑會全部假綠')
+    await page.evaluate((sel) => {
+      const el = document.querySelector(sel)
+      el.scrollTop = el.scrollHeight
+    }, SCROLL)
+    await page.waitForTimeout(100)
+    serverChat(sockets, '新人', '在底部時來的')
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="chat-body"]')].some((n) => n.textContent === '在底部時來的'), null, { timeout: 5_000 })
+    await page.waitForTimeout(100)
+    if (await lastVisible()) ok('[S11] 在底部：新的一則在可見區')
+    else bad('[S11] 在底部收到新訊息，最新的一則不在可見區')
+    await page.evaluate((sel) => {
+      document.querySelector(sel).scrollTop = 0
+    }, SCROLL)
+    await page.waitForTimeout(100)
+    const topBefore = await page.$eval(SCROLL, (el) => el.scrollTop)
+    if ((await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) === null) ok('[S12] 往上捲、還沒有新訊息：沒有控制')
+    else bad('[S12] 往上捲就出現控制（新訊息還沒來）')
+    serverChat(sockets, '新人', '往上讀時來的')
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="chat-body"]')].some((n) => n.textContent === '往上讀時來的'), null, { timeout: 5_000 })
+    await page.waitForTimeout(150)
+    const topAfter = await page.$eval(SCROLL, (el) => el.scrollTop)
+    const jump = await page.$(`${HUD} [data-testid="chat-jump-latest"]`)
+    if (Math.abs(topAfter - topBefore) <= 1 && jump !== null && !(await lastVisible())) ok(`[S12] 往上讀：位置不動（${topBefore}→${topAfter}）、出現回到最新的控制、最新的一則不在可見區`)
+    else bad('[S12] 往上讀時被搶走位置或沒有控制', `scrollTop ${topBefore}→${topAfter} jump=${jump !== null} lastVisible=${await lastVisible()}`)
+    // 控制不蓋住任何可見的列（它在列表下面自己的一列，不是浮在列表上）
+    const jumpBox = await jump?.boundingBox()
+    // 只看**可見的**列（跟捲動容器的可見區有交集的）：被捲到下面、被 overflow 裁掉的列在 DOM 上還有 rect，但使用者看不到它們。
+    const covered = await page.$$eval(`${HUD} [data-testid="chat-row"]`, (rows, box) => {
+      const rect = (r) => ({ x: r.x, y: r.y, width: r.width, height: r.height })
+      const inter = (a, b) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))
+      const view = rect(document.querySelector('[data-testid="chat-scroll"]').getBoundingClientRect())
+      // 列的 rect 先裁到捲動容器的可見區（被 overflow 切掉的部分使用者看不到，也不會被「蓋住」）
+      const clip = (r) => {
+        const x = Math.max(r.x, view.x)
+        const y = Math.max(r.y, view.y)
+        return { x, y, width: Math.max(0, Math.min(r.x + r.width, view.x + view.width) - x), height: Math.max(0, Math.min(r.y + r.height, view.y + view.height) - y) }
+      }
+      return rows
+        .map((r) => clip(rect(r.getBoundingClientRect())))
+        .filter((r) => r.width > 0 && r.height > 0)
+        .filter((r) => inter(r, box) > 0).length
+    }, jumpBox)
+    if (covered === 0) ok('[S12] 回到最新的控制沒有蓋住任何一列')
+    else bad('[S12] 控制蓋住了正在讀的列', `${covered} 列`)
+    await page.screenshot({ path: path.join(OUT, 'hud-unseen.png') })
+    await jump?.click()
+    await page.waitForTimeout(150)
+    if ((await lastVisible()) && (await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) === null) ok('[S12] 啟動控制：最新的一則在可見區、控制消失')
+    else bad('[S12] 啟動控制之後不對', `lastVisible=${await lastVisible()} jump=${(await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) !== null}`)
+    // S12 的邊界：只往上移一點點、最後一列被切掉一部分（沒有完整在可見區）→ 新訊息也不能把人拉到底
+    await page.evaluate((sel) => {
+      const el = document.querySelector(sel)
+      el.scrollTop = el.scrollHeight - el.clientHeight - 10
+    }, SCROLL)
+    await page.waitForTimeout(100)
+    if (!(await lastVisible())) ok('[S12] 邊界前提：往上 10px，最後一列已經不完整在可見區')
+    else throw new Error('[S12] 往上 10px 之後最後一列仍完整可見 —— 邊界前提不成立')
+    const edgeBefore = await page.$eval(SCROLL, (el) => el.scrollTop)
+    serverChat(sockets, '新人', '邊界時來的')
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="chat-body"]')].some((n) => n.textContent === '邊界時來的'), null, { timeout: 5_000 })
+    await page.waitForTimeout(150)
+    const edgeAfter = await page.$eval(SCROLL, (el) => el.scrollTop)
+    const edgeJump = await page.$(`${HUD} [data-testid="chat-jump-latest"]`)
+    if (Math.abs(edgeAfter - edgeBefore) <= 1 && edgeJump !== null) ok(`[S12] 邊界：最後一列只被切掉一點也不拉到底（${edgeBefore}→${edgeAfter}）、有控制`)
+    else bad('[S12] 邊界：被拉到底或沒有控制', `scrollTop ${edgeBefore}→${edgeAfter} jump=${edgeJump !== null}`)
+    await edgeJump?.click()
+    await page.waitForTimeout(150)
+    await (await field(page)).focus()
+    await page.keyboard.press('Escape')
+
+    // S08：進房（hello 之後 committed）→ 大廳的話不見；房間送一則 → 只剩它。
+    // 進房前先把大廳的列表捲到頂（「往上讀過」）：新場景要從底部開始跟隨，不能把上一個場景的捲動狀態帶過去。
+    await page.evaluate((sel) => {
+      document.querySelector(sel).scrollTop = 0
+    }, SCROLL)
+    await page.waitForTimeout(100)
     let since = await overlaysSeen(page)
     await page.keyboard.press('KeyE')
     await waitForTransition(page, '按 E 進房間', since, 'S08')
@@ -146,6 +235,12 @@ try {
     await waitRows(page, 1)
     if (JSON.stringify(await rowsText(page)) === JSON.stringify(['房間訊息'])) ok('[S08] 房間送一則：只顯示它')
     else bad('[S08] 房間的列表不對', JSON.stringify(await rowsText(page)))
+    // 新場景從底部開始跟隨（S11 在換場景之後也成立）：房間再送 30 則多行 → 最新的一則在可見區、沒有「回到最新」
+    for (let i = 0; i < 30; i += 1) serverChat(sockets, `房${i}`, `房間第 ${i} 則\n第二行`)
+    await waitRows(page, 31)
+    await page.waitForTimeout(150)
+    if ((await lastVisible()) && (await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) === null) ok('[S11] 換場景之後：新場景從底部開始跟隨（上一個場景往上讀過也一樣）')
+    else bad('[S11] 換場景之後沒有從底部開始跟隨', `lastVisible=${await lastVisible()} jump=${(await page.$(`${HUD} [data-testid="chat-jump-latest"]`)) !== null}`)
 
     // S09：回大廳（有一則）→ 再進房被拒 → 自動回大廳 → 那則還在
     since = await overlaysSeen(page)

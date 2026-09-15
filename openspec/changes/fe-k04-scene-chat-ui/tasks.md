@@ -44,15 +44,25 @@
 
 ## 5. 捲動（PR：`--scroll`；產品碼 ≤120、測試 ≤150）
 
-- [ ] 5.1 先寫瀏覽器判準（`tests/e2e/scene-chat.mjs` 的 S11／S12 段）：在底部收新訊息 → 最新可見；往上捲 → `scrollTop` 差 ≤1px、出現控制、按了最新可見且控制消失
-- [ ] 5.2 實作底部跟隨、往上讀不搶、「有新訊息」控制；量「底部附近」的閾值 —— 量出來若改變了 S11／S12 的可觀察結果，停下重開 spec PR
-- [ ] 5.3 突變：每則都 `scrollIntoView` → S12 紅；不跟隨 → S11 紅；拿掉控制 → S12 紅
+- [x] 5.1 先寫瀏覽器判準（`tests/e2e/scene-chat.mjs` 的 S11／S12 段）：在底部收新訊息 → 最新可見；往上捲 → `scrollTop` 差 ≤1px、出現控制、按了最新可見且控制消失
+- [x] 5.2 實作底部跟隨、往上讀不搶、「有新訊息」控制；量「底部附近」的閾值 —— 量出來若改變了 S11／S12 的可觀察結果，停下重開 spec PR
+  - 2026-09-15：`SceneChatHud` 的捲動容器 `onScroll` 記「距底 ≤ 24px 就算在底部」（量過：單行列約 20px，一行以內算在底部）；`useLayoutEffect([log])`：在底部就 `scrollTop = scrollHeight`，否則 `unseen`＋「回到最新」控制（`SECONDARY`，浮在列表右下）。
+    閾值沒有改變 S11／S12 的可觀察結果（不用重開 spec）。HUD 最大高度從 40vh 改 50vh（720 高時 feed 只剩 5 行）。
+    審查退回：`ResizeObserver` 重算距底（視窗變高矮不發 scroll 事件）；按鈕置中浮在列表下緣（不壓右側原生捲軸）；`unseen` 在下一幀設（effect 裡不直接 setState，lint 擋）；
+    e2e 的前提（列表會捲）不成立就 throw（否則往下全假綠）。「換場景清空就重設 atBottom」試過拿掉也綠（瀏覽器把 scrollTop 夾回 0 會發 scroll 事件）→ 刪掉，e2e 留「上一個場景往上讀過、新場景仍從底部跟隨」那條。
+    第 2 輪（codex）：**「在底部」改成「最後一列完整落在可見區」**（24px 閾值會讓「最後一列被切掉一點」時仍被拉到底，跟 S12 的前提衝突；現在跟規格的定義一模一樣，沒有閾值可量）；
+    「回到最新」改到列表**下面**自己的一列（浮在上面會蓋住正在讀的舊訊息；e2e 斷言它跟可見的列 rect 交集 0，列的 rect 先裁到捲動容器）；
+    rAF 亮起前再看一次 `atBottom`（那一幀內拖回底部的窗口 —— **沒有判準能穩定重現，誠實記著**）。e2e 加邊界：往上只 10px、最後一列不完整 → 新訊息不拉到底、有控制。
+- [x] 5.3 突變：每則都 `scrollIntoView` → S12 紅；不跟隨 → S11 紅；拿掉控制 → S12 紅
+  - 2026-09-15 結果（e2e，每種 build＋跑，兩輪）：一律捲到底 → S12 紅；不跟隨 → S11 紅；拿掉控制 → S12 兩處紅；「空了不重設」不紅（如上，程式碼已拿掉）。執行紀錄貼在 PR 留言。
 
 ## 6. 瀏覽器與收尾
 
-- [ ] 6.1（S11／S12 在 `--scroll` 之後補）`tests/e2e/scene-chat.mjs`（`next start`；`tests/e2e/lib/world.mjs` 的偽造與走位）：`S01`（出生點附近、沒按 E、沒有 dialog、訊息出現）、`S02`（真的按 W 位移、textarea 裡打 w 不動、Escape 回錨、再按 W 會動）、`S15`（30 則多行訊息、兩個 viewport、chat 區與提示的 rect 交集 0）、`S08`（走到門前按 E 進房、hello 後只剩房間的）、`S09`（`refuse` 房間握手 → 大廳的話還在）、`S10`（reload、只回 hello＋snapshot、空狀態）＋同一段標 `[FE-R11-S05]` 並照它原文驗請求 allowlist（`/api/me`、`/api/rooms`、`/api/profiles/*`、靜態資源、`/ws`）—— **若 `/world` 載入必然打別的端點，先開 `spec/fe-r11-realtime-chat` PR 修 allowlist，不在這裡放寬**、`S11`／`S12`
+- [x] 6.1 `tests/e2e/scene-chat.mjs`（`next start`；`tests/e2e/lib/world.mjs` 的偽造與走位）：`S01`（出生點附近、沒按 E、沒有 dialog、訊息出現）、`S02`（真的按 W 位移、textarea 裡打 w 不動、Escape 回錨、再按 W 會動）、`S15`（30 則多行訊息、兩個 viewport、chat 區與提示的 rect 交集 0）、`S08`（走到門前按 E 進房、hello 後只剩房間的）、`S09`（`refuse` 房間握手 → 大廳的話還在）、`S10`（reload、只回 hello＋snapshot、空狀態）＋同一段標 `[FE-R11-S05]` 並照它原文驗請求 allowlist（`/api/me`、`/api/rooms`、`/api/profiles/*`、靜態資源、`/ws`）—— **若 `/world` 載入必然打別的端點，先開 `spec/fe-r11-realtime-chat` PR 修 allowlist，不在這裡放寬**、`S11`／`S12`
   - 2026-09-15（`--world`）：S01／S02／S15（1280×720 與 1024×640 都不相交：chat 區 320×288／307×256）／S08／S09／S10＋`[FE-R11-S05]`（38 個請求都在 allowlist 內；`/world` 載入只打 `/api/me`、`/api/rooms`）對 `next start` 全部符合。
-    `lib/world.mjs` 的 socket 紀錄多帶 `ws`（伺服器主動送 chat 用）。S11／S12 在 `--scroll` 補。
+    `lib/world.mjs` 的 socket 紀錄多帶 `ws`（伺服器主動送 chat 用）。S11／S12 在 `--scroll` 補上：對 `next start` 跑兩次全部符合（27 項）；`room-entry.mjs`、`scene-switch.mjs` 也重跑（lib 改了）全部符合。
 - [ ] 6.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
-- [ ] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 的結果如實記在這裡；`FE-R11` 的 5.1 在 S10 綠了之後才勾
+- [x] 6.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 的結果如實記在這裡；`FE-R11` 的 5.1 在 S10 綠了之後才勾
+  - 2026-09-15（`--scroll` 分支）：typecheck 過；eslint 乾淨；`pnpm test` 147 檔 1116 passed／7 skipped（一次全綠，沒有逾時）；契約 internal 52 passed／11 todo、guildhub 49 passed／3 skipped／11 todo；
+    e2e `scene-chat.mjs` 27 項全部符合（兩次）。
 - [ ] 6.4 封存（`archive/fe-k04-scene-chat-ui`；勾勾先用 `feat/fe-k04-scene-chat-ui--tasks` 進 main）
