@@ -310,8 +310,8 @@ describe('送出', () => {
         if (who.state === 'signed-in' && who.profile.id === Q.profile.id) pb().okNow('TB-race')
       }
       identity.set(Q)
-      await waitFor(() => expect(submitButton().disabled).toBe(false))
-      await waitFor(() => expect(enterProject).toHaveBeenCalledTimes(1))
+      // 等那一輪落定：作廢（送出鈕恢復）或錯採（視窗關了）都算落定，讓下面的斷言說出是哪一種。
+      await waitFor(() => expect(dialogs().length === 0 || !submitButton().disabled).toBe(true))
     } finally {
       env.IS_REACT_ACT_ENVIRONMENT = true
     }
