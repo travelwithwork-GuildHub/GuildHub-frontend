@@ -18,6 +18,9 @@
     突變全紅：拿掉 `verifyPassword` → 403 兩列紅（含空字串密碼）；回 `{ token }` → `EnterOut` 四處紅；替身換 secret → 握手兩條紅；簽章去掉 `|<profileId>` → 「別人拿著這張票進了房」紅；
     `auth: 'none'` → S16 紅（403 而不是 401）；handler 加 `status = 'active'` → closed 那列紅；handler 看座位 → 滿座那列紅。
     ⚠️ 突變改了 `src/` 之後要**重新 `next build`** 才算數（契約測試打的是 `next start`）；第一輪沒重建，紅在錯的地方。
+    審查後補：`tests/room-token-sign.test.ts`（簽章綁房也綁人；`roomSceneProject` 對不合法 uuid 回 null —— 替身在驗票前先用它擋格式，契約檔手上沒有票所以由這裡守）、S13 對 401／403／404 斷言 `toUiError(...).kind`、
+    替身在 `identify()` 期間 client 斷線的防護（`socket.on('error')`、`destroyed` 就不 `write`）；ADR 0008 邊界狀態改「僅約定」（契約守不住「前端不解析」與「簽章只有一份」）。
+    突變：`roomSceneProject` 不驗 uuid → 那條單元紅；403 改 400 → S12 兩列紅。
 
 ## 3. 視窗、焦點、世界鎖（PR：`--modal`；產品碼 ≤200、測試 ≤200）
 
