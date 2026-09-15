@@ -44,10 +44,12 @@
     代號＝每一輪在 `waiting` 裡的喚醒器：卸載（關閉、換房）與 `profileId` 變化都叫醒還在等的那一輪 → 它直接 resolve（交出 busy）、回應晚到什麼都不動；
     不用 `AbortSignal`（D9）。成功：`holdRoomToken` → `heldRoomToken` 嚴格等於 → `enterRoom` → 關（D2、D10）；空字串票另外擋。
 - [x] 4.3 突變：把 `detail` 印出來 → S09 紅；403 與 404 同一句 → S08／S09 紅；重開視窗保留上次密碼 → S05 紅（e2e）；反轉存票與 `enterRoom` 的順序 → S06 紅；submit 不去重 → S04 紅；存票不讀回或只驗非 null → S14 紅；關閉後不作廢那一輪 → S04 晚到那段紅；換代號不解除 busy → S15 紅
-  - 2026-09-15 結果（`tests/room-entry-submit.test.tsx`，15 條）：detail 進 DOM → S09 紅；403 用 404 那句 → S08 紅；反轉順序 → S06＋S14 四種紅；不讀回 → S14 四種紅；只驗非 null → S14「舊票 OLD」紅；
+  - 2026-09-15 結果（`tests/room-entry-submit.test.tsx`，17 條）：detail 進 DOM → S09 紅；403 用 404 那句 → S08 紅；反轉順序 → S06＋S14 四種紅；不讀回 → S14 四種紅；只驗非 null → S14「舊票 OLD」紅；
     空字串票放行 → S14 空字串紅；`.min(1)` → S04 空字串段紅（連帶 S09／S10／S15 —— 它們都用空欄位送）；卸載不換代號 → S04 晚到段＋S15 紅；身分變化不換代號 → S15 紅；
     換代號不叫醒舊輪 → S15「立刻可按」紅；`useForm` 拿掉 in-flight guard → S04 紅；送出鈕不 disabled → S04／S15 紅；失敗時寫票 → S08／S09／S10／S15 八條紅。
-    **拿掉的防禦**：曾有一個「回應落地後再比一次代號計數」的檢查，沒有任何突變讓它紅（promise 鏈在 microtask、換代號的 effect 在 task，插不進去）→ 刪掉，只留 race。
+    審查退回兩次的地方（都跟排程有關）：換代號改成 **layout effect**（passive 在 commit 之後另一個 task 才 flush；不用 act 的真排程下，回應在那個縫裡落地會被錯採 → 有一條 S15 專門重現，改回 `useEffect` 就紅）；
+    race 之後**再比一次代號**（回應已贏了 race、副作用還沒做、`flushSync` 把身分同步 commit 成 Q → 喚醒器叫不回它 → 有一條 S15 用 `flushSync` 交錯重現，拿掉比對就紅）。
+    測試的身分改用 context ＋ `useState`（DefaultLane，跟正式 `IdentityProvider` 在 fetch 回來時 `adopt` 一樣）—— `useSyncExternalStore` 是 SyncLane，passive 會同步 flush，測不到那個縫。
     S05（密碼不落地、重開是空的）是 e2e 的（tasks 6）。
 
 ## 5. 重新輸入密碼（PR：`--retry`；產品碼 ≤120、測試 ≤150）
