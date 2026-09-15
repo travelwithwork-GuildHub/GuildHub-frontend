@@ -147,7 +147,7 @@ try {
       })
     const scrollable = await page.$eval(SCROLL, (el) => el.scrollHeight > el.clientHeight + 10)
     if (scrollable) ok('[S11] 列表已經長到會捲動')
-    else bad('[S11] 列表沒有長到會捲動（判準的前提不成立）')
+    else throw new Error('[S11] 列表沒有長到會捲動 —— 判準的前提不成立，往下跑會全部假綠')
     await page.evaluate((sel) => {
       const el = document.querySelector(sel)
       el.scrollTop = el.scrollHeight

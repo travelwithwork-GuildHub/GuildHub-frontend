@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { SECONDARY } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { useSceneChatIfProvided } from '@/realtime/SceneChatProvider'
@@ -40,10 +40,32 @@ export function SceneChatHud() {
 
   useLayoutEffect(() => {
     const el = scroller.current
-    if (el === null || log === undefined || log.length === 0) return
-    if (atBottom.current) el.scrollTop = el.scrollHeight
-    else setUnseen(true)
+    if (el === null || log === undefined) return
+    // 空了（換場景清空、剛掛載）：下一個場景從底部開始 —— ref 是跨場景的，不重設會把上一個場景「往上讀過」帶到下一個（審查抓到）。
+    // 按鈕的顯示另外在 render 時 `&& log.length > 0`，空的時候自然不顯示。
+    if (log.length === 0) {
+      atBottom.current = true
+      return
+    }
+    if (atBottom.current) {
+      el.scrollTop = el.scrollHeight
+      return
+    }
+    // 不在底部：下一幀再把「有新的」亮起來（effect 裡不直接 setState —— lint 擋的；一幀的延遲對「辨識有新訊息」沒差）。
+    const frame = requestAnimationFrame(() => setUnseen(true))
+    return () => cancelAnimationFrame(frame)
   }, [log])
+  // 視窗變矮／變高不會發 scroll 事件，但「距底多少」變了：用 ResizeObserver 重算（jsdom 沒有，跳過）。
+  useEffect(() => {
+    const el = scroller.current
+    if (el === null || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      atBottom.current = distanceToBottom(el) <= NEAR_BOTTOM_PX
+      if (atBottom.current) setUnseen(false)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [chat])
 
   if (chat === null) return null
   const onScroll = () => {
@@ -71,8 +93,9 @@ export function SceneChatHud() {
         <div ref={scroller} onScroll={onScroll} data-testid="chat-scroll" className="min-h-0 flex-1 overflow-y-auto">
           <SceneChatFeed log={chat.log} />
         </div>
-        {unseen && (
-          <button type="button" onClick={jumpToLatest} data-testid="chat-jump-latest" className={`${SECONDARY} absolute right-2 bottom-2 text-caption`}>
+        {/* 浮在列表下緣正中：不壓到右側的原生捲軸（Windows／Linux 有 12～16px 寬）。 */}
+        {unseen && chat.log.length > 0 && (
+          <button type="button" onClick={jumpToLatest} data-testid="chat-jump-latest" className={`${SECONDARY} absolute bottom-2 left-1/2 -translate-x-1/2 text-caption`}>
             {CHAT_HUD_LABELS.jumpToLatest}
           </button>
         )}
