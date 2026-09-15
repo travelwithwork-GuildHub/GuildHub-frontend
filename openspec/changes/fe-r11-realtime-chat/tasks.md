@@ -16,7 +16,8 @@
     `LIMITS.chatBody = {0, UNBOUNDED}`、`LIMIT_SOURCES.chatBody`；`tests/contract/boundaries.ts` 加 `pending`（WS 不走 REST 那張表）。
 - [x] 2.3 突變：拿掉筆數截斷 → S04 紅；拿掉單則預算 → S04 紅；`max` 改 2000 或 `min` 改 1 → S09 紅；`ChatIn.body` 加 `.max(10_000_000)` → S09 自省紅
   - 2026-09-15 結果（`tests/scene-chat-memory.test.ts`，5 條）：全部如上紅；另外 用 UTF-16 `.length` 截 → S04 emoji 那條紅；原始碼出現 `sessionStorage` → S05 紅；import `@/api/operations` → S05 紅。
-    靜態邊界的尺有對照組（`operations.ts` 的圖到得了 `transport`）。
+    執行紀錄貼在 PR #434 的留言（每一種：套用 → 跑 → checkout；含無突變的對照）。**流程上的誠實紀錄**：這一片的判準與實作是同一個 commit 進來的（`22033b0`），沒有「先紅再綠」的 commit 證據 —— 審查指出；之後的片先 commit 紅的判準。
+    靜態邊界的尺是 `tests/lib/importGraph.ts`（TypeScript AST：`require`／`import =`／`import()` 都算、`import type` 與註解不算；有正反對照）。
 
 ## 3. 分派與送出（PR：`--transport`；產品碼 ≤180、測試 ≤200）
 
