@@ -41,12 +41,10 @@ export function SceneChatHud() {
   useLayoutEffect(() => {
     const el = scroller.current
     if (el === null || log === undefined) return
-    // 空了（換場景清空、剛掛載）：下一個場景從底部開始 —— ref 是跨場景的，不重設會把上一個場景「往上讀過」帶到下一個（審查抓到）。
-    // 按鈕的顯示另外在 render 時 `&& log.length > 0`，空的時候自然不顯示。
-    if (log.length === 0) {
-      atBottom.current = true
-      return
-    }
+    // 換場景清空時不用重設 `atBottom`：內容一縮，瀏覽器把 `scrollTop` 夾回 0 並發 scroll 事件 → `onScroll` 量到距底 0 → 在底部。
+    // （曾加過「空了就重設」，e2e 的「上一個場景往上讀過、新場景仍從底部跟隨」拿掉它也綠 —— 是瀏覽器在做，不是這裡。）
+    // 按鈕的顯示在 render 時 `&& log.length > 0`，空的時候自然不顯示。
+    if (log.length === 0) return
     if (atBottom.current) {
       el.scrollTop = el.scrollHeight
       return
