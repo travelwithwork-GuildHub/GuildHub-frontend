@@ -27,6 +27,7 @@
     `ui-ux-pro-max`（`--domain ux`：可見 label、不用 placeholder 當 label）。Escape 回錨在 `--world`。
     審查退回：空輸入改成**欄位級**提示（`aria-invalid`＋`aria-describedby` 掛在欄位下、不是 alert、不搶焦點 —— chat 是高頻操作，空的 Enter 不該把人拉走）；
     `SubmitError` 只給 transport 失敗；兩種提示在 `onChange` 時清掉；alert 要有字；IME 組字中的 Enter 不送有判準。
+    第 3 輪（codex）：同一內容連續失敗兩次，第二次 alert 也要取焦點 —— `SubmitError` 只在 message 變時聚焦，改用失敗次數當 `key` 重掛；拿掉 key 就紅。
 - [x] 3.3 突變：送出前 trim → S05 紅；不擋全空白 → S05 紅；拋錯後仍清空 → S06 紅；吞掉例外、或只接 `RealtimeError` → S06 紅；alert 印例外訊息 → S06 紅；送出時本地 append → S06 紅；加 `maxLength={2000}` → S07 紅；Enter 不送或 Shift+Enter 也送 → S14 紅
   - 2026-09-15 結果（`tests/scene-chat-composer.test.tsx`，5 條）：十三種全紅（「本地 append」第一版突變不真實 —— 加的 li 沒有 `chat-row` 標記；改成元件自己畫一列 pending 才紅；
     第 2 輪加：空的當 alert、打字不清提示、組字中 Enter 也送）。執行紀錄貼在 PR 留言。
