@@ -13,7 +13,7 @@ import { SceneChatFeed } from './SceneChatFeed'
 // 進 Escape 層級、focus trap），也不掛成 `useEscapeLayer` 的一層（常駐的東西掛成層會永遠是最上層，`FE-X06` 的「Escape 關最上層」就壞了）。
 // 只看不鎖：鎖只在輸入框有焦點時由既有的 `EditableFocusLock` 持有；Escape 在輸入框裡 → 焦點回世界錨（不關 HUD、不導覽）。
 // 版面：靠左下、寬度上限 20rem／30vw（`InteractionPrompt` 在下方正中央；1024 寬時 chat 右緣 ≈ 323px、提示左緣 ≈ 362px —— e2e 的 S15 量 rect 交集），
-// 列表有最大高度、內部捲動。
+// 列表有最大高度（50vh；720 高時 feed 約 200px、8 行，40vh 只剩 5 行 —— 量過）、內部捲動。
 //
 // 捲動（D5）：新訊息到達時，使用者在底部附近 → 捲到最新；已往上讀 → 位置不動、出現「回到最新」的控制。「底部附近」＝距底 ≤ `NEAR_BOTTOM_PX`
 // （量過：一列單行約 20px，一行以內算在底部；判準在 e2e 的 S11／S12，是可觀察結果不是這個數字）。
@@ -64,7 +64,7 @@ export function SceneChatHud() {
       aria-label={CHAT_HUD_LABELS.region}
       data-testid="scene-chat"
       style={{ zIndex: layer('hud') }}
-      className="bg-surface/90 border-line text-ink absolute bottom-gutter left-gutter flex w-[min(20rem,30vw)] max-h-[40vh] min-h-0 flex-col gap-2 rounded border p-2 backdrop-blur-sm"
+      className="bg-surface/90 border-line text-ink absolute bottom-gutter left-gutter flex w-[min(20rem,30vw)] max-h-[50vh] min-h-0 flex-col gap-2 rounded border p-2 backdrop-blur-sm"
     >
       {/* 兩層 flex：外層 `flex-1 min-h-0` 吃掉剩下的高度，內層再 `flex-1 min-h-0 overflow-y-auto` 才會真的捲（百分比 max-height 在 flex 子項裡不可靠）。 */}
       <div className="relative flex min-h-0 flex-1 flex-col">
