@@ -21,6 +21,9 @@
     審查後補：`tests/room-token-sign.test.ts`（簽章綁房也綁人；`roomSceneProject` 對不合法 uuid 回 null —— 替身在驗票前先用它擋格式，契約檔手上沒有票所以由這裡守）、S13 對 401／403／404 斷言 `toUiError(...).kind`、
     替身在 `identify()` 期間 client 斷線的防護（`socket.on('error')`、`destroyed` 就不 `write`）；ADR 0008 邊界狀態改「僅約定」（契約守不住「前端不解析」與「簽章只有一份」）。
     突變：`roomSceneProject` 不驗 uuid → 那條單元紅；403 改 400 → S12 兩列紅。
+    第二輪審查後：替身的裁決集中成 `roomHandshakeAllowed`（替身只呼叫它）；harness 對 `internal` 給一個「探針」（登入一張名片、用同一把 secret 簽「不合法 scene 的票」與「seed 房間的票」），
+    `rooms.contract.ts` 的 S21 經替身握手驗「uuid 不合法但票算對也拒」，對照組（seed 房間連得上、`hello.you` 是那個人）擋 harness 簽法漂掉的恆真。
+    突變：裁決只看 `room:` 前綴 → S21 紅；harness 簽法改 `:` → 對照組紅（403）。internal 52 passed。
 
 ## 3. 視窗、焦點、世界鎖（PR：`--modal`；產品碼 ≤200、測試 ≤200）
 
