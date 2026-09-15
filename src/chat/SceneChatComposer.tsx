@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useId, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { ChatIn } from '@/api/contract/ws'
 import { FIELD, FIELD_LABEL, PRIMARY } from '@/design/controls'
 import { SubmitError } from '@/forms/SubmitError'
@@ -9,9 +9,12 @@ import { SubmitError } from '@/forms/SubmitError'
 //
 // `send` 是注入的（`SceneChatHud` 給 `useSceneChat().send`；測試給假的）。沒有 `useForm`：沒有規則可驗（後端對 body 沒有任何限制，`FE-R11` D5），
 // 但 alert 的位置與焦點照 `form-conventions`（`SubmitError`：在送出控制之前、`role="alert"`、出現時取焦點）。
-// `trim()` 為空就不送（讓人知道要先輸入）；否則送**原字串**（含首尾空白，不 trim）。沒有 `maxLength`、沒有剩餘字數（沒有上限可數）。
-// `send` 同步回來沒拋才清空；拋了（沒連線、沒 ready、socket 拋）就保留輸入、顯示受控的一句 —— 不印例外訊息、不自動重送（節流是 `FE-X11` 的事，
-// 之後包在 `send` 外面，被節流也是「沒交給 transport」→ 同一條保留的路）。
+// `trim()` 為空就不送：那是**欄位級**的、可修正的問題 —— 照 `form-conventions` 的欄位錯誤（`aria-invalid`＋`aria-describedby` 掛在欄位下），
+// 不是 `role="alert"`、不搶焦點（chat 是高頻操作，空的 Enter 不該把人從輸入框拉走；審查抓到的）。否則送**原字串**（含首尾空白，不 trim）。
+// 沒有 `maxLength`、沒有剩餘字數（沒有上限可數）。
+// `send` 同步回來沒拋才清空；拋了（沒連線、沒 ready、socket 拋）就保留輸入、`SubmitError`（`role="alert"`、在送出控制之前、取焦點）說一句受控的話 ——
+// 不印例外訊息、不自動重送（節流是 `FE-X11` 的事，之後包在 `send` 外面，被節流也是「沒交給 transport」→ 同一條保留的路）。
+// 兩種提示都在使用者再動鍵盤（`onChange`）時清掉 —— 提示是給「上一次送出」的，不該掛到下一次。
 // Enter 送、Shift+Enter 交給瀏覽器換行（不 preventDefault）。Escape 離開輸入框是 `--world` 那片接的（焦點回世界錨）。
 // ⚠️ 這裡的字是元件常數，不是規格。
 
@@ -24,22 +27,27 @@ export const CHAT_COMPOSER_LABELS = {
 
 export function SceneChatComposer({ send }: { send: (input: ChatIn) => void }) {
   const [value, setValue] = useState('')
-  const [problem, setProblem] = useState<string | null>(null)
+  /** 欄位級：空的（不是 alert）。 */
+  const [needInput, setNeedInput] = useState(false)
+  /** 送出級：transport 拒了（alert）。 */
+  const [notSent, setNotSent] = useState(false)
+  const hintId = useId()
 
   const submit = () => {
     if (value.trim() === '') {
-      setProblem(CHAT_COMPOSER_LABELS.needInput)
+      setNeedInput(true)
       return
     }
     try {
       send({ t: 'chat', body: value })
     } catch {
       // 拋的是什麼都一樣：沒交給 transport 就保留、說一句受控的話。例外本身不進 DOM。
-      setProblem(CHAT_COMPOSER_LABELS.notSent)
+      setNotSent(true)
       return
     }
     setValue('')
-    setProblem(null)
+    setNeedInput(false)
+    setNotSent(false)
   }
   const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
@@ -58,9 +66,27 @@ export function SceneChatComposer({ send }: { send: (input: ChatIn) => void }) {
     >
       <label className={FIELD_LABEL}>
         {CHAT_COMPOSER_LABELS.field}
-        <textarea rows={2} className={`${FIELD} resize-none`} value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} data-testid="chat-input" />
+        <textarea
+          rows={2}
+          className={`${FIELD} resize-none`}
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value)
+            setNeedInput(false)
+            setNotSent(false)
+          }}
+          onKeyDown={onKeyDown}
+          aria-invalid={needInput || undefined}
+          aria-describedby={needInput ? hintId : undefined}
+          data-testid="chat-input"
+        />
       </label>
-      <SubmitError message={problem} />
+      {needInput && (
+        <p id={hintId} data-testid="chat-need-input" className="text-danger text-caption">
+          {CHAT_COMPOSER_LABELS.needInput}
+        </p>
+      )}
+      <SubmitError message={notSent ? CHAT_COMPOSER_LABELS.notSent : null} />
       <button type="submit" className={PRIMARY}>
         {CHAT_COMPOSER_LABELS.submit}
       </button>
