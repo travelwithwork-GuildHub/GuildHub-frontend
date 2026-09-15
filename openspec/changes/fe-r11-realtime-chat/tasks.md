@@ -6,7 +6,8 @@
 ## 1. 規格
 
 - [x] 1.1 規格已在 PR 上談定（`spec/fe-r11-realtime-chat`；兩位外部審查）
-- [ ] 1.2 ADR：chat 只走 `RemoteWorld` 注入的窄介面、不 import client 的值（design D1；邊界狀態、證據照 `docs/adr/README.md`）
+- [x] 1.2 ADR：chat 只走 `RemoteWorld` 注入的窄介面、不 import client 的值（design D1；邊界狀態、證據照 `docs/adr/README.md`）
+  - 2026-09-15：`docs/adr/0009-scene-chat-through-remoteworld-port.md`（已強制：eslint 的 client 邊界＋ S01／S05 靜態邊界＋ type fixtures）。
 
 ## 2. 記憶體與限制（PR：`--memory`；產品碼 ≤120、測試 ≤150）
 
@@ -21,9 +22,14 @@
 
 ## 3. 分派與送出（PR：`--transport`；產品碼 ≤180、測試 ≤200）
 
-- [ ] 3.1 先寫單元：`[FE-R11-S01]`（從 raw `onMessage` 進、假驗證器四則都成功、chat 回 sentinel M、sink `toBe(M)` 恰好一次；靜態邊界 lint；型別測試 sink 不收 string）、`[FE-R11-S10]`（正式驗證器＋分派：缺 name／body 非字串不到 sink；空字串、全空白、HTML 的 name 與 body 照原值）、`[FE-R11-S02]`（四個非 ready 狀態各一 case → `toThrow(RealtimeError)`、socket.send 沒被叫、不補送；ready 但 socket.send 拋 → 原樣拋、不 append、不排隊）、`[FE-R11-S03]`（送出不 append、回聲後恰好一筆、`id === me` 不略過）
-- [ ] 3.2 `RemoteWorld`：驗證後的 `ChatOut` 分派給 chat；注入 `send(chatIn)` port（包 `client.send(JSON.stringify(...))`）；用 context 暴露給 Canvas 外
-- [ ] 3.3 突變：送出時 append → S03 紅；`id === selfId` 略過 → S03 紅；status 也餵 sink → S01 紅；sink 裡 trim → S10 紅；驗證失敗也餵 → S10 紅
+- [x] 3.1 先寫單元：`[FE-R11-S01]`（從 raw `onMessage` 進、假驗證器四則都成功、chat 回 sentinel M、sink `toBe(M)` 恰好一次；靜態邊界 lint；型別測試 sink 不收 string）、`[FE-R11-S10]`（正式驗證器＋分派：缺 name／body 非字串不到 sink；空字串、全空白、HTML 的 name 與 body 照原值）、`[FE-R11-S02]`（四個非 ready 狀態各一 case → `toThrow(RealtimeError)`、socket.send 沒被叫、不補送；ready 但 socket.send 拋 → 原樣拋、不 append、不排隊）、`[FE-R11-S03]`（送出不 append、回聲後恰好一筆、`id === me` 不略過）
+- [x] 3.2 `RemoteWorld`：驗證後的 `ChatOut` 分派給 chat；注入 `send(chatIn)` port（包 `client.send(JSON.stringify(...))`）；用 context 暴露給 Canvas 外
+  - 2026-09-15：`sceneChatStore.ts`（`port.attach(sendRaw) → { receive, detach }`：連線身分綁在閉包、`current` 不是就不收；`send` 不 catch）、
+    `SceneChatProvider.tsx`（`useSceneChat()` 給 K04；`useSceneChatPortIfProvided()` 給 `WorldCanvas` 當 prop 交給 `RemoteWorld` —— context 不跨 R3F）、
+    `page.tsx` 掛 provider（`SceneProvider` 底下）。`send` 沒有連線時拋一般 `Error`（`RealtimeError` 在 client.ts，chat 不 import 它的值）。
+- [x] 3.3 突變：送出時 append → S03 紅；`id === selfId` 略過 → S03 紅；status 也餵 sink → S01 紅；sink 裡 trim → S10 紅；驗證失敗也餵 → S10 紅
+  - 2026-09-15 結果（`tests/scene-chat-transport.test.tsx`，6 條；S02 分兩條）：全部如上紅；另 送出 catch 後 setTimeout 補送 → S02 兩條紅；交複本不交原物件 → S01 紅。
+    型別那段：`tests/type-fixtures/scene-chat-{sink,link}-string.ts` 各恰好一則 TS2345（`tests/lib/typeFixtures.ts` 是從 `path-params.test.ts` 抽出的共用 runner）。
 
 ## 4. 場景 generation（PR：`--scene-generation`；產品碼 ≤120、測試 ≤200）
 
