@@ -1,7 +1,8 @@
 import { act, render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CLOSE_ACK_TIMEOUT_MS } from '@/realtime/client'
+import { RealtimeGenerationProvider, useRealtimeGeneration } from '@/realtime/RealtimeGenerationProvider'
 import { SceneRefProvider } from '@/world/scenes/SceneContext'
 import type { SceneRef } from '@/world/scenes/registry'
 import WorldCanvas from '@/world/WorldCanvas'
@@ -102,8 +103,17 @@ const shownCount = () => {
   const match = /^(\d+)\s*人在線/.exec(text)
   return match ? Number(match[1]) : Number.NaN
 }
-/** 畫面上任何「N 人在線」形狀的數字 —— `S09` 要求未就緒時**一個都沒有**，不只是那個元素不在。 */
-const anyCountNumber = () => /\d+\s*人在線/.test(document.body.textContent ?? '')
+/**
+ * 畫面上有沒有任何在線人數。`S09` 要求未就緒時**一個數字都沒有**。
+ *
+ * ⚠️ **兩件事都要驗**（slice 2 審查抓到的）：只認「N 人在線」這一種文案的話，
+ * 「null 時渲染『在線 0 人』」會綠，文案一改這幾句就恆真。所以：
+ *   1. 人數元素本身不存在；
+ *   2. 整個畫面上「在線」前後都沒有數字（兩種語序都算）。
+ */
+const anyCountNumber = () =>
+  screen.queryByTestId('online-count') !== null ||
+  /\d+\s*人?\s*在線|在線\s*\d+/.test(document.body.textContent ?? '')
 
 function World({ scene }: { scene: SceneRef }) {
   return (
@@ -111,6 +121,13 @@ function World({ scene }: { scene: SceneRef }) {
       <WorldCanvas />
     </SceneRefProvider>
   )
+}
+
+/** 把 `rejoin` 交給測試 —— 跟改完外觀之後重連（`FE-A05-S04`）走的是同一個入口。 */
+function RejoinHandle({ onReady }: { onReady: (rejoin: () => void) => void }) {
+  const { rejoin } = useRealtimeGeneration()
+  useEffect(() => onReady(rejoin), [onReady, rejoin])
+  return null
 }
 
 const realGetContext = HTMLCanvasElement.prototype.getContext
@@ -202,6 +219,44 @@ describe('目前 scene 的在線人數（畫面）', () => {
 
     await send(room, { t: 'snapshot', players: [player(SELF), player('u9')] })
     expect(shownCount(), '新 snapshot 到達後才顯示它所代表的人數').toBe(2)
+    view.unmount()
+  })
+
+  it('[FE-R10-S09] 同一個元件換連線（generation）：新 snapshot 前也不顯示舊人數', async () => {
+    // ⚠️ **換場景那條路證明不了這一條**：場景子樹以 key 重掛，新的 `RemoteWorld` 拿到全新的 state。
+    // 這裡是**同一個** `RemoteWorld` 重跑 effect（`generation` 在依賴裡），`useState` 建的 state 會沿用 ——
+    // cleanup 沒把 ready 清掉的話，新連線早到的 join 就會算出人數（slice 2 審查的 W03）。
+    let rejoin: () => void = () => {}
+    const view = render(
+      <RealtimeGenerationProvider>
+        <RejoinHandle onReady={(r) => (rejoin = r)} />
+        <World scene={HALL} />
+      </RealtimeGenerationProvider>,
+    )
+    await flush()
+    const first = FakeSocket.instances[0]!
+    await openAndHello(first)
+    await send(first, { t: 'snapshot', players: [player(SELF), player('u1'), player('u2')] })
+    expect(shownCount(), '前提：前一條連線顯示過非零人數').toBe(3)
+
+    await act(async () => rejoin())
+    await flush()
+    expect(anyCountNumber(), '換連線之後，畫面上不得留著上一條連線的人數').toBe(false)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CLOSE_ACK_TIMEOUT_MS)
+    })
+    const second = FakeSocket.instances.at(-1)!
+    expect(second, '前提：新連線已經建立').not.toBe(first)
+    expect(FakeSocket.instances, '前提：同一個場景，只多一條連線').toHaveLength(2)
+    await openAndHello(second)
+    expect(anyCountNumber(), 'hello 不是基準線').toBe(false)
+
+    await send(second, { t: 'presence', join: [player('u9')], leave: [] })
+    expect(anyCountNumber(), 'join 比 snapshot 早到也不得顯示（上一條連線的 ready 不得沿用）').toBe(false)
+
+    await send(second, { t: 'snapshot', players: [player(SELF), player('u9')] })
+    expect(shownCount(), '新 snapshot 到達後才顯示').toBe(2)
     view.unmount()
   })
 })

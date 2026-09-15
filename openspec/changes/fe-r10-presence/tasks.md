@@ -39,7 +39,10 @@
 - [x] 3.2 以 snapshot-ready 與遠端 roster 推導 distinct player id 數 `roster.size + 1`，讓 `FE-R10-S07`／`S08` 通過，不新增獨立累加器
       —— `onlineCountOf`／`resetRemotePlayers`。突變：少了 +1、未就緒回 0、snapshot 沒設 ready、join 也設 ready → 紅
 - [x] 3.3 先為 `FE-R10-S09` 寫失敗測試，涵蓋卸載、換連線以及新 snapshot 到達前不顯示任何人數數字
-      —— 換場景（`FE-V01` 的 key 重掛）→ 等舊 close（`FE-V01-S18`）→ hello → 早到的 join → snapshot，每一步斷言畫面上沒有任何「N 人在線」
+      —— 換場景（`FE-V01` 的 key 重掛）→ 等舊 close（`FE-V01-S18`）→ hello → 早到的 join → snapshot，每一步斷言畫面上沒有任何「N 人在線」。
+      slice 2 審查後補：①「同一個元件換連線」路徑（`generation` 加一，state 沿用、不重掛）→ hello → 早到的 join，
+      突變「cleanup 不清 ready 但直接通知 null」只有這條會紅；②「沒有人數」改成人數元素不存在，且「在線」前後都沒有數字，
+      突變「null 時渲染『在線 0 人』」→ S07／S09 紅
 - [x] 3.4 以穩定 callback 把低頻人數送到 Canvas 外的 DOM 顯示，讓 `FE-R10-S09` 通過，並驗證單純更新人數不會建立新的 WebSocket client generation
       —— `WorldCanvas` 直接傳 `useState` setter；`S08` 斷言整段只有一條 WebSocket。突變：inline 箭頭函式、cleanup 不通知、
       cleanup 不重設 ready、名單變動不通知、不渲染、顯示遠端數、多算十個人 → 紅。畫面過 ui-ux-pro-max（ux／react），
