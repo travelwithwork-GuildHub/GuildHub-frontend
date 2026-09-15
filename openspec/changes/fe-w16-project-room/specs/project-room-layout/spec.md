@@ -45,7 +45,8 @@ MUST NOT 要求走到門前按 E，MUST NOT 踏入門洞就自動離開。
 - **WHEN** 從出生點做連通性搜尋
 - **THEN** 對照組裡門廊的代表點 SHALL 不可達（證明左右兩段牆本身穿不過，不是靠繞路）；沒封的原配置 SHALL 可達
 - **AND** 門洞淨寬（兩段牆內側面的距離）SHALL 不小於角色直徑的 2 倍（`FE-W11-S10` 的「明顯大於」在這裡量化：兩個人能錯身）
-- **AND** 外層南邊界 SHALL 仍是完整一面：門廊裡向南 SHALL 走不出遊玩區域（外層邊界以南的點不可達）
+- **AND** 外層南邊界 SHALL 仍是完整一面：門廊裡向南 SHALL 走不出遊玩區域 —— 連通性搜尋的範圍 SHALL 延伸到外層邊界以南至少 2 單位，
+  外層邊界以南的代表點 SHALL 不可達（是被 collider 擋住，不是搜尋域剛好裁在邊界上；拿掉外層南牆 → 那個點可達 → 紅）
 - → 驗於：單元
 
 ### Requirement: 八個工位是穩定的模板，識別字含索引，排列是推導出來的
@@ -134,7 +135,7 @@ MUST NOT 為房間另寫碰撞尺寸或第二份座標。桌椅 MUST NOT 註冊�
 
 - **WHEN** 場景是 `room`，掛載世界
 - **THEN** DOM SHALL 恰好有八個工位錨點，`data-seat-index` 0–7 各一，全部 `aria-hidden`、沒有文字；跑一個 frame 之後每個錨點的座標 SHALL 是有限數
-- **AND WHEN** 把相機目標放在門廊、viewport 設成 1280×720（jsdom 裡用投影函式算；受控的畫面外案例，不依賴模板座標）
+- **AND WHEN** 把相機目標放在 S01 的門廊代表點、viewport 設成 1280×720（jsdom 裡用投影函式算；受控的畫面外案例，不依賴模板座標）
 - **THEN** 投影落在畫面外的錨點 SHALL 是 hidden、畫面內的 SHALL 不是；至少一個 hidden、至少一個不 hidden（兩邊都有，判準才不空）
 - **AND WHEN** 場景是 `hall`
 - **THEN** SHALL 一個都沒有
@@ -142,15 +143,17 @@ MUST NOT 為房間另寫碰撞尺寸或第二份座標。桌椅 MUST NOT 註冊�
 
 #### Scenario: [FE-W16-S08] 真瀏覽器：從門口出生、桌子有畫出來、走到桌邊、撞桌子會停、通道走得通
 
-- **GIVEN** `next start` 的正式建置；viewport 1280×720、deviceScaleFactor 1；`page.route` 給一扇門與票、`routeWebSocket` 回 `hello`／`snapshot`
-  （snapshot 放一名遠端玩家在 `seat_index=0` 的站位）；進房**之前**先取得 Canvas 的 element handle
-- **WHEN** 進入房間、等相機收斂（連續兩次讀數差 ≤ 1 px）
+- **GIVEN** `next start` 的正式建置；viewport 1280×720、deviceScaleFactor 1；載入 `/world`（大廳）、`page.route` 給一扇門、事先把那間房的票放進 `sessionStorage`
+  （`scene-switch.mjs` 的作法）、`routeWebSocket` 回 `hello`／`snapshot`（房間的 snapshot 放一名遠端玩家在 `seat_index=0` 的站位）；
+  在大廳先取得 Canvas 的 element handle
+- **WHEN** 走到門前按 E、經既有的場景切換進入房間（不是整頁導覽）、等相機收斂（連續兩次讀數差 ≤ 1 px）
 - **THEN** 至少 `seat_index` 0 與 4（近端那一對）的錨點 SHALL 在 Canvas 內且不是 hidden（viewHeight 12、房間深 24，出生點看不到北端是預期的）；
   用 0 與 4 的錨點（已知世界 x 距離）量出每單位的像素數 s 後，其餘**在畫面內**的錨點的螢幕位置 SHALL 與模板推導的位置相差 ≤ 2 px
 - **AND** 桌子有畫出來：對每個在畫面內的錨點，取以它為中心、邊長 `DESK_SAMPLE_SIDE`（以 s 為單位）px 的方塊（桌面投影的內側，不含桌腳與椅子）裡的像素，
   與同一畫面上**桌子旁邊的裸地板**（桌子與外牆之間、不在通道地毯上、同一種地板材質）取樣的顏色距離（RGB 歐氏）> `DESK_COLOR_DISTANCE` 的像素比例
   SHALL ≥ `DESK_PIXEL_RATIO`（突變：把桌面的 mesh 拿掉、桌腳、地毯與椅子留著 → 那個方塊露出的是同一種裸地板 → 比例掉下去 → 紅）。
-  三個具名常數的數值**還不知道**：由 design〈待答問題〉的量測程序（正式建置 3 次＋突變 3 次）定出後，重開 spec PR 補進這條；補進之前這段不算批准
+  三個具名常數的數值由 design〈待答問題〉的量測程序（正式建置 3 次＋突變 3 次）定；這條 Scenario 的形狀現在批准，數值是實作第一片量出來後、
+  照 design 規則「量出來的數字進 Requirement」重開 spec PR 補進來（tasks 4.1 的前置）
 - **AND** 遠端玩家的像素 SHALL 出現在 `seat_index=0` 錨點旁（`avatar-pixels.mjs` 的判準）
 - **AND WHEN** 用錨點當里程計（每一小步：按鍵 ≤ 80 ms、等收斂、量一次；步數上限 200；世界距離用 s 與 s/√2 反算）沿中央通道往北走
 - **THEN** 角色相對錨點的 z SHALL 前進到通道北端（允許 ≤ 1 px 的回抖）；走到通道中點時八個錨點 SHALL 都在 Canvas 內且位置與模板相差 ≤ 2 px
@@ -160,5 +163,6 @@ MUST NOT 為房間另寫碰撞尺寸或第二份座標。桌椅 MUST NOT 註冊�
   之後連續 5 步該距離的變化都 ≤ 1 px（撞到桌子的 plateau）；步數上限 60
 - **AND WHEN** 繞回通道再走到 `seat_index=2` 的站位
 - **THEN** 離該錨點的反算距離 SHALL 收斂到站位與桌面中心的模板距離 ± 0.15 單位
-- **AND** 全程 Canvas SHALL 是進房前取得的同一個 element handle；MUST NOT 用固定毫秒判定「走到了」
+- **AND** 全程 Canvas SHALL 是在大廳取得的同一個 element handle；MUST NOT 用固定毫秒判定「走到了」
+- **AND** 突變對照：只拿掉桌子的 collider、mesh 留著 → plateau 那段 SHALL 失敗（角色穿過桌子）；只拿掉桌面 mesh、collider 留著 → 像素那段 SHALL 失敗
 - → 驗於：e2e
