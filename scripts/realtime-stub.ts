@@ -22,7 +22,7 @@ import http from 'node:http'
 import pg from 'pg'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { ClientMessage, HZ, ServerMessage, type Player } from '../src/api/contract/ws'
-import { roomHandshakeAllowed, roomSceneProject } from '../src/server/roomToken'
+import { roomHandshakeAllowed } from '../src/server/roomToken'
 
 const PORT = Number(process.env.INTERNAL_REALTIME_PORT ?? 3102)
 const SECRET = process.env.INTERNAL_SESSION_SECRET ?? 'dev-only-internal-session-secret'
@@ -109,11 +109,6 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ noServer: true })
 
-/** scene 的形狀：`lobby`，或 `room:<uuid>`（真的 uuid，不是「36 個 hex 或連字號」—— 審查抓到 `room:----…` 也會過；判斷在 `roomSceneProject`）。 */
-function sceneShapeOk(scene: string): boolean {
-  return scene === 'lobby' || roomSceneProject(scene) !== null
-}
-
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const scene = url.searchParams.get('scene') ?? 'lobby'
@@ -126,10 +121,11 @@ server.on('upgrade', (req, socket, head) => {
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
     socket.destroy()
   }
-  if (url.pathname !== '/ws' || !sceneShapeOk(scene)) return refuse()
+  if (url.pathname !== '/ws') return refuse()
   void identify(req.headers.cookie).then((who) => {
     if (socket.destroyed) return
-    // 房間要票，而且票要綁**這個人**：先解析出身分才驗得了（裁決在 `roomHandshakeAllowed`，替身不另寫一套）。
+    // 握手的裁決**只有這一處**（`roomHandshakeAllowed`，替身不另寫一套）：scene 格式（`room:<真的 uuid>`，不是「36 個 hex 或連字號」——
+    // 審查抓到 `room:----…` 也會過）、票綁房間、票綁**這個人** —— 所以先解析出身分才裁決。
     if (!roomHandshakeAllowed(SECRET, scene, url.searchParams.get('token'), who.id)) return refuse()
     wss.handleUpgrade(req, socket, head, (ws) => {
       const conn: Conn = { ws, scene, moved: false, player: { ...who, x: 0, y: 0, f: 0, st: '' } }
