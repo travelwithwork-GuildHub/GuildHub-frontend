@@ -35,7 +35,12 @@
 
 ## 4. 瀏覽器與收尾
 
-- [ ] 4.0 量像素常數：照 design 待答的程序跑（正式建置 3 次＋突變 3 次），定出 `DESK_SAMPLE_SIDE`／`DESK_COLOR_DISTANCE`／`DESK_PIXEL_RATIO`，**重開 spec PR** 補進 S08 —— 這條合併前 4.1 不能打勾
+- [x] 4.0 量像素常數：照 design 待答的程序跑（正式建置 3 次＋突變 3 次），定出 `DESK_SAMPLE_SIDE`／`DESK_COLOR_DISTANCE`／`DESK_PIXEL_RATIO`，**重開 spec PR** 補進 S08 —— 這條合併前 4.1 不能打勾
+  - 2026-09-16 量測（`next start` 正式建置、1280×720、DPR 1、swiftshader；量測腳本放 scratchpad、跑完即刪，不進 repo）：
+    s = 53.67（錨點 0／4 相距 386.4 px ÷ 7.2）；方塊 0.4·s = 21 px；地板基準 (181,184,193)、離散 0
+    - 正常 ×3：出生視角 seat 0／1／4／5 ＋ 往北走後 seat 1～3／5～7（第 3 次 0～7 全在畫面內）—— 門檻 20／30／40／50／60／80 的比例**全部 100%**
+    - 拔桌面 mesh ×3（桌腳、collider、`DESK_TOP` 留著）：seat 0／3／6／7 = 0%；seat 1／2／4／5 在門檻 20 時 15.9～18.8%、門檻 40 時 15.0～17.0%（留下來的桌腳的陰影）
+    - 定：`DESK_SAMPLE_SIDE = 0.4·s`、`DESK_COLOR_DISTANCE = 40`、`DESK_PIXEL_RATIO = 60%`（門檻 40 時間隔 83 個百分點 ≥ 20；門檻取中間）
 - [ ] 4.1 `tests/e2e/project-room.mjs`：`[FE-W16-S08]`（`next start`；viewport 1280×720、DPR 1；進房前取 Canvas handle；大廳先取 Canvas handle、票先放進 sessionStorage、門前按 E 進房；近端錨點在 Canvas 內、畫面內的錨點相對位置 ≤ 2 px；桌面方塊 vs 桌旁裸地板的像素判準（常數待量：先跑量測程序、重開 spec PR 補數字，補進前這段不打勾）；遠端玩家在 seat 0 旁；錨點里程計往北前進（≤ 1 px 回抖）、通道中點八個錨點都在；從北端走回 seat 1 站位（反算距離 ≤ 0.3；反算先扣桌面高度偏移）再朝桌子走：先連續 3 步 ≥ 2 px 再 plateau 5 步、plateau 距離＝碰撞盒近側＋角色半徑 ± 0.15；繞回通道到 seat 2（模板距離 ± 0.15）；Canvas 同一 handle；只設步數上限）；突變：拿掉桌面 mesh（collider 留）→ 像素那段紅；拿掉桌子 collider（mesh 留）→ plateau 那段紅；不掛投影器 → 里程計那段紅；里程計函式抽到 `tests/e2e/lib/` 與 `scene-switch.mjs` 共用
 - [ ] 4.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
 - [ ] 4.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 對正式建置跑 3 次的結果如實記在這裡
