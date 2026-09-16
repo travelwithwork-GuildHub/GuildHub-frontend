@@ -80,8 +80,8 @@ function configIdAt(layout: readonly LayoutItem[], kind: FurnitureKind, at: { x:
 }
 
 /**
- * 整份碰撞裡「尺寸是這種家具（轉 0 或 90°）」的**全部**盒子，再對回渲染位置。
- * ⚠️ 不是只在渲染位置上找 —— 那樣多出一個放在別處的桌型盒（有碰撞、沒畫）數不到（審查抓到）。
+ * 整份碰撞裡「尺寸是這種家具（轉 0 或 90°）」的**全部**盒子有幾個，以及每一個畫出來的位置上各有幾個。
+ * ⚠️ 兩個數字都要：只在渲染位置上找，多一個放在別處的桌型盒（有碰撞、沒畫）數不到；只數總數，八個盒子全疊在第一張桌子上也數不到（兩位審查各抓一個）。
  */
 function furnitureBoxes(layout: readonly LayoutItem[], kind: FurnitureKind, rendered: { x: number; z: number }[]) {
   const local = furnitureFootprint(kind)
@@ -91,8 +91,8 @@ function furnitureBoxes(layout: readonly LayoutItem[], kind: FurnitureKind, rend
       (close(b.halfWidth, local.halfWidth) && close(b.halfDepth, local.halfDepth)) ||
       (close(b.halfWidth, local.halfDepth) && close(b.halfDepth, local.halfWidth)),
   )
-  const orphan = shaped.filter((b) => !rendered.some((at) => Math.abs(b.x - at.x) < 0.5 && Math.abs(b.z - at.z) < 0.5))
-  return { count: shaped.length, orphan }
+  const perRendered = rendered.map((at) => shaped.filter((b) => Math.abs(b.x - at.x) < 0.5 && Math.abs(b.z - at.z) < 0.5).length)
+  return { count: shaped.length, perRendered }
 }
 
 describe('房間的正式元件樹畫出來的桌椅＝配置裡的桌椅', () => {
@@ -106,9 +106,9 @@ describe('房間的正式元件樹畫出來的桌椅＝配置裡的桌椅', () =
     expect(new Set(deskIds), '每張畫出來的桌子對回一個不同的工位').toEqual(new Set(STATIONS.map((s) => s.deskId)))
     expect(new Set(chairIds)).toEqual(new Set(STATIONS.map((s) => s.chairId)))
 
-    // 碰撞：桌型盒**恰好** 8 個、椅型盒恰好 8 個，而且每一個都在某張畫出來的桌子／椅子上（沒有畫不出來的碰撞）。
-    expect(furnitureBoxes(ROOM_LAYOUT, 'desk', desks)).toEqual({ count: 8, orphan: [] })
-    expect(furnitureBoxes(ROOM_LAYOUT, 'chair', chairs)).toEqual({ count: 8, orphan: [] })
+    // 碰撞：桌型盒**恰好** 8 個、每張畫出來的桌子上恰好一個（沒有畫不出來的碰撞、沒有沒碰撞的桌子）；椅子同理。
+    expect(furnitureBoxes(ROOM_LAYOUT, 'desk', desks)).toEqual({ count: 8, perRendered: Array(8).fill(1) })
+    expect(furnitureBoxes(ROOM_LAYOUT, 'chair', chairs)).toEqual({ count: 8, perRendered: Array(8).fill(1) })
   })
 
   it('[FE-W16-S04] 從配置拿掉 seat_index=3 的桌子：渲染物件與碰撞盒都變 7，其餘不變', async () => {
@@ -118,10 +118,11 @@ describe('房間的正式元件樹畫出來的桌椅＝配置裡的桌椅', () =
 
     const { desks, chairs } = await renderRoom(layout)
     expect(desks.length).toBe(7)
-    expect(furnitureBoxes(layout, 'desk', desks)).toEqual({ count: 7, orphan: [] })
+    expect(furnitureBoxes(layout, 'desk', desks)).toEqual({ count: 7, perRendered: Array(7).fill(1) })
     expect(desks.map((at) => configIdAt(layout, 'desk', at))).not.toContain(removed)
-    // 其餘不變：椅子還是 8，其它 7 張桌子還在原位。
+    // 其餘不變：椅子（渲染與碰撞）還是 8，其它 7 張桌子還在原位。
     expect(chairs.length).toBe(8)
+    expect(furnitureBoxes(layout, 'chair', chairs)).toEqual({ count: 8, perRendered: Array(8).fill(1) })
     expect(new Set(desks.map((at) => configIdAt(layout, 'desk', at)))).toEqual(
       new Set(STATIONS.filter((s) => s.deskId !== removed).map((s) => s.deskId)),
     )
