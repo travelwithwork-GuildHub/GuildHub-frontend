@@ -128,18 +128,22 @@ describe('八個工位是穩定的模板', () => {
       const chair = byId(station.chairId) as LayoutItem
       const west = station.seatIndex < 4
       expect(west ? desk.x < AISLE_CENTER_X : desk.x > AISLE_CENTER_X, `${station.id} 在錯的那一側`).toBe(true)
+      // 桌椅跟站位在同一排 —— 量的是**放進配置的實體**，不是 `stationAt` 自己（審查抓到的：兩邊都從同一把尺推導的話，實體擺錯測不到）。
+      expect(desk.z, `${station.id} 的桌子不在站位那一排`).toBe(station.z)
+      expect(chair.z, `${station.id} 的椅子不在站位那一排`).toBe(station.z)
       // 站位在桌子與通道中線之間；椅子比桌子更靠外牆。
       expect(Math.abs(station.x)).toBeLessThan(Math.abs(desk.x))
       expect(Math.sign(station.x)).toBe(Math.sign(desk.x))
       expect(Math.abs(chair.x)).toBeGreaterThan(Math.abs(desk.x))
     }
+    const deskZ = (i: number) => (byId(stationAt(i).deskId) as LayoutItem).z
     for (const side of [[0, 1, 2, 3], [4, 5, 6, 7]]) {
-      const zs = side.map((i) => stationAt(i).z)
-      for (let k = 1; k < zs.length; k += 1) expect(zs[k]!, `索引 ${side[k]} 沒有比 ${side[k - 1]} 更北`).toBeLessThan(zs[k - 1]!)
+      const zs = side.map(deskZ)
+      for (let k = 1; k < zs.length; k += 1) expect(zs[k]!, `索引 ${side[k]} 的桌子沒有比 ${side[k - 1]} 更北`).toBeLessThan(zs[k - 1]!)
     }
     // 0 與 4 是離門口最近的一對（南是 +z）。
-    const others = STATIONS.filter((s) => s.seatIndex !== 0 && s.seatIndex !== 4)
-    expect(Math.min(stationAt(0).z, stationAt(4).z)).toBeGreaterThan(Math.max(...others.map((s) => s.z)))
+    const others = [1, 2, 3, 5, 6, 7].map(deskZ)
+    expect(Math.min(deskZ(0), deskZ(4))).toBeGreaterThan(Math.max(...others))
   })
 
   it('[FE-W16-S03] 八個站位兩兩距離不小於角色直徑的 2 倍', () => {
