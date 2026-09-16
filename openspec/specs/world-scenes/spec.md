@@ -29,8 +29,8 @@ MUST NOT 各自寫死 `lobby` 或直接 import Guild Hall 的配置。
 只屬於 Guild Hall 的東西 —— 走廊的門、兩塊看板、門標籤、專案清單的提示與 `GET /api/rooms` 的輪詢 ——
 SHALL 只在 `hall` 場景掛載；在 `room` 場景 MUST NOT 掛載（不是隱藏，是不存在於元件樹）。
 
-Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 的邊界牆，出生點在原點；
-它 SHALL 通過 `world-layout` 對 Guild Hall 配置跑的同一組判準（識別字不重複、沒有東西擺到區域外、邊界只來自配置）。
+Project Room 的配置與出生點 SHALL 由 `project-room-layout` 提供（外層四面 `role: 'boundary'` 的邊界牆與 Guild Hall 同一份推導、
+內側南牆與門洞、八個工位）；它 SHALL 通過 `world-layout` 對 Guild Hall 配置跑的同一組判準（識別字不重複、沒有東西擺到區域外、邊界只來自配置）。
 
 #### Scenario: [FE-V01-S01] 兩個場景推導出的 scene 參數，合法與不合法的邊界
 
@@ -43,7 +43,8 @@ Project Room 在 `FE-W16` 之前的配置 SHALL 只有四面 `role: 'boundary'` 
 #### Scenario: [FE-V01-S02] 房間的配置通過 world-layout 的判準
 
 - **WHEN** 對 Project Room 的配置跑 `FE-W11-S05`／`S07`／`S08` 的檢查
-- **THEN** SHALL 全部通過；邊界牆 SHALL 恰好四面，且它們是配置裡**全部**的項目
+- **THEN** SHALL 全部通過；`role: 'boundary'` 的邊界牆 SHALL 恰好四面（外層）；配置 SHALL 是 `project-room-layout` 提供的那一份（內容由它的規格定義）
+- **AND** 註冊表交給物理層的碰撞盒 SHALL 多於四面邊界（含 `project-room-layout` 的內側南牆與桌椅）
 
 #### Scenario: [FE-V01-S03] 房間裡沒有走廊的門與看板，也不輪詢專案清單
 
