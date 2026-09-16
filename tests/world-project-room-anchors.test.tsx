@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cameraOffset } from '@/world/camera'
 import { visualBoundsOf } from '@/world/environment/definition'
 import { furnitureDefinition } from '@/world/environment/furnitureProps'
-import { isOnScreen } from '@/world/layout/framing'
 import { ROOM_LAYOUT, ROOM_POINTS, SEAT_INDICES, STATIONS } from '@/world/layout/projectRoomLayout'
 import { DESK_TOP, SEAT_ANCHORS, seatAnchorsFor } from '@/world/seats/anchors'
 import { SeatAnchorProjector } from '@/world/seats/SeatAnchorProjector'
@@ -16,14 +15,16 @@ import { SceneRefProvider } from '@/world/scenes/SceneContext'
 import type { SceneRef } from '@/world/scenes/registry'
 import WorldCanvas from '@/world/WorldCanvas'
 
-// 每個工位一個投影到螢幕的 DOM 錨點。規格 `FE-W16-S06`；`S07` 的 DOM 那一半。
+// 每個工位一個投影到螢幕的 DOM 錨點。規格 `FE-W16-S06`。
 //
 // 兩個殼（跟 `world-scenes-hall-only.test.tsx` 同一組替身）：
 // - `WorldCanvas` 在 jsdom 裡掛（`Canvas` 換成 stub、`LocalPlayer`／`RemoteWorld` 換成 null）：驗**有哪些錨點**、在哪個場景有。
 // - `SeatAnchorProjector` 用 `@react-three/test-renderer` 跑真的 `useFrame`：驗**位置真的被寫進 DOM**、畫面外真的藏起來。
 //
-// ⚠️ 畫面內／外的期望值用 `framing.ts` 的 `isOnScreen`（構圖判準那把尺）算，不用投影器自己那條路 ——
-// 兩邊同源的話「藏錯邊」測不到。兩邊都要有（至少一個藏、至少一個不藏），判準才不空。
+// ⚠️ 像素位置與畫面內／外的期望值是**手算的常數**（見 `PORCH_EXPECTED`），不呼叫 `toScreen`／`isOnScreen` ——
+// 那些跟投影器同源，投影寫偏 10 px 或藏錯邊它們會一起錯（第一版用 `isOnScreen`，兩位審查者都指出）。
+// `S07` 的「DOM 沒有提示」不在這裡驗：這個殼把 `SpatialInteraction` 換掉了，在這裡斷言「沒有提示」是恆真的（審查抓到）；
+// 那一句由 `world-project-room-furniture.test.tsx` 的目標恆為 null ＋ `interaction-prompt.test.tsx`（`FE-W06-S13`：目標 null 就沒有提示）合起來守。
 
 const listRooms = vi.hoisted(() => vi.fn())
 vi.mock('@/api/operations', () => ({ listRooms }))
@@ -93,18 +94,6 @@ describe('Canvas 外面：錨點的 DOM', () => {
     expect(screen.queryAllByTestId('seat-anchor')).toEqual([])
     view.unmount()
   })
-
-  it('[FE-W16-S07] 房間裡的 DOM 沒有互動提示', () => {
-    // 目標是 null 那一半在 `world-project-room-furniture.test.tsx`（真的移動與目標選擇）；
-    // 這裡是同一棵正式 DOM 樹：房間掛起來，提示不存在。
-    const view = render(
-      <SceneRefProvider scene={ROOM}>
-        <WorldCanvas />
-      </SceneRefProvider>,
-    )
-    expect(screen.queryByTestId('interaction-prompt')).toBeNull()
-    view.unmount()
-  })
 })
 
 describe('錨點的世界座標', () => {
@@ -150,7 +139,15 @@ describe('投影元件真的寫進 DOM', () => {
 
   const TRANSLATE = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0\)/
 
-  it('[FE-W16-S06] 相機目標在門廊代表點、1280×720：一幀之後每個座標是有限數；畫面外 hidden、畫面內不是，兩邊都有', async () => {
+  // 手算的期望值（`framing.ts` 檔頭的公式，數字自己算、不呼叫 `toScreen`）：相機目標＝門廊 (0, 10.875)、viewHeight 12 → 半高 6、半寬 6·16/9 = 10.667；
+  //   seat 0 桌面中心 (−3.6, 0.76, 5)：sx = −3.6 → x = 640 − 3.6/10.667·640 = 424；sy = (0.76 − 5 + 10.875)·√½ = 4.692 → y = 360 − 4.692/6·360 = 78.5
+  //   seat 4 對稱 → x = 856；seat 1（z = 1）：sy = 7.52 → y = −91（畫面上緣之外），更北的更負。所以**恰好 0 與 4 在畫面內**。
+  const PORCH_EXPECTED = new Map([
+    [0, { x: 424, y: 78.5 }],
+    [4, { x: 856, y: 78.5 }],
+  ])
+
+  it('[FE-W16-S06] 相機目標在門廊代表點、1280×720：一幀之後每個座標是有限數；0／4 在手算位置 ±1 px 且不藏，其餘六個在畫面外且 hidden', async () => {
     const target = ROOM_POINTS.porch
     const offset = cameraOffset()
     const { nodesRef, nodes } = nodesFor()
@@ -162,7 +159,6 @@ describe('投影元件真的寫進 DOM', () => {
     await renderer.advanceFrames(2, 16)
 
     let hidden = 0
-    let shown = 0
     for (const [i, anchor] of SEAT_ANCHORS.entries()) {
       const node = nodes[i]!
       const m = TRANSLATE.exec(node.style.transform)
@@ -170,21 +166,19 @@ describe('投影元件真的寫進 DOM', () => {
       const x = Number(m![1])
       const y = Number(m![2])
       expect(Number.isFinite(x) && Number.isFinite(y), `seat ${anchor.seatIndex} 的座標不是有限數`).toBe(true)
-      // 期望用構圖判準那把尺算，不用投影器自己的判斷。
-      const expected = isOnScreen(anchor, target, VIEWPORT.width / VIEWPORT.height)
-      expect(node.style.visibility, `seat ${anchor.seatIndex} 藏錯邊`).toBe(expected ? 'visible' : 'hidden')
-      if (expected) shown += 1
-      else hidden += 1
-      // 畫面內的：像素位置落在 viewport 裡。
-      if (expected) {
-        expect(x).toBeGreaterThanOrEqual(0)
-        expect(x).toBeLessThanOrEqual(VIEWPORT.width)
-        expect(y).toBeGreaterThanOrEqual(0)
-        expect(y).toBeLessThanOrEqual(VIEWPORT.height)
+      const expected = PORCH_EXPECTED.get(anchor.seatIndex)
+      if (expected !== undefined) {
+        expect(Math.abs(x - expected.x), `seat ${anchor.seatIndex} 的 x 偏了：${x}`).toBeLessThanOrEqual(1)
+        expect(Math.abs(y - expected.y), `seat ${anchor.seatIndex} 的 y 偏了：${y}`).toBeLessThanOrEqual(1)
+        expect(node.style.visibility, `seat ${anchor.seatIndex} 在畫面內卻藏起來`).toBe('visible')
+      } else {
+        // 寫進 DOM 的像素本身就在 viewport 外（不是靠投影器自己說它在外面）。
+        expect(y < 0 || y > VIEWPORT.height || x < 0 || x > VIEWPORT.width, `seat ${anchor.seatIndex} 應該在畫面外：(${x}, ${y})`).toBe(true)
+        expect(node.style.visibility, `seat ${anchor.seatIndex} 在畫面外卻沒藏`).toBe('hidden')
+        hidden += 1
       }
     }
-    expect(hidden, '沒有任何錨點在畫面外 —— 這條的「藏起來」沒驗到').toBeGreaterThan(0)
-    expect(shown, '沒有任何錨點在畫面內 —— 這條的「不藏」沒驗到').toBeGreaterThan(0)
+    expect(hidden).toBe(SEAT_ANCHORS.length - PORCH_EXPECTED.size)
     await renderer.unmount()
   })
 

@@ -5,7 +5,7 @@ import { Vector3, type Mesh, type Object3D } from 'three'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ListPanelProvider, useListPanel } from '@/list-panel/ListPanelProvider'
 import { FACING } from '@/world/coords'
-import { furnitureDefinition, type FurnitureKind } from '@/world/environment/furnitureProps'
+import { furnitureDefinition, furnitureFootprint, type FurnitureKind } from '@/world/environment/furnitureProps'
 import { WorldShell } from '@/world/environment/WorldShell'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
 import type { InteractableRegistry } from '@/world/interaction/registry'
@@ -83,14 +83,20 @@ function configIdAt(layout: readonly LayoutItem[], kind: FurnitureKind, at: { x:
   return hits[0]!.id
 }
 
-/** 碰撞盒裡「中心在這個位置、尺寸是這種家具轉過之後的尺寸」的那些。 */
-function boxesAt(layout: readonly LayoutItem[], kind: FurnitureKind, at: { x: number; z: number }) {
-  const item = layout.find((i) => i.kind === kind && close(i.x, at.x) && close(i.z, at.z))
-  const expected = item === undefined ? undefined : staticBoxFor(item)
-  if (expected === undefined) return []
-  return staticBoxesFor(layout).filter(
-    (b) => close(b.x, expected.x) && close(b.z, expected.z) && close(b.halfWidth, expected.halfWidth) && close(b.halfDepth, expected.halfDepth),
+/**
+ * 整份碰撞裡「尺寸是這種家具（轉 0 或 90°）」的**全部**盒子，再對回渲染位置。
+ * ⚠️ 不是只在渲染位置上找 —— 那樣多出一個放在別處的桌型盒（有碰撞、沒畫）數不到（審查抓到）。
+ */
+function furnitureBoxes(layout: readonly LayoutItem[], kind: FurnitureKind, rendered: { x: number; z: number }[]) {
+  const local = furnitureFootprint(kind)
+  if (local === undefined) throw new Error(`${kind} 沒有碰撞盒`)
+  const shaped = staticBoxesFor(layout).filter(
+    (b) =>
+      (close(b.halfWidth, local.halfWidth) && close(b.halfDepth, local.halfDepth)) ||
+      (close(b.halfWidth, local.halfDepth) && close(b.halfDepth, local.halfWidth)),
   )
+  const orphan = shaped.filter((b) => !rendered.some((at) => Math.abs(b.x - at.x) < 0.5 && Math.abs(b.z - at.z) < 0.5))
+  return { count: shaped.length, orphan }
 }
 
 describe('房間的正式元件樹畫出來的桌椅＝配置裡的桌椅', () => {
@@ -104,9 +110,9 @@ describe('房間的正式元件樹畫出來的桌椅＝配置裡的桌椅', () =
     expect(new Set(deskIds), '每張畫出來的桌子對回一個不同的工位').toEqual(new Set(STATIONS.map((s) => s.deskId)))
     expect(new Set(chairIds)).toEqual(new Set(STATIONS.map((s) => s.chairId)))
 
-    // 碰撞：每一張畫出來的桌子／椅子，在同一個位置恰好有一個它尺寸的碰撞盒。
-    expect(desks.flatMap((at) => boxesAt(ROOM_LAYOUT, 'desk', at)).length).toBe(8)
-    expect(chairs.flatMap((at) => boxesAt(ROOM_LAYOUT, 'chair', at)).length).toBe(8)
+    // 碰撞：桌型盒**恰好** 8 個、椅型盒恰好 8 個，而且每一個都在某張畫出來的桌子／椅子上（沒有畫不出來的碰撞）。
+    expect(furnitureBoxes(ROOM_LAYOUT, 'desk', desks)).toEqual({ count: 8, orphan: [] })
+    expect(furnitureBoxes(ROOM_LAYOUT, 'chair', chairs)).toEqual({ count: 8, orphan: [] })
   })
 
   it('[FE-W16-S04] 從配置拿掉 seat_index=3 的桌子：渲染物件與碰撞盒都變 7，其餘不變', async () => {
@@ -116,7 +122,7 @@ describe('房間的正式元件樹畫出來的桌椅＝配置裡的桌椅', () =
 
     const { desks, chairs } = await renderRoom(layout)
     expect(desks.length).toBe(7)
-    expect(desks.flatMap((at) => boxesAt(layout, 'desk', at)).length).toBe(7)
+    expect(furnitureBoxes(layout, 'desk', desks)).toEqual({ count: 7, orphan: [] })
     expect(desks.map((at) => configIdAt(layout, 'desk', at))).not.toContain(removed)
     // 其餘不變：椅子還是 8，其它 7 張桌子還在原位。
     expect(chairs.length).toBe(8)
