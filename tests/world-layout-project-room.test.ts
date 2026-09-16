@@ -108,7 +108,9 @@ describe('八個工位是穩定的模板', () => {
   it('[FE-W16-S03] 索引集合恰好 0–7、每個工位三件齊全、識別字含索引且唯一', () => {
     expect(STATIONS.length).toBe(8)
     expect(new Set(STATIONS.map((s) => s.seatIndex))).toEqual(new Set(SEAT_INDICES))
-    expect(new Set(STATIONS.map((s) => s.id)).size).toBe(8)
+    // 「全配置唯一」＝站位、桌子、椅子、牆、地毯的識別字**合在一起**沒有重複（第 3 輪 codex 抓到：分開驗的話站位跟自己的桌子同名也綠）。
+    const allIds = [...ROOM_LAYOUT.map((item) => item.id), ...STATIONS.map((s) => s.id)]
+    expect(new Set(allIds).size, '站位與配置項的識別字有重複').toBe(allIds.length)
     for (const station of STATIONS) {
       expect(station.id).toContain(String(station.seatIndex))
       const desk = byId(station.deskId)
