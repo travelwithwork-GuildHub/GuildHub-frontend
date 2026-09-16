@@ -55,7 +55,18 @@ export const decode = (f) =>
  * 實測基線因此降到 **0**。
  */
 export function stableDiff(as, bs) {
-  let count = 0
+  return stableDiffWhere(as, bs).total
+}
+
+/**
+ * 跟 `stableDiff` 同一個演算法，另外數「落在 `within(col, row)` 裡的差異像素」——
+ * `FE-W16-S08` 要的是「遠端玩家的像素出現在**某個錨點旁**」，不只是「畫面上某處有差異」。
+ * `row` 從畫面**上緣**數（`readPixels` 的原點在左下，這裡已經翻回來）。
+ */
+export function stableDiffWhere(as, bs, within = () => true) {
+  const { w, h } = as[0]
+  let total = 0
+  let inside = 0
   outer: for (let i = 0; i < as[0].px.length; i += 4) {
     for (const a of as)
       for (const b of bs) {
@@ -66,9 +77,11 @@ export function stableDiff(as, bs) {
         )
         if (d < CHANNEL) continue outer
       }
-    count++
+    total++
+    const p = i / 4
+    if (within(p % w, h - 1 - Math.floor(p / w))) inside++
   }
-  return count
+  return { total, inside }
 }
 
 /** 連拍幾幀。`stableDiff` 要靠多幀取交集才濾得掉動畫。 */

@@ -35,8 +35,9 @@ export const failureCount = () => failures
 /**
  * 假的即時後端。每一條連線記一筆 `{ scene, token }`（順序就是建立的順序），回 `hello` ＋ 只有自己的 `snapshot`，讓連線走到 `ready`。
  * `refuse(scene)` 回 true 的連線在 open 之前就關掉（握手被拒：客戶端看到 `opened=false`）。
+ * `others(scene)` 回這個場景的 snapshot 裡除了自己以外的人（協定的 player：`x`／`y` 是像素）；預設沒有別人。
  */
-export function fakeRealtime(context, sockets, { refuse = () => false } = {}) {
+export function fakeRealtime(context, sockets, { refuse = () => false, others = () => [] } = {}) {
   return context.routeWebSocket(/\/ws(\?|$)/, async (ws) => {
     const url = new URL(ws.url())
     const scene = url.searchParams.get('scene')
@@ -50,7 +51,7 @@ export function fakeRealtime(context, sockets, { refuse = () => false } = {}) {
     }
     const you = `self-${sockets.length}`
     ws.send(JSON.stringify({ t: 'hello', you, hz: 10 }))
-    ws.send(JSON.stringify({ t: 'snapshot', players: [{ id: you, name: '訪客', av: 0, x: 0, y: 0, f: 0, st: 'idle' }] }))
+    ws.send(JSON.stringify({ t: 'snapshot', players: [{ id: you, name: '訪客', av: 0, x: 0, y: 0, f: 0, st: 'idle' }, ...others(scene)] }))
   })
 }
 
@@ -160,6 +161,39 @@ export async function watchCanvas(page, canvas) {
 }
 
 /**
+ * 等讀數收斂：連續兩次 `read()` 被 `same(prev, next)` 判成一樣才回傳。相機跟拍是阻尼的（半衰期 120 ms），
+ * 剛放開鍵那一刻的讀數還在追 —— 任何拿螢幕座標當尺的判準都要先過這一步。`room`／`hall` 的里程計都用它。
+ */
+export async function settle(page, read, same, { gapMs = 150, rounds = 20, what = '讀數' } = {}) {
+  let prev = await read()
+  for (let i = 0; i < rounds; i++) {
+    await page.waitForTimeout(gapMs)
+    // 兩次讀數之間要真的畫過新的一幀：分頁沒出幀時兩次讀到同一個舊值，會把「沒更新」誤認成「收斂」。
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))))
+    const next = await read()
+    if (same(prev, next)) return next
+    prev = next
+  }
+  throw new Error(`${what}一直在動 —— 相機沒收斂，或量尺沒畫出來`)
+}
+
+/**
+ * 一段走位：每一步先量（`where()`）再決定往哪走（`steer(pos, step)` 回要按的鍵、或 `{ code, ms }` 自訂這一步的長度；回 `null` 就是到了）。
+ * **只設步數上限、不按固定毫秒判定「走到了」**（`e2e-main.sh` 記著那種尺在 runner 上會 flake）。迷路就截圖再拋。
+ */
+export async function walkLeg(page, { label, where, steer, holdMs, maxSteps, out }) {
+  for (let i = 0; i < maxSteps; i++) {
+    const pos = await where()
+    const next = await steer(pos, i)
+    if (next === null) return pos
+    const { code, ms } = typeof next === 'string' ? { code: next, ms: holdMs } : next
+    await hold(page, code, ms)
+  }
+  await page.screenshot({ path: path.join(out, 'lost.png') })
+  throw new Error(`${label}：走了 ${maxSteps} 步還沒到（截圖 ${out}/lost.png）`)
+}
+
+/**
  * 走位。`room`／`decoy`：走廊前兩格的門（相隔剛好一格：`CORRIDOR_SLOTS` z 差 `slotGap`，螢幕上的距離就是「每單位幾個像素」）；
  * `title`：目標門的名字（提示上出現它就是到了）；`out`：迷路時的截圖目錄。
  */
@@ -201,16 +235,10 @@ export function walker({ room, decoy, title, out, slotGap = 2, doorZ = -2, spawn
         },
         [room, decoy],
       )
-    const settled = async () => {
-      let prev = await read()
-      for (let i = 0; i < 20; i++) {
-        await page.waitForTimeout(150)
-        const next = await read()
-        if (prev.target && next.target && Math.abs(prev.target.x - next.target.x) <= 1 && Math.abs(prev.target.y - next.target.y) <= 1) return next
-        prev = next
-      }
-      throw new Error('門標籤一直在動 —— 相機沒收斂，或標籤沒畫出來')
-    }
+    const settled = () =>
+      settle(page, read, (prev, next) => prev.target !== null && next.target !== null && Math.abs(prev.target.x - next.target.x) <= 1 && Math.abs(prev.target.y - next.target.y) <= 1, {
+        what: '門標籤',
+      })
     // 出生點看不到走廊（`rooms-fixture` 記著：門根本不在畫面裡）。先往西一小步一小步，直到兩個標籤都看得見再校準。
     let origin = null
     for (let i = 0; i < 15 && origin === null; i++) {
@@ -242,17 +270,8 @@ export function walker({ room, decoy, title, out, slotGap = 2, doorZ = -2, spawn
     // 里程計的絕對 z 只在「校準那一刻角色在出生點的 z」時成立（上面的註解）。角色已經走過（不只往西）的話，
     // 要把先前那次校準的 `where` 傳進來，不能在這裡重新校準 —— 重校會把現在的位置硬定成出生點的 z（審查抓到的）。
     const where = known ?? (await odometer(page))
-    /** 每一步先量再決定往哪走：`steer` 回傳要按的鍵，回傳 null 就是到了。**雙向**：跨過頭就走回來（審查：單向＋單邊不等式會越界）。 */
-    const leg = async (label, ms, steer, maxSteps) => {
-      for (let i = 0; i < maxSteps; i++) {
-        const pos = await where()
-        const code = await steer(pos)
-        if (code === null) return pos
-        await hold(page, code, ms)
-      }
-      await page.screenshot({ path: path.join(out, 'lost.png') })
-      throw new Error(`${label}：走了 ${maxSteps} 步還沒到（截圖 ${out}/lost.png）`)
-    }
+    /** **雙向**：跨過頭就走回來（審查：單向＋單邊不等式會越界）。 */
+    const leg = (label, ms, steer, maxSteps) => walkLeg(page, { label, where, steer, holdMs: ms, maxSteps, out })
     await leg('往北繞過隔牆', 250, (p) => (p.z > -4 ? 'ArrowUp' : p.z < -6 ? 'ArrowDown' : null), 30)
     await leg('往西到門前', 300, (p) => (p.doorWest > 1.2 ? 'ArrowLeft' : p.doorWest < 0 ? 'ArrowRight' : null), 60)
     const arrived = await leg(
