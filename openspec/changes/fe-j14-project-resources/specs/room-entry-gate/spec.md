@@ -63,8 +63,6 @@
 - **THEN** SHALL 分別是 `200`、`403`
 - **AND WHEN** 甲再對 B `enter` 成功，`GET` A 與 B
 - **THEN** SHALL 都是 `200`
-- **AND WHEN** 換一組專案 C、D：甲以同一個 cookie jar **同時**（兩個並行請求）對 C 與 D `enter` 成功，接著 `GET` C 與 D 的資源
-- **THEN** SHALL 都是 `200` —— 後回來的那一次記錄 MUST NOT 覆蓋掉先回來的那一間（一間房一份記錄）
 - **AND WHEN** 同一個 cookie jar 改以乙登入（沒有 enter 過），`GET /api/projects/A/resources`
 - **THEN** SHALL 是 `403`
 - → 驗於：契約測試（兩個目標，同一份檔案）
@@ -79,4 +77,9 @@
 - **THEN** SHALL 是 `403`
 - **AND WHEN** 甲把自己對 A **有效的** cookie 值原封改放到 B 那一間的 cookie 名稱下（沒有對 B `enter` 過），`GET /api/projects/B/resources`
 - **THEN** SHALL 是 `403` —— 簽章要同時綁房間與身分；只綁身分的實作會在這裡變成 200
+- **AND WHEN** 換一組專案 C、D：甲以同一個 cookie jar **同時**（兩個並行請求）對 C 與 D `enter` 成功，接著 `GET` C 與 D 的資源
+- **THEN** SHALL 都是 `200` —— 後回來的那一次記錄 MUST NOT 覆蓋掉先回來的那一間（一間房一份記錄）
 - → 驗於：單元（契約測試 harness 的 `raw()`，只對 `local` 目標 —— 真後端的票在它自己的 session 裡，格式不是前端的事，ADR 0008）
+- 並行 enter 那段只對 `local`：真後端把所有票放在同一個 session cookie 裡，兩個並行的 `enter` 各自回一整份 session，
+  後回來的 `Set-Cookie` 蓋掉先回來的。2026-09-17 對真後端實測同一個 cookie jar 並行 enter C、D，結果是 `403`／`200`；
+  循序 enter 則是 `200`／`200`（S34 驗的就是循序）。`enter` 是凍結的既有端點，這是 D4 記下的已知差異，不是真後端要修的 bug。
