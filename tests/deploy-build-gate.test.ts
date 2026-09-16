@@ -4,6 +4,10 @@ import { describe, expect, it } from 'vitest'
 // 規格：openspec/changes/fe-o14-preview-deploy/specs/runtime-config/spec.md
 //   Requirement: 部署設定的錯誤 SHALL 在建置時失敗 —— FE-O14-S03 / S04 / S05
 //
+// 規格：openspec/changes/fe-o14-rest-build-gate/specs/runtime-config/spec.md
+//   Requirement: 資料層的資料來源是一個明確的選擇 —— FE-O14-S14（建置那一半）
+//   S03 補「資料來源為 guildhub」的前提、S05 的成功案例補合法的 REST base
+//
 // ⚠️ **這裡跑的是真的 `next build`，不是呼叫那個驗證函式。**
 //
 // design 的 V1：「函式會拋錯」證明不了「建置會失敗」—— 中間隔著
@@ -35,18 +39,20 @@ function build(vars: Record<string, string>): { code: number | null; output: str
 }
 
 const VALID_WS = 'wss://guildhub.example/ws'
+const VALID_REST = 'https://guildhub.example'
 
 describe('部署設定的建置閘門', () => {
   it(
     '[FE-O14-S03] 缺少必要設定的部署建置會失敗，preview 與 production 都是',
     () => {
-      const prod = build({ NEXT_PUBLIC_APP_ENV: 'production', NEXT_PUBLIC_REALTIME_ADAPTER: 'guildhub' })
+      // REST base 給合法值：這條驗的是 WS 缺席，REST 缺席是 S14 的事（資料來源缺席即 guildhub，REST 也必填）。
+      const prod = build({ NEXT_PUBLIC_APP_ENV: 'production', NEXT_PUBLIC_REALTIME_ADAPTER: 'guildhub', NEXT_PUBLIC_GUILDHUB_REST: VALID_REST })
       expect(prod.code, 'production 缺 WebSocket 位址竟然建置成功了').not.toBe(0)
       expect(prod.output).toMatch(/NEXT_PUBLIC_GUILDHUB_WS/)
 
       // **preview 不能被排除在外** —— preview 部署是拿給人看的，
       // 它壞掉的方式跟 production 完全一樣。
-      const preview = build({ NEXT_PUBLIC_APP_ENV: 'preview', NEXT_PUBLIC_REALTIME_ADAPTER: 'guildhub' })
+      const preview = build({ NEXT_PUBLIC_APP_ENV: 'preview', NEXT_PUBLIC_REALTIME_ADAPTER: 'guildhub', NEXT_PUBLIC_GUILDHUB_REST: VALID_REST })
       expect(preview.code, 'preview 缺 WebSocket 位址竟然建置成功了').not.toBe(0)
       expect(preview.output).toMatch(/NEXT_PUBLIC_GUILDHUB_WS/)
     },
@@ -74,6 +80,7 @@ describe('部署設定的建置閘門', () => {
         NEXT_PUBLIC_APP_ENV: 'production',
         NEXT_PUBLIC_REALTIME_ADAPTER: 'guildhub',
         NEXT_PUBLIC_GUILDHUB_WS: VALID_WS,
+        NEXT_PUBLIC_GUILDHUB_REST: VALID_REST,
       })
       expect(withBackend.code, withBackend.output.slice(-600)).toBe(0)
 
@@ -81,12 +88,43 @@ describe('部署設定的建置閘門', () => {
       const noBackend = build({
         NEXT_PUBLIC_APP_ENV: 'production',
         NEXT_PUBLIC_REALTIME_ADAPTER: 'none',
+        NEXT_PUBLIC_GUILDHUB_REST: VALID_REST,
       })
       expect(noBackend.code, noBackend.output.slice(-600)).toBe(0)
 
       // 本機什麼都不設也不能被擋住。
       const local = build({ NEXT_PUBLIC_APP_ENV: 'local' })
       expect(local.code, local.output.slice(-600)).toBe(0)
+    },
+    180_000,
+  )
+
+  it(
+    '[FE-O14-S14] REST base 的必填跟著資料層資料來源走，建置也是',
+    () => {
+      // 資料來源缺席（即 guildhub）、沒有 REST → 紅，輸出含變數名。
+      // 這就是後端指出的那個洞：以前它建置綠、部署綠，訪客打開 /talent 才炸。
+      const missingRest = build({ NEXT_PUBLIC_APP_ENV: 'production', NEXT_PUBLIC_REALTIME_ADAPTER: 'none' })
+      expect(missingRest.code, 'production 缺 REST base 竟然建置成功了').not.toBe(0)
+      expect(missingRest.output).toMatch(/NEXT_PUBLIC_GUILDHUB_REST/)
+
+      // 部署版 internal → 紅，輸出含資料來源的變數名（部署出去的 internal 沒有契約）。
+      const internal = build({
+        NEXT_PUBLIC_APP_ENV: 'production',
+        NEXT_PUBLIC_DATA_ADAPTER: 'internal',
+        NEXT_PUBLIC_REALTIME_ADAPTER: 'none',
+        NEXT_PUBLIC_GUILDHUB_REST: VALID_REST,
+      })
+      expect(internal.code, 'production 的 internal 竟然建置成功了').not.toBe(0)
+      expect(internal.output).toMatch(/NEXT_PUBLIC_DATA_ADAPTER/)
+
+      // 資料來源缺席、REST 合法 → 綠：缺席預設 guildhub 不只是讀設定的行為，建置也認。
+      const ok = build({
+        NEXT_PUBLIC_APP_ENV: 'production',
+        NEXT_PUBLIC_REALTIME_ADAPTER: 'none',
+        NEXT_PUBLIC_GUILDHUB_REST: VALID_REST,
+      })
+      expect(ok.code, ok.output.slice(-600)).toBe(0)
     },
     180_000,
   )

@@ -81,6 +81,15 @@ describe('資料存取的傳輸層', () => {
     expect(new URL(sent.url).origin).toBe(window.location.origin)
     expect(new URL(sent.url).pathname).toBe('/api/me')
 
+    // fe-o14-rest-build-gate（`FE-O14-S14` 最後一條）：internal 下 REST base 是「不適用」——
+    // 殘留一個協定錯誤的值、或完全不設，請求一樣是同源的 `/api/...`，不會因為那個值拋錯。
+    process.env.NEXT_PUBLIC_GUILDHUB_REST = 'ws://real-backend.example:8000'
+    expect(() => buildRequest({ method: 'GET', path: '/api/me' }), 'internal 竟然去檢查了 REST base 的協定').not.toThrow()
+    expect(new URL(buildRequest({ method: 'GET', path: '/api/me' }).url).origin).toBe(window.location.origin)
+    delete process.env.NEXT_PUBLIC_GUILDHUB_REST
+    expect(new URL(buildRequest({ method: 'GET', path: '/api/me' }).url).origin).toBe(window.location.origin)
+    process.env.NEXT_PUBLIC_GUILDHUB_REST = 'http://real-backend.example:8000'
+
     // 對照：guildhub 打的是設定的主機。
     process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
     expect(new URL(buildRequest({ method: 'GET', path: '/api/me' }).url).host).toBe('real-backend.example:8000')
