@@ -195,6 +195,9 @@ function resolve(
  * 而症狀是「我的本地資料改了沒有反應」，不是「設定錯了」。
  */
 export function dataAdapter(): DataAdapter {
+  // 先解析環境代號：`FE-O09-S07` 說「讀取設定」時代號打錯或部署版缺席都要拋，這個讀取端也算 ——
+  // 缺席分支直接回 `guildhub` 的話，`prod` 這種打錯字在這裡會被安靜放過（審查抓到的）。
+  const env = appEnv()
   const raw = read(process.env.NEXT_PUBLIC_DATA_ADAPTER)
   if (raw === null) return 'guildhub'
   if (!(DATA_ADAPTERS as readonly string[]).includes(raw)) {
@@ -204,9 +207,9 @@ export function dataAdapter(): DataAdapter {
         '退回去的話，一個打錯字的環境會安靜地連到另一個資料來源。',
     )
   }
-  if (raw === 'internal' && appEnv() !== 'local') {
+  if (raw === 'internal' && env !== 'local') {
     throw new ConfigError(
-      `NEXT_PUBLIC_DATA_ADAPTER=internal 只在本機合法，而目前的環境是 ${appEnv()}。` +
+      `NEXT_PUBLIC_DATA_ADAPTER=internal 只在本機合法，而目前的環境是 ${env}。` +
         '部署出去的 internal 沒有契約（資料庫連線字串與 session secret 都不在建置閘門裡），' +
         '放行的話是建置綠、部署綠、第一個請求 500。要部署 internal 先開 spec PR 把 INTERNAL_* 翻成必驗。',
     )

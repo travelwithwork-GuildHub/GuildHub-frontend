@@ -92,6 +92,8 @@ describe('執行期設定', () => {
     expect(() => appEnv(), 'production 打成 prod 應該拋錯').toThrow(ConfigError)
     // 「MUST NOT 當成本機處理」—— 退回本機的話它會安靜地連到 localhost
     expect(() => restBase()).toThrow(/prod/)
+    // 資料層資料來源也是「讀取設定」：缺席分支不能略過環境代號的驗證（fe-o14-rest-build-gate 審查抓到的）
+    expect(() => dataAdapter(), '代號打錯時 dataAdapter() 竟然安靜地回了預設值').toThrow(/prod/)
 
     set('NEXT_PUBLIC_APP_ENV', undefined)
     set('NODE_ENV', 'production')
