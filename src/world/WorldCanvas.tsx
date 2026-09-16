@@ -25,6 +25,8 @@ import { DoorLabels, useLabelNodes } from './rooms/DoorLabels'
 import { RoomsNotice } from './rooms/RoomsNotice'
 import { CORRIDOR_SLOTS } from './rooms/slots'
 import { useRooms } from './rooms/useRooms'
+import { SEAT_ANCHORS } from './seats/anchors'
+import { SeatAnchors, useSeatAnchorNodes } from './seats/SeatAnchors'
 import { sceneOf } from './scenes/registry'
 import { useSceneRef } from './scenes/SceneContext'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
@@ -127,6 +129,8 @@ export default function WorldCanvas() {
   const rooms = useRooms(CORRIDOR_SLOTS.length, hall)
   // 標籤的 DOM 節點。**身分穩定，不進 React** —— 位置每幀由投影元件直接寫進 style。
   const labelNodesRef = useLabelNodes()
+  // 工位錨點的 DOM 節點（`FE-W16-S06`）：同樣不進 React，位置由 Canvas 裡的投影器每幀寫。
+  const seatNodesRef = useSeatAnchorNodes()
 
   if (!webgl2) return <WebGLUnavailable />
 
@@ -201,6 +205,7 @@ export default function WorldCanvas() {
                 slots={CORRIDOR_SLOTS}
                 anchors={anchors}
                 nodesRef={labelNodesRef}
+                seatNodesRef={seatNodesRef}
                 requestEntry={requestEntry}
               />
               <SpatialInteraction poseRef={localPose} />
@@ -233,6 +238,8 @@ export default function WorldCanvas() {
           {/* 門標籤與走廊提示也是大廳的（`FE-V01-S03`）：房間裡沒有走廊。 */}
           {hall && <DoorLabels anchors={anchors} nodesRef={labelNodesRef} />}
           {hall && <RoomsNotice view={rooms} />}
+          {/* 工位的投影錨點（`FE-W16-S06`）**只在房間**：aria-hidden、沒有內容，是 `FE-J13` 座位標籤的位置與 e2e 的尺。 */}
+          {!hall && <SeatAnchors anchors={SEAT_ANCHORS} nodesRef={seatNodesRef} />}
           {/* ⚠️ 規格 FE-O14-S11／S12：這裡刻意什麼都沒有。
               以前這裡有一段「目前是單人預覽，看不到其他人」——
               拿掉是產品決定（這個網址對外的用途是展示世界，而那段字是
