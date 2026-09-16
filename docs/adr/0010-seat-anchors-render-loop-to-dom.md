@@ -4,7 +4,7 @@
 - **Date**: 2026-09-16
 - **Deciders**: 實作 `FE-W16` 的那個 session；兩位外部審查（規格 PR #422、實作 PR）
 - **邊界狀態**: 已強制
-- **證據**: tests/world-project-room-anchors.test.tsx:180、tests/world-project-room-anchors.test.tsx:83、tests/world-project-room-furniture.test.tsx:153、src/world/seats/SeatAnchorProjector.tsx:20、src/world/seats/SeatAnchors.tsx:21、src/world/layout/projectRoomLayout.ts:21
+- **證據**: tests/world-project-room-anchors.test.tsx:177、tests/world-project-room-anchors.test.tsx:83、tests/world-project-room-furniture.test.tsx:154、src/world/seats/SeatAnchorProjector.tsx:20、src/world/seats/SeatAnchors.tsx:21、src/world/layout/projectRoomLayout.ts:21
 
 > `邊界狀態` 與 `證據` 兩欄由 `bash .github/scripts/arch-view.sh` 讀。
 > 三種狀態的意思見 `docs/adr/README.md`。
@@ -57,7 +57,7 @@ Project Room（`FE-W16`）的每個工位要有一個「投影到螢幕的參考
 
 - **不進 React**：`tests/world-project-room-anchors.test.tsx` 的「相機跟拍時位置每幀更新，而且不經過 React」—— 相機移動兩幀、位置變了、投影器函式的呼叫次數不變。走 state 會數到每幀一次重繪 → 紅。
 - **只在 room、hall 沒有**：同檔「大廳裡一個都沒有」＋ `tests/world-project-room-furniture.test.tsx` 的「房間裡一幀之後八個節點都被寫了位置；大廳裡一個都沒被寫」。
-- **座標有限、對齊桌面中心 ≤ 1 px、畫面外 hidden**：同檔「一幀之後每個座標是有限數；0／4 在手算位置 ±1 px…」（期望是手算常數，不呼叫 `toScreen`）；`tests/world-project-room-desk-top.test.ts`：桌面高度換了錨點 y 要跟著（不是寫死）。
+- **座標有限、對齊桌面中心 ≤ 1 px、畫面外 hidden**：同檔「八個錨點都在手算位置 ±1 px…」（期望是手算常數，不呼叫 `toScreen`）；`tests/world-project-room-desk-top.test.ts`：桌面高度換了錨點 y 要跟著（不是寫死）。
 - **八格固定**：`tests/world-layout-project-room.test.ts` 的 `[FE-W16-S03]`（集合恰好 0–7）；配置不含任何 `seat_count` 的讀取（靜態資料）。
 
 ## 代價
