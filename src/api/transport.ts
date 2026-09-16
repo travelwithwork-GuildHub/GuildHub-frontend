@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { ConfigError, REST_CREDENTIALS, dataAdapter, restBase } from '@/config/env'
+import { ConfigError, REST_CREDENTIALS, restBase } from '@/config/env'
 import type { paths } from './contract/schema'
 import { ErrorEnvelope } from './contract/errors'
 
@@ -267,16 +267,20 @@ export function buildRequest(spec: RequestSpec): Request {
     init.body = JSON.stringify(spec.body)
     init.headers = { 'content-type': 'application/json' }
   }
-  return new Request(`${baseFor(dataAdapter())}${path}${queryString(spec.query)}`, init)
+  return new Request(`${baseFor()}${path}${queryString(spec.query)}`, init)
 }
 
 /**
  * 兩個 adapter 走同一份 operation 與契約，差別**只在這裡**：`guildhub` 打 `NEXT_PUBLIC_GUILDHUB_REST`，
  * `internal` 打**同源**的 `/api/...`（我們自己的 Route Handlers，`FE-O03`）。規格 `FE-O02-S02`（改寫版）。
  * 同源用相對網址：瀏覽器自己補主機名；jsdom 裡 `new Request('/api/me')` 會拿 `location.origin` 補上。
+ *
+ * 「哪個 adapter 不適用 REST base」由 `restBase()` 決定（`internal` 回 `null`，`FE-O14-S14`），這裡不再自己問
+ * `dataAdapter()` —— 兩邊各判一次的話，判準會漂（design D1）。
  */
-function baseFor(adapter: ReturnType<typeof dataAdapter>): string {
-  if (adapter !== 'internal') return restBase()
+function baseFor(): string {
+  const base = restBase()
+  if (base !== null) return base
   // 同源。用 `location.origin` 組成絕對網址：Node 的 `Request` 不接受相對網址（jsdom 裡是 Node 的 `Request`），
   // 而瀏覽器裡 `location.origin` 就是這個頁面的來源。
   // ⚠️ 伺服器端（SSR／Server Component）沒有 `location`：這一層今天**只在瀏覽器**被呼叫（`CLAUDE.md`：身分的查詢在瀏覽器端
