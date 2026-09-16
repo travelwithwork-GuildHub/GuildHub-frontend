@@ -275,7 +275,7 @@ try {
   const arrived = await walkLeg(page, { label: '走回 seat 1 的站位', where: odo.where, holdMs: 80, maxSteps: 200, out: OUT, steer: (p) => (Math.hypot(p.x - st1.x, p.z - st1.z) <= 0.3 ? null : aim(p, st1, 0.15)) })
   ok(`[S08] 走到 seat 1 的站位：反算 (${fmt(arrived.x)}, ${fmt(arrived.z)})，離站位 ${fmt(Math.hypot(arrived.x - st1.x, arrived.z - st1.z))}`)
 
-  // ── 朝桌子走：至少 1 步位移 ≥ 2 px，接近到 < 1 單位，然後連續 5 步變化 ≤ 1 px（plateau）；plateau 距離＝碰撞盒近側＋角色半徑 ──
+  // ── 持續朝桌子送輸入：至少 1 步離錨點的距離**減少** ≥ 2 px、曾 < 1 單位，然後連續 5 次同方向輸入變化 ≤ 1 px（plateau）；plateau 距離＝碰撞盒近側＋角色半徑 ──
   const box = T.boxOf(T.desks[1])
   const expectPlateau = box.halfWidth + T.radius
   let prevD = arrived.dist(1)
@@ -290,10 +290,10 @@ try {
     out: OUT,
     steer: (p, step) => {
       const d = p.dist(1)
-      const moved = Math.abs(d - prevD) * s
+      const closer = (prevD - d) * s
       if (step > 0) {
-        if (moved >= 2) moving += 1
-        flat = moved <= 1 ? flat + 1 : 0
+        if (closer >= 2) moving += 1
+        flat = Math.abs(closer) <= 1 ? flat + 1 : 0
       }
       prevD = d
       closest = Math.min(closest, d)
@@ -301,9 +301,9 @@ try {
     },
   })
   const plateau = stopped.dist(1)
-  if (moving >= 1) ok(`[S08] 朝桌子走：${moving} 步位移 ≥ 2 px（輸入生效、步幅高於容差），最近到 ${fmt(closest)} 單位`)
-  else bad('[S08] 朝桌子走：沒有任何一步位移 ≥ 2 px', `最近到 ${fmt(closest)} 單位`)
-  if (closest < 1) ok('[S08] 接近到離桌面中心 < 1 單位')
+  if (moving >= 1) ok(`[S08] 朝桌子走：${moving} 步離錨點的距離減少 ≥ 2 px（輸入生效、方向對、步幅高於容差）`)
+  else bad('[S08] 朝桌子走：沒有任何一步讓離錨點的距離減少 ≥ 2 px', `最近到 ${fmt(closest)} 單位`)
+  if (closest < 1) ok(`[S08] 曾接近到離桌面中心 < 1 單位（${fmt(closest)}）`)
   else bad('[S08] 沒有接近到 < 1 單位', `最近 ${fmt(closest)}`)
   if (Math.abs(plateau - expectPlateau) <= 0.15) ok(`[S08] 撞桌子停下：plateau 距離 ${fmt(plateau)} ＝ 碰撞盒近側 ${box.halfWidth} ＋ 角色半徑 ${T.radius}（±0.15）`)
   else bad('[S08] plateau 距離對不上桌子的碰撞盒', `量到 ${fmt(plateau)}，要 ${fmt(expectPlateau)} ± 0.15（比它小是穿過桌子；大很多是撞到別的東西）`)
