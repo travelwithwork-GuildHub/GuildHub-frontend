@@ -46,7 +46,8 @@
   - 量到的：s = 53.67；出生點反算 (0.00, 6.75)；通道中點八個錨點都在模板 ±2 px；往北回抖 0 px；到站 x −2.26～−2.53；朝桌子走 2～4 步 ≥ 2 px；plateau 0.66（0.4 ＋ 0.25 ＋ controller offset 0.01）；seat 2 距離 1.07～1.21
   - **規格改了一句**（#456）：原文「連續 3 步 ≥ 2 px」在物理上做不到 —— 一步的位移是整個 frame 的（20 fps → 最小 0.2 單位 ≈ 11 px），站位到碰撞面只有 0.45 單位；實測 3 次 3／2／2 步。改成「至少 1 步距離**減少** ≥ 2 px、曾 < 1 單位、連續 5 次同方向輸入變化 ≤ 1 px」
   - 突變（每個都重新 `pnpm run build`、重啟 `next start`、跑完 `git checkout` 還原）：① `PropParts` 對桌面部件回 `null`（桌腳、collider、`DESK_TOP` 留著）→ 像素段紅（0／16／15／17% < 60%）；② `addStaticBox` 把桌子的盒子設成 sensor（mesh 留著）→ **原本照樣綠**：角色穿過桌面中心後被椅子擋在另一側，離桌面中心剛好 0.52、落在 0.65 ± 0.15 內 —— 距離改成**有號**（站位側為正）＋全程最近一步也不得小於碰撞距離，之後紅（plateau −0.52）；③ `SceneObjects` 的 room 分支不掛投影器 → 出生視角 seat 0／4 hidden、里程計起不來 → 紅
-  - 對正式建置連跑 3 次全綠（103／103／102 秒）；`scene-switch`／`room-entry`／`scene-chat`（共用改過的 `walker`）各跑 1 次全綠（35／172／59 秒）。⚠️ **`pnpm test` 不能跟 e2e 同時跑**：`deploy-build-gate.test.ts` 跑真的 `next build`，會把 `.next` 清掉、正在跑的 `next start` 回不出 canvas（這次撞到：兩支 e2e 20 秒內「沒有 canvas」）
+  - 第一輪雙審後補（codex：`toward` 只量 x、S08 要的是二維距離；北端只有單邊不等式；`presence leave` 後固定等 800 ms；三次 `grab` 沒隔幀；基準色取整後才算距離；`settle` 兩次讀到同一舊幀會誤判收斂。Gemini：`templateCheck(all)` 只迭代 DOM 裡有的錨點、少一個照樣綠且 `a0` 缺時會 TypeError；基準色沒依 seat 0→7）：有號**二維**距離；北端終點 ± 0.6 雙邊；離開看 `online-count` 2 → 1；`burst` 連拍 220 ms；基準色不取整；模板與基準都依 seat 0→7、少一個紅；`settle` 兩次讀數之間等一個 rAF。突變 ② 再跑一次 → 紅（plateau −0.53）
+  - 對正式建置連跑 3 次全綠（第一版 103／103／102 秒；雙審修正後 116／119／115 秒）；`scene-switch`／`room-entry`／`scene-chat`（共用改過的 `walker`／`settle`）各跑 1 次全綠（修正後 42／193／64 秒）。⚠️ **`pnpm test` 不能跟 e2e 同時跑**：`deploy-build-gate.test.ts` 跑真的 `next build`，會把 `.next` 清掉、正在跑的 `next start` 回不出 canvas（這次撞到：兩支 e2e 20 秒內「沒有 canvas」）
 - [ ] 4.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
 - [ ] 4.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 對正式建置跑 3 次的結果如實記在這裡
 - [ ] 4.4 Google Sheet：`FE-W16` → On-going／Done 各一次
