@@ -25,13 +25,9 @@ import type { SceneRef } from '@/world/scenes/registry'
 
 // 房間裡的桌椅：畫出來的＝配置裡的、撞得到、但不是互動物件。規格 `FE-W16-S04`／`S07`。
 //
-// ⚠️⚠️ **辨識「一張畫出來的桌子」不靠 Three 的物件名，也不靠配置** —— 靠它的部件幾何。
-// `geometryFor` 對同一份 spec 回同一個實例（`FE-W09` 的快取），所以「一個 group 底下的 mesh 依序拿著
-// desk definition 每一個部件的幾何」就是一張桌子，不管誰畫的、畫在哪。這樣 `SceneObjects` 的 JSX 裡
-// 偷畫一張，數量會變 9；而配置少一張、渲染卻沒少，也抓得到。位置再對回配置的識別字。
-//
-// ⚠️ `S07` 走的是**正式的移動與目標選擇路徑**：真的 `LocalPlayer`（Rapier）從站位朝桌子走到撞上，
-// 真的 `SpatialInteraction` 每幀選目標。用 `poseRef` 直接寫座標的話，「撞得到」那一半就沒驗到。
+// ⚠️⚠️ **辨識「一張畫出來的桌子」不靠 Three 的物件名，也不靠配置** —— 靠部件幾何：`geometryFor` 對同一份 spec 回同一個實例（`FE-W09` 的快取），
+// 「一個 group 底下的 mesh 依序拿著 desk definition 每個部件的幾何」就是一張桌子，不管誰畫的、畫在哪 —— `SceneObjects` 的 JSX 偷畫一張會數到 9。位置再對回配置的識別字。
+// ⚠️ `S07` 走**正式的移動與目標選擇路徑**：真的 `LocalPlayer`（Rapier）從站位朝桌子走到撞上、真的 `SpatialInteraction` 每幀選目標 —— 用 `poseRef` 直接寫座標的話「撞得到」沒驗到。
 
 const ROOM: SceneRef = { id: 'room', projectId: 'a0000000-0000-4000-8000-00000000000a' }
 const close = (a: number, b: number) => Math.abs(a - b) < 1e-6
@@ -159,13 +155,7 @@ describe('工位錨點的投影器掛在 room 分支', () => {
   })
 })
 
-function Probe({
-  sinkRef,
-  seen,
-}: {
-  sinkRef: RefObject<InteractableRegistry | null>
-  seen: (id: string | null, panel: string | null) => void
-}) {
+function Probe({ sinkRef, seen }: { sinkRef: RefObject<InteractableRegistry | null>; seen: (id: string | null, panel: string | null) => void }) {
   const { registry, target } = useInteraction()
   const { open } = useListPanel()
   useEffect(() => {
@@ -187,9 +177,8 @@ describe('桌子在、撞得到，但不會冒出 E 提示', () => {
     const station = stationAt(0)
     const desk = ROOM_LAYOUT.find((item) => item.id === station.deskId)
     const deskBox = desk === undefined ? undefined : staticBoxFor(desk)
-    // GIVEN：配置裡有那張桌子，而且它有碰撞盒 —— 少了這個，下面「撞上」是恆真的。
+    // GIVEN：配置裡有那張桌子、有碰撞盒（少了這個，「撞上」恆真）；西側：桌子在站位的 -x 方向，面向它就是 `left`。
     if (desk === undefined || deskBox === undefined) throw new Error('seat 0 的桌子不在配置裡或沒有碰撞盒')
-    // 西側：桌子在站位的 -x 方向，面向它就是 `left`。
     expect(desk.x).toBeLessThan(station.x)
     const nearFace = deskBox.x + deskBox.halfWidth
 

@@ -16,14 +16,10 @@ import type { SceneRef } from '@/world/scenes/registry'
 import WorldCanvas from '@/world/WorldCanvas'
 
 // 每個工位一個投影到螢幕的 DOM 錨點。規格 `FE-W16-S06`。
-//
-// 兩個殼（跟 `world-scenes-hall-only.test.tsx` 同一組替身）：
-// - `WorldCanvas` 在 jsdom 裡掛（`Canvas` 換成 stub、`LocalPlayer`／`RemoteWorld` 換成 null）：驗**有哪些錨點**、在哪個場景有。
-// - `SeatAnchorProjector` 用 `@react-three/test-renderer` 跑真的 `useFrame`：驗**位置真的被寫進 DOM**、畫面外真的藏起來。
-//
-// ⚠️ 像素位置與畫面內／外的期望值是**手算的常數**（見 `PORCH_EXPECTED`），不呼叫 `toScreen`／`isOnScreen` ——
-// 那些跟投影器同源，投影寫偏 10 px 或藏錯邊它們會一起錯（第一版用 `isOnScreen`，兩位審查者都指出）。
-// `S07` 的「DOM 沒有提示」不在這裡驗：這個殼把 `SpatialInteraction` 換掉了，在這裡斷言「沒有提示」是恆真的（審查抓到）；
+// 兩個殼（跟 `world-scenes-hall-only.test.tsx` 同一組替身）：`WorldCanvas` 在 jsdom 掛（`Canvas` stub、R3F hook 的使用者換成 null）驗**有哪些錨點**、在哪個場景有；
+// `SeatAnchorProjector` 用 `@react-three/test-renderer` 跑真的 `useFrame`，驗**位置真的被寫進 DOM**、畫面外真的藏。
+// ⚠️ 像素位置與畫面內／外的期望值是**手算的常數**（`PORCH_EXPECTED`），不呼叫 `toScreen`／`isOnScreen` —— 那些跟投影器同源，投影寫偏 10 px 或藏錯邊會一起錯
+// （第一版用 `isOnScreen`，兩位審查者都指出）。`S07` 的「DOM 沒有提示」不在這裡驗：這個殼把 `SpatialInteraction` 換掉了，在這裡斷言「沒有提示」恆真（審查抓到）；
 // 那一句由 `world-project-room-furniture.test.tsx` 的目標恆為 null ＋ `interaction-prompt.test.tsx`（`FE-W06-S13`：目標 null 就沒有提示）合起來守。
 
 const listRooms = vi.hoisted(() => vi.fn())
@@ -40,8 +36,7 @@ vi.mock('@react-three/fiber', async () => {
 })
 vi.mock('@/world/player/LocalPlayer', () => ({ LocalPlayer: () => null }))
 vi.mock('@/world/RemoteWorld', () => ({ RemoteWorld: () => null }))
-// Canvas 是 stub，裡面的 `useThree`／`useFrame` 沒有 R3F 的 root：3D 那一半在 jsdom 裡換成不畫的殼；
-// 錨點的 DOM 在 Canvas 外面，是這裡要驗的。
+// Canvas 是 stub、沒有 R3F root：裡面用 `useThree`／`useFrame` 的元件換成不畫的殼；錨點的 DOM 在 Canvas 外面，是這裡要驗的。
 vi.mock('@/world/environment/WorldShell', () => ({ WorldShell: () => null }))
 vi.mock('@/world/WorldCamera', () => ({ WorldCamera: () => null }))
 vi.mock('@/world/interaction/SpatialInteraction', () => ({ SpatialInteraction: () => null }))

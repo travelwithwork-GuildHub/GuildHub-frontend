@@ -30,6 +30,7 @@
   - 2026-09-16：`src/world/seats/{anchors.ts,SeatAnchors.tsx,SeatAnchorProjector.tsx}`；`labelProjection.ts` 抽出 `screenPixelFor`（門標籤與錨點同一份像素投影，`labelRectFor` 改成它的呼叫端）；錨點 x／z 讀配置裡的桌子、y 讀 definition 的桌面高度（`DESK_TOP` = 0.76，e2e 反算要扣的那個 h）；NaN 不寫進 DOM
 - [x] 3.3 突變：桌子註冊 `Interactable` → S07 紅；錨點在 hall 也掛、座標 NaN → S06 紅；JSX 另畫一張桌 → S04 紅（不掛投影器是 S08 的事，e2e 那片再拔）
   - 2026-09-16 執行紀錄（每個突變後 `git checkout` 還原）：① 桌子註冊 `Interactable` → S07 紅；② `SeatAnchors` 與投影器在 hall 也掛 → S06「大廳裡一個都沒有」＋「大廳裡一個都沒被寫」紅；③ `DESK_TOP = NaN` → S06 五條紅；④ `SceneObjects` 的 JSX 另畫一張桌 → S04 兩條紅（9 張）；⑤ 投影器每幀 `setState` → **原本照樣綠**：frame 沒包在 `act` 裡，排隊的重繪沒 flush 就數不到 —— 測試改成 `act` 包 frame（commit `6d922b5`）後紅；⑥ room 分支不掛投影器 → S06「八個節點都被寫了位置」紅（jsdom 這層守「掛了就會寫」；「不掛也不動」仍由 S08 的里程計守）；⑦ 畫面外也 `visible` → S06 紅；⑧ 配置少桌子時靜默略過 → S06「配置錯誤要拋」紅；⑨ `LayoutItems` 不畫 desk → S04 兩條紅；⑩ `screenPixelFor` 的螢幕 y 符號反了 → `FE-W12-S10`（門標籤）＋ S06 跟拍那條紅
+  - 2026-09-16 第一輪雙審後補（codex：S06 沒驗 ≤1 px、S04 只在渲染位置找碰撞盒、`DESK_TOP` 寫死 0.76 照樣綠；Gemini：S06 期望用 `isOnScreen` 跟投影器同源、S07 的 DOM 斷言在 mock 掉 `SpatialInteraction` 的殼裡恆真）：S06 期望改成**手算常數**（門廊視角 seat 0／4 在 (424, 78.5)／(856, 78.5) ±1 px、其餘六個寫進 DOM 的像素在畫面外且 hidden）、S04 數**整份碰撞裡全部桌型／椅型盒**再對回渲染位置、新增 `tests/world-project-room-desk-top.test.ts`（把桌面部件抬高 0.5，`DESK_TOP` 與錨點 y 要跟著）、拿掉恆真的 S07 DOM 斷言（那一句由 S07 的目標恆為 null ＋ `FE-W06-S13` 合起來守）。突變：⑪ 投影寫偏 10 px → S06 紅；⑫ `DESK_TOP = 0.76` → desk-top 紅；⑬ `staticBoxesFor` 多回一個放在別處的桌型盒 → S04 兩條紅
 
 ## 4. 瀏覽器與收尾
 
