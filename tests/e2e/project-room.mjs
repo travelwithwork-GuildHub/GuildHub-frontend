@@ -90,7 +90,7 @@ function seatOdometer(page, canvas) {
   /** 用 0 與 4 的錨點量 s。**兩個都要在 Canvas 內且不 hidden**，否則整支尺不成立。 */
   const calibrate = (r) => {
     const [a0, a4] = [0, 4].map((i) => r.anchors.find((a) => a.seat === i))
-    if (!a0 || !a4 || !inside(r, a0) || !inside(r, a4)) throw new Error(`seat 0／4 的錨點不在 Canvas 內：${JSON.stringify([a0, a4])}`)
+    if (!a0 || !a4 || !inside(r, a0) || !inside(r, a4)) throw new Error(`[S08] 出生視角：seat 0／4 的錨點不在 Canvas 內或 hidden（投影器沒掛？）：${JSON.stringify([a0, a4])}`)
     s = (a4.x - a0.x) / (T.desks[4].x - T.desks[0].x)
     return s
   }
@@ -108,7 +108,13 @@ function seatOdometer(page, canvas) {
       const p = relTo(r, a)
       return Math.hypot(p.x - T.desks[seat].x, p.z - T.desks[seat].z)
     }
-    return { r, x, z, dist }
+    /** 離桌面中心的**有號**距離：站位那一側為正。穿過桌子之後 `dist` 又會變大（停在椅子上剛好也是 0.52），這個不會。 */
+    const toward = (seat) => {
+      const a = r.anchors.find((q) => q.seat === seat)
+      if (!a || !inside(r, a)) return NaN
+      return Math.sign(T.stations[seat].x - T.desks[seat].x) * (relTo(r, a).x - T.desks[seat].x)
+    }
+    return { r, x, z, dist, toward }
   }
   /** 畫面內的錨點 vs 模板：以 0／4 的中點與 seat 0 的 y 為基準，其餘每個差 ≤ 2 px。`all` 時八個都要在畫面內。 */
   const templateCheck = (r, label, all = false) => {
@@ -278,7 +284,7 @@ try {
   // ── 持續朝桌子送輸入：至少 1 步離錨點的距離**減少** ≥ 2 px、曾 < 1 單位，然後連續 5 次同方向輸入變化 ≤ 1 px（plateau）；plateau 距離＝碰撞盒近側＋角色半徑 ──
   const box = T.boxOf(T.desks[1])
   const expectPlateau = box.halfWidth + T.radius
-  let prevD = arrived.dist(1)
+  let prevD = arrived.toward(1)
   let moving = 0
   let flat = 0
   let closest = prevD
@@ -289,7 +295,7 @@ try {
     maxSteps: 60,
     out: OUT,
     steer: (p, step) => {
-      const d = p.dist(1)
+      const d = p.toward(1)
       const closer = (prevD - d) * s
       if (step > 0) {
         if (closer >= 2) moving += 1
@@ -300,13 +306,14 @@ try {
       return flat >= 5 ? null : 'KeyA'
     },
   })
-  const plateau = stopped.dist(1)
+  const plateau = stopped.toward(1)
   if (moving >= 1) ok(`[S08] 朝桌子走：${moving} 步離錨點的距離減少 ≥ 2 px（輸入生效、方向對、步幅高於容差）`)
   else bad('[S08] 朝桌子走：沒有任何一步讓離錨點的距離減少 ≥ 2 px', `最近到 ${fmt(closest)} 單位`)
   if (closest < 1) ok(`[S08] 曾接近到離桌面中心 < 1 單位（${fmt(closest)}）`)
   else bad('[S08] 沒有接近到 < 1 單位', `最近 ${fmt(closest)}`)
-  if (Math.abs(plateau - expectPlateau) <= 0.15) ok(`[S08] 撞桌子停下：plateau 距離 ${fmt(plateau)} ＝ 碰撞盒近側 ${box.halfWidth} ＋ 角色半徑 ${T.radius}（±0.15）`)
-  else bad('[S08] plateau 距離對不上桌子的碰撞盒', `量到 ${fmt(plateau)}，要 ${fmt(expectPlateau)} ± 0.15（比它小是穿過桌子；大很多是撞到別的東西）`)
+  // 全程最近的一步也不能比碰撞距離小：只拔桌子的 collider 會先穿過桌面中心、再被椅子擋在另一側（那裡離桌面中心剛好也是 0.52，落在 ±0.15 內）。
+  if (Math.abs(plateau - expectPlateau) <= 0.15 && closest >= expectPlateau - 0.15) ok(`[S08] 撞桌子停下：plateau 距離 ${fmt(plateau)} ＝ 碰撞盒近側 ${box.halfWidth} ＋ 角色半徑 ${T.radius}（±0.15），全程最近 ${fmt(closest)}`)
+  else bad('[S08] plateau 距離對不上桌子的碰撞盒', `plateau ${fmt(plateau)}、全程最近 ${fmt(closest)}，要 ${fmt(expectPlateau)} ± 0.15（比它小是穿過桌子；大很多是撞到別的東西）`)
   await page.screenshot({ path: path.join(OUT, 'at-desk.png') })
 
   // ── 繞回通道再到 seat 2 的站位：離它的錨點的反算距離收斂到模板距離 ± 0.15 ──
