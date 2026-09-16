@@ -6,9 +6,10 @@
 ## 1. 規格
 
 - [x] 1.1 規格已在 PR 上談定（`spec/fe-w16-project-room`；兩位外部審查）—— #422，2026-09-15 合併
-- [ ] 1.2（流程，不對應 Requirement）動 tsx／視覺之前先過 `ui-ux-pro-max`（`--domain` 3D 場景構圖與地毯色；輸出不進版控）
+- [x] 1.2（流程，不對應 Requirement）動 tsx／視覺之前先過 `ui-ux-pro-max`（`--domain` 3D 場景構圖與地毯色；輸出不進版控）
   - 2026-09-16 `--layout`：查了 `--domain ux`「isometric 3d room desks aisle」與 `--stack threejs`「scene composition」，資料庫沒有 3D 房間構圖的條目（回的是觸控間距、材質／燈光）；這片沒有 tsx、地毯與桌椅沿用 `world-environment` 既有材質色，沒有新的視覺決定。`--anchors` 片再過一次
   - 2026-09-16 `--anchors`：查了 `--domain ux`「invisible positioned anchor overlay aria-hidden screen reader」—— 回的是「Screen Reader：語意 HTML、不要 div soup」；錨點沒有可見內容，做成 `aria-hidden`、`pointer-events-none`、0×0，不進無障礙樹。這片的 tsx 沒有任何看得見的像素，沒有新的視覺決定。剩 e2e 片（不動 tsx）
+  - 2026-09-16 `--e2e`（#457）與 `governance/`（#459）：沒有動任何 tsx／css／design，不用過。整個 change 沒有新的視覺決定 —— 桌椅地毯全部沿用 `world-environment` 既有材質色；順帶看到的「方向光陰影只罩房間中段」歸 `FE-W14`，沒改
 - [x] 1.3（流程，不對應 Requirement）ADR：錨點的 render loop → DOM 邊界、八格固定容量歸 J13（design D5 補記）
   - 2026-09-16：`docs/adr/0010-seat-anchors-render-loop-to-dom.md`（已強制；證據是這片的三條測試；`arch-view.sh` 對得上）
 
@@ -48,7 +49,9 @@
   - 突變（每個都重新 `pnpm run build`、重啟 `next start`、跑完 `git checkout` 還原）：① `PropParts` 對桌面部件回 `null`（桌腳、collider、`DESK_TOP` 留著）→ 像素段紅（0／16／15／17% < 60%）；② `addStaticBox` 把桌子的盒子設成 sensor（mesh 留著）→ **原本照樣綠**：角色穿過桌面中心後被椅子擋在另一側，離桌面中心剛好 0.52、落在 0.65 ± 0.15 內 —— 距離改成**有號**（站位側為正）＋全程最近一步也不得小於碰撞距離，之後紅（plateau −0.52）；③ `SceneObjects` 的 room 分支不掛投影器 → 出生視角 seat 0／4 hidden、里程計起不來 → 紅
   - 第一輪雙審後補（codex：`toward` 只量 x、S08 要的是二維距離；北端只有單邊不等式；`presence leave` 後固定等 800 ms；三次 `grab` 沒隔幀；基準色取整後才算距離；`settle` 兩次讀到同一舊幀會誤判收斂。Gemini：`templateCheck(all)` 只迭代 DOM 裡有的錨點、少一個照樣綠且 `a0` 缺時會 TypeError；基準色沒依 seat 0→7）：有號**二維**距離；北端終點 ± 0.6 雙邊；離開看 `online-count` 2 → 1；`burst` 連拍 220 ms；基準色不取整；模板與基準都依 seat 0→7、少一個紅；`settle` 兩次讀數之間等一個 rAF。突變 ② 再跑一次 → 紅（plateau −0.53）
   - 對正式建置連跑 3 次全綠（第一版 103／103／102 秒；雙審修正後 116／119／115 秒）；`scene-switch`／`room-entry`／`scene-chat`（共用改過的 `walker`／`settle`）各跑 1 次全綠（修正後 42／193／64 秒）。⚠️ **`pnpm test` 不能跟 e2e 同時跑**：`deploy-build-gate.test.ts` 跑真的 `next build`，會把 `.next` 清掉、正在跑的 `next start` 回不出 canvas（這次撞到：兩支 e2e 20 秒內「沒有 canvas」）
-- [ ] 4.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）
-- [ ] 4.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 對正式建置跑 3 次的結果如實記在這裡
-- [ ] 4.4 Google Sheet：`FE-W16` → On-going／Done 各一次
-- [ ] 4.5 封存（`archive/fe-w16-project-room`；勾勾先用 `feat/fe-w16-project-room--tasks` 進 main；archive 會把 `world-scenes` 那條 Requirement 整條換掉 —— 對 diff 時確認 `S01`／`S03` 逐字沒變）
+- [x] 4.2 e2e 加進 `.github/scripts/e2e-main.sh`（`governance/`，獨立 PR）—— #459（`63f1bed`）。改 e2e-main.sh 會觸發安全網在 runner 上自己跑一輪：8/8 綠，project-room 203 秒（本機 119；room-entry 同比 175→346，是 runner 的 swiftshader 慢 1.7 倍，不是這支特別慢）；合併前本機整支 e2e-main 也跑過一次 8/8 綠
+- [x] 4.3 `pnpm run typecheck`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test`、e2e 對正式建置跑 3 次的結果如實記在這裡
+  - main `63f1bed`（#459 之後）：typecheck 過、eslint 乾淨；`pnpm test` 151 檔 1145 過／1 失敗／7 skipped（243 秒）—— 失敗的是 `tests/server-auth.test.ts` 的 scrypt 時序判準（「格式壞掉 63 ms vs 密碼錯 221 ms」，平行跑時 CPU 搶佔讓 median 失真），跟 W16 無關（W16 沒動 `src/server`）；單檔重跑 8/8 過。#457 那輪也是 3 個逾時（build-gate 180 s、lint 30 s、inbox findBy）單檔重跑全過
+  - e2e 對正式建置：#457 連跑 3 次 116／119／115 秒全綠；#459 本機 e2e-main 整支 119 秒綠、runner 203 秒綠。三個突變（拔桌面 mesh → 像素 0～17%；桌子 collider 設 sensor → plateau −0.53；不掛投影器 → 錨點 hidden）都紅，紀錄在 4.1 與 #457 留言
+- [x] 4.4 Google Sheet：`FE-W16` → On-going／Done 各一次 —— On-going 從 #451 起逐片 20→60→80→85%；Done 在瀏覽器層（runner 上的 e2e-main）驗過之後、這條勾勾的同一天打
+- [x] 4.5 封存（`archive/fe-w16-project-room`；勾勾先用 `feat/fe-w16-project-room--tasks` 進 main；archive 會把 `world-scenes` 那條 Requirement 整條換掉 —— 對 diff 時確認 `S01`／`S03` 逐字沒變） —— 勾勾在這支 PR 進 main（AGENTS.md〈archive 之前先把 tasks 打勾〉），接著開 `archive/fe-w16-project-room`
