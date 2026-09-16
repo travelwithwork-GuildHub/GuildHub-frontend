@@ -131,10 +131,12 @@ describe('八個工位是穩定的模板', () => {
       // 桌椅跟站位在同一排 —— 量的是**放進配置的實體**，不是 `stationAt` 自己（審查抓到的：兩邊都從同一把尺推導的話，實體擺錯測不到）。
       expect(desk.z, `${station.id} 的桌子不在站位那一排`).toBe(station.z)
       expect(chair.z, `${station.id} 的椅子不在站位那一排`).toBe(station.z)
-      // 站位在桌子與通道中線之間；椅子比桌子更靠外牆。
+      // 站位在桌子與通道中線之間；椅子比桌子更靠外牆 —— **帶方向比**，不是比絕對值
+      // （第 2 輪兩位審查者同時抓到：西側椅子搬到 +4.6 時 |4.6| > |−3.6| 仍綠）。
       expect(Math.abs(station.x)).toBeLessThan(Math.abs(desk.x))
       expect(Math.sign(station.x)).toBe(Math.sign(desk.x))
-      expect(Math.abs(chair.x)).toBeGreaterThan(Math.abs(desk.x))
+      if (west) expect(chair.x, `${station.id} 的椅子不在桌子西側`).toBeLessThan(desk.x)
+      else expect(chair.x, `${station.id} 的椅子不在桌子東側`).toBeGreaterThan(desk.x)
     }
     const deskZ = (i: number) => (byId(stationAt(i).deskId) as LayoutItem).z
     for (const side of [[0, 1, 2, 3], [4, 5, 6, 7]]) {
