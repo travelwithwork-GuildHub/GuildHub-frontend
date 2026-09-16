@@ -24,7 +24,11 @@ set -euo pipefail
 # 本機對 next start 跑 3 次全綠。它抓到過兩個單元測試看不到的缺陷（開視窗的 E 打進欄位、換場景後提示殘留）—— 這是它進來的理由。
 # scene-chat（`FE-K04`＋`FE-R11-S05`，#440／#441）同一套零件（`lib/world.mjs`）、同樣全部偽造（兩個 context：走位＋chat、以及「只打 loopback」的 allowlist）；
 # 本機對 next start 連跑 3 次全綠（63／61／69 秒）；rebase 到 #443／#445 之後的 main 再整支跑一次 7/7 綠（scene-chat 60 秒）。
-SCRIPTS=(avatar-picker avatar-pixels control-contrast rooms-fixture scene-switch room-entry scene-chat)
+# project-room（`FE-W16-S08`，#457）同一套零件（`lib/world.mjs` 的 walker／settle／walkLeg）、全部偽造（`fakeRealtime` 多放一個遠端玩家）；
+# 里程計是投影錨點反算的角色座標，每一小步量一次、只設步數上限；模板／桌面高度／碰撞盒從產品 TS 讀（tsx register），不抄數字。
+# 本機對 next start 連跑 3 次全綠（116／119／115 秒）、整支 e2e-main 再跑一次 8/8 綠（project-room 119 秒）；三個突變（拔桌面 mesh、桌子 collider 設 sensor、不掛投影器）都紅。
+# 是這一組裡最慢的一支 —— 它量的是像素與物理（撞桌子的 plateau），jsdom 一項都量不到，這是它進來的理由。
+SCRIPTS=(avatar-picker avatar-pixels control-contrast rooms-fixture scene-switch room-entry scene-chat project-room)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
