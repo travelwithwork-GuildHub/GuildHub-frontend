@@ -8,7 +8,9 @@
 - [x] 1.1 規格已在 PR 上談定（`spec/fe-w16-project-room`；兩位外部審查）—— #422，2026-09-15 合併
 - [ ] 1.2（流程，不對應 Requirement）動 tsx／視覺之前先過 `ui-ux-pro-max`（`--domain` 3D 場景構圖與地毯色；輸出不進版控）
   - 2026-09-16 `--layout`：查了 `--domain ux`「isometric 3d room desks aisle」與 `--stack threejs`「scene composition」，資料庫沒有 3D 房間構圖的條目（回的是觸控間距、材質／燈光）；這片沒有 tsx、地毯與桌椅沿用 `world-environment` 既有材質色，沒有新的視覺決定。`--anchors` 片再過一次
-- [ ] 1.3（流程，不對應 Requirement）ADR：錨點的 render loop → DOM 邊界、八格固定容量歸 J13（design D5 補記）
+  - 2026-09-16 `--anchors`：查了 `--domain ux`「invisible positioned anchor overlay aria-hidden screen reader」—— 回的是「Screen Reader：語意 HTML、不要 div soup」；錨點沒有可見內容，做成 `aria-hidden`、`pointer-events-none`、0×0，不進無障礙樹。這片的 tsx 沒有任何看得見的像素，沒有新的視覺決定。剩 e2e 片（不動 tsx）
+- [x] 1.3（流程，不對應 Requirement）ADR：錨點的 render loop → DOM 邊界、八格固定容量歸 J13（design D5 補記）
+  - 2026-09-16：`docs/adr/0010-seat-anchors-render-loop-to-dom.md`（已強制；證據是這片的三條測試；`arch-view.sh` 對得上）
 
 ## 2. 配置：出口、工位模板、判準（PR：`--layout`；產品碼 ≤180、測試 ≤250）
 
@@ -22,9 +24,12 @@
 
 ## 3. 渲染、碰撞、不互動、錨點（PR：`--anchors`；產品碼 ≤200、測試 ≤250）
 
-- [ ] 3.1 先寫 jsdom：`[FE-W16-S04]`（整棵房間子樹：8 桌 8 椅各一渲染物件與碰撞盒、刪一張兩邊同時消失；辨識桌型物件用配置的識別字，不用 Three 物件名）、`[FE-W16-S07]`（真實目標選擇路徑；註冊表沒有桌椅；E 沒有請求）、`[FE-W16-S06]`（room 8 個錨點、有限座標、畫面外 hidden；hall 0 個）
-- [ ] 3.2 `SeatAnchorProjector`（照 `DoorLabelProjector`／`labelProjection.ts`；`aria-hidden`、`data-seat-index`、無內容）掛進 `SceneObjects` 的 `room` 分支；錨點 DOM 在 Canvas 外
-- [ ] 3.3 突變：桌子註冊 `Interactable` → S07 紅；錨點在 hall 也掛、座標 NaN → S06 紅；JSX 另畫一張桌 → S04 紅（不掛投影器是 S08 的事，e2e 那片再拔）
+- [x] 3.1 先寫 jsdom：`[FE-W16-S04]`（整棵房間子樹：8 桌 8 椅各一渲染物件與碰撞盒、刪一張兩邊同時消失；辨識桌型物件用配置的識別字，不用 Three 物件名）、`[FE-W16-S07]`（真實目標選擇路徑；註冊表沒有桌椅；E 沒有請求）、`[FE-W16-S06]`（room 8 個錨點、有限座標、畫面外 hidden；hall 0 個）
+  - 2026-09-16：`tests/world-project-room-furniture.test.tsx`（S04 ×2、S06 接線 ×1、S07 ×1）＋ `tests/world-project-room-anchors.test.tsx`（S06 ×6、S07 DOM ×1）先紅（commit `abfe805`：模組不存在）。畫出來的桌子靠**部件幾何實例**辨識（`geometryFor` 的快取），位置再對回配置識別字 —— 不靠 Three 物件名、不靠配置數量；S07 用真的 `LocalPlayer`（Rapier）從站位走到撞上桌子（停在近側面＋角色半徑 ±0.05）
+- [x] 3.2 `SeatAnchorProjector`（照 `DoorLabelProjector`／`labelProjection.ts`；`aria-hidden`、`data-seat-index`、無內容）掛進 `SceneObjects` 的 `room` 分支；錨點 DOM 在 Canvas 外
+  - 2026-09-16：`src/world/seats/{anchors.ts,SeatAnchors.tsx,SeatAnchorProjector.tsx}`；`labelProjection.ts` 抽出 `screenPixelFor`（門標籤與錨點同一份像素投影，`labelRectFor` 改成它的呼叫端）；錨點 x／z 讀配置裡的桌子、y 讀 definition 的桌面高度（`DESK_TOP` = 0.76，e2e 反算要扣的那個 h）；NaN 不寫進 DOM
+- [x] 3.3 突變：桌子註冊 `Interactable` → S07 紅；錨點在 hall 也掛、座標 NaN → S06 紅；JSX 另畫一張桌 → S04 紅（不掛投影器是 S08 的事，e2e 那片再拔）
+  - 2026-09-16 執行紀錄（每個突變後 `git checkout` 還原）：① 桌子註冊 `Interactable` → S07 紅；② `SeatAnchors` 與投影器在 hall 也掛 → S06「大廳裡一個都沒有」＋「大廳裡一個都沒被寫」紅；③ `DESK_TOP = NaN` → S06 五條紅；④ `SceneObjects` 的 JSX 另畫一張桌 → S04 兩條紅（9 張）；⑤ 投影器每幀 `setState` → **原本照樣綠**：frame 沒包在 `act` 裡，排隊的重繪沒 flush 就數不到 —— 測試改成 `act` 包 frame（commit `6d922b5`）後紅；⑥ room 分支不掛投影器 → S06「八個節點都被寫了位置」紅（jsdom 這層守「掛了就會寫」；「不掛也不動」仍由 S08 的里程計守）；⑦ 畫面外也 `visible` → S06 紅；⑧ 配置少桌子時靜默略過 → S06「配置錯誤要拋」紅；⑨ `LayoutItems` 不畫 desk → S04 兩條紅；⑩ `screenPixelFor` 的螢幕 y 符號反了 → `FE-W12-S10`（門標籤）＋ S06 跟拍那條紅
 
 ## 4. 瀏覽器與收尾
 
