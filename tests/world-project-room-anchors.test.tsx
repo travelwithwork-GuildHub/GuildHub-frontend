@@ -203,7 +203,10 @@ describe('投影元件真的寫進 DOM', () => {
       </>,
       { width: VIEWPORT.width, height: VIEWPORT.height, camera: { position: [start.x + offset.x, offset.y, start.z + offset.z] } },
     )
-    await renderer.advanceFrames(1, 16)
+    // ⚠️ frame 要包在 `act` 裡：不包的話 `useFrame` 裡的 setState 只排隊不 flush，重繪數不到 —— 突變「每幀 setState」照樣綠（實測）。
+    await ReactThreeTestRenderer.act(async () => {
+      await renderer.advanceFrames(1, 16)
+    })
     const renders = counted.mock.calls.length
     const before = nodes.map((n) => Number(TRANSLATE.exec(n.style.transform)?.[2]))
     expect(before.every(Number.isFinite)).toBe(true)
@@ -212,7 +215,9 @@ describe('投影元件真的寫進 DOM', () => {
     const camera = cameraRef.current
     if (camera === null) throw new Error('沒拿到相機')
     camera.position.z -= 2
-    await renderer.advanceFrames(2, 16)
+    await ReactThreeTestRenderer.act(async () => {
+      await renderer.advanceFrames(2, 16)
+    })
     const after = nodes.map((n) => Number(TRANSLATE.exec(n.style.transform)?.[2]))
     for (const [i, y] of after.entries()) expect(y, `seat ${i} 沒跟著相機動`).toBeGreaterThan(before[i]! + 1)
     expect(counted.mock.calls.length, '投影器在 frame 之間重繪了 —— 位置走了 React').toBe(renders)
