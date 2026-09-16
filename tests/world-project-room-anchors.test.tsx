@@ -1,6 +1,8 @@
 import ReactThreeTestRenderer from '@react-three/test-renderer'
 import { render, screen } from '@testing-library/react'
-import type { ReactNode, RefObject } from 'react'
+import { useThree } from '@react-three/fiber'
+import { useEffect, type ReactNode, type RefObject } from 'react'
+import type { Camera } from 'three'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cameraOffset } from '@/world/camera'
 import { visualBoundsOf } from '@/world/environment/definition'
@@ -125,6 +127,14 @@ describe('錨點的世界座標', () => {
   })
 })
 
+function CameraProbe({ sinkRef }: { sinkRef: RefObject<Camera | null> }) {
+  const camera = useThree((state) => state.camera)
+  useEffect(() => {
+    sinkRef.current = camera
+  }, [camera, sinkRef])
+  return null
+}
+
 describe('投影元件真的寫進 DOM', () => {
   function nodesFor(): { nodesRef: RefObject<SeatAnchorNodes>; nodes: HTMLElement[] } {
     const map: SeatAnchorNodes = new Map()
@@ -175,6 +185,37 @@ describe('投影元件真的寫進 DOM', () => {
     }
     expect(hidden, '沒有任何錨點在畫面外 —— 這條的「藏起來」沒驗到').toBeGreaterThan(0)
     expect(shown, '沒有任何錨點在畫面內 —— 這條的「不藏」沒驗到').toBeGreaterThan(0)
+    await renderer.unmount()
+  })
+
+  it('[FE-W16-S06] 相機跟拍時位置每幀更新，而且不經過 React（投影器一次都沒重繪）', async () => {
+    // 邊界（ADR 0010）：render loop → DOM 直接寫，**不進 React state**。走 state 的話這條會數到每幀一次重繪。
+    const { nodesRef, nodes } = nodesFor()
+    const counted = vi.fn((props: Parameters<typeof SeatAnchorProjector>[0]) => SeatAnchorProjector(props))
+    const Counted = counted as unknown as typeof SeatAnchorProjector
+    const offset = cameraOffset()
+    const start = ROOM_POINTS.aisleEntry
+    const cameraRef: RefObject<Camera | null> = { current: null }
+    const renderer = await ReactThreeTestRenderer.create(
+      <>
+        <CameraProbe sinkRef={cameraRef} />
+        <Counted anchors={SEAT_ANCHORS} nodesRef={nodesRef} />
+      </>,
+      { width: VIEWPORT.width, height: VIEWPORT.height, camera: { position: [start.x + offset.x, offset.y, start.z + offset.z] } },
+    )
+    await renderer.advanceFrames(1, 16)
+    const renders = counted.mock.calls.length
+    const before = nodes.map((n) => Number(TRANSLATE.exec(n.style.transform)?.[2]))
+    expect(before.every(Number.isFinite)).toBe(true)
+
+    // 相機往北跟拍 2 單位（跟 `WorldCamera` 一樣直接寫 camera.position）：每個錨點在畫面上往下移（螢幕 y 變大）。
+    const camera = cameraRef.current
+    if (camera === null) throw new Error('沒拿到相機')
+    camera.position.z -= 2
+    await renderer.advanceFrames(2, 16)
+    const after = nodes.map((n) => Number(TRANSLATE.exec(n.style.transform)?.[2]))
+    for (const [i, y] of after.entries()) expect(y, `seat ${i} 沒跟著相機動`).toBeGreaterThan(before[i]! + 1)
+    expect(counted.mock.calls.length, '投影器在 frame 之間重繪了 —— 位置走了 React').toBe(renders)
     await renderer.unmount()
   })
 

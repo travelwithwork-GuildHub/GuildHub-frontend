@@ -33,6 +33,33 @@ export interface Viewport {
   readonly height: number
 }
 
+/** 一個世界座標點投影到的 CSS 像素位置（viewport 左上角是原點、y 往下）。 */
+export interface ScreenPixel {
+  readonly x: number
+  readonly y: number
+  /** 這一點本身在不在畫面內（點的判準；標籤那種有尺寸的東西另外看整個矩形）。 */
+  readonly inside: boolean
+}
+
+/**
+ * 世界座標 → CSS 像素。**門標籤與工位錨點都從這裡拿**（`FE-W16-S06`：同一套投影函式）。
+ *
+ * ⚠️ 輸入有 NaN 時原樣傳出去（`inside` 會是 `false`）—— 呼叫端負責「不把 NaN 寫進 DOM」。
+ */
+export function screenPixelFor(
+  point: { x: number; y: number; z: number },
+  target: { x: number; z: number },
+  viewport: Viewport,
+): ScreenPixel {
+  const { sx, sy } = toScreen(point, target)
+  const { halfWidth, halfHeight } = screenHalfExtents(viewport.width / viewport.height)
+  // 螢幕的 y 往下增加，相機空間的 sy 往上增加 —— 所以是減號。
+  const x = viewport.width / 2 + (sx / halfWidth) * (viewport.width / 2)
+  const y = viewport.height / 2 - (sy / halfHeight) * (viewport.height / 2)
+  const inside = x >= 0 && x <= viewport.width && y >= 0 && y <= viewport.height
+  return { x, y, inside }
+}
+
 export interface LabelRect {
   /** 標籤左上角（CSS 像素）。 */
   readonly left: number
@@ -57,12 +84,7 @@ export function labelRectFor(
   target: { x: number; z: number },
   viewport: Viewport,
 ): LabelRect | null {
-  const { sx, sy } = toScreen(point, target)
-  const { halfWidth, halfHeight } = screenHalfExtents(viewport.width / viewport.height)
-
-  // 螢幕的 y 往下增加，相機空間的 sy 往上增加 —— 所以是減號。
-  const centerX = viewport.width / 2 + (sx / halfWidth) * (viewport.width / 2)
-  const centerY = viewport.height / 2 - (sy / halfHeight) * (viewport.height / 2)
+  const { x: centerX, y: centerY } = screenPixelFor(point, target, viewport)
 
   const left = centerX - LABEL_SIZE.width / 2
   const top = centerY - LABEL_SIZE.height

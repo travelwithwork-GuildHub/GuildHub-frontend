@@ -12,6 +12,7 @@ import { SpatialInteraction } from '@/world/interaction/SpatialInteraction'
 import { doorTargetId } from '@/world/rooms/labels'
 import { CORRIDOR_SLOTS } from '@/world/rooms/slots'
 import { useLabelNodes } from '@/world/rooms/DoorLabels'
+import { useSeatAnchorNodes } from '@/world/seats/SeatAnchors'
 import { EntryGateProvider, useRequestEntry } from '@/world/scenes/EntryGate'
 import { holdRoomToken } from '@/world/scenes/roomTokens'
 import { SceneNotices, GATE_TEXT } from '@/world/scenes/SceneNotices'
@@ -46,8 +47,9 @@ function Spy({ seen, sink }: { seen: (id: string | null) => void; sink: (scene: 
 function Objects() {
   const requestEntry = useRequestEntry()
   const nodesRef = useLabelNodes()
+  const seatNodesRef = useSeatAnchorNodes()
   return (
-    <SceneObjects scene={{ id: 'hall' }} doors={[ROOM]} slots={CORRIDOR_SLOTS} anchors={[]} nodesRef={nodesRef} requestEntry={requestEntry} />
+    <SceneObjects scene={{ id: 'hall' }} doors={[ROOM]} slots={CORRIDOR_SLOTS} anchors={[]} nodesRef={nodesRef} seatNodesRef={seatNodesRef} requestEntry={requestEntry} />
   )
 }
 

@@ -207,7 +207,7 @@ describe('桌子在、撞得到，但不會冒出 E 提示', () => {
       for (let i = 0; i < 50; i++) await new Promise((r) => setTimeout(r, 0))
     })
 
-    // 朝桌子走：1.5 秒足夠走完 1.1 單位（速度 4／秒）—— 停下來一定是撞到了。
+    // 朝桌子走：站位到桌子近側面只有 0.7（扣角色半徑剩 0.45），1.5 秒（速度 4／秒）夠走 6 單位 —— 停下來一定是撞到了。
     await ReactThreeTestRenderer.act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }))
       await renderer.advanceFrames(90, 1 / 60)
@@ -220,7 +220,7 @@ describe('桌子在、撞得到，但不會冒出 E 提示', () => {
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowLeft' }))
     })
     expect(poseRef.current.f, '面向桌子').toBe(FACING.left)
-    expect(stopped, '沒有朝桌子走').toBeLessThan(station.x - 0.5)
+    expect(stopped, '沒有朝桌子走').toBeLessThan(station.x - 0.3)
     expect(stopped, '穿過桌子了').toBeGreaterThanOrEqual(nearFace + PHYSICS.playerRadius - 0.05)
     expect(stopped, '沒有走到桌邊').toBeLessThan(nearFace + PHYSICS.playerRadius + 0.15)
     expect(poseRef.current.x, '撞上之後還在動').toBeCloseTo(stopped, 3)

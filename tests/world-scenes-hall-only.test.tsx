@@ -8,6 +8,7 @@ import { InteractionProvider, useInteraction } from '@/world/interaction/Interac
 import type { InteractableRegistry } from '@/world/interaction/registry'
 import { useLabelNodes } from '@/world/rooms/DoorLabels'
 import { CORRIDOR_SLOTS } from '@/world/rooms/slots'
+import { useSeatAnchorNodes } from '@/world/seats/SeatAnchors'
 import { POLL_INTERVAL_MS } from '@/world/rooms/useRooms'
 import { SceneObjects } from '@/world/scenes/SceneObjects'
 import { SceneRefProvider } from '@/world/scenes/SceneContext'
@@ -76,8 +77,9 @@ function Probe({ sinkRef }: { sinkRef: RefObject<InteractableRegistry | null> })
 
 function Objects({ scene }: { scene: SceneRef }) {
   const nodesRef = useLabelNodes()
+  const seatNodesRef = useSeatAnchorNodes()
   return (
-    <SceneObjects scene={scene} doors={ROOMS} slots={CORRIDOR_SLOTS} anchors={[]} nodesRef={nodesRef} />
+    <SceneObjects scene={scene} doors={ROOMS} slots={CORRIDOR_SLOTS} anchors={[]} nodesRef={nodesRef} seatNodesRef={seatNodesRef} />
   )
 }
 
