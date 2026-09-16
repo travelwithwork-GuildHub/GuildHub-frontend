@@ -168,6 +168,8 @@ export async function settle(page, read, same, { gapMs = 150, rounds = 20, what 
   let prev = await read()
   for (let i = 0; i < rounds; i++) {
     await page.waitForTimeout(gapMs)
+    // 兩次讀數之間要真的畫過新的一幀：分頁沒出幀時兩次讀到同一個舊值，會把「沒更新」誤認成「收斂」。
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))))
     const next = await read()
     if (same(prev, next)) return next
     prev = next

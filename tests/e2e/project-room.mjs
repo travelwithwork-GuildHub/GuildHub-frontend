@@ -20,7 +20,7 @@ import path from 'node:path'
 import { chromium } from 'playwright-core'
 import { register as registerCjs } from 'tsx/cjs/api'
 import { register as registerEsm } from 'tsx/esm/api'
-import { decode, grab, stableDiffWhere } from './lib/pixels.mjs'
+import { burst, decode, grab, stableDiffWhere } from './lib/pixels.mjs'
 import { assertLoopback, bad, countOverlays, failureCount, fakeRealtime, fakeRest, guardLoopback, ok, overlaysSeen, profile, settle, uuid, waitForTransition, waitForWorld, walkLeg, walker, watchCanvas } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
@@ -108,11 +108,11 @@ function seatOdometer(page, canvas) {
       const p = relTo(r, a)
       return Math.hypot(p.x - T.desks[seat].x, p.z - T.desks[seat].z)
     }
-    /** 離桌面中心的**有號**距離：站位那一側為正。穿過桌子之後 `dist` 又會變大（停在椅子上剛好也是 0.52），這個不會。 */
+    /** 有號的 `dist`：角色在站位那一側為正、穿過桌面中心到另一側為負。穿過桌子之後 `dist` 又會變大（停在椅子上剛好也是 0.52），這個不會。 */
     const toward = (seat) => {
       const a = r.anchors.find((q) => q.seat === seat)
       if (!a || !inside(r, a)) return NaN
-      return Math.sign(T.stations[seat].x - T.desks[seat].x) * (relTo(r, a).x - T.desks[seat].x)
+      return Math.sign((relTo(r, a).x - T.desks[seat].x) * (T.stations[seat].x - T.desks[seat].x)) * dist(seat)
     }
     return { r, x, z, dist, toward }
   }
@@ -120,14 +120,17 @@ function seatOdometer(page, canvas) {
   const templateCheck = (r, label, all = false) => {
     const a0 = r.anchors.find((a) => a.seat === 0)
     const a4 = r.anchors.find((a) => a.seat === 4)
+    if (!a0 || !a4) return bad(`[S08] ${label}：DOM 裡沒有 seat 0／4 的錨點`, JSON.stringify(r.anchors.map((a) => a.seat)))
     const midX = (a0.x + a4.x) / 2
     const worst = []
-    for (const a of r.anchors) {
-      if (!inside(r, a)) {
-        if (all) worst.push(`seat ${a.seat} 不在畫面內`)
+    // 依 seat 0→7 找，不是 DOM 裡有幾個就量幾個 —— 少一個要紅。
+    for (let seat = 0; seat < 8; seat++) {
+      const a = r.anchors.find((q) => q.seat === seat)
+      if (!a || !inside(r, a)) {
+        if (all) worst.push(`seat ${seat} ${a ? '不在畫面內' : '不在 DOM 裡'}`)
         continue
       }
-      const d = T.desks[a.seat]
+      const d = T.desks[seat]
       const want = { x: midX + d.x * s, y: a0.y + ((d.z - T.desks[0].z) * s) / Math.SQRT2 }
       const off = Math.hypot(a.x - want.x, a.y - want.y)
       if (off > 2) worst.push(`seat ${a.seat} 偏 ${off.toFixed(1)} px`)
@@ -164,15 +167,17 @@ async function deskPixels(page, odo, r, label) {
   const f = decode(await grab(page))
   if (f === null || f.w !== r.w || f.h !== r.h) return bad(`[S08] ${label}：讀不到 WebGL 像素或尺寸對不上`, JSON.stringify({ f: f && [f.w, f.h], canvas: [r.w, r.h] }))
   let ref = null
-  for (const a of r.anchors) {
-    const d = T.desks[a.seat]
+  for (let seat = 0; seat < 8 && ref === null; seat++) {
+    const a = r.anchors.find((q) => q.seat === seat)
+    if (!a) continue
+    const d = T.desks[seat]
     const floor = square(f, a.x + Math.sign(d.x) * (FLOOR_X - Math.abs(d.x)) * s, a.y + (T.h * s) / Math.SQRT2, side)
     if (floor === null) continue
     const m = mean(floor)
     const spread = Math.max(...floor.map((p) => dist3(p, m)))
-    if (spread > DESK_COLOR_DISTANCE) return bad(`[S08] ${label}：裸地板基準方塊不均勻（seat ${a.seat} 旁，離散 ${spread.toFixed(1)}）`, '基準落在陰影邊界或家具上；不放寬判準')
-    ref = { seat: a.seat, color: m.map(Math.round), spread }
-    break
+    if (spread > DESK_COLOR_DISTANCE) return bad(`[S08] ${label}：裸地板基準方塊不均勻（seat ${seat} 旁，離散 ${spread.toFixed(1)}）`, '基準落在陰影邊界或家具上；不放寬判準')
+    // 基準色是平均色本身（不取整）：取整的話基準的均勻度與桌面的距離會用到兩個不同的基準。
+    ref = { seat, color: m, spread }
   }
   if (ref === null) return bad(`[S08] ${label}：沒有任何裸地板基準方塊完整在 Canvas 內`, '像素判準不能略過')
   const results = []
@@ -186,8 +191,9 @@ async function deskPixels(page, odo, r, label) {
   if (missing.length > 0) bad(`[S08] ${label}：seat ${missing.join('／')} 的桌面方塊沒有完整在 Canvas 內`, '')
   const low = results.filter((q) => q.ratio < DESK_PIXEL_RATIO)
   const summary = results.map((q) => `${q.seat}:${Math.round(q.ratio * 100)}%`).join(' ')
-  if (results.length > 0 && low.length === 0) ok(`[S08] ${label}：${results.length} 張桌子的桌面方塊（${side} px）離裸地板 ${ref.color.join(',')} 的像素比例都 ≥ ${DESK_PIXEL_RATIO * 100}%（${summary}）`)
-  else bad(`[S08] ${label}：桌面方塊的像素比例低於 ${DESK_PIXEL_RATIO * 100}%`, `${summary}；基準 seat ${ref.seat} 旁 ${ref.color.join(',')}`)
+  const refText = ref.color.map(Math.round).join(',')
+  if (results.length > 0 && low.length === 0) ok(`[S08] ${label}：${results.length} 張桌子的桌面方塊（${side} px）離裸地板 ${refText} 的像素比例都 ≥ ${DESK_PIXEL_RATIO * 100}%（${summary}）`)
+  else bad(`[S08] ${label}：桌面方塊的像素比例低於 ${DESK_PIXEL_RATIO * 100}%`, `${summary}；基準 seat ${ref.seat} 旁 ${refText}`)
 }
 
 await mkdir(OUT, { recursive: true })
@@ -232,10 +238,16 @@ try {
   await page.screenshot({ path: path.join(OUT, 'spawn.png') })
   {
     // 遠端玩家：有他 vs 他離開之後（同一個相機），差異像素要落在 seat 0 站位地面點上方的角色高度範圍裡。
-    const withPeer = [decode(await grab(page)), decode(await grab(page)), decode(await grab(page))]
+    // 多幀連拍（`burst`，間隔 220 ms）取交集濾掉 idle 動畫；「離開了」看在線人數的 DOM（含自己：2 → 1），不用固定等待。
+    const onlineText = () => page.$eval('[data-testid="online-count"]', (n) => n.textContent ?? '').catch(() => null)
+    const before = await onlineText()
+    const withPeer = await burst(page)
     room.ws.send(JSON.stringify({ t: 'presence', join: [], leave: [PEER_ID] }))
-    await page.waitForTimeout(800)
-    const without = [decode(await grab(page)), decode(await grab(page)), decode(await grab(page))]
+    const left = await page.waitForFunction(() => document.querySelector('[data-testid="online-count"]')?.textContent?.startsWith('1 '), null, { timeout: 5_000 }).then(() => true).catch(() => false)
+    if (before === '2 人在線' && left) ok('[S08] 在線人數 2 → 1：遠端玩家的 presence leave 套用了')
+    else bad('[S08] 在線人數沒有從 2 變 1', `之前「${before}」，離開後「${await onlineText()}」`)
+    await page.waitForTimeout(300)
+    const without = await burst(page)
     const a0 = r.anchors.find((a) => a.seat === 0)
     const ground = { x: a0.x + (T.stations[0].x - T.desks[0].x) * s, y: a0.y + (T.h * s) / Math.SQRT2 }
     const near = (col, row) => Math.abs(col - ground.x) <= 0.75 * s && row >= ground.y - (2.2 * s) / Math.SQRT2 && row <= ground.y + (0.4 * s) / Math.SQRT2
@@ -265,7 +277,10 @@ try {
       return p.z <= T.aisleNorth.z + 0.5 ? null : 'KeyW'
     },
   })
-  if (regress <= pxZ) ok(`[S08] 往北走到通道北端 z=${fmt(north.z)}，最大回抖 ${(regress / pxZ).toFixed(2)} px`)
+  // 終點要真的在北端附近（單步 ≤ 0.5 單位，所以停下來的位置離 aisleNorth 不會超過 0.6）—— 單邊不等式會放過「跳過北端」。
+  if (Math.abs(north.z - T.aisleNorth.z) <= 0.6 && Math.abs(north.x - T.aisleNorth.x) <= 0.6) ok(`[S08] 走到通道北端 (${fmt(north.x)}, ${fmt(north.z)})，配置 (${T.aisleNorth.x}, ${T.aisleNorth.z})`)
+  else bad('[S08] 沒有停在通道北端', `量到 (${fmt(north.x)}, ${fmt(north.z)})，要 (${T.aisleNorth.x}, ${T.aisleNorth.z}) ± 0.6`)
+  if (regress <= pxZ) ok(`[S08] 往北一路 z 單調前進，最大回抖 ${(regress / pxZ).toFixed(2)} px`)
   else bad('[S08] 往北的里程計有回抖', `最大 ${(regress / pxZ).toFixed(1)} px（允許 1 px）`)
   if (!midChecked) bad('[S08] 沒有在通道中點量到（步幅太大？）', '')
 
@@ -281,7 +296,8 @@ try {
   const arrived = await walkLeg(page, { label: '走回 seat 1 的站位', where: odo.where, holdMs: 80, maxSteps: 200, out: OUT, steer: (p) => (Math.hypot(p.x - st1.x, p.z - st1.z) <= 0.3 ? null : aim(p, st1, 0.15)) })
   ok(`[S08] 走到 seat 1 的站位：反算 (${fmt(arrived.x)}, ${fmt(arrived.z)})，離站位 ${fmt(Math.hypot(arrived.x - st1.x, arrived.z - st1.z))}`)
 
-  // ── 持續朝桌子送輸入：至少 1 步離錨點的距離**減少** ≥ 2 px、曾 < 1 單位，然後連續 5 次同方向輸入變化 ≤ 1 px（plateau）；plateau 距離＝碰撞盒近側＋角色半徑 ──
+  // ── 持續朝桌子送輸入：至少 1 步離錨點的距離**減少** ≥ 2 px、曾 < 1 單位，然後連續 5 次同方向輸入變化 ≤ 1 px（plateau）；plateau 距離＝碰撞盒近側＋角色半徑。
+  //    距離是有號的二維反算距離（`toward`）：穿過桌面中心會變負，「全程最近」就抓得到。──
   const box = T.boxOf(T.desks[1])
   const expectPlateau = box.halfWidth + T.radius
   let prevD = arrived.toward(1)
