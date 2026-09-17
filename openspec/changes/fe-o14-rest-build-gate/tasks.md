@@ -34,14 +34,18 @@
 
 ## 4. 負向驗證（突變前先 commit）
 
-- [ ] 4.1 `checkedAtBuild` 翻回 `false` → `S14` 建置那條紅
-- [ ] 4.2 `dataAdapter()` 在 `production` 放行 `internal` → `S13` 紅
-- [ ] 4.3 `restBase()` 在本機 `internal` 仍回 `localhost` 預設值 → `S14` 的 internal 那條紅
-- [ ] 4.4 執行紀錄貼在 PR 留言
+- [x] 4.1 `checkedAtBuild` 翻回 `false` → `S14` 建置那條紅
+- [x] 4.2 `dataAdapter()` 在 `production` 放行 `internal` → `S13` 紅
+- [x] 4.3 `restBase()` 在本機 `internal` 仍回 `localhost` 預設值 → `S14` 的 internal 那條紅
+- [x] 4.4 執行紀錄貼在 PR 留言
 
 ## 5. 收尾
 
-- [ ] 5.0 **合併 feat 之前**：Vercel production 已設好 `NEXT_PUBLIC_GUILDHUB_REST`（`NEXT_PUBLIC_DATA_ADAPTER=guildhub` 可設可不設）
+- [x] 5.0 **合併 feat 之前**：Vercel production 已設好 `NEXT_PUBLIC_GUILDHUB_REST`（`NEXT_PUBLIC_DATA_ADAPTER=guildhub` 可設可不設）
       （不在 repo 裡、要使用者同意），否則合併後 `main` 的自動建置會紅（design D2）
-- [ ] 5.1 `pnpm exec tsc --noEmit`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test` 全綠
-- [ ] 5.2 `archive/fe-o14-rest-build-gate`
+- [x] 5.1 `pnpm exec tsc --noEmit`、`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm test` 全綠
+- [x] 5.2 `archive/fe-o14-rest-build-gate`
+
+> 收尾紀錄（2026-09-17）：4.1～4.3 的突變紀錄在 PR #463 留言；5.0 Vercel production 已設 `NEXT_PUBLIC_GUILDHUB_REST`／`_WS`／`_DATA_ADAPTER=guildhub`／`_REALTIME_ADAPTER=guildhub`，
+> 並從 main `0db4e3b` 手動 `vercel deploy --prod`（專案沒連 GitHub、不自動部署），閘道上真瀏覽器走過：金鑰登入 200、`/api/me`／`/api/rooms` 200、
+> `wss://…/ws?scene=lobby` 握手成功、0 console error；5.1 typecheck／eslint／`pnpm test` 151/151 綠（CI #463 pass）。
