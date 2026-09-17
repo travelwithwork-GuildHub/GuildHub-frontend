@@ -17,7 +17,14 @@ export class Relay {
       this.blockedBy.set(key, root)
       throw new Error(`blocked: ${root}`)
     }
-    await fn()
+    try {
+      await fn()
+    } catch (err) {
+      // 步驟自己丟的 `blocked: x`（例如共用狀態少了一塊）也記進來，後面的步驟才追得到根因，不會斷在這一步。
+      const m = /^blocked: (\S+)/.exec(err instanceof Error ? err.message : String(err))
+      if (m?.[1]) this.blockedBy.set(key, this.blockedBy.get(m[1]) ?? m[1])
+      throw err
+    }
     this.passed.add(key)
   }
 }
