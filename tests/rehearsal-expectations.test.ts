@@ -96,18 +96,22 @@ function section(md: string, heading: string): string {
 }
 
 /**
- * 一節裡表格列的 `(key, owner)`：`| \`key\` | FE-Xnn | …`。只略過 header（第一格是 `key`）與分隔列；
- * 其他任何解析不出 `(key, owner)` 的表格列直接拋（審查抓到：沒反引號的幽靈列、少一格的列靜默 continue，S09 照樣綠）。
+ * 一節裡表格列的 `(key, owner)`：`| \`key\` | FE-Xnn | …`。凡是含 `|` 的行都當表格列（GFM 允許省掉首尾的 `|`、
+ * 前面加 1–3 個空白 —— 審查抓到：只認 `|` 開頭的話，這種列會從比對裡消失）；只略過 header（第一格是 `key`）與分隔列，
+ * 其他解析不出 `(key, owner)` 的列直接拋（沒反引號的幽靈列、少一格的列），訊息含節名與那一列。
  * 同一節列兩次同一個 key 也拋（`Map.set` 會靜默蓋掉，集合大小照樣相等）。
  */
 function listed(heading: string, body: string): Map<string, string> {
   const out = new Map<string, string>()
   for (const line of body.split('\n')) {
-    if (!line.startsWith('|') || /^\|\s*(key|-+)\s*\|/.test(line)) continue
-    const m = /^\|\s*`([^`]+)`\s*\|\s*(FE-[A-Z]\d{2})\s*\|/.exec(line)
-    if (!m?.[1] || !m[2]) throw new Error(`〈${heading}〉有一列解析不出 (key, owner)：${line}`)
-    if (out.has(m[1])) throw new Error(`〈${heading}〉把 \`${m[1]}\` 列了兩次`)
-    out.set(m[1], m[2])
+    if (!line.includes('|')) continue
+    const [first = '', second = ''] = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+    if (first === 'key' || /^:?-+:?$/.test(first)) continue
+    const key = /^`([^`]+)`$/.exec(first)?.[1]
+    const owner = /^FE-[A-Z]\d{2}$/.test(second) ? second : undefined
+    if (!key || !owner) throw new Error(`〈${heading}〉有一列解析不出 (key, owner)：${line}`)
+    if (out.has(key)) throw new Error(`〈${heading}〉把 \`${key}\` 列了兩次`)
+    out.set(key, owner)
   }
   return out
 }
