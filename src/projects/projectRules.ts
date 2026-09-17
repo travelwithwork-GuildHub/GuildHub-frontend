@@ -38,14 +38,22 @@ export const CreateProjectSchema = z.object({
         .refine((items) => items.length <= (skillCount.max as number), { error: `技能最多 ${skillCount.max} 項（本站的上限）。` })
         .refine((items) => items.every(within(skillLength.max as number)), { error: `每個技能最多 ${skillLength.max} 個字（本站的上限）。` }),
     ),
+  // 空白是「必填空白」（`too_small`，送出才說）—— 把 4 刪掉準備打 6 的那一瞬間不該被罵（Gemini 審查抓到的）；
+  // 第一段 `.min(1)` 沒過就不會進第二段，不會有 `Number('')` 變 0 的漏洞。
   seat_count: z
     .string()
-    .transform((v) => (v.trim() === '' ? NaN : Number(v)))
+    .transform((v) => v.trim())
     .pipe(
       z
-        .number({ error: '座位數要是整數。' })
-        .int({ error: '座位數要是整數。' })
-        .refine((n) => n >= seat.min && n <= (seat.max as number), { error: `座位數要在 ${seat.min} 到 ${seat.max} 之間（本站的上限）。` }),
+        .string()
+        .min(1, { error: '座位數不能空白。' })
+        .transform(Number)
+        .pipe(
+          z
+            .number({ error: '座位數要是整數。' })
+            .int({ error: '座位數要是整數。' })
+            .refine((n) => n >= seat.min && n <= (seat.max as number), { error: `座位數要在 ${seat.min} 到 ${seat.max} 之間（本站的上限）。` }),
+        ),
     ),
 })
 
