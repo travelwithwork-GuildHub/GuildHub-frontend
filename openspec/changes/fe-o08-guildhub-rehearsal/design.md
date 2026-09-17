@@ -33,13 +33,13 @@ JSON 會被覆蓋成別的 reporter，`finishRehearsal` 讀到的不是它要的
 `tests/rehearsal/expectations.ts` 是一張表：每一條有 `key`、人讀的說明、期望的
 狀態碼與 `detail`、`report`（要不要送回後端）、`owner`（前端哪一份規格接手）。
 演練的斷言從表讀；報告的〈送回後端〉從表的 `report: true` 產；`README.md` 分三節
-（契約全部、異常全部、送回後端全部），每一節由測試比對成「跟期望表的對應集合相等」——
+（契約全部、異常全部、送回後端全部），每一節由測試比對成「跟期望表的對應 `(key, owner)` 集合相等」（owner 寫錯也紅，第 4 輪審查）——
 不是只驗 `report: true`（第 2 輪審查：那樣 `report: false` 的契約漏掉也綠）。三份講同一件事，只有一份是來源。
 
 ## D3｜報告從 vitest 的 JSON 產，落在 `docs/evidence/fe-o08/`
 
 vitest `--reporter=json --outputFile=<唯一暫存檔>`；wrapper 跑完（**不論結束碼**）交給 `finishRehearsal()`：
-JSON 完整就渲染（`renderReport()` 純函式）到 `docs/evidence/fe-o08/<YYYY-MM-DD>-<後端 sha7>-<前端 sha7>.md`，
+JSON 完整就渲染（`renderReport()` 純函式）到 `docs/evidence/fe-o08/`（檔名格式在下面，跟 S08 同一份），
 結束碼沿用 vitest 的 —— **有失敗的那一次正是最需要報告的那一次**（審查抓到第一版寫反了）。
 被訊號終止、JSON 缺席或不合法、後端 sha 空 → 不產、非零。檔名帶 UTC 秒＋6 位隨機（`<YYYYMMDD>T<HHMMSS>Z-<be7>-<fe7>-<rand>.md`，`now`／`random` 都注入），
 「每次都留證據」與「不可變」才不打架；已存在仍不覆寫，但那是保險不是預期路徑（第 3 輪審查：「同一秒不會跑兩次」是假設不是機制）。

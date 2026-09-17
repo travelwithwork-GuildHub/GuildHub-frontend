@@ -146,10 +146,10 @@
 ### Requirement: README 的差異清單跟期望表一致
 
 `docs/evidence/fe-o08/README.md` SHALL 分三節列：〈前端要相容的契約〉（`kind: contract` 的**全部**）、〈送回後端裁定的異常〉
-（`kind: anomaly` 的**全部**）、〈送回後端〉（`report: true` 的全部，跨兩種 kind），每一條寫 `key` 與接手的工作項目。
-三節各自 MUST 跟期望表的對應集合**相等**（不多、不少、不錯置）；任一節不相等，單元測試 SHALL 失敗並指出 `key`。
+（`kind: anomaly` 的**全部**）、〈送回後端〉（`report: true` 的全部，跨兩種 kind），每一條寫 `key` 與接手的工作項目（`owner`）。
+三節各自 MUST 跟期望表的對應 **`(key, owner)` 集合相等**（不多、不少、不錯置、`owner` 不能寫錯）；任一節不相等，單元測試 SHALL 失敗並指出 `key` 與那一節。
 
 #### Scenario: [FE-O08-S09] 兩邊一致
 
-- **WHEN** README 的〈契約〉少列一條 `contract`、或〈異常〉多寫一個期望表沒有的 `key`、或把 `anomaly` 放進〈契約〉、或〈送回後端〉漏一條 `report: true`
+- **WHEN** README 的〈契約〉少列一條 `contract`、或〈異常〉多寫一個期望表沒有的 `key`、或把 `anomaly` 放進〈契約〉、或〈送回後端〉漏一條 `report: true`、或某一條的 `owner` 跟期望表不同（例如把 `seat-409-detail` 寫成 `FE-J04`）
 - **THEN** 比對測試失敗，訊息含那個 `key` 與那一節的名字

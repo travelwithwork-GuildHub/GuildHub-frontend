@@ -18,11 +18,11 @@
 
 ## 3. slice 二：`feat/fe-o08-guildhub-rehearsal--ledger`（不連網）
 
-- [ ] 3.1 判準先紅：`tests/rehearsal-expectations.test.ts` —— `S06` 形狀（`kind`／`report`／`owner`／`anomaly ⇒ report`／`key` 不重複）；`S03` 的 step 集合恰好十三個；`S09` 三節各自跟期望表集合相等
+- [ ] 3.1 判準先紅：`tests/rehearsal-expectations.test.ts` —— `S06` 形狀（`kind`／`report`／`owner`／`anomaly ⇒ report`／`key` 不重複）；`S03` 的 step 集合恰好十三個；`S09` 三節各自跟期望表 `(key, owner)` 集合相等
 - [ ] 3.2 **commit 紅的判準**
 - [ ] 3.3 `tests/rehearsal/expectations.ts`：十三步 ＋ 十條基線（`kind`／`report`／`owner`）
 - [ ] 3.4 `docs/evidence/fe-o08/README.md`：〈前端要相容的契約〉〈送回後端裁定的異常〉〈送回後端〉〈量到但不在基線裡〉（1012）、交接表與「anomaly 不進替身」（design D4）、跑的頻率
-- [ ] 3.5 突變（先 commit）：README 〈契約〉少一條 → `S09` 紅；〈送回後端〉少一條 `report: true` → `S09` 紅；期望表某條 anomaly 的 `report` 改 false → `S06` 紅；紀錄貼 PR
+- [ ] 3.5 突變（先 commit）：README 〈契約〉少一條 → `S09` 紅；某條 `owner` 改成別的 ID → `S09` 紅；〈送回後端〉少一條 `report: true` → `S09` 紅；期望表某條 anomaly 的 `report` 改 false → `S06` 紅；紀錄貼 PR
 - [ ] 3.6 `pr-size.sh` 手寫 ≤ 400
 
 ## 4. slice 三：`feat/fe-o08-guildhub-rehearsal--flow`
