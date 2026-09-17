@@ -101,17 +101,12 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * 案件那一支：列表＋「發案」（`FE-J01`）。
+ * 案件那一支：列表＋「發案」（`FE-J01`）。入口只在 `signed-in` 時渲染（`S01`；訪客拿到的是 `FE-X04` 的權限阻擋，
+ * 身分還沒問完也不放）。表單住在 overlay（列表 `inert`、不卸載）；確認層**疊在仍掛載的表單上**（design D5）——
+ * 換掉 overlay 會卸載表單、丟掉還沒送出的值。
  *
- * 入口只在 `identity.state === 'signed-in'` 時渲染（`S01`）—— 訪客按 E 拿到的是 `FE-X04` 的權限阻擋，那裡已經有「先登入」；
- * 身分還沒問完也不放，一顆等一下會消失的按鈕比沒有更糟。
- *
- * 表單住在 overlay（列表 `inert`、不卸載，`S02`）。確認層**疊在仍掛載的表單上**（design D5）：overlay 裡是一個容器，
- * 表單一直在裡面、確認時標 `inert`、`DiscardConfirm` 渲染在它旁邊 —— 換掉 overlay 會卸載表單、丟掉還沒送出的值。
- *
- * ⚠️ dirty 與送出中的判斷在表單的 `requestClose` 裡；這裡的 `onClose` 只做顯式分支。
- * **不得寫成 `closeIntentRef.current?.() ?? closePanel()`**：`requestClose()` 回 `void`，`??` 右邊照樣執行，
- * dirty 確認與送出中不可關全部被繞過（codex 審查抓到的，`S07` 對殼的關閉鈕有判準）。
+ * ⚠️ dirty 與送出中的判斷在表單的 `requestClose`；這裡的 `onClose` 只做顯式分支。**不得寫成 `closeIntentRef.current?.() ?? closePanel()`**：
+ * `requestClose()` 回 `void`，`??` 右邊照樣執行，dirty 確認與送出中不可關全部被繞過（codex 審查抓到的；`S07` 對殼的關閉鈕有判準）。
  */
 function ProjectBoard() {
   const { closePanel, page, reportPage } = useListPanel()

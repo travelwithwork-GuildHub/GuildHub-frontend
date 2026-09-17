@@ -11,9 +11,7 @@ import { useForm } from '@/forms/useForm'
 import { joinSkills, normalizeSkills } from '@/profile/normalizeSkills'
 import { CreateProjectSchema, INITIAL, isDirty, toPayload, type CreateProjectInput } from './projectRules'
 
-// 發案表單。規格 `FE-J01`。機制全部是 `FE-X05` 的（`useForm`、`SubmitError`），形狀跟 `ProfileForm` 一樣：
-// 四欄、skills 的 blur 正規化、payload 白名單（`toPayload`）、關閉意圖的攔截（`closeIntentRef`）。
-//
+// 發案表單。規格 `FE-J01`。機制全部是 `FE-X05` 的（`useForm`、`SubmitError`），形狀跟 `ProfileForm` 一樣。
 // ⚠️ **恰好四個欄位**（`S02`）：後端的 `ProjectCreate` 只有這四個；Open Role、期程、預算、截止日連 disabled 的都不放。
 // ⚠️ **成功之後不把回應交給列表插入** —— 呼叫端讓列表回第 0 頁重取（design D2）；`onCreated` 只是「關掉我」的訊號。
 // ⚠️ dirty 與送出中的判斷**留在這裡**（design D5）：殼的 Escape／關閉鈕與自己的取消鈕都走 `requestClose`。
