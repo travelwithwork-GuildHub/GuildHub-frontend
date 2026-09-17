@@ -48,12 +48,28 @@ describe('parsePanelUrl：解析出來的一定是 canonical 的', () => {
     expect(parsePanelUrl(search)).toEqual(expected)
   })
 
-  it('[FE-B09-S14] 序列化：project 在 panel 之後、page 之前；解析 → 序列化是定點', () => {
-    expect(serializePanelUrl({ panel: 'projects', profile: null, project: PID, page: 2 })).toBe(`?panel=projects&project=${PID}&page=2`)
-    for (const search of [`?project=${PID}&page=2`, `?panel=projects&project=${PID}&profile=${ID}`, `?project=${PID}&project=${ID}`, `?panel=bogus&project=${PID}`]) {
-      const once = serializePanelUrl(parsePanelUrl(search))
-      expect(serializePanelUrl(parsePanelUrl(once)), search).toBe(once)
-    }
+  it.each([
+    [`?panel=projects&project=${PID}`, `?panel=projects&project=${PID}`],
+    [`?panel=projects&profile=${ID}`, '?panel=projects'],
+    [`?panel=profiles&project=${PID}`, '?panel=profiles'],
+    [`?project=${PID}&page=2`, `?panel=projects&project=${PID}&page=2`],
+    [`?profile=${ID}&project=${PID}`, `?panel=profiles&profile=${ID}`],
+    [`?panel=projects&project=${PID}&profile=${ID}`, `?panel=projects&project=${PID}`],
+    [`?panel=bogus&project=${PID}`, ''],
+    ['?project=not-a-uuid', ''],
+    [`?project=${PID}&project=${ID}`, `?panel=projects&project=${PID}`],
+  ])('[FE-B09-S14] canonical 網址：%s → %s（而且是定點、意義不變）', (search, canonical) => {
+    // 第一輪就要是規格列的那一串（只驗 f(f(x)) = f(x) 的話，「永遠省略 project」也會過 —— 審查抓到的）
+    const once = serializePanelUrl(parsePanelUrl(search))
+    expect(once).toBe(canonical)
+    expect(serializePanelUrl(parsePanelUrl(once))).toBe(once)
+    expect(parsePanelUrl(once)).toEqual(parsePanelUrl(search))
+  })
+
+  it('[FE-B09-S14] 序列化只認對應面板的詳情欄位：錯位的狀態寫不出非 canonical 的網址', () => {
+    expect(serializePanelUrl({ panel: 'profiles', profile: null, project: PID, page: 0 })).toBe('?panel=profiles')
+    expect(serializePanelUrl({ panel: 'projects', profile: ID, project: null, page: 1 })).toBe('?panel=projects&page=1')
+    expect(serializePanelUrl({ panel: 'projects', profile: ID, project: PID, page: 0 })).toBe(`?panel=projects&project=${PID}`)
   })
 
   it('[FE-B09-S05] 解析 → 序列化 → 解析是定點（canonical 才有終止條件）', () => {

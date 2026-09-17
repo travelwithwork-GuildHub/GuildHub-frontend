@@ -25,6 +25,12 @@ describe('provider：選中的案件', () => {
     expect(result.current.page).toBe(1)
     act(() => result.current.restore({ panel: 'profiles', profile: ID, project: null, page: 0 }))
     expect(result.current.selected).toBe(ID)
+    // 錯位的組合：關著卻殘留 profile、人才面板殘留 project —— selected 都不能冒出來
+    act(() => result.current.restore({ panel: null, profile: ID, project: PID, page: 0 }))
+    expect(result.current.open).toBeNull()
+    expect(result.current.selected, '面板關著卻有選中').toBeNull()
+    act(() => result.current.restore({ panel: 'profiles', profile: null, project: PID, page: 0 }))
+    expect(result.current.selected, '人才面板讀到了案件的選中').toBeNull()
   })
 
   it('[FE-B09-S14] selectProject 只在案件面板下有效；selectProfile 只在人才面板下有效；換面板選中清掉', () => {

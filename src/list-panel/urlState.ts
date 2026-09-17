@@ -58,8 +58,9 @@ export function parsePanelUrl(search: string): PanelUrlState {
 export function serializePanelUrl(state: PanelUrlState): string {
   if (state.panel === null) return ''
   const params = new URLSearchParams({ panel: state.panel })
-  if (state.profile !== null) params.set('profile', state.profile)
-  if (state.project !== null) params.set('project', state.project)
+  // 序列化也只認對應面板的那一個：拿到錯位的狀態（`profiles` 帶 `project`）不能寫出非 canonical 的網址（審查抓到的）
+  if (state.panel === 'profiles' && state.profile !== null) params.set('profile', state.profile)
+  if (state.panel === 'projects' && state.project !== null) params.set('project', state.project)
   if (state.page > 0) params.set('page', String(state.page))
   return `?${params.toString()}`
 }

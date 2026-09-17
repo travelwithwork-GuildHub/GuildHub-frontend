@@ -117,7 +117,8 @@ export function ListPanelProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       open: route.panel,
-      selected: route.panel === 'projects' ? route.project : route.profile,
+      // 三種面板狀態各自分支：關著時一定是 null（`restore` 拿到錯位的組合也不會冒出一個選中）
+      selected: route.panel === 'projects' ? route.project : route.panel === 'profiles' ? route.profile : null,
       page: route.page,
       openPanel,
       closePanel,
