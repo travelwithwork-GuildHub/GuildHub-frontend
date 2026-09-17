@@ -140,7 +140,7 @@ bash .github/scripts/test-progress-check.sh   # 每條規則各造一次違規�
 | `docs/adr/` | 難逆轉的決策 |
 | `openspec/config.yaml` | 規格要寫到什麼程度 |
 | `openspec/specs/` | 系統現在是什麼樣子（archive 時自動同步） |
-| `SETUP-GITHUB.md` | 建 repo 的人做一次，**設完可刪** |
+| `SETUP-MACHINE.md` | **這台機器要有什麼**：執行檔、登入、守門與 hooks。每台各做一次，**不要刪**（GitHub 那一半已設好，`SETUP-GITHUB.md` 已刪；線上設定用 `check-ruleset.sh` 對） |
 
 ## 幾條不會變的
 
