@@ -20,7 +20,8 @@
 ### Requirement: 案件卡讓人一眼判斷「要什麼」「還在招嗎」「剩幾天」「幾個座位」
 
 案件卡 SHALL 呈現 `title`、每一項 `needed_skills`、`status` 對應的中文狀態、距 `expires_at` 剩幾天、`seat_count`；
-狀態、到期、座位數 SHALL 各是一個可辨識的節點（`data-testid` 分別為 `project-status`、`project-expires`、`project-seats`），
+標題、每一項技能、狀態、到期、座位數 SHALL 各是一個可辨識的節點（`data-testid` 分別為 `project-card-title`、`project-skill`、`project-status`、`project-expires`、`project-seats`；
+卡片根節點 `data-testid="project-card"`、`data-project-id` 是那一筆的 `id`），
 座位數 SHALL 帶人讀得懂的標籤（「N 個座位」），剩幾天 SHALL 呈現為「剩 N 天」。
 狀態 SHALL 以文字呈現（`recruiting` → 「招募中」、`active` → 「已成軍」、`closed` → 「已結案」），
 三種狀態的文字 SHALL 互不相同；SHALL NOT 只靠顏色區分。
@@ -28,7 +29,7 @@
 `expires_at` SHALL 以 `<time dateTime>` 帶出原始的絕對時間。
 `needed_skills` 為空陣列時 SHALL 呈現一個標示為「未指定」的節點（可見文字「未指定」，且 `data-missing="needed_skills"` 機器可辨識），SHALL NOT 留空白。
 案件卡 SHALL NOT 呈現 `body`、`updated_at`、`owner_id`、`room_template`。
-案件卡在這一份 SHALL 是非互動的 `<article>`：SHALL NOT 是按鈕或連結、SHALL NOT 可以鍵盤聚焦（沒有 `tabIndex ≥ 0`）、SHALL NOT 開啟任何東西 —— 控制項由 `FE-B03` 以 MODIFIED 加上。
+案件卡在這一份 SHALL 是非互動的 `<article>`：SHALL NOT 宣告或呈現任何卡片層級的啟動控制項（不是按鈕或連結、沒有 `role="button"`／`role="link"`、沒有可鍵盤聚焦的元素）—— 控制項由 `FE-B03` 以 MODIFIED 加上。
 
 ⚠️ **`updated_at` 是案件更新時間，不是活躍時間**；`body` 長度不定會把卡片高度弄亂；`owner_id` 是 UUID，人讀不懂 ——
 發案者是誰歸詳情（`FE-B03`）。
@@ -36,7 +37,7 @@
 #### Scenario: [FE-B02-S01] 卡片上有標題、技能、狀態、剩幾天、座位數
 
 - **WHEN** 以 `status: 'recruiting'`、`needed_skills: ['Three.js', 'TypeScript']`、`seat_count: 3`、`expires_at` 為呈現時刻 ＋6 天 23 小時的 `ProjectOut` 掛載案件卡
-- **THEN** 卡片 SHALL 呈現 `title`、兩個技能各一個節點；狀態節點 SHALL 是「招募中」、到期節點 SHALL 是「剩 7 天」（`ceil`）、座位數節點 SHALL 是「3 個座位」
+- **THEN** 標題節點的文字 SHALL 等於 `title`、兩個技能各一個技能節點；狀態節點 SHALL 是「招募中」、到期節點 SHALL 是「剩 7 天」（`ceil`）、座位數節點 SHALL 是「3 個座位」
 - **AND** `expires_at` 的節點 SHALL 是 `<time>`，其 `dateTime` 等於 fixture 的 `expires_at`
 
 #### Scenario: [FE-B02-S02] 三種狀態三種字，而且不是靜態的字
