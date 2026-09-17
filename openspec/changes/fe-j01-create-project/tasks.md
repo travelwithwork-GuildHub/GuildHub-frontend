@@ -53,7 +53,8 @@
       成功後不 `reload`／樂觀插入 → `S05` 紅；失敗也 `reload` → `S06` 紅；拿掉送出 guard → `S11` 紅；dirty 不問 → `S07` 紅；送出中可關 → `S07` 紅；
       `onClose` 改成 `?.() ??` → `S07` 紅；殼關閉鈕不走 `closeIntentRef` → `S07` 紅；紀錄貼 PR
 - [x] 4.9 效能：`/world` 首屏 JS（next start＋playwright 加總 script 回應）main 16 檔 raw 3895.7 KB／gz 1249.1 KB → 本片 raw 3900.8／gz 1250.2：**+5.1 KB raw／+1.1 KB gz**，不用 `next/dynamic`
-- [ ] 4.10 eslint／tsc／`pnpm test`／pr-size
+- [x] 4.10 eslint／tsc／`pnpm test`（159 檔全綠）／pr-size（產品 245、手寫 ≤800）。
+      審查中規格用詞對不上實際結構 → `spec/fe-j01-create-project` #487（S01 `unknown`、S07 殼的關閉意圖以 Escape 驗）先合併
 
 ## 5. `--e2e`：真瀏覽器（`S08`）
 
