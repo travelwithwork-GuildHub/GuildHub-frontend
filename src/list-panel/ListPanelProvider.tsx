@@ -20,13 +20,16 @@ import { CLOSED, parsePanelUrl, type PanelUrlState } from './urlState'
 
 interface ListPanelValue {
   open: ListKind | null
-  /** 開著的詳情（人才 id）；只有人才面板有。 */
+  /** 開著的面板裡選中的那一筆：人才面板是 profile id、案件面板是 project id（`FE-B03`）。 */
   selected: string | null
   /** 清單畫面上呈現的頁次（0-based）。 */
   page: number
   openPanel: (kind: ListKind) => void
   closePanel: () => void
+  /** 只在人才面板下有效。 */
   selectProfile: (id: string | null) => void
+  /** 只在案件面板下有效（`FE-B03`）。 */
+  selectProject: (id: string | null) => void
   reportPage: (page: number) => void
   /** 網址說現在開著哪一層（掛載後的 popstate）：整份套上，鎖與焦點跟著走。 */
   restore: (route: PanelUrlState) => void
@@ -76,7 +79,7 @@ export function ListPanelProvider({ children }: { children: ReactNode }) {
     (kind: ListKind) => {
       hold()
       // 同一塊看板再按一次 E：什麼都不變（頁碼、詳情都留著）。換一塊：從第 0 頁重新開。
-      setRoute((r) => (r.panel === kind ? r : { panel: kind, profile: null, page: 0 }))
+      setRoute((r) => (r.panel === kind ? r : { panel: kind, profile: null, project: null, page: 0 }))
     },
     [hold],
   )
@@ -86,6 +89,9 @@ export function ListPanelProvider({ children }: { children: ReactNode }) {
   }, [release])
   const selectProfile = useCallback((id: string | null) => {
     setRoute((r) => (r.panel !== 'profiles' || r.profile === id ? r : { ...r, profile: id }))
+  }, [])
+  const selectProject = useCallback((id: string | null) => {
+    setRoute((r) => (r.panel !== 'projects' || r.project === id ? r : { ...r, project: id }))
   }, [])
   const reportPage = useCallback((page: number) => {
     setRoute((r) => (r.panel === null || r.page === page ? r : { ...r, page }))
@@ -111,15 +117,16 @@ export function ListPanelProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       open: route.panel,
-      selected: route.profile,
+      selected: route.panel === 'projects' ? route.project : route.profile,
       page: route.page,
       openPanel,
       closePanel,
       selectProfile,
+      selectProject,
       reportPage,
       restore,
     }),
-    [route, openPanel, closePanel, selectProfile, reportPage, restore],
+    [route, openPanel, closePanel, selectProfile, selectProject, reportPage, restore],
   )
   return <ListPanelContext.Provider value={value}>{children}</ListPanelContext.Provider>
 }
