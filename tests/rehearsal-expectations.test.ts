@@ -108,10 +108,12 @@ function listed(heading: string, body: string): Map<string, string> {
   let at: 'header' | 'separator' | 'rows' = 'header'
   for (const line of body.split('\n')) {
     if (!line.includes('|')) continue
-    const [first = '', second = ''] = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
-    if (at === 'header' && first === 'key') { at = 'separator'; continue }
-    if (at === 'separator' && /^:?-+:?$/.test(first)) { at = 'rows'; continue }
-    if (at !== 'rows') throw new Error(`〈${heading}〉的表格開頭不是 header ＋ 分隔列：${line}`)
+    const cells = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+    const [first = '', second = ''] = cells
+    // header 的前兩格要是 `key`、`owner`；分隔列每一格都要是 `---`（第 4 輪審查：只看第一格的話，分隔列的位置能藏一列幽靈）。
+    if (at === 'header' && first === 'key' && second === 'owner') { at = 'separator'; continue }
+    if (at === 'separator' && cells.every((c) => /^:?-+:?$/.test(c))) { at = 'rows'; continue }
+    if (at !== 'rows') throw new Error(`〈${heading}〉的表格開頭不是 header（key｜owner）＋ 分隔列：${line}`)
     const key = /^`([^`]+)`$/.exec(first)?.[1]
     const owner = /^FE-[A-Z]\d{2}$/.test(second) ? second : undefined
     if (!key || !owner) throw new Error(`〈${heading}〉有一列解析不出 (key, owner)：${line}`)
