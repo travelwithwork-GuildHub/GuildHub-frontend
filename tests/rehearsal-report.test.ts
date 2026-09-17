@@ -49,6 +49,15 @@ const SAMPLE: Leaf[] = [
   { key: 'close-keeps-token', status: 'failed', report: true, failureMessages: ['AssertionError: close-keeps-token 期望 201，實測 403'] },
 ]
 
+/** 把第一個葉節點換掉（其餘不動）。 */
+function withLeaf(leaves: Leaf[], patch: (t: Record<string, unknown>) => Record<string, unknown>) {
+  const json = vitestJson(leaves)
+  const first = json.testResults[0]?.assertionResults[0] as Record<string, unknown> | undefined
+  if (!first) throw new Error("withLeaf 需要至少一個葉節點")
+  json.testResults[0]!.assertionResults[0] = patch(first) as never
+  return json
+}
+
 function line(out: string, key: string): string {
   const hit = out.split('\n').find((l) => l.includes(`\`${key}\``))
   expect(hit, `報告裡沒有 ${key} 那一行`).toBeDefined()
@@ -111,6 +120,13 @@ describe('finishRehearsal()', () => {
       ['JSON 缺席', async () => {}, {}],
       ['不是合法 JSON', () => writeFile(d.jsonPath, '{ not json'), {}],
       ['不是 vitest 的形狀', () => writeFile(d.jsonPath, JSON.stringify({ hello: 1 })), {}],
+      // 外形像、內容半份的（審查抓到）：這些寫成證據會說謊。
+      ['numTotalTests 跟葉節點數對不上', () => writeFile(d.jsonPath, JSON.stringify({ ...vitestJson(SAMPLE), numTotalTests: 99 })), {}],
+      ['零個葉節點', () => writeFile(d.jsonPath, JSON.stringify(vitestJson([]))), {}],
+      ['葉節點缺 meta.key', () => writeFile(d.jsonPath, JSON.stringify(withLeaf(SAMPLE, (t) => ({ ...t, meta: {} })))), {}],
+      ['key 重複', () => writeFile(d.jsonPath, JSON.stringify(vitestJson([...SAMPLE, SAMPLE[0] as Leaf]))), {}],
+      ['有 skipped 的葉節點（-t 篩過的那種不是一整輪）', () => writeFile(d.jsonPath, JSON.stringify(withLeaf(SAMPLE, (t) => ({ ...t, status: 'skipped' })))), {}],
+      ['失敗卻沒有訊息', () => writeFile(d.jsonPath, JSON.stringify(withLeaf(SAMPLE, (t) => ({ ...t, status: 'failed', failureMessages: [] })))), {}],
       ['後端 SHA 空', () => writeFile(d.jsonPath, JSON.stringify(vitestJson(SAMPLE))), { shas: { backend: '', frontend: FRONTEND_SHA } }],
       ['被訊號終止', () => writeFile(d.jsonPath, JSON.stringify(vitestJson(SAMPLE))), { exitCode: null, signal: 'SIGTERM' }],
     ]

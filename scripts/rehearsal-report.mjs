@@ -8,7 +8,7 @@
 // 「已存在就不覆寫」是最後一道保險（時鐘倒退、random 撞了），不是預期路徑。
 // 前端工作樹不乾淨 → 落 `.local/rehearsal/`（gitignore）：證據目錄裡永遠只有乾淨工作樹產的報告。
 //
-// 每一條 `key` 從 vitest 葉節點的 `meta.key` 來（演練測試從期望表抄進 `task.meta`）；
+// 每一條 `key` 從 vitest 葉節點的 `meta.key` 來（演練測試從期望表抄進 `task.meta`；沒有就不是完整的演練 JSON，不產）；
 // 〈送回後端〉列 `meta.report === true` 的。訊息以 `blocked:` 開頭的算 `blocked`，不算 `failed`。
 
 import { randomBytes } from 'node:crypto'
@@ -36,18 +36,33 @@ function leaves(json) {
       const meta = t.meta && typeof t.meta === 'object' ? t.meta : {}
       const message = t.status === 'failed' ? firstLine(t.failureMessages) : ''
       const status = t.status === 'failed' && /^blocked: /.test(message) ? 'blocked' : t.status
-      out.push({ key: typeof meta.key === 'string' && meta.key ? meta.key : t.title, status, message, report: meta.report === true })
+      out.push({ key: meta.key, status, message, report: meta.report === true })
     }
   }
   return out
 }
 
-/** 是不是 vitest `--reporter=json` 寫出來的形狀。只看報告會讀的欄位。 */
+/**
+ * 是不是**一整輪**演練的 vitest `--reporter=json`。形狀對還不夠（審查抓到：外形像、內容半份的也會被寫成證據）：
+ * 每個葉節點要有非空的 `meta.key`（演練測試從期望表抄的）、狀態只能是 `passed`／`failed`（`skipped`／`todo` 表示這一輪
+ * 不完整 —— `-t` 篩過的那種不留證據）、失敗的要有訊息、`key` 不重複、葉節點數要等於 `numTotalTests` 且大於 0。
+ */
 export function isVitestJson(json) {
   if (!json || typeof json !== 'object' || !Array.isArray(json.testResults) || typeof json.numTotalTests !== 'number') return false
-  return json.testResults.every(
-    (f) => f && Array.isArray(f.assertionResults) && f.assertionResults.every((t) => t && typeof t.title === 'string' && typeof t.status === 'string'),
-  )
+  const keys = new Set()
+  let n = 0
+  for (const f of json.testResults) {
+    if (!f || !Array.isArray(f.assertionResults)) return false
+    for (const t of f.assertionResults) {
+      if (!t || typeof t.title !== 'string' || (t.status !== 'passed' && t.status !== 'failed')) return false
+      const key = t.meta && typeof t.meta === 'object' ? t.meta.key : undefined
+      if (typeof key !== 'string' || !key || keys.has(key)) return false
+      if (t.status === 'failed' && !firstLine(t.failureMessages)) return false
+      keys.add(key)
+      n += 1
+    }
+  }
+  return n > 0 && n === json.numTotalTests
 }
 
 function cell(s) {
