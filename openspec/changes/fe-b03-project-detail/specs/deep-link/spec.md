@@ -13,8 +13,10 @@
 `/world` 的 query SHALL 表示三件事：開著哪一種清單（`panel=profiles`／`panel=projects`）、開著哪一筆詳情
 （人才 `profile=<id>`；案件 `project=<id>`）、清單在第幾頁（0-based 的 `page=N`，第 0 頁 SHALL 省略）。
 載入帶這些參數的網址 SHALL 還原同一層：清單、詳情（以 `id` 請求 `GET /api/profiles/{id}`／`GET /api/projects/{id}`）、頁碼。
-`profile` 只在 `panel=profiles`、`project` 只在 `panel=projects` 下有意義：帶錯面板的那一個 SHALL 被去掉；單獨的 `project`（沒有 `panel`）SHALL 視為 `panel=projects`；
-同時單獨帶 `profile` 與 `project` 時 SHALL 取 `profile`（`panel=profiles`）。
+`profile` 只在 `panel=profiles`、`project` 只在 `panel=projects` 下有意義：帶錯面板的那一個 SHALL 被去掉（顯式 `panel` 同時帶兩個詳情參數時，留下對應面板的那一個）；
+`project` 的形狀跟 `profile` 一樣只接受 UUID，不合形狀的視同沒有；單獨的 `project`（沒有 `panel`）SHALL 視為 `panel=projects`，`page` SHALL 保留；
+同時單獨帶 `profile` 與 `project` 時 SHALL 取 `profile`（`panel=profiles`）；`panel` 不合法時 SHALL 整份視為沒有面板（既有規則，不因 `project` 而推導面板）；
+同名參數重複時 SHALL 取第一個。canonical 化 SHALL 用 replace（不新增瀏覽紀錄）；只有使用者在清單裡開詳情才 push。
 
 深連結直達時面板直接開著，不受看板互動距離限制；角色在哪裡、關掉之後怎麼再開，
 這一列**不改變**既有規則（不傳送角色；再開仍是走到看板前按 E —— `FE-W06`／`FE-B01` 的判準守著）。
@@ -63,5 +65,5 @@
 
 - **WHEN** 載入 `/world?panel=projects&project=<id>`
 - **THEN** 案件面板 SHALL 開著且詳情蓋在上面，並已送出 `GET /api/projects/<id>`；開詳情 SHALL 多一層瀏覽紀錄、Escape 或上一頁 SHALL 回到 `/world?panel=projects`
-- **AND WHEN** 載入 `/world?panel=projects&profile=<id>`、`/world?panel=profiles&project=<id>`、`/world?project=<id>`、`/world?profile=<a>&project=<b>` 各一次
-- **THEN** 網址 SHALL 分別被改成 `/world?panel=projects`、`/world?panel=profiles`、`/world?panel=projects&project=<id>`、`/world?panel=profiles&profile=<a>`，每一次都是可操作的畫面
+- **AND WHEN** 載入 `/world?panel=projects&profile=<id>`、`/world?panel=profiles&project=<id>`、`/world?project=<id>&page=2`、`/world?profile=<a>&project=<b>`、`/world?panel=projects&project=<b>&profile=<a>`、`/world?panel=bogus&project=<id>`、`/world?project=not-a-uuid`、`/world?project=<a>&project=<b>` 各一次
+- **THEN** 網址 SHALL 分別被改成 `/world?panel=projects`、`/world?panel=profiles`、`/world?panel=projects&project=<id>&page=2`、`/world?panel=profiles&profile=<a>`、`/world?panel=projects&project=<b>`、`/world`、`/world`、`/world?panel=projects&project=<a>`，每一次都是可操作的畫面，且這些 canonical 化 SHALL NOT 新增瀏覽紀錄（replace）

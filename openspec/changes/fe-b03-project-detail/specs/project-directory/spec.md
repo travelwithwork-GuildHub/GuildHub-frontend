@@ -57,7 +57,8 @@
 - **WHEN** 詳情請求回 `401 {"detail":"未登入"}`
 - **THEN** 詳情 SHALL 呈現 `FE-X04` 的權限阻擋狀態，不是載入失敗
 - **AND WHEN** 詳情請求回 `404 {"detail":"專案不存在"}`（例如深連結直達一個被移除的案子）
-- **THEN** 詳情 SHALL 呈現 `FE-X04` 的找不到狀態，SHALL NOT 請求任何 `/api/profiles/*`（沒有 `owner_id` 可以問）
+- **THEN** 詳情 SHALL 呈現 `FE-X04` 的找不到狀態
+- **AND** 上述 401、404 與 `S04` 的 500 三種情況下，SHALL NOT 請求任何 `/api/profiles/*`（案子本體沒成功就沒有 `owner_id` 可以問）
 
 #### Scenario: [FE-B03-S06] 快速連點不同案子，晚到的舊回應不覆蓋
 
@@ -83,6 +84,16 @@ SHALL NOT 呈現發案者的 `bio`、時數、名片更新時間。
 - **THEN** 詳情 SHALL 呈現那張名片的 `display_name` 與每一項技能，外觀色 SHALL 等於世界裡 `avatar_id: 1` 用的顏色
 - **AND** 詳情 SHALL NOT 含那張名片的 `bio` 字串、SHALL NOT 含其 `updated_at` 的年份
 
+#### Scenario: [FE-B03-S15] 案子已 ready、發案者還在載：兩塊各自的狀態
+
+- **WHEN** 案子本體回 200，`GET /api/profiles/{owner_id}` 尚未回應
+- **THEN** 案子本體 SHALL 是 `data-phase="ready"` 且標題、內容都在；發案者那一塊 SHALL 是自己的載入中狀態（`data-phase="loading"`），SHALL NOT 呈現任何名字
+
+#### Scenario: [FE-B03-S16] 切換案件後，舊發案者的回應不得覆蓋新案子的發案者
+
+- **WHEN** 使用者先開 A（owner X）再開 B（owner Y）；A 的案子本體、B 的案子本體與 `GET /api/profiles/Y` 都已回應，而 `GET /api/profiles/X` 最後才回來
+- **THEN** 詳情呈現的 SHALL 是 B 與 Y 的名字、技能、外觀；X 的回應到達後 SHALL NOT 在任何一格出現 X 的名字、技能或外觀
+
 #### Scenario: [FE-B03-S09] 發案者名片載不到，案子本體仍是 ready；可獨立重試
 
 - **WHEN** 案子本體回 200，`GET /api/profiles/{owner_id}` 回 500
@@ -106,8 +117,8 @@ owner（`owner_id` 等於自己的 `id`）SHALL 看到「這是你發的案子�
 
 - **WHEN** owner 開自己案子的詳情
 - **THEN** SHALL 有「這是你發的案子」的標示節點與插槽節點，SHALL NOT 有「私訊發案者」
-- **AND WHEN** 訪客（身分 `guest`）以深連結開同一筆詳情且請求回 200
-- **THEN** SHALL NOT 有「私訊發案者」、SHALL NOT 有 owner 標示
+- **AND WHEN** 訪客（身分 `guest`）以深連結開同一筆詳情（真實系統下請求回 `401`）
+- **THEN** 詳情 SHALL 是權限阻擋狀態，SHALL NOT 有「私訊發案者」、SHALL NOT 有 owner 標示、SHALL NOT 有插槽節點
 
 #### Scenario: [FE-B03-S12] 沒有做不到的動作
 
@@ -118,10 +129,10 @@ owner（`owner_id` 等於自己的 `id`）SHALL 看到「這是你發的案子�
 
 從案件詳情返回列表 SHALL NOT 重新請求列表，SHALL 回到進入前的頁碼與捲動位置；詳情顯示時列表區 SHALL 是 `inert`、SHALL NOT 卸載或 `display: none`。
 
-#### Scenario: [FE-B03-S13] 第二頁進去、第二頁回來，沒有重打列表；列表區 inert
+#### Scenario: [FE-B03-S13] 第 1 頁（0-based）進去、第 1 頁回來，頁碼與捲動位置都在、沒有重打列表；列表區 inert
 
-- **WHEN** 案件清單在第 1 頁，使用者開某一筆詳情再返回
-- **THEN** 列表 SHALL 仍在第 1 頁，期間 SHALL NOT 送出任何 `GET /api/projects?page=` 請求
+- **WHEN** 案件清單在 0-based 的第 1 頁、列表已捲到非零的 `scrollTop`，使用者開某一筆詳情再返回
+- **THEN** 列表 SHALL 仍在第 1 頁、`scrollTop` SHALL 等於進入前的值；期間對 `/api/projects` 的列表請求總次數 SHALL 不增加（含不帶 `page` 的第 0 頁）
 - **AND** 詳情開著時列表區 SHALL 是 `inert` 且不是 `display: none`
 
 #### Scenario: [FE-B03-S14] 真瀏覽器：點卡開詳情、發案者名片、返回

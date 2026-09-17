@@ -30,13 +30,18 @@ WBS 逐字：「owner 看到成軍／結案的入口（動作本身在 `FE-J04`�
 不另設狀態），而且詳情有一個 `ownerActions` 插槽讓 `FE-J04` 把成軍／結案接進來。這一份不渲染成軍／結案按鈕 —— 跟 `FE-B02` D1 同一個理由：
 沒有 handler 的控制項對鍵盤與螢幕閱讀器使用者是騙人的。判準驗「owner 看到標示、非 owner 看不到；這一份沒有成軍／結案／應徵／收藏／檢舉的控制項」。
 
+⚠️ WBS 原句「owner 看到成軍／結案的入口（動作本身在 `FE-J04`）」與這個決定不一致（codex 審查抓到）：空插槽不是使用者看得到的入口。
+處理：另開 `governance/` PR 把 `docs/WBS.md` 的 `FE-B03` 那兩列改成「owner 看到『這是你發的案子』的標示與動作插槽；成軍／結案的可見入口與動作都在 `FE-J04`」、
+動作列的「進房」改成「進房不在詳情（唯一入口是大廳的門，`room-entry-gate`）」—— **先合併那個 governance PR，這份規格才成立**（tasks 1.2）。
+
 非 owner 且已登入：「私訊發案者」= `SendMessageButton`（`FE-K01`）換標籤（`label` prop，預設仍是「寄信給他」）；它自己會處理「訪客／自己不長出來」。
 
 ### D4｜網址：`project=<id>` 跟 `profile=<id>` 平行，一次只會有一個
 
 `PanelUrlState` 多 `project: string | null`（只在 `panel === 'projects'` 時非 null）。canonical 規則對稱於 `profile`：`panel=projects` 帶 `profile` → 去掉 `profile`；
 `panel=profiles` 帶 `project` → 去掉 `project`；單獨的 `project` → 視為 `panel=projects`；同時單獨帶兩個 → `profile` 贏（`panel=profiles`，去掉 `project`）—— 要有一個確定的答案，選既有的那個。
-`depthOf` 把 `project` 算成第 2 層。`ListPanelProvider.selected` 的語意改成「開著的面板裡選中的那一筆」（人才或案件），`selectProfile` 保留、
+`project` 跟 `profile` 一樣只收 UUID；顯式 `panel` 帶兩個詳情參數時留對應面板的那一個；`panel=bogus` 仍整份 CLOSED（不因 `project` 推導面板 —— 既有規則）；同名重複取第一個（`URLSearchParams.get`）。
+`depthOf` 把 `project` 算成第 2 層。canonical 化是 replace（既有 `PanelUrlSync` 的規則），只有清單裡開詳情才 push。`ListPanelProvider.selected` 的語意改成「開著的面板裡選中的那一筆」（人才或案件），`selectProfile` 保留、
 多 `selectProject`（各自只在對應的面板下有效）。
 
 ### D5｜卡片變控制項：`FE-B02-S08` 被取代
