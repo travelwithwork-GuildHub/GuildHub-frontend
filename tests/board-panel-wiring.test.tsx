@@ -123,9 +123,16 @@ describe('走到看板前按 E，開得起對應的面板', () => {
   })
 
   it('[FE-B02-S06] 案件面板的每一筆都是案件卡，data-project-id 對得上', async () => {
+    // `replyFor` 是佇列：`beforeEach` 排的那一筆先被拿走，所以先開一次面板消耗它、關掉、再開一次拿兩筆的。
     const SECOND = { ...PROJECT, id: UUID(3), title: '案件乙' }
     server.replyFor('/api/projects', 200, [PROJECT, SECOND])
     const { pressE } = mount()
+    pressE(boardId('projectBoard'))
+    await waitFor(() => expect(screen.getByText('案件甲')).toBeInTheDocument())
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
+    })
+    await waitFor(() => expect(screen.queryByTestId('list-panel')).toBeNull())
     pressE(boardId('projectBoard'))
     await waitFor(() => expect(screen.getByText('案件乙')).toBeInTheDocument())
     const items = screen.getByTestId('list-panel-list').querySelectorAll('li')
