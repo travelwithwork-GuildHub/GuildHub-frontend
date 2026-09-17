@@ -1,6 +1,7 @@
 # tasks：`fe-b03-project-detail`
 
-三個 `feat/fe-b03-project-detail--<slice>` PR（每個產品碼 ≤250、手寫 ≤800）：`--url` → `--detail` → `--wire`。
+四個 `feat/fe-b03-project-detail--<slice>` PR（每個產品碼 ≤250、手寫 ≤800）：`--url` → `--owner` → `--detail` → `--wire`。
+（原本三片；`--detail` 做完量出 269 行產品碼，按 Requirement〈發案者名片是獨立的載入單元〉切出 `--owner`。）
 每片：先寫判準（紅）→ commit → 實作（綠）→ 突變（拔掉防禦要紅、紀錄貼 PR）→ 檢查。
 
 ## 1. 規格
@@ -14,7 +15,13 @@
 - [x] 2.2 `urlState.ts`：`project` 欄位、canonical 規則；`ListPanelProvider`：`selected` = 開著面板的那一筆、`selectProject`；`PanelUrlSync`：層數含 `project`
 - [x] 2.3 **突變**：`panel=projects` 帶 `profile` 不去掉 → `S14` 紅；`depthOf` 不算 `project` → `S14`（push／Escape 那一半）紅；直達時也 push → `S14` 紅（整棵樹的那一半在 4.x；這一片：不驗 UUID／bogus 推導面板／兩個單獨取 project／selected 永遠讀 profile 各紅；「selectProject 在人才面板下也生效」是等價突變 —— `selected` 依面板讀，看不到）
 
-## 3. `--detail`：詳情、發案者名片、動作列（ADDED 四條；design D1／D2／D3）
+## 3a. `--owner`：發案者名片（ADDED〈發案者名片是獨立的載入單元〉；design D2）
+
+- [x] 3a.1 `tests/owner-card.test.tsx`：`S08`（名片半邊）、`S09`、`S15`、`S16`（`rerender` 換 owner）；先 commit 紅
+- [x] 3a.2 `OwnerCard.tsx`：重用 `useProfileDetail`＋名字／外觀色／技能，自己的 `data-phase`、`EmptyState` 失敗、重試
+- [x] 3a.3 **突變**：失敗不顯示 → `S09` 紅；印 `bio` → `S08` 紅；`aria-busy` 拿掉 → `S15` 紅
+
+## 3. `--detail`：詳情、動作列（ADDED 三條；design D1／D3；發案者的成對判準）
 
 - [ ] 3.1 `tests/project-detail.test.tsx`：`S03`～`S12`、`S15`、`S16`（`contract-server` 替身；`S06` 用 `renderHook` 逐格看沒有「B 的 id 配 A 的內容」；`S16` 用 `replyFor` 的 `after` 把 X 的名片壓到最後；`S09` 發案者 500 時案子 ready、重試只打 profiles；`S10` 用真的 `InboxPanelProvider`；`S11` 訪客走 401；`S12` 掃控制項名字）；先 commit 紅
 - [ ] 3.2 `useProjectDetail.ts`（照 `useProfileDetail` 的紀律）、`OwnerCard.tsx`（重用 `useProfileDetail`＋`TalentFacts` 精簡版）、`ProjectDetail.tsx`（overlay、返回、Escape 層、焦點、`data-phase`、`FE-X04` 三種失敗、owner 標示＋ `ownerActions` 插槽）、`SendMessageButton` 多 `label`
