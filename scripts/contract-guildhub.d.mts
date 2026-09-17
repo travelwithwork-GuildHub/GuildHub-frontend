@@ -10,6 +10,7 @@ export interface RunDeps {
   reset: (options: { url: string }) => Promise<unknown>
   spawn: (...args: unknown[]) => unknown
   finish: (options: Record<string, unknown>) => Promise<{ code: number; path: string | null; message: string }>
+  mkdtemp?: (prefix: string) => Promise<string>
 }
 export declare function run(options: {
   argv: string[]

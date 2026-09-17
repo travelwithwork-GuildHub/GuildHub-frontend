@@ -176,7 +176,7 @@ async function git(args, cwd) {
 }
 
 /**
- * 整個流程。`deps` 注入 `preflight`／`reset`／`spawn`／`finish`，回傳結束碼、不自己 `process.exit` ——
+ * 整個流程。`deps` 注入 `preflight`／`reset`／`spawn`／`finish`（`mkdtemp` 選配，測試用來在那個 await 裡送訊號），回傳結束碼、不自己 `process.exit` ——
  * `S02` 要驗的是「四條 preflight 任一不過，`reset` 與 `spawn` 都沒被叫到」，只單測 `preflight()` 證明不了。
  */
 export async function run({ argv, env, deps, io = console }) {
@@ -232,9 +232,11 @@ export async function run({ argv, env, deps, io = console }) {
     let args = ['run', '--config', 'vitest.contract.mts', ...rest]
     if (suite === 'rehearsal') {
       // 報告從 JSON reporter 產：唯一的暫存檔，finally 清；default reporter 留著給人看。
-      tmpDir = await mkdtemp(path.join(os.tmpdir(), 'rehearsal-'))
+      tmpDir = await (deps.mkdtemp ?? mkdtemp)(path.join(os.tmpdir(), 'rehearsal-'))
       args = ['run', '--config', 'vitest.rehearsal.mts', '--reporter=default', '--reporter=json', `--outputFile.json=${path.join(tmpDir, 'result.json')}`, ...rest]
     }
+    // 起 vitest 之前是最後一個 await（mkdtemp）之後：訊號若剛好落在那裡，不能還把套件跑起來（審查抓到的）。
+    if (signalled) throw bail()
     io.log(`${tag} ready，跑 ${suite} 套件`)
     vitest = deps.spawn('npx', ['vitest', ...args], {
       cwd: ROOT,

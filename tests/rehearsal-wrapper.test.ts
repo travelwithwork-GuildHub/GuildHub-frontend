@@ -1,4 +1,5 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import http from 'node:http'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
@@ -204,6 +205,46 @@ describe('run() 的訊號處理（沿用 contract 那一輪的契約：Ctrl-C �
       await rm(dir, { recursive: true })
     }
   }, 15_000)
+
+  it('後端 ready 之後、起 vitest 之前的 await（rehearsal 的 mkdtemp）期間收到 SIGINT：不起 vitest、回 130（審查抓到的 race）', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'fake-backend-'))
+    await writeFile(path.join(dir, 'run.sh'), '#!/usr/bin/env bash\necho fake\n')
+    // 真的在 port 上回 401 的迷你後端：讓 waitFor401 立刻過；preflight 用假的放行（它的「port 沒人聽」那條會擋住這個 server）。
+    const server = http.createServer((_req, res) => {
+      res.statusCode = 401
+      res.end()
+    })
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+    const port = (server.address() as net.AddressInfo).port
+    const spawn = vi.fn(() => ({ pid: 2_147_483_000, exitCode: null }))
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rehearsal-'))
+    try {
+      const code = await run({
+        argv: ['--suite', 'rehearsal'],
+        env: { GUILDHUB_BACKEND_DIR: dir, CONTRACT_GUILDHUB_PORT: String(port), INTERNAL_TEST_DATABASE_URL: 'postgresql://guildhub:guildhub@127.0.0.1:5432/guildhub_frontend_test' },
+        deps: {
+          preflight: vi.fn(async () => ({ runSh: path.join(dir, 'run.sh') })),
+          reset: vi.fn(async () => []),
+          spawn,
+          finish: vi.fn(),
+          // 訊號正好落在 ready 之後、起 vitest 之前的那個 await 裡。
+          mkdtemp: vi.fn(async () => {
+            // ready 已經量到了：先把迷你 server 關掉，stop() 等 port 釋放才不會等滿 5 秒。
+            await new Promise<void>((r) => server.close(() => r()))
+            process.emit('SIGINT' as never, 'SIGINT' as never)
+            return tmp
+          }),
+        },
+        io: { log: () => {}, error: () => {} },
+      })
+      expect(code).toBe(130)
+      expect(spawn, '只有後端那一次，vitest 不該被起').toHaveBeenCalledTimes(1)
+    } finally {
+      server.close()
+      await rm(dir, { recursive: true })
+      await rm(tmp, { recursive: true, force: true })
+    }
+  })
 
   it('reset 期間收到 SIGINT：不起後端也不起 vitest、回 130（handler 要在 preflight 之前就掛上）', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'fake-backend-'))
