@@ -33,6 +33,7 @@ function run(...events: PagingEvent<Item>[]): PagingState<Item> {
 
 const resolved = (identity: RequestIdentity, items: Item[]): PagingEvent<Item> => ({
   type: 'resolved',
+  at: 1_700_000_000_000,
   identity,
   items,
 })
@@ -176,6 +177,7 @@ describe('晚到的回應不得覆蓋畫面', () => {
     // 沒有這一條，「所有回應一律丟掉」也會讓上一條全綠。
     const s = reduce(opened<Item>('profiles'), {
       type: 'resolved',
+  at: 1_700_000_000_000,
       identity: { kind: 'profiles', page: 0 },
       items: page(0, 7),
     })
@@ -212,5 +214,16 @@ describe('起始頁與 goto（`FE-B09`）', () => {
     const s = reduce(probing, { type: 'goto', page: 3 })
     expect(s.identity.page).toBe(3)
     expect(s.shown).toBeNull()
+  })
+})
+
+describe('`shown.at`：這一頁回來的時刻跟資料同一次提交（`FE-B02` design D2 的時鐘）', () => {
+  it('[FE-B02] 提交時記下 `at`；reload 後重取回來的是新的 `at`，不是舊的', () => {
+    const first = reduce(opened<Item>('projects'), { type: 'resolved', identity: { kind: 'projects', page: 0 }, items: page(0, 3), at: 1_000 })
+    expect(first.shown?.at).toBe(1_000)
+    const reloaded = reduce(first, { type: 'reload' })
+    expect(reloaded.shown, 'reload 要把舊頁清掉').toBeNull()
+    const second = reduce(reloaded, { type: 'resolved', identity: { kind: 'projects', page: 0 }, items: page(0, 3), at: 2_000 })
+    expect(second.shown?.at, '重取回來的時鐘還是舊的 —— 剩幾天會算錯').toBe(2_000)
   })
 })

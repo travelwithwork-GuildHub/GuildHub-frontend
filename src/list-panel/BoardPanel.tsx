@@ -141,7 +141,7 @@ function ProjectBoard() {
       kind="projects"
       title={TITLES.projects}
       labels={LABELS}
-      renderItem={(item) => <ProjectCard project={item} />}
+      renderItem={(item, { fetchedAt }) => <ProjectCard project={item} now={fetchedAt} />}
       onClose={onClose}
       page={page}
       onShownPage={reportPage}

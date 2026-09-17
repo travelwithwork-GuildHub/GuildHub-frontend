@@ -41,9 +41,10 @@ export interface PagingState<T> {
   /**
    * 畫面上呈現的那一頁。**前進探測期間它不變** —— 撲空要留在原頁（`S09`），
    * 所以探測中的頁次在 `identity`，已呈現的頁次在這裡，兩者刻意分開。
-   * 首次載入還沒回來之前是 `null`。
+   * 首次載入還沒回來之前是 `null`。`at` 是這一頁**回來的時刻**（epoch ms）—— 呈現「剩幾天」這種相對時間的卡片以它為時鐘
+   * （`FE-B02` design D2）：時鐘要跟資料同一次取回，不能綁在元件掛載（重取不一定重新掛載 `li`）。
    */
-  shown: { page: number; items: readonly T[] } | null
+  shown: { page: number; items: readonly T[]; at: number } | null
   /**
    * 下一頁：`'maybe'`（不確定）或 `'none'`（確定沒有）。
    * ⚠️ **沒有 `'yes'`** —— 在這個契約下前端永遠拿不到那個確定（`S08`）。
@@ -60,7 +61,7 @@ export type PagingEvent<T> =
   | { type: 'retry' }
   /** 回第 0 頁、重新向伺服器取（發案成功之後，`FE-J01` design D2）。不樂觀插入：畫面上呈現的一定是重取回來的。 */
   | { type: 'reload' }
-  | { type: 'resolved'; identity: RequestIdentity; items: readonly T[] }
+  | { type: 'resolved'; identity: RequestIdentity; items: readonly T[]; at: number }
   | { type: 'failed'; identity: RequestIdentity; error: unknown }
 
 /** `page` 是起始頁（深連結帶進來的，`FE-B09-S03`）；沒給就從第 0 頁開始。 */
@@ -107,7 +108,7 @@ export function reduce<T>(state: PagingState<T>, event: PagingEvent<T>): PagingS
 
     case 'resolved': {
       if (!sameIdentity(event.identity, state.identity)) return state
-      const { items } = event
+      const { items, at } = event
       // 起始頁就撲空（深連結帶的頁碼已經不存在，`FE-B09-S04`）：退回第 0 頁再問一次。
       // 沒有「原頁」可以留 —— 下面 `S09` 的規則是給「從滿頁前進」用的（前提是 `shown !== null`）。
       // 畫成「首次無資料」的話，使用者會以為整個系統沒資料或連結壞了。
@@ -120,7 +121,7 @@ export function reduce<T>(state: PagingState<T>, event: PagingEvent<T>): PagingS
         return {
           ...state,
           phase: 'ready',
-          shown: { page: event.identity.page, items },
+          shown: { page: event.identity.page, items, at },
           next: items.length < PAGE_SIZE ? 'none' : 'maybe',
           error: null,
         }

@@ -69,7 +69,7 @@ describe('案件卡讓人一眼判斷', () => {
     render(<ProjectCard project={project({ needed_skills: [] })} now={NOW} />)
     expect(screen.queryAllByTestId('project-skill')).toEqual([])
     const missing = within(card()).getByText((_, el) => el?.getAttribute('data-missing') === 'needed_skills')
-    expect(missing.textContent, '「未提供」是「這個人沒填」；案子不限技能是「未指定」').toBe('未指定')
+    expect(missing.textContent, '「未提供」是「這個人沒填」；發案者沒指定技能是「未指定」').toBe('未指定')
   })
 
   it('[FE-B02-S05] body、updated_at、owner_id 不上卡片；唯一的 <time> 是 expires_at', () => {
@@ -90,11 +90,11 @@ describe('案件卡讓人一眼判斷', () => {
     render(<ProjectCard project={project()} now={NOW} />)
     const c = card()
     expect(c.tagName, '詳情還沒有，做成按鈕是一顆按下去沒反應的控制項').toBe('ARTICLE')
-    // 含根節點自己：`matches` 加 `querySelectorAll`
-    const FOCUSABLE = 'button, a, input, select, textarea, [role="button"], [role="link"], [tabindex]'
-    const focusable = [c, ...c.querySelectorAll<HTMLElement>(FOCUSABLE)]
-      .filter((el) => el.matches(FOCUSABLE))
-      .filter((el) => !el.hasAttribute('tabindex') || Number(el.getAttribute('tabindex')) >= 0)
-    expect(focusable, '卡片裡有可聚焦的東西 —— 做成 div role=button 也會在這裡紅').toEqual([])
+    // 兩條各自獨立（codex 審查抓到合在一起會放過 `<button tabIndex={-1}>`）：
+    // (1) 控制項一個都不能有，不管 tabindex；(2) 沒有任何 tabindex ≥ 0。都含根節點自己（`matches`）。
+    const CONTROLS = 'button, a, input, select, textarea, [role="button"], [role="link"]'
+    const all = [c, ...c.querySelectorAll<HTMLElement>('*')]
+    expect(all.filter((el) => el.matches(CONTROLS)), '卡片裡有控制項 —— 做成 div role=button、或 button tabIndex=-1 都會在這裡紅').toEqual([])
+    expect(all.filter((el) => el.hasAttribute('tabindex') && Number(el.getAttribute('tabindex')) >= 0), '卡片裡有 tabindex ≥ 0 的元素').toEqual([])
   })
 })
