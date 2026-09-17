@@ -22,7 +22,8 @@ export type Expectation = {
   title: string
   /** 回應要通過的 schema（step 必有；基線各自建專案、回應的形狀由那一條的 `expect` 決定，可省）。 */
   schema?: Schema
-  /** 演練測試從這裡讀的期望值；欄位名各條自己定。測試 MUST NOT 在斷言裡另寫數字。 */
+  /** 演練測試從這裡讀的期望值；欄位名各條自己定。測試 MUST NOT 在斷言裡另寫數字。
+   *  慣用字：`roomTemplate` 是 `room_template` 的型別（`integer`／`null`）；`door` 是 `/api/rooms` 有沒有這扇門（`present`／`absent`）。 */
   expect: Readonly<Record<string, number | string>>
   /** 要不要進報告的〈送回後端〉。 */
   report: boolean
@@ -42,19 +43,19 @@ export const EXPECTATIONS: readonly Expectation[] = [
   step('list-contains', 'B `GET /api/projects` → 200 ProjectOut[]，含剛建的 id', 'ProjectOut[]', { status: 200 }, 'FE-B02'),
   step('get', 'B `GET /api/projects/{id}` → 200 ProjectOut，同一個 id', 'ProjectOut', { status: 200 }, 'FE-B03'),
   step('form-team', 'A `POST …/form-team` 密碼 → 200 ProjectOut、active、room_template 是整數', 'ProjectOut', { status: 200, projectStatus: 'active', roomTemplate: 'integer' }, 'FE-J04'),
-  step('rooms-contains', 'B `GET /api/rooms` → 200 RoomDoorOut[]，含它', 'RoomDoorOut[]', { status: 200 }, 'FE-J04'),
+  step('rooms-contains', 'B `GET /api/rooms` → 200 RoomDoorOut[]，含它', 'RoomDoorOut[]', { status: 200, door: 'present' }, 'FE-J04'),
   step('enter', 'B `POST …/enter` 正確密碼 → 200 EnterOut', 'EnterOut', { status: 200 }, 'FE-N08'),
   step('seats-empty', 'B `GET …/seats` → 200 []', 'SeatOut[]', { status: 200, count: 0 }, 'FE-J13'),
   step('seat-claim', 'B `POST …/seats` seat_index 0 → 201 SeatOut，user_id 是 B', 'SeatOut', { status: 201, seatIndex: 0 }, 'FE-J13'),
   step('message', 'B `POST /api/messages` 給 A → 201 MessageOut', 'MessageOut', { status: 201 }, 'FE-K01'),
   step('close', 'A `POST …/close` → 200 ProjectOut、closed', 'ProjectOut', { status: 200, projectStatus: 'closed' }, 'FE-J04'),
-  step('rooms-excludes', 'B `GET /api/rooms` → 200，不含它', 'RoomDoorOut[]', { status: 200 }, 'FE-J04'),
+  step('rooms-excludes', 'B `GET /api/rooms` → 200，不含它', 'RoomDoorOut[]', { status: 200, door: 'absent' }, 'FE-J04'),
 
   // ── 十條基線（各自建自己的專案，互不依賴）──
   anomaly('create-unvalidated', '`POST /api/projects` 空 title、seat_count 0 與 9 都 201', { status: 201, title: '', seatCountLow: 0, seatCountHigh: 9 }, 'FE-J01'),
   contract('list-default-recruiting', '`GET /api/projects` 不帶 status 只回 recruiting；`?status=active` 才回成軍的', { status: 200, defaultStatus: 'recruiting', filter: 'active' }, 'FE-J01'),
   contract('form-team-repeat', '成軍後再成軍 200 換密碼：舊密碼 enter 403、新密碼 200', { status: 200, oldPasswordEnter: 403, newPasswordEnter: 200 }, 'FE-J04'),
-  anomaly('form-team-after-close', 'closed 之後成軍 200、狀態回到 active、`/api/rooms` 再含它', { status: 200, projectStatus: 'active' }, 'FE-J04'),
+  anomaly('form-team-after-close', 'closed 之後成軍 200、狀態回到 active、`/api/rooms` 再含它', { status: 200, projectStatus: 'active', door: 'present' }, 'FE-J04'),
   contract('seat-409-detail', '同一人再坐 409「你已經在這個房間有座位了」；坐別人的位 409「這個座位已經有人了」', { status: 409, seatIndex: 0, otherSeatIndex: 1, ownSeat: '你已經在這個房間有座位了', taken: '這個座位已經有人了' }, 'FE-J13'),
   contract('seat-out-of-range', 'seat_index ≥ seat_count 是 400，訊息含座位數', { status: 400, seatCount: 2, seatIndex: 2 }, 'FE-J13'),
   contract('owner-needs-enter', '發案者沒 enter 也看不到座位（403）', { status: 403 }, 'FE-J13'),

@@ -64,7 +64,24 @@ const seats = (a: Actor, id: string) => a.c.raw('GET', `/api/projects/${id}/seat
 const claim = (a: Actor, id: string, seat_index: number) => a.c.raw('POST', `/api/projects/${id}/seats`, { body: { seat_index } })
 const close = (a: Actor, id: string) => a.c.raw('POST', `/api/projects/${id}/close`)
 const rooms = (a: Actor) => a.c.raw('GET', '/api/rooms')
-const doorFor = (r: RawResponse, id: string) => rest.RoomDoorOut.array().parse(r.json).some((d) => d.project_id === id)
+/** `/api/rooms` 裡有沒有這扇門：回期望表的慣用字 `present`／`absent`。 */
+const door = (r: RawResponse, id: string) => (rest.RoomDoorOut.array().parse(r.json).some((d) => d.project_id === id) ? 'present' : 'absent')
+/** `room_template` 的型別，回期望表的慣用字（`integer`／`null`／其他 typeof）。 */
+const templateKind = (v: unknown) => (Number.isInteger(v) ? 'integer' : v === null ? 'null' : typeof v)
+
+/**
+ * 每一條的失敗訊息都要以 `key` 開頭（S05：報告只取第一行，要指得出是哪一條變了）。`checked` 已經加了；
+ * 前置動作（登入、建案、zod parse）拋的沒有 —— 這裡補上，並把多行的 zod 訊息壓成一行。`blocked:` 的原樣放行。
+ */
+async function withKey(key: string, fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message.startsWith(`${key}:`) || message.startsWith('blocked: ')) throw err
+    throw new Error(`${key}: ${message.replace(/\s*\n\s*/g, ' ').slice(0, 300)}`, { cause: err })
+  }
+}
 
 /** 基線用：A 建案並成軍（各自的專案）。 */
 async function activeProject(a: Actor, body: Record<string, unknown> = {}): Promise<ProjectOut> {
@@ -94,7 +111,7 @@ describe('閉環', () => {
     it(`[FE-O08-S03] ${key} —— ${e.title}`, async ({ task }) => {
       task.meta.key = e.key
       task.meta.report = e.report
-      await relay.run(key, deps, () => run(e))
+      await relay.run(key, deps, () => withKey(key, () => run(e)))
     })
   }
 
@@ -125,13 +142,13 @@ describe('閉環', () => {
   step('form-team', ['create'], async (e) => {
     const p = checked(e, await formTeam(owner(), project().id, PASSWORD.first)) as ProjectOut
     expect(p.status, `${e.key}: status`).toBe(e.expect.projectStatus)
-    expect(Number.isInteger(p.room_template), `${e.key}: room_template 要是整數，實測 ${JSON.stringify(p.room_template)}`).toBe(true)
+    expect(templateKind(p.room_template), `${e.key}: room_template 的型別（實測 ${JSON.stringify(p.room_template)}）`).toBe(e.expect.roomTemplate)
     state.project = p
   })
   step('rooms-contains', ['login-member', 'form-team'], async (e) => {
     const r = await rooms(member())
     checked(e, r)
-    expect(doorFor(r, project().id), `${e.key}: /api/rooms 沒有 ${project().id}`).toBe(true)
+    expect(door(r, project().id), `${e.key}: /api/rooms 有沒有 ${project().id}`).toBe(e.expect.door)
   })
   step('enter', ['login-member', 'form-team'], async (e) => {
     checked(e, await enter(member(), project().id, PASSWORD.first))
@@ -154,7 +171,7 @@ describe('閉環', () => {
   step('rooms-excludes', ['close'], async (e) => {
     const r = await rooms(member())
     checked(e, r)
-    expect(doorFor(r, project().id), `${e.key}: /api/rooms 還有 ${project().id}`).toBe(false)
+    expect(door(r, project().id), `${e.key}: /api/rooms 有沒有 ${project().id}`).toBe(e.expect.door)
   })
 })
 
@@ -167,8 +184,10 @@ describe('基線', () => {
     it(`[FE-O08-S05] ${key} —— ${e.title}`, async ({ task }) => {
       task.meta.key = e.key
       task.meta.report = e.report
-      const [a, b] = await Promise.all([login(NICK.owner), login(NICK.member)])
-      await run(e, a, b)
+      await withKey(key, async () => {
+        const [a, b] = await Promise.all([login(NICK.owner), login(NICK.member)])
+        await run(e, a, b)
+      })
     })
   }
 
@@ -197,7 +216,7 @@ describe('基線', () => {
     rest.ProjectOut.parse((await close(a, p.id)).json)
     const revived = rest.ProjectOut.parse(checked(e, await formTeam(a, p.id, PASSWORD.second)))
     expect(revived.status, `${e.key}: status`).toBe(e.expect.projectStatus)
-    expect(doorFor(await rooms(b), p.id), `${e.key}: /api/rooms 要再含 ${p.id}`).toBe(true)
+    expect(door(await rooms(b), p.id), `${e.key}: /api/rooms 有沒有 ${p.id}`).toBe(e.expect.door)
   })
   baseline('seat-409-detail', async (e, a, b) => {
     const p = await activeProject(a)
