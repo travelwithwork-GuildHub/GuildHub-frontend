@@ -77,8 +77,8 @@
 #### Scenario: [FE-J01-S05] 成功：payload 白名單、回第 0 頁、第一筆是它
 
 - **GIVEN** 已登入的人在專案看板面板的第 1 頁（`page=1`）
-- **WHEN** 填「標題 `找一個會 Three.js 的人`、內容 `做一個小房間。`、技能 ` three.js, TypeScript ,three.js `、座位數 `3`」並送出，替身回 `201 ProjectOut`
-- **THEN** 替身收到的 body SHALL 恰好是 `{"title":"找一個會 Three.js 的人","body":"做一個小房間。","needed_skills":["three.js","TypeScript"],"seat_count":3}`（沒有別的鍵）
+- **WHEN** 填「標題 `  找一個會 Three.js 的人  `（前後各兩個空白）、內容 `做一個小房間。\n`（尾端一個換行）、技能 ` three.js, TypeScript ,three.js `、座位數 `3`」並送出，替身回 `201 ProjectOut`
+- **THEN** 替身收到的 body SHALL 恰好是 `{"title":"找一個會 Three.js 的人","body":"做一個小房間。","needed_skills":["three.js","TypeScript"],"seat_count":3}`（沒有別的鍵；標題與內容的前後空白已去掉 —— 漏寫 `trim` 這裡要紅）
 - **AND** 表單 SHALL 關閉；替身 SHALL 收到一次 `GET /api/projects?page=0`；列表第一筆 SHALL 顯示 `找一個會 Three.js 的人`；回報的頁碼 SHALL 是 0
 - **AND** 焦點 SHALL 在列表上
 

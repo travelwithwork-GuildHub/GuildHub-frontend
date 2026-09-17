@@ -65,7 +65,9 @@
 （`DiscardConfirm`，殼的 overlay 換成它、表單 `inert`）：「丟棄」回列表、「繼續編輯」回表單。乾淨時直接關。
 送出中三種關閉都無效（`FE-A04-S10` 同一條規則）。
 
-實作上 `BoardPanel` 把 `onClose` 包一層：表單開著且 dirty → 開確認層；否則照舊。`PanelShell` 不改。
+實作照 `FE-A04` 的形狀，**dirty 與送出中的判斷留在表單裡**：`CreateProjectForm` 收 `closeIntentRef`（殼的 Escape／關閉鈕與自己的取消鈕都走它的 `requestClose`：送出中 → 無效；dirty → `askDiscard()`；否則 → `onDone()`），
+`BoardPanel` 的 `onClose` 只做 `closeIntentRef.current ? closeIntentRef.current() : closePanel()`，並持有「確認層開著沒有」這一個布林。
+不把 dirty 提升到 `BoardPanel`：那會讓每打一個字整個 `ListPanel` 重繪（Gemini 審查抓到的，跟 3.5 的 `closeIntentRef` 形狀也矛盾）。`PanelShell` 不改。
 
 ### D6 替身補 `POST`，跟真後端一樣不驗
 
