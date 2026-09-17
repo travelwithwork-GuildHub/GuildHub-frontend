@@ -12,7 +12,7 @@
 持久資料相容性：不適用 —— 演練寫進的是可拋棄庫，跑前重設
 失敗路徑：適用 —— 期望不符、後端起不來、port 被占、報告產不出來、報告撞名
 測試連到什麼：演練套件連**本機自起的可拋棄真後端**（`127.0.0.1`，由 wrapper 起、跑完關；庫是 `INTERNAL_TEST_DATABASE_URL`，跑前重設）；
-單元測試（`parseSuite`、`renderReport`、`finishRehearsal`、期望表比對）不連任何外部服務，檔案系統只用暫存目錄
+單元測試（`parseSuite`、`run()` 的 preflight 分支、`renderReport`、`finishRehearsal`、期望表比對）不連任何外部服務，檔案系統只用暫存目錄
 
 ## ADDED Requirements
 
@@ -21,7 +21,9 @@
 演練 SHALL 經由 `scripts/contract-guildhub.mjs --suite rehearsal` 執行，沿用契約套件 `guildhub`
 那一輪的 preflight 與起停。preflight 的四條 —— 後端 repo 不在、port 已有人在聽、`INTERNAL_TEST_DATABASE_URL`
 缺席或不是 loopback、跟 `INTERNAL_DATABASE_URL` 是同一個庫 —— 任一條不過 SHALL 在 `reset()` 與 `spawn()`
-之前失敗、結束碼非零並說明是哪一條。演練 MUST NOT 接受任何既有的後端位址。
+之前失敗、結束碼非零並說明是哪一條。wrapper 的流程 SHALL 是一個可注入依賴的函式 `run({ argv, env, deps })`
+（`deps` 至少含 `preflight`、`reset`、`spawn`、`finish`），回傳結束碼、不自己 `process.exit`；
+`main()` 只負責把真的依賴餵進去。演練 MUST NOT 接受任何既有的後端位址。
 
 `--suite` 的文法由純函式 `parseSuite(argv)` 決定：接受 `--suite rehearsal` 與 `--suite=rehearsal` 兩種寫法；
 合法值只有 `contract`（預設）與 `rehearsal`；缺席時 SHALL 是 `contract`（既有行為不變）；出現兩次、缺值、
@@ -42,14 +44,17 @@
 
 #### Scenario: [FE-O08-S02] preflight 四條各自擋在起任何東西之前
 
-- **WHEN** 後端目錄沒有 `run.sh`、或 port 已有人在聽、或 `INTERNAL_TEST_DATABASE_URL` 缺席或主機不是 loopback、或它跟 `INTERNAL_DATABASE_URL` 指到同一個庫
-- **THEN** `preflight()` 拋出說明那一條的錯誤；`reset()` 與 `spawn()` 都沒有被呼叫，結束碼非零
+- **WHEN** 用注入的依賴呼叫 `run()`，而後端目錄沒有 `run.sh`、或 port 已有人在聽、或 `INTERNAL_TEST_DATABASE_URL` 缺席或主機不是 loopback、或它跟 `INTERNAL_DATABASE_URL` 指到同一個庫
+- **THEN** 四種情況各自：回傳的結束碼非零、錯誤訊息說明那一條、注入的 `reset` 與 `spawn` 呼叫次數都是 0
 
 ### Requirement: 閉環的每一步都對照期望表
 
 演練 SHALL 用兩張名片（發案者 A、隊員 B）循序走下列十三步。每一步是期望表裡一條有穩定 `key` 的項目，
-含請求、期望狀態碼、回應要通過的 schema（`src/api/contract/rest.ts`）；任何一步不符 SHALL 讓該步失敗、
-套件結束碼非零，失敗訊息含 `key`、期望值與實測值。期望表是唯一來源：測試 MUST NOT 在斷言裡另寫數字。
+含請求、期望狀態碼、回應要通過的 schema（`src/api/contract/rest.ts`）。**每個 `key` SHALL 是 vitest 裡獨立的一個葉節點**
+（標題含 `key` 與 Scenario ID），前一步的結果經共用狀態傳給下一步；任何一步不符 SHALL 讓該步失敗、
+套件結束碼非零，失敗訊息含 `key`、期望值與實測值。**前置步驟失敗時，依賴它的步驟 SHALL 以 `blocked: <前置 key>`
+開頭的訊息失敗**（不得假裝通過、也不得消失），報告把它們標成 `blocked` 而不是 `failed`。
+期望表是唯一來源：測試 MUST NOT 在斷言裡另寫數字。
 
 | # | key | 請求 | 期望 |
 |---|---|---|---|
@@ -75,7 +80,7 @@
 #### Scenario: [FE-O08-S04] 期望不符就紅
 
 - **WHEN** 期望表裡 `form-team` 的狀態碼被改成 201
-- **THEN** 第 6 步失敗，訊息含 `form-team`、`201` 與實測的 `200`；套件結束碼非零
+- **THEN** 第 6 步失敗，訊息含 `form-team`、`201` 與實測的 `200`；第 7、8、9、10、12、13 步以 `blocked: form-team` 失敗；套件結束碼非零；報告裡第 6 步是 `failed`、其餘是 `blocked`
 
 ### Requirement: 已知行為釘成觀測基線，並區分契約與異常
 
@@ -102,7 +107,7 @@
 #### Scenario: [FE-O08-S05] 十條基線
 
 - **WHEN** 對基準後端 `c6f3928` 跑演練
-- **THEN** 十條全部通過；每一條的失敗訊息含 `key`，讓報告指得出是哪一條變了
+- **THEN** 十條各自是獨立葉節點且全部通過；每一條的失敗訊息含 `key`，讓報告指得出是哪一條變了；基線之間互不依賴（各自建自己的專案），一條紅不擋其他條
 
 #### Scenario: [FE-O08-S06] 期望表的形狀
 
@@ -114,19 +119,20 @@
 `--suite rehearsal` 時 wrapper SHALL 以 `--reporter=json --outputFile=<唯一暫存檔>` 跑 vitest，跑完（不論結束碼）
 由 `finishRehearsal()` 決定：
 - vitest 是被訊號終止的、JSON 檔缺席、或不是合法的 vitest JSON → MUST NOT 寫任何檔案，結束碼非零；
-- JSON 完整（含有失敗的情況）→ 渲染報告到 `docs/evidence/fe-o08/<YYYY-MM-DD>-<後端 SHA 前 7 碼>-<前端 SHA 前 7 碼>.md`，
-  結束碼沿用 vitest 的；
-- 目標檔已存在 → MUST NOT 覆寫，結束碼非零、訊息含路徑；
-- 前端工作樹不乾淨 → 檔名多一段 `-dirty`，報告首行寫明；`-dirty` 的報告 MUST NOT 進版控（單元測試掃 `docs/evidence/fe-o08/`）。
-暫存檔 SHALL 在 finally 清除。報告內容 SHALL 含：後端 SHA、前端 SHA、每一條 `key` 的通過與否、失敗訊息、
-〈送回後端〉節（`report: true` 的 `key`）；MUST NOT 複製期望表的說明全文。後端 SHA 拿不到（空字串）視同 JSON 缺席。
+- JSON 完整（含有失敗的情況）→ 渲染報告，檔名 `<YYYYMMDD>T<HHMMSS>Z-<後端 SHA 前 7 碼>-<前端 SHA 前 7 碼>.md`
+  （UTC 時間；同一秒不會跑兩次），結束碼沿用 vitest 的；
+- 前端工作樹乾淨 → 落在 `docs/evidence/fe-o08/`（進版控的證據）；不乾淨 → 落在 `.local/rehearsal/`（已 gitignore），
+  報告首行寫明 dirty。**證據目錄裡永遠只有乾淨工作樹產的報告**，不靠掃描、不靠人記得刪；
+- 目標檔已存在（時鐘倒退之類）→ MUST NOT 覆寫，結束碼非零、訊息含路徑。
+暫存檔 SHALL 在 finally 清除。報告內容 SHALL 含：後端 SHA、前端 SHA、每一條 `key` 的 `passed`／`failed`／`blocked`、
+失敗訊息、〈送回後端〉節（`report: true` 的 `key`）；MUST NOT 複製期望表的說明全文。後端 SHA 拿不到（空字串）視同 JSON 缺席。
 
 #### Scenario: [FE-O08-S07] 報告渲染
 
 - **WHEN** 給 `renderReport()` 一份含通過與失敗的 vitest JSON、兩個 SHA、日期、dirty 旗標
-- **THEN** 輸出含兩個 SHA、每個 `key` 一行標示通過／失敗、失敗那行含錯誤訊息、〈送回後端〉列出 `report: true` 的 `key`；dirty 時首行寫明
+- **THEN** 輸出含兩個 SHA、每個 `key` 一行標示 `passed`／`failed`／`blocked`（訊息以 `blocked:` 開頭的算 blocked）、失敗那行含錯誤訊息、〈送回後端〉列出 `report: true` 的 `key`；dirty 時首行寫明
 
-#### Scenario: [FE-O08-S08] 半份報告不產、撞名不覆寫、有失敗照樣產
+#### Scenario: [FE-O08-S08] 半份報告不產、撞名不覆寫、有失敗照樣產、dirty 不進證據目錄
 
 - **WHEN** JSON 缺席、或不是合法 JSON、或後端 SHA 是空字串、或 vitest 被訊號終止
 - **THEN** `finishRehearsal()` 不寫任何檔案、回傳非零結束碼
@@ -134,14 +140,16 @@
 - **THEN** 報告寫出、內含失敗的 `key`，回傳 1
 - **WHEN** 目標檔已存在
 - **THEN** 檔案內容不變、回傳非零、訊息含路徑
+- **WHEN** dirty 旗標是 true
+- **THEN** 報告寫到 `dirtyDir`（`.local/rehearsal/`），`outDir`（證據目錄）裡沒有新檔
 
 ### Requirement: README 的差異清單跟期望表一致
 
-`docs/evidence/fe-o08/README.md` SHALL 分兩節列：〈前端要相容的契約〉（`kind: contract`）與〈送回後端裁定的異常〉
-（`kind: anomaly`），每一條寫 `key` 與接手的工作項目。它 MUST 跟期望表對得上：README 提到的每個 `key`
-存在於期望表且在正確的那一節；期望表 `report: true` 的每個 `key` 出現在 README。任一邊多或少或放錯節，單元測試 SHALL 失敗。
+`docs/evidence/fe-o08/README.md` SHALL 分三節列：〈前端要相容的契約〉（`kind: contract` 的**全部**）、〈送回後端裁定的異常〉
+（`kind: anomaly` 的**全部**）、〈送回後端〉（`report: true` 的全部，跨兩種 kind），每一條寫 `key` 與接手的工作項目。
+三節各自 MUST 跟期望表的對應集合**相等**（不多、不少、不錯置）；任一節不相等，單元測試 SHALL 失敗並指出 `key`。
 
 #### Scenario: [FE-O08-S09] 兩邊一致
 
-- **WHEN** README 少列一條 `report: true` 的 `key`、或多寫一個期望表沒有的 `key`、或把 `anomaly` 放進〈契約〉那一節
-- **THEN** 比對測試失敗，訊息含那個 `key`
+- **WHEN** README 的〈契約〉少列一條 `contract`、或〈異常〉多寫一個期望表沒有的 `key`、或把 `anomaly` 放進〈契約〉、或〈送回後端〉漏一條 `report: true`
+- **THEN** 比對測試失敗，訊息含那個 `key` 與那一節的名字
