@@ -55,11 +55,11 @@ export const EXPECTATIONS: readonly Expectation[] = [
   contract('list-default-recruiting', '`GET /api/projects` 不帶 status 只回 recruiting；`?status=active` 才回成軍的', { status: 200, defaultStatus: 'recruiting', filter: 'active' }, 'FE-J01'),
   contract('form-team-repeat', '成軍後再成軍 200 換密碼：舊密碼 enter 403、新密碼 200', { status: 200, oldPasswordEnter: 403, newPasswordEnter: 200 }, 'FE-J04'),
   anomaly('form-team-after-close', 'closed 之後成軍 200、狀態回到 active、`/api/rooms` 再含它', { status: 200, projectStatus: 'active' }, 'FE-J04'),
-  contract('seat-409-detail', '同一人再坐 409「你已經在這個房間有座位了」；坐別人的位 409「這個座位已經有人了」', { status: 409, seatIndex: 0, ownSeat: '你已經在這個房間有座位了', taken: '這個座位已經有人了' }, 'FE-J13'),
+  contract('seat-409-detail', '同一人再坐 409「你已經在這個房間有座位了」；坐別人的位 409「這個座位已經有人了」', { status: 409, seatIndex: 0, otherSeatIndex: 1, ownSeat: '你已經在這個房間有座位了', taken: '這個座位已經有人了' }, 'FE-J13'),
   contract('seat-out-of-range', 'seat_index ≥ seat_count 是 400，訊息含座位數', { status: 400, seatCount: 2, seatIndex: 2 }, 'FE-J13'),
   contract('owner-needs-enter', '發案者沒 enter 也看不到座位（403）', { status: 403 }, 'FE-J13'),
   contract('close-idempotent', '重複結案 200', { status: 200 }, 'FE-J04'),
-  contract('close-clears-seats', '結案後 `GET …/seats`（持有效 token）是 []', { status: 200, count: 0 }, 'FE-J04'),
+  contract('close-clears-seats', '結案後 `GET …/seats`（持有效 token）是 []', { status: 200, seatIndex: 0, count: 0 }, 'FE-J04'),
   anomaly('close-keeps-token', '結案後隊員用舊 token 仍能 `POST …/seats` 201', { status: 201, seatIndex: 0 }, 'FE-J13'),
 ]
 
