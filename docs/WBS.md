@@ -18,7 +18,7 @@
 | **ID** | 工作項目編號。change id 要以它開頭（小寫） |
 | **項目** | 模組名稱 |
 | **工作** | 一條可以認領的工作 |
-| **週** | **目前核准的相對執行順序，不是日期承諾。** 同一週內以表格順序或明示的依賴決定先後。寫 `—` 代表**沒有排程**（等外部或待裁決），它不計入「未開始」。缺口這一欄放的是 `決策≤Wn`，那是**決策期限，不是工期** |
+| **週** | **目前核准的相對執行順序，不是日期承諾。** 同一週內以表格順序或明示的依賴決定先後。寫 `—` 代表**沒有排程**（等外部或待裁決），它不計入「未開始」。**2026-09-17 起到 demo 為止，執行順序以〈demo 之前的核准順序〉那一節為準**，那一節列到的項目週次已對齊；沒列到的排在整份順序之後。缺口這一欄放的是 `決策≤Wn`，那是**決策期限，不是工期** |
 | **點** | 估點 |
 | **阻塞** | 這一列要跟外部對齊什麼：`待銜接`（本地先做了，之後要對齊）／`後端行為有誤`／`BE-拒`（後端明文不做，做了上不了線）／`待裁決`／`外部`，前面接缺口的 ID。**填了這一欄不代表做不了** —— 缺口清單在 `BE-G` |
 | **標記** | 人為決定，見下 |
@@ -80,6 +80,8 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-B04 | 已封存 | `fe-b04-talent-directory` |
 | FE-B09 | 已封存 | `fe-b09-deep-link` |
 | FE-K01 | 已封存 | `fe-k01-inbox` |
+| FE-K04 | 已封存 | `fe-k04-scene-chat-ui` |
+| FE-N08 | 已封存 | `fe-n08-room-entry-gate` |
 | FE-O01 | 已封存 | `fe-o01-contract` |
 | FE-O02 | 已封存 | `fe-o02-data-access` |
 | FE-O03 | 已封存 | `fe-o03-internal-backend` |
@@ -88,7 +90,8 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-O06 | 已封存 | `fe-o06-limit-source` |
 | FE-O09 | 已封存 | `fe-o09-env` |
 | FE-O11 | 已封存 | `fe-o11-coverage`、`fe-o11-evidence` |
-| FE-O14 | 已封存 | `fe-o14-drop-preview-notice`、`fe-o14-preview-deploy` |
+| FE-O20 | 已封存 | `fe-o20-path-params` |
+| FE-O21 | 已封存 | `fe-o21-boundary-lint` |
 | FE-R01 | 已封存 | `fe-r01-realtime` |
 | FE-R02 | 已封存 | `fe-r02-protocol` |
 | FE-R03 | 已封存 | `fe-r03-position-sync` |
@@ -97,7 +100,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-R07 | 已封存 | `fe-r07-remote-players` |
 | FE-R08 | 已封存 | `fe-r08-interpolation` |
 | FE-R09 | 已封存 | `fe-r09-browser-load` |
+| FE-R11 | 已封存 | `fe-r11-realtime-chat` |
 | FE-T06 | 已封存 | `fe-t06-output-safety` |
+| FE-V01 | 已封存 | `fe-v01-scene-switch` |
 | FE-W01 | 已封存 | `fe-w01-worldcanvas` |
 | FE-W02 | 已封存 | `fe-w02-coords` |
 | FE-W03 | 已封存 | `fe-w03-player`、`fe-w03-render-interpolation` |
@@ -109,6 +114,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-W10 | 已封存 | `fe-w10-environment-components` |
 | FE-W11 | 已封存 | `fe-w11-guild-hall` |
 | FE-W12 | 已封存 | `fe-w12-interactive-objects` |
+| FE-W16 | 已封存 | `fe-w16-project-room` |
 | FE-W19 | 已封存 | `fe-w19-avatar-appearance` |
 | FE-X01 | 已封存 | `fe-x01-appshell` |
 | FE-X03 | 已封存 | `fe-x03-error-vocabulary` |
@@ -121,6 +127,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-O10 | 已完成 | 標記 `Done` |
 | FE-X08 | 已完成 | 標記 `Done` |
 | FE-A06 | 規格已合併 | `fe-a06-first-entry` |
+| FE-O14 | 規格已合併 | `fe-o14-drop-preview-notice`、`fe-o14-preview-deploy`、`fe-o14-rest-build-gate` |
 | FE-R04 | 規格已合併 | `fe-r04-background-tab` |
 | FE-R10 | 規格已合併 | `fe-r10-presence` |
 | FE-O18 | 常態 | — |
@@ -143,7 +150,6 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G26 | 等外部 | — |
 | BE-G27 | 等外部 | — |
 | BE-G32 | 等外部 | — |
-| BE-G33 | 等外部 | — |
 | BE-G07 | 已取消 | — |
 | BE-G08 | 已取消 | — |
 | BE-G15 | 已取消 | — |
@@ -151,9 +157,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | BE-G18 | 已取消 | — |
 | BE-G19 | 已取消 | — |
 
-共 175 項：未開始 98、已封存 44、等外部 17、已取消 6、已完成 4、規格已合併 3、待裁決 2、常態 1
+共 177 項：未開始 93、已封存 50、等外部 17、已取消 6、已完成 4、規格已合併 4、待裁決 2、常態 1
 
-來源指紋 `305b8c1092bbb7fe`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `4373537afa3ea48a`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -325,6 +331,85 @@ bash .github/scripts/wbs-page.sh --open
 
 ---
 
+## demo 之前的核准順序（2026-09-17）
+
+> **主軸：後端已經提供的每一個端點與 WS 訊息，前端都要有對應的、使用者做得到的操作。**
+> 這是使用者 2026-09-17 三輪修正後定下的（第一輪只到「觀看」、第二輪漏掉整組案件 API，
+> 兩輪都被打回）。原話：「你要把這些 api 實作的功能都完成」。
+>
+> 三條規則，改動任何排程之前先讀：
+>
+> 1. **要靠後端沒有的 API 才動得了的功能，demo 之前不開。** 不是砍需求，是延後 ——
+>    那些列照原樣留在各組（週次、阻塞、標記都不動），並在下面〈demo 之後〉列成一份，
+>    免得有人再排進來。「後端沒有」的判準是 `src/api/contract/schema.d.ts` 沒有那個操作。
+> 2. **純前端做得到的照做**（視覺、載入、名字牌、狀態 UI、斷線復原）——
+>    「後端沒有」不是它們的理由。
+> 3. **沒有後端的入口不上畫面，連灰掉的按鈕都不放**（使用者原話：「目前後端那邊沒有規劃，
+>    可以先隱藏，不然也沒辦法使用」）。2026-09-17 盤過 `src/`：今天畫面上沒有這種入口，
+>    之後也不准出現。
+
+後端 `c6f3928` 的端點對前端功能的覆蓋（**未接的那六個 REST 操作就是這一輪的主體**）：
+
+| 端點／訊息 | 前端今天 | 去哪一項補 |
+|---|---|---|
+| `POST /api/login` 三種模式、`POST /api/register`、`GET /api/me` | 有 | 三種登入去向不一致 → `FE-A06` 補一刀 |
+| `GET /api/profiles`、`GET /api/profiles/{id}`、`PATCH /api/profiles/me` | 有 | — |
+| `GET /api/projects` | 半：看板只列標題一行 | `FE-B02` |
+| `GET /api/projects/{id}` | 無 | `FE-B03` |
+| `POST /api/projects` | 無 | `FE-J01` |
+| `POST /api/projects/{id}/form-team`、`POST /api/projects/{id}/close` | 無 | `FE-J04` |
+| owner 找自己的案子（前端用 `owner_id` 過濾） | 無 | `FE-J03` |
+| `GET /api/rooms`、`POST /api/projects/{id}/enter` | 有 | — |
+| `GET /api/projects/{id}/seats`、`POST /api/projects/{id}/seats` | 無 | `FE-J13` |
+| `POST /api/messages`、`GET /api/messages` | 有：收件匣、人才頁私訊 | 案件頁私訊、對話串 → `FE-K01` 補一列 |
+| WS `move`／`pos`／`snapshot`／`chat` | 有 | — |
+| WS `presence`（`name`、`av`） | 半：外觀畫了、名字沒畫 | `FE-W08` 的名字那一列 |
+| WS `status` | 無：收得到、沒 UI 送也沒畫 | `FE-K05` |
+| 斷線重連（後端每次重部署 WS 全斷） | 無 | `FE-R12` |
+
+**順序**（做完 #3～#9 就能在閘道上從頭演：取名 → 發案 → 看板 → 詳情、私訊發案者 →
+成軍設密碼 → 門 → 進房坐位 → 結案）：
+
+| 順序 | 工作項目 | 使用者能做什麼 | 點 |
+|---|---|---|---|
+| 0 | 這份 governance ＋ `archive/fe-o14-rest-build-gate` | — | 2 |
+| 1 | `FE-O08` 演練 | 用真後端量 form-team／close／seats 的實際狀態碼與 409 內容 —— **#3～#8 的規格靠這個** | 4 |
+| 2 | `FE-A06` 入口一致 | 三種登入都直接進世界 | 3 |
+| 3 | `FE-J01` 建案 | 看板旁「發案」→ 送出立刻上看板 | 6 |
+| 4 | `FE-B02` 案件卡片 | 標題、需要技能、狀態、剩幾天、座位數 | 5 |
+| 5 | `FE-B03` 案件詳情 | 描述、發案者名片、「私訊發案者」；owner 看到成軍／結案鈕 | 8 |
+| 6 | `FE-J04` 成軍／結案 | 設密碼成軍 → 門出現、密碼可複製與一鍵私訊；結案門消失 | 5 |
+| 7 | `FE-J03` 我的案件 | 我發的案子、各自狀態、直達成軍／結案 | 4 |
+| 8 | `FE-J13` 座位 | 進房看誰坐哪、一鍵入座、被搶有提示 | 7 |
+| 9 | `FE-K01` 補片 | 案件頁私訊、對話串、回覆 | 3 |
+| 10 | `FE-K05` 狀態 | 快捷狀態＋自由輸入，別人看得到 | 5 |
+| 11 | `FE-W08` 名字牌 | 附近的人頭上有名字（只畫附近／鏡頭內） | 3 |
+| 12 | `FE-R12` 斷線復原 | 後端重部署不用重整、沒鬼影 | 13 |
+| 13 | `FE-X15` 首屏載入 ＋ `FE-O12` | 打開就有畫面、按鍵有反應；Rapier 與面板延後載 | 12 |
+| 14 | `FE-W20` 看板摘要 | 不按 E 也看得出看板有沒有案子 | 8 |
+| 15 | `FE-O15` 發表準備 | 固定腳本、reset 策略、rehearsal | 17 |
+| 16 | `FE-X09`、`FE-W14` | 弱裝置、好看 | 15 |
+
+每一項都走 spec → feat → archive，看得見的功能要有真瀏覽器 e2e，每個 PR 回報一句效能影響
+（基線：`/world` HTML 293 ms、canvas 1315 ms、18 個資源 998 KB、最大 chunk 711 KB 是 Rapier）。
+
+**demo 之後**（要靠後端沒有的 API；對應的缺口在括號裡）：
+`FE-M01`–`FE-M10`、`FE-N01`–`FE-N07`（`BE-G10` 應徵／邀請／Offer 沒有模型）；
+`FE-J02`、`FE-J05`–`FE-J12`（`BE-G10`、`BE-G22` 生命週期只有三態）；
+`FE-J14`（`BE-G12`，別人負責）；`FE-B05`–`FE-B07`（`BE-G05`、`BE-G23`）；
+`FE-K02`、`FE-K03`（`BE-G11`）；`FE-K01` 的已讀那一列（`BE-G06`）；
+`FE-T01`–`FE-T05`（`BE-G24`、`BE-G15`）；`FE-A03`、`FE-A07`（`BE-G26`）；
+`FE-V02`–`FE-V06`、`FE-V08`–`FE-V14`（`BE-G27`、`BE-G09`、`BE-G13`、`BE-G14`）；
+`FE-B10` 的回訪入口（`BE-G01`、`BE-G23`）。
+其餘沒列在上表、也不在這一段的項目（例如 `FE-W09`、`FE-W10`、`FE-W17`、`FE-W18`、
+`FE-V07`、`FE-X10`）是純前端可做，排在上表之後，不是不做。
+
+**送回後端的清單**（`FE-O08` 之後一併送）：`BE-G10` 什麼時候有（第一條）；`BE-G27` 活動物件；
+Demo reset；重部署時的 close code；room token TTL；`/api/rooms` 只回 active 與 seed 房間穩定性；
+nickname 超過 20 字回 500 不是 422；座位 409 要分「被搶」與「已坐別格」；demo 期間不重部署。
+
+---
+
 ## BE-G 後端銜接清單
 
 > **這一組不擋任何前端工作。**
@@ -469,14 +554,14 @@ bash .github/scripts/wbs-page.sh --open
 | FE-O10 | CI 補齊 | scaffold 之後**立刻**把 `Lint` / `Typecheck` / `Test` / `Build` 放回 `ci.yml`（檔案裡有註記） | W1 | 3 | | Done｜governance PR #58，commit ae78a12c。治理工作對不到 change，狀態算不出來 |
 | FE-O11 | 測試策略 | 單元 / component（Testing Library）/ E2E（Playwright）的分工與比重；3D 怎麼測 —— 哪些值得 E2E，哪些只驗 store 與純函式 | W1 | 8 | | |
 | | | **測試環境隔離**：只准打自己 `./run.sh` 起的後端。一次 40 連線的壓測足以把共用實例的人全部踢下線 | W1 | 2 | | |
-| FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`） | W5 | 7 | | |
+| FE-O12 | 效能預算 | FPS、Draw Calls、Memory、WebSocket 流量、bundle size、首次載入、3D 初始化時間的**數字目標**，超過就紅。（40 人渲染的量測在 `FE-W13`；首屏的載入順序在 `FE-X15`） | W7 | 7 | | |
 | FE-O13 | 視覺回歸 | 3D 畫面怎麼測 —— 截圖比對還是只測 DOM。**先決定，不要做一半** | W5 | 4 | | |
 | FE-O14 | 部署與環境 | 部署在哪、preview 連哪個後端、環境變數注入。**設定錯誤在建置時就紅** —— 以前是建置綠燈、部署成功、線上白畫面 | W1 | 4 | | |
 | | | 即時後端要部署在**常駐容器**（Railway／Render／Fly），不是 Vercel：Vercel 的 WebSocket 連線被釘在個別 function instance，跨實例要 Redis，不接就會形成兩個互不相見的房間。現有的 FastAPI 已經是那個形狀，一行都不用改 | — | — | | Pending｜需要帳號與帳單決策，不是程式碼 |
-| FE-O15 | 發表準備 | Demo fake data、固定流程、Demo reset；World 預載、異常 fallback、完整 E2E rehearsal | W5 | 7 | | |
-| | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W5 | 2 | | Alarm｜發表當天最不想踩的地雷 |
-| | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W5 | 5 | | |
-| | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W5 | 3 | | |
+| FE-O15 | 發表準備 | 固定 demo 腳本（照〈demo 之前的核准順序〉那條閉環）、World 預載、異常 fallback、完整 E2E rehearsal。**Demo reset 在真後端做不到**（沒有端點）—— 策略改成固定 `resume_token` 的名片 ＋ demo 前一天新建的案件 | W8 | 7 | | |
+| | | **Demo 資料與正式資料的隔離** —— reset 會不會動到真的東西 | W8 | 2 | | Alarm｜發表當天最不想踩的地雷 |
+| | | Local fake player（spawn / wander / idle at board、status rotation）。**不進 DB、不送 WebSocket** | W8 | 5 | | |
+| | | 走完一次完整流程並留下 evidence（不是只說「已完成」） | W8 | 3 | | |
 | FE-O19 | 契約哨兵的新鮮度 | `src/api/contract/schema.d.ts` 是**人工**重產的，`GENERATED.md` 檔頭就寫著「這個哨兵會過期，而且不會有人告訴你」。⚠️ **2026-09-10 證實了那句話**：後端從 `27c3077` 走到 `cd2929c`（六個 commit、兩天），期間 `drift.ts` 一路綠燈；重產之後**立刻紅了兩處**（`_coverage` 少了 `RegisterIn`、`_LoginIn` 的 `nickname` 從必填變選填）。要做的是「CI 從一份**釘住版本的**後端 OpenAPI 重產，並要求工作樹零差異」——不是叫 CI 連活的後端（`AGENTS.md`：CI 不提供任何服務）。判準：改掉後端的任一 endpoint／method／entity 而不更新產出物，CI 必須紅 | W3 | 5 | | Alarm｜**它綠得合乎設計，所以沒有人會發現它過期** |
 | FE-O20 | 路徑參數的型別約束 | `RequestSpec.params` 現在是 `Record<string, string>`，**收任何鍵**。把 `profile_id` 打成 `id` 的話 `path.replace('{id}', …)` 找不到東西，客戶端會送出字面值 `/api/profiles/{profile_id}` 然後靜靜吃 404。**兩個審查者獨立指到同一個洞**，而它跟 `FE-A01` 那條「method 與 path 必須存在於產出契約」的判準是同一個缺陷類別（`path` 已經綁進型別了，`params` 沒有）。做法：用 template literal type 從路徑萃取 `{param}`，強制 `params` 的鍵完全吻合。⚠️ **期限不是「有空再說」：W3 第一個帶路徑參數的功能開工之前。** 今天沒有阻塞，是因為 `FE-A01` 只用 `POST /api/login` 與 `GET /api/me`，兩個都沒有路徑參數 | W3 | 3 | | TBD｜`FE-A01` 談定的處置（tasks 5.5）：不進那個 change，獨立追蹤 |
 | FE-O21 | 架構邊界的強制 | `docs/adr/0005`（僅約定）與 `docs/adr/0006`（已知缺口）各寫了一條同樣的路：`eslint.config.js` 加一段 `no-restricted-imports`，把「`src/config/env.ts` 不得 import `@/api/*`」「`src/api/contract/**` 不得 import `@/config/*`」「`src/**` 只有 `src/world/RemoteWorld.tsx` 可以 import `@/realtime/client` 的值（type import 放行）」三條從「大家都這樣寫」變成「不這樣寫會變紅」；配一條 `lintText` 虛擬檔案的測試（寫法照 `FE-O09` 那條 env lint 測試）。**正式碼零行**，不改 `realtime-client` 的 Purpose。做完把 0005／0006 的邊界狀態改「已強制」、證據改指到那條測試（`arch-view.sh` 會驗）。判準：在 `src/world/PositionSync.tsx` 寫 `new RealtimeClient(`，lint 必須紅在那條規則，不是紅在別處。它鎖的是 import，不是「進 `RemoteWorld` 之後有沒有先驗證」—— 那半截仍由 review 守，ADR 要寫明 | W3 | 3 | | |
@@ -518,11 +603,11 @@ bash .github/scripts/wbs-page.sh --open
 | ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 |
 |---|---|---|---|---|---|---|
 | FE-B01 | 共用清單容器 | Panel Layout、列表、**`page` 翻頁**（0-based、`PAGE_SIZE=20`，沒有 total／`has_more`／`limit` —— 端點收的是 `page`，換算成 SQL offset 是後端內部的事；**沒有 `limit` 代表不能多抓一筆探測有沒有下一頁**）、Loading／Error／Escape。**案件與人才共用這一個**，不要各做一份 | W2 | 8 | | |
-| FE-B02 | 案件列表 | 卡片要能一眼判斷：標題、需求技能、**還缺哪些角色**、預算範圍、期程、發案者、剩幾天到期、已幾人應徵 | W6 | 5 | | |
-| | | 排序：最新／即將到期／符合度 | W6 | 3 | | |
-| FE-B03 | 案件詳情 | 描述、需求技能、**Open Roles**（職責／技能／每週工時／報酬形式）、期程、目前狀況（幾人應徵、哪些角色已補滿、招募是否暫停） | W6 | 8 | | |
+| FE-B02 | 案件列表 | 卡片要能一眼判斷：標題、需要技能（`needed_skills`）、狀態（招募中／已成軍／已結案）、剩幾天到期（`expires_at`，建立後 7 天）、座位數。⚠️ **2026-09-17 縮成後端有的欄位**：沒有 Open Role、預算、期程、應徵數（`BE-G10`、`BE-G20`、`BE-G21`），卡片上不放 | W5 | 5 | | |
+| | | 排序：最新／即將到期／符合度 | — | — | BE-G05 待銜接 | Pending｜後端只有 `page`，排序要等後端；demo 之前不做 |
+| FE-B03 | 案件詳情 | `GET /api/projects/{id}`：描述、需要技能、狀態、到期、座位數、發案者名片（`GET /api/profiles/{owner_id}`）、**「私訊發案者」**（`POST /api/messages`）；owner 看到成軍／結案的入口（動作本身在 `FE-J04`）。⚠️ **2026-09-17 縮成後端有的欄位**：沒有 Open Roles、期程、應徵狀況（`BE-G10`、`BE-G21`） | W5 | 8 | | |
 | | | 發案者資訊：帳號年齡、發過幾個案子、回覆率、平均回覆時間、目前團隊。**陌生人憑什麼相信他** | W10 | 4 | BE-G24 待銜接 | |
-| | | 動作列。**只放這一週已經存在的動作** —— 收藏在 W12、檢舉在 W11，那之前不要放灰掉的按鈕 | W6 | 3 | | Alarm｜之前這一列寫了還不存在的動作 |
+| | | 動作列。**只放後端今天做得到的動作**（私訊、成軍、結案、進房）—— 收藏、檢舉、應徵沒有後端，**不放灰掉的按鈕** | W5 | 3 | | Alarm｜之前這一列寫了還不存在的動作 |
 | FE-B04 | 人才列表與詳情 | 讀取 profiles、Talent Card、Detail。**人才端不能只有讀取** —— 發案者的工作區在 `FE-M06` | W2 | 6 | | |
 | FE-B05 | 搜尋與篩選 | 技能、每週工時、可開始時間、時區、預算範圍、角色類型。本地後端自己做 | W6 | 8 | BE-G05 待銜接 | |
 | | | **真後端只有 20 筆 offset 翻頁**，銜接時這一項會退化。UI 要能誠實降級成「瀏覽」 | W6 | 3 | BE-G05 待銜接 | Alarm｜本地做得到、真後端做不到的典型 |
@@ -609,14 +694,14 @@ bash .github/scripts/wbs-page.sh --open
 
 | ID | 項目 | 工作 | 週 | 點 | 阻塞 | 標記 | 負責人 |
 |---|---|---|---|---|---|---|---|
-| FE-J01 | 建立案件 | 標題、描述、需求技能、**逐個 Open Role**、期程（開始日／長度／時區需求／緊急程度／一次性或長期）、預算範圍與計價方式、招募截止日 | W6 | 10 | BE-G21 待銜接 | | |
+| FE-J01 | 建立案件 | `POST /api/projects`（`ProjectCreate`：`title`、`body`、`needed_skills[]`、`seat_count`）；送出後立刻出現在看板與列表，7 天後自動過期（後端算 `expires_at`）。⚠️ **2026-09-17 縮成後端有的欄位**：Open Role、期程、預算、招募截止日全部沒有模型（`BE-G10`、`BE-G20`、`BE-G21`），表單上不放；`title`／`body`／`skills` 的上限前端自己訂（`FE-X05`） | W5 | 6 | | | |
 | | | 草稿與發布分開。發布前預覽「別人會看到什麼」 | W6 | 3 | | | |
 | FE-J02 | 編輯已發布的案件 | 改描述、改條件、新增／修改／關閉／重開 Open Role、延長或提前結束招募 | W7 | 8 | | | |
 | | | 觸發入口：改了之後**套用 `FE-M01` 定義的規則**，**這裡不另外發明一套** | W7 | 4 | | | |
-| FE-J03 | 我的案件 | 案件擁有者的管理首頁：我發的每個案子、各自幾人應徵、哪些角色還缺、要處理什麼 | W7 | 6 | | | |
+| FE-J03 | 我的案件 | 案件擁有者的管理入口：我發的每個案子、各自的狀態（招募中／已成軍／已結案）、直達成軍／結案。後端沒有 owner 篩選，前端用 `owner_id` 過濾已載入的頁面並誠實標明。⚠️ **2026-09-17 縮成後端有的欄位**：沒有應徵數、沒有「還缺哪些角色」（`BE-G10`） | W5 | 4 | | | |
 | | | 複製舊案件重新發布 | W12 | 3 | | | |
-| FE-J04 | 案件招募狀態 | 招募中／暫停／取消，各自的 UI 與後果（暫停時還能不能收應徵？） | W7 | 5 | BE-G22 待銜接 | | |
-| | | **「已補滿」不是這裡設的，是所有 Open Role 都補滿時聚合推導出來的** —— 案件層只能暫停或取消，不能手動宣稱補滿 | W7 | 3 | | Alarm｜兩層各有一個「已補滿」的話一定會不一致 | |
+| FE-J04 | 成軍與結案 | 後端只有 `recruiting → active → closed`。**成軍**：`POST /api/projects/{id}/form-team`（owner 設房間密碼）→ 狀態 active、大廳長出門（`GET /api/rooms`）、密碼可複製並一鍵私訊給隊員。**結案**：`POST /api/projects/{id}/close` → 門消失、座位整批清掉（`BE-G07`）。⚠️ **2026-09-17 改寫**：原本的「暫停／取消／已補滿」要靠 `BE-G22` 拆開的生命週期，demo 之前不做 | W5 | 5 | | | |
+| | | 招募中／暫停／取消與「已補滿」的聚合推導（案件層只能暫停或取消，不能手動宣稱補滿） | — | — | BE-G22 待銜接 | Pending｜等後端拆開生命週期；兩層各有一個「已補滿」的話一定會不一致 | |
 | FE-J05 | 執行狀態 | 準備中／進行中／待驗收／已完成／中止。**跟招募狀態是兩條獨立的線** | W10 | 5 | BE-G22 待銜接 | Alarm｜不拆的話算不出完成紀錄，信任訊號整層做不了 | |
 | FE-J06 | 狀態轉移規則 | **誰能改、從哪個狀態能改到哪個、改動可不可逆。** 光列狀態名稱不夠 | W10 | 6 | | Alarm｜狀態很多但轉移規則不完整，是最容易出爭議的地方 | |
 | FE-J07 | 團隊名單與角色 | 誰在隊上、擔任哪個角色、角色調整、同一人多角色、替補與重新開缺 | W10 | 8 | BE-G10 待銜接 | | |
@@ -626,7 +711,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-J10 | 團隊脈搏 | Project Room 現在只有外部連結，那是書籤不是工作脈絡。要能回答：目前目標、最近發生什麼、下一個里程碑、誰在做什麼、需要什麼協助、新成員怎麼進入狀況 | W11 | 8 | BE-G12 待銜接 | | |
 | | | **不做完整專案管理** —— 但沒有脈搏，Office 的 Presence 就沒有可讀內容 | W11 | 3 | | | |
 | FE-J11 | 市場有效期 | 案件到期、招募需求定期確認、人才可用狀態過期、長期未回覆降權、「目前仍在招募」重新確認 | W12 | 6 | BE-G19 `BE-拒` | Alarm｜**「資料還有效嗎」比搜尋功能多寡更重要**，但後端排除了到期排程 | |
-| FE-J13 | 座位 | Seat List / Claim / Occupied（`seat_index` 0–7，一人一格）、衝突處理 | W4 | 7 | | | |
+| FE-J13 | 座位 | `GET`／`POST /api/projects/{id}/seats`：進房看誰坐哪、一鍵入座、Occupied（`seat_index` 0–7，一人一格）、被搶或已坐別格的 409 提示（先在 `FE-O08` 量出後端怎麼分） | W5 | 7 | | | |
 | | | 釋放座位 | — | — | BE-G07 `BE-拒` | Cancelled｜後端明文砍除，不是漏做。只有結案會整批清 | |
 | FE-J14 | 專案資源 | Project Room 的資源看板：GitHub / Figma / Notion / Drive / Meeting 外部連結，含 icon / type / URL 驗證與 External Open | W11 | 8 | BE-G12 待銜接 | | 小玉 |
 | FE-J12 | 既有後端的相容對映 | 真後端只有 `recruiting → active → closed` 三個狀態。**目標模型（招募 × 執行）要怎麼映射回去** —— 銜接時一定會撞到 | W10 | 5 | BE-G22 待銜接 | Alarm｜不先想好，銜接那天要重做整組狀態 | |
@@ -643,6 +728,7 @@ bash .github/scripts/wbs-page.sh --open
 |---|---|---|---|---|---|---|
 | FE-K01 | Inbox | 清單、詳情、寄信。**收件與寄件混在同一份清單**（後端如此）、對話分組、對方名稱解析、分頁交錯 | W2 | 9 | | |
 | | | **不可 Edit / Delete**（immutable，後端明文排除） | W2 | 1 | | |
+| | | 案件頁「私訊發案者」的入口、按對方分成對話串、在串裡回覆（同一個 `POST /api/messages`，`fe-k01-inbox` 已封存，另開 change） | W5 | 3 | | |
 | | | 已讀／未讀與未讀數 | W7 | 4 | BE-G06 待銜接 | |
 | FE-K02 | 交易必要通知 | 通知機制本身 ＋ 顯示位置（全域未讀標記 ＋ 我的應徵／我的邀請頁上的標記） | W7 | 6 | BE-G11 待銜接 | Alarm｜**沒有這個，W7 之後的媒合流程等於要使用者自己一直重整** |
 | | | 應徵類事件：被查看、被婉拒、被邀請洽談 | W7 | 3 | | |
@@ -652,7 +738,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-K03 | 回訪通知 | 新案件符合你的條件、收藏的案件有動靜、儲存的搜尋有新結果 | W12 | 5 | BE-G23 待銜接 | |
 | | | 管道（站內／email／推播）之後決定。**先決定「訂閱什麼」** | W12 | 2 | | |
 | FE-K04 | 場景 chat | Lobby / Room chat UI、訊息列表、輸入框；場景切換清理。**不落 DB，refresh 清空** | W3 | 5 | | |
-| FE-K05 | 狀態文字 | 快捷狀態、自由輸入、**12 字硬限制**、清除；透過 WS 同步 | W3 | 5 | | |
+| FE-K05 | 狀態文字 | 快捷狀態、自由輸入、**12 字硬限制**、清除；透過 WS `status` 同步，別人頭上看得到（渲染跟 `FE-W08` 的名字牌共用）。**不是 Looking For**（那是 `FE-M10`，要 `BE-G14`） | W6 | 5 | | |
 
 ---
 
@@ -698,7 +784,7 @@ bash .github/scripts/wbs-page.sh --open
 | FE-W07 | 資源生命週期 | 場景切換時 geometry / material / texture 的釋放；**重複進出十次記憶體不得成長**（可量測的驗收） | W1 | 3 | | |
 | | | Rapier world 與 R3F tree 的拆除順序 | W4 | 3 | | |
 | FE-W08 | ProceduralAvatar | Head / Hair / Body / Arms / Legs 模組化 Chibi Avatar；Idle / Walk 正式版，Local 與 Remote 共用。**另外接手：把遠端玩家的名字畫出來。** 協定早就送得到（`FE-A01` 實測 snapshot 是 `{"name":"名字測試員",…}`），但世界從來沒有讀過它 —— 那條驗收原本誤放在 `FE-A01` 的 tasks 4.2，封存前兩個審查者一致認定它超出 `FE-A01` 已合併的 17 條 Scenario（那些只講**自己**的名字）。這一列負責**渲染能力**，雙瀏覽器互見的驗收在 `FE-R10` | W3 | 10 | | |
-| | | 顯示 Display Name / Status | W3 | 2 | | Alarm｜後端已修（`BE-G02`），但**前端不登入就仍然全是「訪客」** —— 先做 `FE-A02` |
+| | | **名字牌**：把 `presence`／`snapshot` 的 `name` 畫在遠端玩家頭上，只畫附近／鏡頭內的，Status 由 `FE-K05` 接上同一塊牌子。可以不等 ProceduralAvatar 那 10 點 | W6 | 3 | | Alarm｜登入已做（`FE-A01`、`FE-A06`），名字送得到；**只剩沒畫**。雙瀏覽器互見的驗收在 `FE-R10`（別人負責） |
 | FE-W09 | WorldDesignSystem | 3D 色票、材質、比例、圓角、Outline、Shadow 規範（**所有場景元件只能用統一 tokens**）；RoundedBox / Capsule / Sphere / Cylinder primitive；StylizedMaterial / Outline / Shadow conventions | W3 | 11 | | |
 | FE-W10 | EnvironmentComponents | Floor / Wall / Carpet / Platform；Desk / Chair / Shelf / Plant / Lamp / Sign；GuildBanner / ProjectBoard / TalentBoard / Door | W3 | 15 | | |
 | FE-W11 | Guild Hall | spawn、Board、社交區、Corridor 配置；簡化 Collider 與固定 Camera 構圖驗證 | W3 | 14 | | |
@@ -707,9 +793,9 @@ bash .github/scripts/wbs-page.sh --open
 | FE-W17 | 視覺分區 | Marketplace 與 Office 的配置 | W4 | 11 | BE-G09 待銜接 | Alarm｜先裁決「視覺分區」還是「伺服器 scene」，否則做出來名不符實 |
 | FE-W12 | 互動物件 | Project Board、Talent Board、Project Door（依 `GET /api/rooms` 生成，顯示名稱與在線數）。**Seat 移到 `FE-W16`** —— 座位綁專案，Guild Hall 不是專案 | W3 | 12 | | |
 | FE-W13 | 渲染預算 | 遠端角色的 instancing / LOD / 簡化。**40 人同畫面是架構決定，不是收尾優化**。量測與數字目標一起在這裡 | W5 | 10 | | |
-| FE-W14 | VisualPolish | 統一 Chibi / Toy-like 的色彩、圓角、Outline、Shadow；固定 Camera 下的構圖與可讀性；Avatar 組合檢查避免穿模 | W5 | 10 | | |
+| FE-W14 | VisualPolish | 統一 Chibi / Toy-like 的色彩、圓角、Outline、Shadow；固定 Camera 下的構圖與可讀性；Avatar 組合檢查避免穿模 | W8 | 10 | | |
 | FE-W18 | 牆面語意物件的可讀性 | **固定的 45° 俯視相機只看得見朝南或朝上的面** —— 貼在南北向牆上、面朝東西的東西在畫面上是一條細縫。量出來：`door-corridor` 螢幕橫向輪廓 0.22、`shelf-social` 0.40，而角色直徑是 0.5。做三件事：① 鋸齒狀西牆（每個槽位凹折出一個朝南的小牆面，門搬回牆上，全部維持 90° 整數倍）② 全域掃描判準（**必須區分結構牆與語意物件** —— 牆本來就該是細的）③ 修 `door-corridor` 與 `shelf-social` | W4 | 8 | | Alarm｜視角讓核心語意物件讀不出來，`CONTEXT.md`：分不出來的話 3D 就是一條很貴的導覽列 |
-| FE-W20 | 資料驅動的世界看板摘要 | 兩塊看板的固定卡槽顯示**第一頁前幾筆的可辨識摘要**（案件標題／人才名字），**不假裝知道 total**；看板自己的載入／錯誤／空三種呈現（跟 `FE-X04` 共用語彙）；世界物件的資料訂閱生命週期；「看板上的摘要」與「按 E 開出來的面板」一致性的判準。目的是讓**沒有開面板的人**遠遠就看得出「這裡現在有東西／沒東西／暫時讀不到」 | W4 | 8 | | Alarm｜`FE-B01` 做完之後看板唯一的 affordance 是走過去按 E —— `CONTEXT.md`：那是一條很貴的導覽列。這一列是那份規格 `design.md` `D5` 明寫交代不了的缺口，兩個外部審查者都判定它不屬於那 8 點 |
+| FE-W20 | 資料驅動的世界看板摘要 | 兩塊看板的固定卡槽顯示**第一頁前幾筆的可辨識摘要**（案件標題／人才名字），**不假裝知道 total**；看板自己的載入／錯誤／空三種呈現（跟 `FE-X04` 共用語彙）；世界物件的資料訂閱生命週期；「看板上的摘要」與「按 E 開出來的面板」一致性的判準。目的是讓**沒有開面板的人**遠遠就看得出「這裡現在有東西／沒東西／暫時讀不到」 | W7 | 8 | | Alarm｜`FE-B01` 做完之後看板唯一的 affordance 是走過去按 E —— `CONTEXT.md`：那是一條很貴的導覽列。這一列是那份規格 `design.md` `D5` 明寫交代不了的缺口，兩個外部審查者都判定它不屬於那 8 點 |
 | FE-W15 | 資產管線 | 紋理尺寸、壓縮、授權、快取、版本與 fallback | W5 | 4 | | |
 | | | 外部 GLB 使用規則：僅特殊物件、需符合色票與風格；必要時 Blender 簡化後導入 | W5 | 1 | | Pending｜預設不排入 MVP 工時 |
 
@@ -739,10 +825,10 @@ bash .github/scripts/wbs-page.sh --open
 | | | **只准打自己本機起的後端。** 後端已有 `tools/run_swarm.py --n 40 --seconds 300` 可直接調插值，`--n 5 --idle` 驗證靜止時封包數為 0 | W1 | 1 | | | |
 | FE-R10 | Presence | Online snapshot / player status / offline cleanup / online count。**另外接手一條驗收**：兩個瀏覽器（不是兩個分頁 —— 分頁共用 cookie）各登入一個名字，**互相看得見對方的名字**。原本誤放在 `FE-A01` 的 tasks 4.2，而 `FE-A01` 已合併的 17 條 Scenario 沒有任何一條要求它。⚠️ **依賴 `FE-W08` 的名稱渲染能力** —— 它做完之前這條驗收跑不了 | W3 | 6 | | TBD｜從 `FE-A01` 轉交過來的驗收，範圍與點數沒有改。**先後順序寫在〈跨項依賴〉** | 小玉 |
 | FE-R11 | RealtimeChat | Lobby / Room scene chat 送收；client memory 保留近期訊息，refresh 後清空 | W3 | 6 | | | |
-| FE-R12 | 斷線與復原 | 重連後重新握手、重建 snapshot、**清掉舊的 remote players 避免鬼影**；指數退避與 jitter | W5 | 5 | | | |
-| | | **重連後自己的位置會回到 (0,0)**，狀態文字被清空 —— 要重送 | W5 | 3 | | | |
-| | | 使用者看得見的連線狀態；**握手失敗只會被 close 1008，沒有 `err`**，UI 要能解釋 | W5 | 3 | | | |
-| | | room token **8 小時 TTL** 過期後要重新 `/enter` | W5 | 2 | | | |
+| FE-R12 | 斷線與復原 | 重連後重新握手、重建 snapshot、**清掉舊的 remote players 避免鬼影**（snapshot 前先清 roster）；**單一重連迴圈**、指數退避＋ full jitter。⚠️ 後端每次重部署 WS 全斷，demo 期間也可能發生 | W6 | 5 | | | |
+| | | **重連後自己的位置會回到 (0,0)**，狀態文字被清空 —— 要重送 | W6 | 3 | | | |
+| | | 使用者看得見的連線狀態；**握手失敗只會被 close 1008，沒有 `err`**，UI 要能解釋 | W6 | 3 | | | |
+| | | room token **8 小時 TTL** 過期後要重新 `/enter`（1008 時走 `/enter`，不是無限重連） | W6 | 2 | | | |
 
 ---
 
@@ -810,11 +896,12 @@ bash .github/scripts/wbs-page.sh --open
 | FE-X06 | 鍵盤與焦點 | **WASD 與輸入框會打架。** Modal、Escape、focus trap、螢幕閱讀器與 3D 輸入的焦點治理 | W2 | 5 | | Alarm｜晚做要改每一個面板 |
 | FE-X07 | 無障礙 | DOM 面板的 aria、對比、鍵盤路徑。**3D 世界不承諾無障礙，但產品核心流程必須能純 DOM 完成** | W5 | 5 | | |
 | FE-X08 | 裝置與降級 | 手機上 3D + WASD 不成立。**決定（2026-09-12）：DOM-only 模式**，不做虛擬搖桿、不做點地移動。理由：3D 的價值是「看見 → 靠近 → 旁聽」那條鏈，手機上面板一開就佔滿螢幕，鏈先天不成立；搖桿與點地都是把桌面的移動搬到更差的介面上，還把 `FE-X09` 的 iOS／效能問題整包提前到現在；產品核心流程本來就要能純 DOM 完成（`FE-X07`），看板／名片／收件匣／登入／深連結都在了。邊界（實作是 `FE-X14`，規格要照這個寫）：(1) 判定看**主要輸入是觸控**（`matchMedia('(pointer: coarse)')`），不看 UA、不看寬度；(2) DOM-only 下不掛 R3F／Rapier、不開世界 WS、沒有 presence，明說「完整的空間體驗在電腦上」；(3) iPad 等觸控平板一律 DOM-only；(4) 桌面小視窗**不**切模式（避免 WebGL context 反覆銷毀），3D 上蓋一層「放大視窗」的提示、已開的面板照常可用；(5) 判定錯了要有「試試完整空間」／「回到精簡模式」兩個入口並記住選擇；(6) 翻案條件：公開活動那條鏈在電腦上被證明成立、`FE-X09` 的 iOS 降級成熟、有專屬的行動版佈局與人力 —— 三者都有才重開 B／C 的比較，不預設選哪個 | W2 | 3 | | Done｜產品決定，對不到 change；codex gpt-5.6-sol 與 Gemini 3.1 Pro 各自獨立給出同一個結論（A）；governance PR 記錄。決定的內容寫在本列，`CONTEXT.md`〈已知的邊界與限制〉同步一句 |
-| FE-X09 | 相容矩陣 | WebGL2 偵測與友善提示、整合顯卡降級、**context lost**、`prefers-reduced-motion`、背景分頁節流、Safari / iOS | W5 | 5 | | |
+| FE-X09 | 相容矩陣 | WebGL2 偵測與友善提示、整合顯卡降級、**context lost**、`prefers-reduced-motion`、背景分頁節流、Safari / iOS | W8 | 5 | | |
 | FE-X10 | 降級模式 | REST 活著但 WS 掛了／WS 活著但 DB 掛了／3D 掛了 —— 每一種的產品行為 | W5 | 4 | | |
 | FE-X11 | 送出節流 | chat / status / 表單的前端節流。**後端沒有 rate limit**（BE-G16），這只擋得住守規矩的人 —— 要做，但不要當成防護 | W3 | 3 | | |
 | FE-X12 | i18n | 文案抽出、語言切換、日期時間與時區格式化 | W13–W16 | 6 | | |
 | FE-X14 | 行動版 DOM-only 模式 | `FE-X08` 決定的實作（原本是它的第二列；拆成自己的 ID 是因為決定已 `Done`、實作還沒開始，兩件事不該共用一個狀態）：`pointer: coarse` 判定、不進世界的 DOM 殼（看板／名片／收件匣／登入／深連結）、桌面小視窗的提示遮罩、「試試完整空間」／「回到精簡模式」兩個入口與記憶、`[Mobile]` 的線上狀態呈現（電腦版看得到但走不過去）。邊界照 `FE-X08` 那一列 | W13–W16 | 8 | | |
+| FE-X15 | 首屏載入順序 | 使用者打開 `/world` 到能動之間的順序：**DOM 殼先出來 → 身分 → 3D chunk → Canvas → WS**；Rapier（最大 chunk，711 KB）延後到 Canvas 之後才載；面板（看板／名片／收件匣）code-split、按 E 才載；載入中要有看得出在動的畫面，不是白屏。數字目標歸 `FE-O12`，這一列只管順序與拆分。⚠️ 2026-09-17 使用者：「不要讓使用者覺得卡或者讀取很慢」 | W7 | 5 | | Alarm｜今天是全部一起載：HTML 293 ms、canvas 1315 ms，中間什麼都看不到 |
 
 ---
 
@@ -828,7 +915,7 @@ bash .github/scripts/wbs-page.sh --open
 | **W2** | **自己的後端立起來，能跑 W1–W2 這一期的流程。** 本地 Route Handler 骨架 ＋ 可拋棄資料庫 ＋ 契約測試跑兩邊。加上登入、登出、Profile、Avatar、Inbox、共用清單容器。**後續的產品操作隨各能力追加**（Open Role 在 W6、invitation 在 W8⋯⋯），W2 不會有那些 |
 | **W3** | **Guild Hall 成形。** 統一風格的世界、Presence、場景 chat、狀態文字 |
 | **W4** | **專案空間。** 場景切換、Project Room、Project Door、座位 |
-| **W5** | **MVP 可發表。** 斷線復原、效能預算、降級模式、Demo 流程 |
+| **W5** | **案件閉環接上真後端**（2026-09-17 改）。`FE-O08` 演練 → 入口一致 → 建案 → 卡片 → 詳情與私訊 → 成軍／結案 → 我的案件 → 座位 → 對話串。**W6–W8 見〈demo 之前的核准順序〉**：狀態、名字牌、斷線復原、首屏載入、看板摘要、發表準備。⚠️ 底下 W6 起的里程碑是 2026-09-04 建在本地後端模型上的，**demo 之前不走** |
 | **W6** | **接案流程成立。** 順序是 `FE-J01` 建立案件 → `FE-M01` Open Role → `FE-B02/B03` 瀏覽與詳情 → `FE-M02` 應徵。**沒有案子就沒有東西可以應徵** —— 跨組的同一週要照這個順序 |
 | **W7** | **兩邊都追得到進度。** 我的應徵（七種狀態）、應徵者管理（分組、批次婉拒、已查看）、案件編輯與管理首頁、招募狀態、匹配訊號、媒合意圖、**交易必要通知** |
 | **W8** | **雙向媒合。** 候選名單、**主動邀請**、我的邀請、邀請的邊界 |
