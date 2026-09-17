@@ -5,7 +5,7 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-b02-project-card` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-b02-project-card --strict` 通過且 PR 已合併
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-b02-project-card` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-b02-project-card --strict` 通過且 PR 已合併 —— #492，main `23aaeb7`
 
 ## 2. 案件卡（`src/projects/ProjectCard.tsx`、`src/projects/projectStatus.ts`）—— Requirement〈案件卡讓人一眼判斷…〉
 
