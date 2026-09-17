@@ -8,7 +8,11 @@
 // 送回後端裁定（`report` 必為 true）。三條 anomaly **不進 internal 替身**（design D4）。
 // 基線是 2026-09-17 對後端 `c6f3928` 量到的：演練變紅＝觀測值變了、要重新分類，不是後端 regression。
 
+import type * as rest from '../../src/api/contract/rest'
+
 export type Kind = 'step' | 'contract' | 'anomaly'
+/** 回應要通過的 schema：`src/api/contract/rest.ts` 的匯出名，陣列加 `[]`。 */
+export type Schema = keyof typeof rest | `${keyof typeof rest}[]`
 
 export type Expectation = {
   /** 穩定的鍵：報告的列、README 的列、vitest 葉節點的 `meta.key`。 */
@@ -16,6 +20,8 @@ export type Expectation = {
   kind: Kind
   /** 人讀的一句：請求 → 期望。報告不複製它（規格：MUST NOT 複製期望表的說明全文）。 */
   title: string
+  /** 回應要通過的 schema（step 必有；基線各自建專案、回應的形狀由那一條的 `expect` 決定，可省）。 */
+  schema?: Schema
   /** 演練測試從這裡讀的期望值；欄位名各條自己定。測試 MUST NOT 在斷言裡另寫數字。 */
   expect: Readonly<Record<string, number | string>>
   /** 要不要進報告的〈送回後端〉。 */
@@ -24,25 +30,25 @@ export type Expectation = {
   owner: `FE-${string}`
 }
 
-const step = (key: string, title: string, expect: Expectation['expect'], owner: Expectation['owner']): Expectation => ({ key, kind: 'step', title, expect, report: false, owner })
+const step = (key: string, title: string, schema: Schema, expect: Expectation['expect'], owner: Expectation['owner']): Expectation => ({ key, kind: 'step', title, schema, expect, report: false, owner })
 const contract = (key: string, title: string, expect: Expectation['expect'], owner: Expectation['owner'], report = false): Expectation => ({ key, kind: 'contract', title, expect, report, owner })
 const anomaly = (key: string, title: string, expect: Expectation['expect'], owner: Expectation['owner']): Expectation => ({ key, kind: 'anomaly', title, expect, report: true, owner })
 
 export const EXPECTATIONS: readonly Expectation[] = [
   // ── 閉環十三步（兩張名片：A 發案者、B 隊員）──
-  step('login-owner', 'A `POST /api/login` 暱稱 → 200 ProfileOut', { status: 200 }, 'FE-A08'),
-  step('login-member', 'B `POST /api/login` 暱稱 → 200 ProfileOut', { status: 200 }, 'FE-A08'),
-  step('create', 'A `POST /api/projects`（seat_count 2）→ 201 ProjectOut、recruiting、expires_at 在建立後 7 天（±5 分）', { status: 201, projectStatus: 'recruiting', seatCount: 2, expiresDays: 7, toleranceMinutes: 5 }, 'FE-J01'),
-  step('list-contains', 'B `GET /api/projects` → 200 ProjectOut[]，含剛建的 id', { status: 200 }, 'FE-B02'),
-  step('get', 'B `GET /api/projects/{id}` → 200 ProjectOut，同一個 id', { status: 200 }, 'FE-B03'),
-  step('form-team', 'A `POST …/form-team` 密碼 → 200 ProjectOut、active、room_template 是整數', { status: 200, projectStatus: 'active', roomTemplate: 'integer' }, 'FE-J04'),
-  step('rooms-contains', 'B `GET /api/rooms` → 200 RoomDoorOut[]，含它', { status: 200 }, 'FE-J04'),
-  step('enter', 'B `POST …/enter` 正確密碼 → 200 EnterOut', { status: 200 }, 'FE-N08'),
-  step('seats-empty', 'B `GET …/seats` → 200 []', { status: 200, count: 0 }, 'FE-J13'),
-  step('seat-claim', 'B `POST …/seats` seat_index 0 → 201 SeatOut，user_id 是 B', { status: 201, seatIndex: 0 }, 'FE-J13'),
-  step('message', 'B `POST /api/messages` 給 A → 201 MessageOut', { status: 201 }, 'FE-K01'),
-  step('close', 'A `POST …/close` → 200 ProjectOut、closed', { status: 200, projectStatus: 'closed' }, 'FE-J04'),
-  step('rooms-excludes', 'B `GET /api/rooms` → 200，不含它', { status: 200 }, 'FE-J04'),
+  step('login-owner', 'A `POST /api/login` 暱稱 → 200 ProfileOut', 'ProfileOut', { status: 200 }, 'FE-A08'),
+  step('login-member', 'B `POST /api/login` 暱稱 → 200 ProfileOut', 'ProfileOut', { status: 200 }, 'FE-A08'),
+  step('create', 'A `POST /api/projects`（seat_count 2）→ 201 ProjectOut、recruiting、expires_at 在建立後 7 天（±5 分）', 'ProjectOut', { status: 201, projectStatus: 'recruiting', seatCount: 2, expiresDays: 7, toleranceMinutes: 5 }, 'FE-J01'),
+  step('list-contains', 'B `GET /api/projects` → 200 ProjectOut[]，含剛建的 id', 'ProjectOut[]', { status: 200 }, 'FE-B02'),
+  step('get', 'B `GET /api/projects/{id}` → 200 ProjectOut，同一個 id', 'ProjectOut', { status: 200 }, 'FE-B03'),
+  step('form-team', 'A `POST …/form-team` 密碼 → 200 ProjectOut、active、room_template 是整數', 'ProjectOut', { status: 200, projectStatus: 'active', roomTemplate: 'integer' }, 'FE-J04'),
+  step('rooms-contains', 'B `GET /api/rooms` → 200 RoomDoorOut[]，含它', 'RoomDoorOut[]', { status: 200 }, 'FE-J04'),
+  step('enter', 'B `POST …/enter` 正確密碼 → 200 EnterOut', 'EnterOut', { status: 200 }, 'FE-N08'),
+  step('seats-empty', 'B `GET …/seats` → 200 []', 'SeatOut[]', { status: 200, count: 0 }, 'FE-J13'),
+  step('seat-claim', 'B `POST …/seats` seat_index 0 → 201 SeatOut，user_id 是 B', 'SeatOut', { status: 201, seatIndex: 0 }, 'FE-J13'),
+  step('message', 'B `POST /api/messages` 給 A → 201 MessageOut', 'MessageOut', { status: 201 }, 'FE-K01'),
+  step('close', 'A `POST …/close` → 200 ProjectOut、closed', 'ProjectOut', { status: 200, projectStatus: 'closed' }, 'FE-J04'),
+  step('rooms-excludes', 'B `GET /api/rooms` → 200，不含它', 'RoomDoorOut[]', { status: 200 }, 'FE-J04'),
 
   // ── 十條基線（各自建自己的專案，互不依賴）──
   anomaly('create-unvalidated', '`POST /api/projects` 空 title、seat_count 0 與 9 都 201', { status: 201, title: '', seatCountLow: 0, seatCountHigh: 9 }, 'FE-J01'),
