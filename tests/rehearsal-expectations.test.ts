@@ -55,9 +55,10 @@ describe('期望表的形狀', () => {
       if (!KINDS.has(e.kind as string)) problems.push(`\`${e.key}\` 的 kind 是 ${JSON.stringify(e.kind)}`)
       if (typeof e.report !== 'boolean') problems.push(`\`${e.key}\` 的 report 不是布林：${JSON.stringify(e.report)}`)
       if (typeof e.owner !== 'string' || !/^FE-[A-Z]\d{2}$/.test(e.owner)) problems.push(`\`${e.key}\` 的 owner 不是 FE- 開頭的工作項目 ID：${JSON.stringify(e.owner)}`)
-      // step 的回應要通過的 schema 必須真的是 rest.ts 匯出的（打錯名字在這裡紅，不是在 --flow 的 undefined.parse）。
-      const name = e.schema?.replace(/\[\]$/, '')
-      if (e.kind === 'step' && !(name && name in rest)) problems.push(`\`${e.key}\` 的 schema ${JSON.stringify(e.schema)} 不是 src/api/contract/rest.ts 的匯出`)
+      // step 的回應要通過的 schema 必須真的是 rest.ts 匯出的、而且是能 parse 的 zod schema（打錯名字、指到別的匯出，在這裡紅，不是在 --flow 的 undefined.parse）。
+      const name = e.schema?.replace(/\[\]$/, '') ?? ''
+      const candidate = (rest as Record<string, unknown>)[name]
+      if (e.kind === 'step' && typeof (candidate as { parse?: unknown } | undefined)?.parse !== 'function') problems.push(`\`${e.key}\` 的 schema ${JSON.stringify(e.schema)} 不是 src/api/contract/rest.ts 匯出的 zod schema`)
     }
     expect(problems, problems.join('\n')).toEqual([])
   })
@@ -97,16 +98,20 @@ function section(md: string, heading: string): string {
 
 /**
  * 一節裡表格列的 `(key, owner)`：`| \`key\` | FE-Xnn | …`。凡是含 `|` 的行都當表格列（GFM 允許省掉首尾的 `|`、
- * 前面加 1–3 個空白 —— 審查抓到：只認 `|` 開頭的話，這種列會從比對裡消失）；只略過 header（第一格是 `key`）與分隔列，
+ * 前面加 1–3 個空白 —— 審查抓到：只認 `|` 開頭的話，這種列會從比對裡消失）；只略過表格**開頭**的 header（第一格是 `key`）
+ * 與緊接的分隔列 —— 進到資料列之後再出現這兩種內容也拋（審查抓到：任何位置都略過的話，`| --- | FE-J01 |` 是一列看不見的幽靈）；
  * 其他解析不出 `(key, owner)` 的列直接拋（沒反引號的幽靈列、少一格的列），訊息含節名與那一列。
  * 同一節列兩次同一個 key 也拋（`Map.set` 會靜默蓋掉，集合大小照樣相等）。
  */
 function listed(heading: string, body: string): Map<string, string> {
   const out = new Map<string, string>()
+  let at: 'header' | 'separator' | 'rows' = 'header'
   for (const line of body.split('\n')) {
     if (!line.includes('|')) continue
     const [first = '', second = ''] = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
-    if (first === 'key' || /^:?-+:?$/.test(first)) continue
+    if (at === 'header' && first === 'key') { at = 'separator'; continue }
+    if (at === 'separator' && /^:?-+:?$/.test(first)) { at = 'rows'; continue }
+    if (at !== 'rows') throw new Error(`〈${heading}〉的表格開頭不是 header ＋ 分隔列：${line}`)
     const key = /^`([^`]+)`$/.exec(first)?.[1]
     const owner = /^FE-[A-Z]\d{2}$/.test(second) ? second : undefined
     if (!key || !owner) throw new Error(`〈${heading}〉有一列解析不出 (key, owner)：${line}`)
