@@ -1,18 +1,24 @@
 // 契約測試的 `guildhub` 那一輪：**自己起**真後端、自己給它一個可拋棄的庫、跑完自己關。規格 `FE-O05`〈目標必須是自己起的、可拋棄的〉。
 //
 //   GUILDHUB_BACKEND_DIR=../GuildHub-backend INTERNAL_TEST_DATABASE_URL=… node scripts/contract-guildhub.mjs
+//   … node scripts/contract-guildhub.mjs --suite rehearsal      # 切換演練（FE-O08）：同一套 preflight／起停，跑完產報告
 //
 // ⚠️ **不接受一個已經在聽的 port。** 8000 有人在聽 → 拒絕，不借用 —— 「自己起的」才是可拋棄的證明；
 // 借用的那一份可能是別人正在用的（AGENTS.md〈測試環境隔離〉）。
 // ⚠️ 後端的 `DATABASE_URL` 指向**我們的測試庫**（同一份 schema 複本），不碰後端自己的 `.env`。
 // 這一輪**只在本機跑**，CI 沒有真後端（`S15`）。
 
-import { spawn } from 'node:child_process'
-import { access } from 'node:fs/promises'
+import { execFile as execFileCb, spawn } from 'node:child_process'
+import { access, mkdtemp, rm } from 'node:fs/promises'
 import net from 'node:net'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { assertLoopback, reset } from './db.mjs'
+import { promisify } from 'node:util'
+import { DbScriptError, assertLoopback, reset } from './db.mjs'
+import { finishRehearsal } from './rehearsal-report.mjs'
+
+const execFile = promisify(execFileCb)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -106,38 +112,92 @@ async function stop(child, port) {
   for (let i = 0; i < 25 && (await portInUse(port)); i += 1) await new Promise((r) => setTimeout(r, 200))
 }
 
-async function main() {
-  const port = Number(process.env.CONTRACT_GUILDHUB_PORT ?? 8000)
-  const backendDir = process.env.GUILDHUB_BACKEND_DIR ? path.resolve(process.env.GUILDHUB_BACKEND_DIR) : path.resolve(ROOT, '..', 'GuildHub-backend')
-  const testUrl = process.env.INTERNAL_TEST_DATABASE_URL
-  const { runSh } = await preflight({ backendDir, port, testUrl, devUrl: process.env.INTERNAL_DATABASE_URL })
+const SUITES = ['contract', 'rehearsal']
+/** rehearsal 時由 wrapper 擁有的 vitest 旗標（含 `--outputFile.json=…` 這種寫法與 `-c` 縮寫）。 */
+const OWNED = /^(?:--(config|reporter|outputFile)(?:[=.]|$)|-c$)/
 
-  console.log(`[contract-guildhub] reset ${testUrl}`)
-  await reset({ url: testUrl })
+/**
+ * `--suite <v>`／`--suite=<v>` 的文法（`S01`）。純函式：只拿掉 `--suite` 那一或兩個 token，其餘一個都不動；
+ * `--` 之後不看。重複、缺值、非法值都拒絕 —— 不退回預設，退回預設會讓打錯字的人以為自己跑了演練。
+ */
+export function parseSuite(argv) {
+  const legal = `合法值只有 'contract'（預設）與 'rehearsal'`
+  let suite = null
+  const rest = []
+  for (let i = 0; i < argv.length; i += 1) {
+    const tok = argv[i]
+    if (tok === '--') {
+      rest.push(...argv.slice(i))
+      break
+    }
+    let value
+    if (tok === '--suite') {
+      value = argv[i + 1]
+      if (value === undefined || value.startsWith('-')) throw new WrapperError(`--suite 缺值；${legal}。`)
+      i += 1
+    } else if (tok.startsWith('--suite=')) {
+      value = tok.slice('--suite='.length)
+    } else {
+      rest.push(tok)
+      continue
+    }
+    if (suite !== null) throw new WrapperError(`--suite 出現兩次；${legal}。`)
+    if (!SUITES.includes(value)) throw new WrapperError(`--suite '${value}' 不合法；${legal}。`)
+    suite = value
+  }
+  suite ??= 'contract'
+  if (suite === 'rehearsal') {
+    const end = rest.indexOf('--')
+    const owned = rest.slice(0, end === -1 ? rest.length : end).find((t) => OWNED.test(t))
+    if (owned) throw new WrapperError(`--suite rehearsal 時 ${owned} 由 wrapper 決定（--config／--reporter／--outputFile），不接受使用者傳的。`)
+  }
+  return { suite, rest }
+}
 
-  console.log(`[contract-guildhub] 起 ${runSh} 在 ${port}`)
+function spawnBackend(spawnFn, { runSh, backendDir, port, testUrl, env }) {
   // ⚠️ 後端 repo 的 `run.sh` 是 **CRLF** 提交的（`git ls-files --eol` 是 i/crlf），`bash run.sh` 會炸在 `set -e\r`。
   // 不動別人的 repo：去掉 `\r` 再餵給 `bash -s`。`$0` 會是 `bash`、`dirname` 是 `.`，cwd 仍是後端目錄，
   // 所以它的 `cd "$(dirname "$0")"` 與 `.venv/bin/python` 都還對。
-  const backend = spawn('bash', ['-c', `tr -d '\\r' < ${JSON.stringify(runSh)} | bash -s`], {
+  return spawnFn('bash', ['-c', `tr -d '\\r' < ${JSON.stringify(runSh)} | bash -s`], {
     cwd: backendDir,
-    env: {
-      ...process.env,
-      DATABASE_URL: testUrl,
-      PORT: String(port),
-      SESSION_SECRET: 'contract-test-secret',
-      ROOM_TOKEN_SECRET: 'contract-test-room-secret',
-    },
+    env: { ...env, DATABASE_URL: testUrl, PORT: String(port), SESSION_SECRET: 'contract-test-secret', ROOM_TOKEN_SECRET: 'contract-test-room-secret' },
     stdio: ['ignore', 'inherit', 'inherit'],
     detached: true,
   })
-  const base = `http://127.0.0.1:${port}`
-  let code = 1
+}
+
+/** 拿不到就回空字串 —— `finishRehearsal` 把空 SHA 視同 JSON 缺席，不產報告。 */
+async function git(args, cwd) {
+  const { stdout } = await execFile('git', args, { cwd }).catch(() => ({ stdout: '' }))
+  return stdout.trim()
+}
+
+/**
+ * 整個流程。`deps` 注入 `preflight`／`reset`／`spawn`／`finish`，回傳結束碼、不自己 `process.exit` ——
+ * `S02` 要驗的是「四條 preflight 任一不過，`reset` 與 `spawn` 都沒被叫到」，只單測 `preflight()` 證明不了。
+ */
+export async function run({ argv, env, deps, io = console }) {
+  let parsed
+  try {
+    parsed = parseSuite(argv)
+  } catch (e) {
+    io.error(e instanceof WrapperError ? e.message : e)
+    return 2
+  }
+  const { suite, rest } = parsed
+  const tag = `[contract-guildhub${suite === 'rehearsal' ? ' rehearsal' : ''}]`
+  const port = Number(env.CONTRACT_GUILDHUB_PORT ?? 8000)
+  const backendDir = env.GUILDHUB_BACKEND_DIR ? path.resolve(env.GUILDHUB_BACKEND_DIR) : path.resolve(ROOT, '..', 'GuildHub-backend')
+  const testUrl = env.INTERNAL_TEST_DATABASE_URL
+  let backend = null
   let vitest = null
+  let signalled = null
+  let tmpDir = null
   // Ctrl-C／被工作管理員砍：一樣要把後端那一組收掉，不然留一個孤兒 uvicorn 咬著 8000（審查抓到的）。
   const onSignal = (sig) => {
-    console.log(`[contract-guildhub] 收到 ${sig}，收拾中`)
-    // vitest 也是一組（worker 是它的子程序）：detached 起的，對 -pid 送。
+    io.log(`${tag} 收到 ${sig}，收拾中`)
+    signalled = sig
+    // vitest 也是一組（worker 是它的子程序）：detached 起的，對 -pid 送；它退了之後 finally 會關後端。
     if (vitest && vitest.exitCode === null) {
       try {
         process.kill(-vitest.pid, 'SIGTERM')
@@ -145,19 +205,31 @@ async function main() {
         vitest.kill('SIGTERM')
       }
     }
-    // stop 會等到 group 沒人、port 釋放才回來 —— 訊號路徑跟正常路徑一樣乾淨（審查抓到 exit 太早）。
-    stop(backend, port).then(() => process.exit(130))
   }
-  process.once('SIGINT', onSignal)
-  process.once('SIGTERM', onSignal)
   try {
+    const { runSh } = await deps.preflight({ backendDir, port, testUrl, devUrl: env.INTERNAL_DATABASE_URL })
+    io.log(`${tag} reset ${testUrl}`)
+    await deps.reset({ url: testUrl })
+
+    io.log(`${tag} 起 ${runSh} 在 ${port}`)
+    backend = spawnBackend(deps.spawn, { runSh, backendDir, port, testUrl, env })
+    const base = `http://127.0.0.1:${port}`
+    process.once('SIGINT', onSignal)
+    process.once('SIGTERM', onSignal)
     await waitFor401(base, 60_000)
     if (backend.exitCode !== null) throw new WrapperError(`真後端在 ready 之前就退出了（code ${backend.exitCode}）。`)
-    console.log(`[contract-guildhub] ready，跑契約套件`)
-    vitest = spawn('npx', ['vitest', 'run', '--config', 'vitest.contract.mts', ...process.argv.slice(2)], {
+
+    let args = ['run', '--config', 'vitest.contract.mts', ...rest]
+    if (suite === 'rehearsal') {
+      // 報告從 JSON reporter 產：唯一的暫存檔，finally 清；default reporter 留著給人看。
+      tmpDir = await mkdtemp(path.join(os.tmpdir(), 'rehearsal-'))
+      args = ['run', '--config', 'vitest.rehearsal.mts', '--reporter=default', '--reporter=json', `--outputFile.json=${path.join(tmpDir, 'result.json')}`, ...rest]
+    }
+    io.log(`${tag} ready，跑 ${suite} 套件`)
+    vitest = deps.spawn('npx', ['vitest', ...args], {
       cwd: ROOT,
       env: {
-        ...process.env,
+        ...env,
         CONTRACT_TARGET: 'guildhub',
         CONTRACT_BASE_URL: base,
         CONTRACT_WS_URL: `ws://127.0.0.1:${port}/ws`,
@@ -167,19 +239,33 @@ async function main() {
       stdio: 'inherit',
       detached: true,
     })
-    code = await new Promise((resolve) => vitest.once('exit', (c) => resolve(c ?? 1)))
+    const [code, signal] = await new Promise((resolve) => vitest.once('exit', (c, sig) => resolve([c, sig])))
+    if (suite !== 'rehearsal') return signalled ? 130 : (code ?? 1)
+
+    const [backendSha, frontendSha, porcelain] = await Promise.all([git(['rev-parse', 'HEAD'], backendDir), git(['rev-parse', 'HEAD'], ROOT), git(['status', '--porcelain'], ROOT)])
+    const result = await deps.finish({
+      jsonPath: path.join(tmpDir, 'result.json'),
+      exitCode: code,
+      signal: signalled ?? signal,
+      shas: { backend: backendSha, frontend: frontendSha },
+      dirty: porcelain !== '',
+    })
+    ;(result.code === 0 ? io.log : io.error)(`${tag} ${result.message}`)
+    return signalled ? 130 : result.code
+  } catch (e) {
+    io.error(e instanceof WrapperError || e instanceof DbScriptError ? e.message : e)
+    return 1
   } finally {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
-    await stop(backend, port)
-    console.log('[contract-guildhub] 後端已關')
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true })
+    if (backend) {
+      await stop(backend, port)
+      io.log(`${tag} 後端已關`)
+    }
   }
-  process.exit(code)
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((e) => {
-    console.error(e instanceof WrapperError ? e.message : e)
-    process.exit(1)
-  })
+  run({ argv: process.argv.slice(2), env: process.env, deps: { preflight, reset, spawn, finish: finishRehearsal } }).then((code) => process.exit(code))
 }
