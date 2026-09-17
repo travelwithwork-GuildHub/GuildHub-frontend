@@ -232,7 +232,7 @@ describe('送出的是白名單 payload，成功後列表回第 0 頁重取', ()
 })
 
 describe('未送出就關要確認；送出中不可關', () => {
-  it('[FE-J01-S07] 有輸入：Escape 問、繼續編輯值還在；殼的關閉鈕再問、丟棄回列表且頁碼不變', async () => {
+  it('[FE-J01-S07] 有輸入：Escape 問、繼續編輯值還在；殼的關閉意圖再問、丟棄回列表且頁碼不變', async () => {
     await openForm(1, [project(2, '第二頁的案子')])
     await type(field('標題'), '半途')
     escape()
@@ -243,11 +243,11 @@ describe('未送出就關要確認；送出中不可關', () => {
     expect(confirm()).toBeNull()
     expect(field('標題').value).toBe('半途')
 
-    // 殼的關閉意圖再來一次。**真瀏覽器裡表單開著時殼的關閉鈕在 inert 的內容區裡、按不到**（跟 `FE-B04` 詳情開著時一樣），
-    // 使用者走的是 Escape；這裡直接 dispatch 到那顆鈕只是驗「同一條 `onCloseRequest` 接線」，不是可操作性的證據（codex 審查指出）。
-    click(within(panel()).getByRole('button', { name: '關閉' }))
-    expect(panel(), '殼的關閉鈕把整個面板關了').toBeDefined()
-    expect(confirm(), '殼的關閉鈕沒有走表單的關閉意圖').not.toBeNull()
+    // 殼的關閉意圖再來一次：Escape（確認層已關、它的 Escape 層已解除，這一下到的是殼）。殼的關閉鈕在表單開著時 inert、按不到，
+    // 規格與判準都以 Escape 驗殼的關閉意圖（codex 審查：對 inert 節點派送事件不是可操作性的證據）。
+    escape()
+    expect(screen.queryByTestId('list-panel'), '殼的關閉意圖把整個面板關了').not.toBeNull()
+    expect(confirm(), '殼的關閉意圖沒有走表單的 requestClose').not.toBeNull()
     click(within(panel()).getByRole('button', { name: '丟棄' }))
     expect(queryForm()).toBeNull()
     expect(within(list()).getByText('第二頁的案子')).toBeDefined()
@@ -273,7 +273,7 @@ describe('未送出就關要確認；送出中不可關', () => {
     expect(document.activeElement).toBe(list())
   })
 
-  it('[FE-J01-S07] 送出中 Escape、取消、殼的關閉鈕都關不掉，也不問', async () => {
+  it('[FE-J01-S07] 送出中 Escape、取消都關不掉，也不問', async () => {
     await openForm()
     await fill()
     const pending = gate()
@@ -283,7 +283,6 @@ describe('未送出就關要確認；送出中不可關', () => {
     await waitFor(() => expect(posts(server)).toHaveLength(1))
     escape()
     click(button('取消'))
-    click(within(panel()).getByRole('button', { name: '關閉' }))
     expect(queryForm(), '送出中被關掉了').not.toBeNull()
     expect(confirm(), '送出中還跳確認').toBeNull()
     expect(screen.getByTestId('list-panel')).toBeDefined()

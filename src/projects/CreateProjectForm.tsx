@@ -7,7 +7,6 @@ import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
 import { FORM_LIMITS } from '@/forms/limits'
 import { SubmitError } from '@/forms/SubmitError'
 import { useForm } from '@/forms/useForm'
-import { joinSkills, normalizeSkills } from '@/profile/normalizeSkills'
 import { CreateProjectSchema, INITIAL, isDirty, toPayload, type CreateProjectInput } from './projectRules'
 
 // 發案表單。規格 `FE-J01`。機制全部是 `FE-X05` 的（`useForm`、`SubmitError`），形狀跟 `ProfileForm` 一樣。
@@ -65,11 +64,7 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
     firstField.current?.focus()
   }, [])
   const titleField = form.register('title')
-  const skillsField = form.register('skills')
-  const onSkillsBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    void skillsField.onBlur(e)
-    form.setValue('skills', joinSkills(normalizeSkills(e.target.value)), { shouldValidate: true })
-  }
+  // 技能欄**不在 blur 時洗**（跟 `ProfileForm` 不同）：真瀏覽器裡按「送出」會先 blur，失敗時欄位就不是原樣了（`S06`；兩位審查者都抓到）。
 
   // 錯誤在、就指錯誤；不在、就指說明（有說明的欄位）。一個表單只有 `SubmitError` 那一個 alert（`FE-X05`）。
   const describedBy = (name: keyof CreateProjectInput, hint?: string) => (visibleErrors[name] ? `project-error-${name}` : hint)
@@ -103,7 +98,7 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
       {fieldError('body')}
       <label className={FIELD_LABEL}>
         {CREATE_PROJECT_LABELS.skills}
-        <input className={FIELD} {...skillsField} onBlur={onSkillsBlur} aria-invalid={!!visibleErrors.skills} aria-describedby={describedBy('skills', 'project-hint-skills')} />
+        <input className={FIELD} {...form.register('skills')} aria-invalid={!!visibleErrors.skills} aria-describedby={describedBy('skills', 'project-hint-skills')} />
       </label>
       {fieldError('skills') ?? <p id="project-hint-skills" className="text-caption">{CREATE_PROJECT_LABELS.skillsHint}</p>}
       <label className={FIELD_LABEL}>
