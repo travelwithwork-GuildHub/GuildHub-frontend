@@ -17,7 +17,8 @@
 ## What Changes
 
 - 新 capability **`project-directory`**：案件卡（`src/projects/ProjectCard.tsx`）—— 標題、需要的技能、狀態（招募中／已成軍／已結案，
-  **以文字呈現，不靠顏色**）、剩幾天到期（由 `expires_at` 與呈現時刻算出：`ceil` 到天；已過期不印負數）、座位數。
+  **以文字呈現，不靠顏色**）、剩幾天到期（由 `expires_at` 與呈現時刻算出：`ceil` 到 24 小時的天；到期或已過期印「已到期」、不印 0 或負數）、座位數（「N 個座位」）。
+  卡片是**非互動的 `<article>`**（不是按鈕、不可聚焦）。
   `body`、`updated_at`、`owner_id`、`room_template` **不上卡片**：`body` 長度不定會把卡片高度弄亂；`updated_at` 會被讀成
   「最近活躍」；`owner_id` 是一個 UUID，人看不懂，發案者是誰歸詳情（`FE-B03`）。
 - 狀態的中文只有一份：`src/projects/projectStatus.ts`（`recruiting → 招募中`、`active → 已成軍`、`closed → 已結案`），
@@ -39,7 +40,7 @@
 
 ## Impact
 
-- 新 `src/projects/ProjectCard.tsx`、`src/projects/projectStatus.ts`；`src/talent/Missing.tsx` 的 `field` 多一個值（`needed_skills`）
+- 新 `src/projects/ProjectCard.tsx`、`src/projects/projectStatus.ts`；`src/talent/Missing.tsx` 多 `label` prop（預設「未提供」）、`field` 多 `needed_skills`
 - `src/list-panel/BoardPanel.tsx`（`renderItem`）
 - 新 `tests/project-card.test.tsx`；`tests/board-panel-wiring.test.tsx`（案件列項是卡片）
 - `tests/e2e/board-panel.mjs`、`tests/e2e/create-project.mjs`

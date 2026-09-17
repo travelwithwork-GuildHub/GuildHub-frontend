@@ -4,8 +4,8 @@
   `room_template: number|null`、`seat_count`、`expires_at`（ISO）、`updated_at`（ISO）。Zod 解析過，時間一定是合法的。
 - 列表來自 `GET /api/projects?page=N`：`updated_at desc`、預設只回 `recruiting`、**過期的（`expires_at <= now()`）不出現**（替身與真後端一致）。
 - 人才卡 `TalentCard`（`FE-B04`）與 `TalentFacts`（`FE-A04`）是這個 repo 裡「卡片」的既有形狀：`data-testid`、技能 chip 的樣式、`Missing` 的 `data-missing` 節點。
-- `ui-ux-pro-max`（`--domain ux`）給的三條要守：狀態**不能只靠顏色**（Color Only，High）；chip 標籤要單行不換行、只把不可預測的值截斷
-  （Compact Label Overflow，High）；對比 4.5:1。
+- `ui-ux-pro-max`（`--domain ux`）給的三條要守：狀態**不能只靠顏色**（Color Only，High，進了 `S02`）；chip 標籤要單行不換行、只把不可預測的值截斷
+  （Compact Label Overflow，High —— **這一條沒有 Scenario**，jsdom 量不到換行；實作用 `whitespace-nowrap`，pre-delivery checklist 目視）；對比 4.5:1（沿用既有 token）。
 
 ## Decisions
 
@@ -15,14 +15,15 @@
 鍵盤使用者 Tab 到它、按 Enter、什麼都沒發生 —— 比不可聚焦更糟。所以這一份是 `<article>`，`FE-B03` 以 MODIFIED 把
 「卡片是可聚焦的控制項、開那一筆的詳情」加上去（照 `FE-B04` 的那條寫）。
 
-代價：`FE-B03` 要動同一個檔案、同一條 Requirement。可接受 —— 那本來就是它的範圍，而且 `<article>` → `<button>` 的替換是一個 tag。
+這個取捨要能被驗：Requirement 明寫「非互動、不可聚焦、沒有按鈕／連結」，`S08` 驗根節點與 Tab（否則做成 `div role="button"` 全綠）。
+代價：`FE-B03` 要動同一個檔案、同一條 Requirement（以 MODIFIED 拿掉 `S08`、加上事件、焦點、Enter／Space、選中 id 與詳情失敗路徑 —— 不只是換一個 tag）。可接受，那本來就是它的範圍。
 
 ### D2｜剩幾天：`ceil` 到天、以呈現時刻算一次、`now` 可注入
 
 `daysLeft(expiresAt, now) = ceil((Date.parse(expiresAt) − now) / 86_400_000)`：
 - 剛建的案子 `expires_at = now + 7 天`（差幾秒）→ `ceil` 給 7、`floor` 給 6。「建立後 7 天」的案子第一眼就寫 6 天是錯的，所以是 `ceil`。
-- 剩 2 小時 → 1 天。粒度是「天」，不寫「小時」—— 那是倒數計時器的事，看板不是。
-- `≤ 0` → 「已到期」。列表本來就過濾掉過期的，但卡片是通用元件（`FE-J03` 我的案件會拿到自己過期的案子），不能印「剩 -3 天」。
+- 剩 2 小時 → 1 天。粒度是「天」，不寫「小時」—— 那是倒數計時器的事，看板不是。「天」是 24 小時的期間（`86_400_000` ms），不是日曆日：不看時區、不看 DST。
+- `≤ 0` → 「已到期」，**含恰等於 `now`**（寫成 `< 0` 會印「剩 0 天」，`S03` 釘住）。列表本來就過濾掉過期的，但卡片是通用元件（`FE-J03` 我的案件會拿到自己過期的案子），不能印「剩 -3 天」。
 
 `now` 是 prop（預設 `Date.now()`），判準才能把時鐘釘住；不裝計時器（Non-goal）。呈現用 `<time dateTime={expires_at}>` 包住，機器讀得到絕對時間。
 
@@ -37,7 +38,8 @@
 
 後端 `needed_skills` 預設 `[]`（`FE-J01-S09`），所以空陣列是常態、不是缺資料。但卡片要讓人一眼判斷「要什麼技能」，
 一片空白讀不出是「不限」還是「沒載到」。用 `Missing` 的形狀（`data-missing="needed_skills"`）標成「未指定」——
-機器可辨識，判準找的是屬性不是那兩個字（`FE-B04-S02` 同一招）。`Missing.field` 的 union 多一個值，不另寫元件。
+機器可辨識（屬性）而且人讀得到（可見文字）。`Missing` 今天永遠印「未提供」；「未提供」是「這個人沒填」，「未指定」是「這個案子不限」，兩個意思不同，
+所以 `Missing` 多一個 `label` prop（預設仍是「未提供」，人才卡與名片不變），不另寫元件。判準同時驗屬性與文字（codex 抓到「只找屬性」會讓印「未提供」的實作過）。
 
 ### D5｜效能
 
