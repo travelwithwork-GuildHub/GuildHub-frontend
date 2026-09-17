@@ -247,7 +247,10 @@ describe('run() 的訊號處理（沿用 contract 那一輪的契約：Ctrl-C �
     }
   })
 
-  it('vitest 退了之後（finish 期間）才收到 SIGINT：這一輪已完整 —— finish 拿到的 signal 是 null、回傳沿用 finish 的結束碼', async () => {
+  it.each([
+    ['finish 正常回傳 → 回 finish 的結束碼 0', async () => ({ code: 0, path: '/x', message: 'ok' }), 0],
+    ['finish 拋錯 → 回 1（不是 130，不能把報告產不出來掩蓋掉）', async () => { throw new Error('finish-boom') }, 1],
+  ] as const)('vitest 退了之後（finish 期間）才收到 SIGINT：這一輪已完整 —— finish 拿到的 signal 是 null；%s', async (_name, after, expected) => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'fake-backend-'))
     await writeFile(path.join(dir, 'run.sh'), '#!/usr/bin/env bash\necho fake\n')
     const server = http.createServer((_req, res) => {
@@ -268,7 +271,7 @@ describe('run() 的訊號處理（沿用 contract 那一輪的契約：Ctrl-C �
     const finish = vi.fn(async () => {
       await new Promise<void>((r) => server.close(() => r()))
       process.emit('SIGINT' as never, 'SIGINT' as never)
-      return { code: 0, path: '/x', message: 'ok' }
+      return after()
     })
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rehearsal-'))
     try {
@@ -280,7 +283,7 @@ describe('run() 的訊號處理（沿用 contract 那一輪的契約：Ctrl-C �
       })
       expect(finish).toHaveBeenCalledTimes(1)
       expect((finish.mock.calls[0] as unknown as [{ signal: string | null; exitCode: number | null }])[0]).toMatchObject({ signal: null, exitCode: 0 })
-      expect(code).toBe(0)
+      expect(code).toBe(expected)
     } finally {
       server.close()
       await rm(dir, { recursive: true })

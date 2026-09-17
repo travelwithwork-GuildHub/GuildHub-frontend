@@ -195,6 +195,9 @@ export async function run({ argv, env, deps, io = console }) {
   let backend = null
   let vitest = null
   let signalled = null
+  /** vitest 退出當下的訊號快照；`settled` 之後一律看它，不看之後才變的 `signalled`。 */
+  let settled = false
+  let cancelled = null
   let tmpDir = null
   // Ctrl-C／被工作管理員砍：一樣要把後端那一組收掉，不然留一個孤兒 uvicorn 咬著 8000（審查抓到的）。
   // 不在這裡 process.exit：記下訊號，讓正在等的那一步（reset 之後的檢查、waitFor401 或 vitest）自己退出，收尾一律走 finally。
@@ -254,7 +257,8 @@ export async function run({ argv, env, deps, io = console }) {
     const [code, signal] = await new Promise((resolve) => vitest.once('exit', (c, sig) => resolve([c, sig])))
     // vitest 退了之後這一輪就是完整的：訊號從這裡起再到（取 SHA、寫報告那幾十 ms）不改結果 —— 報告照產、結束碼沿用 vitest 的；
     // 用退出當下的快照，不看之後才變的 `signalled`（審查抓到：不然會寫了報告卻回 130，或反過來）。
-    const cancelled = signalled
+    settled = true
+    cancelled = signalled
     if (suite !== 'rehearsal') return cancelled ? 130 : (code ?? 1)
 
     const [backendSha, frontendSha, porcelain] = await Promise.all([git(['rev-parse', 'HEAD'], backendDir), git(['rev-parse', 'HEAD'], ROOT), git(['status', '--porcelain'], ROOT)])
@@ -269,7 +273,8 @@ export async function run({ argv, env, deps, io = console }) {
     return cancelled ? 130 : result.code
   } catch (e) {
     io.error(e instanceof WrapperError || e instanceof DbScriptError ? e.message : e)
-    return signalled ? 130 : 1
+    // finish 期間才到的訊號不能把「報告產不出來」掩蓋成 130（審查抓到）。
+    return (settled ? cancelled : signalled) ? 130 : 1
   } finally {
     try {
       if (tmpDir) await rm(tmpDir, { recursive: true, force: true })
