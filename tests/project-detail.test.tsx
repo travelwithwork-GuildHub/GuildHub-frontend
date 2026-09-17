@@ -75,9 +75,10 @@ const mount = (id: string, preview: ProjectOut | undefined, extra: Partial<Param
 async function mountReady(p: ProjectOut, extra: Partial<Parameters<typeof ProjectDetail>[0]> = {}) {
   server.replyFor(projectPath(p.id), 200, p)
   server.replyFor(profilePath(p.owner_id), 200, profile(p.owner_id))
-  mount(p.id, undefined, extra)
+  const view = mount(p.id, undefined, extra)
   await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
   await waitFor(() => expect(owner().dataset.phase).toBe('ready'))
+  return view
 }
 
 describe('案子本體一律來自 GET /api/projects/{id}', () => {
@@ -106,6 +107,7 @@ describe('案子本體一律來自 GET /api/projects/{id}', () => {
     const empty = within(detail()).getByTestId('empty-state')
     expect(empty.dataset.emptyState).toBe('load-failed')
     expect(detail().getAttribute('aria-busy')).toBe('false')
+    expect(calls().filter((c) => c.startsWith('/api/profiles')), '案子沒成功（有預覽）就去打發案者了').toEqual([])
     fireEvent.click(within(empty).getByRole('button', { name: '再試一次' }))
     await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
     expect(calls().filter((p) => p === projectPath(UUID(0)))).toHaveLength(2)

@@ -128,10 +128,10 @@ export async function createProject(input: contract.ProjectCreate) {
   }, contract.ProjectOut)
 }
 
-export async function getProject(projectId: string) {
+export async function getProject(projectId: string, options: { signal?: AbortSignal } = {}) {
   return send(
     'getProject',
-    { method: 'GET', path: '/api/projects/{project_id}', params: { project_id: projectId } },
+    { method: 'GET', path: '/api/projects/{project_id}', params: { project_id: projectId }, signal: options.signal },
     contract.ProjectOut,
   )
 }
