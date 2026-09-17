@@ -51,3 +51,6 @@ docs/arch.html
 # 證據目錄 `docs/evidence/fe-o08/` 裡永遠只有乾淨工作樹產的那些；髒的落這裡，看完就丟。
 /.local/rehearsal/
 /.claude/worktrees/
+
+# Claude Code 的個人本機設定（權限、本機 plugin 開關）。每台機器不同，不進版控。
+/.claude/settings.local.json

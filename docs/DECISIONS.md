@@ -1759,3 +1759,11 @@ node .agents/skills/llm-team/setup.mjs --sync-check               # 快照沒被
 3. **`subagentPromptCacheTtl=1h`**：codex／gemini 不走 Claude subagent、Agent 工具用得少，預估省 0 次有意義的 miss。連續一週每票 ≥2 次 Claude subagent 重用且 5 分鐘 TTL 確實造成重複 creation 才重評。
 
 **沒有的**：不含每票的 token 台帳（規則⑦：不開每票要餵的尺）；量測用 `/usage` 與這裡的 `claude -p` 差分法，不新增工具。
+
+## 2026-09-17　拿模板 #31 的 `SETUP-MACHINE.md`（逐字）；`SETUP-GITHUB.md` 該刪早就該刪
+
+**決定**：`SETUP-MACHINE.md` 逐字拿模板（機器層不進 repo；執行檔／登入／守門與 hooks 先查、沒有才裝、只裝一份；每台一次、不刪），governance 白名單與測試同步加；`.gitignore` 加 `/.claude/settings.local.json`。**刪掉 `SETUP-GITHUB.md`**：它是 #395 之前的舊版（還在建議 `skip_specs: true`，跟本檔〈不提供 `skip_specs` 之類的流程豁免〉相反），而 GitHub 那一半早就設好——`check-ruleset.sh` 全 ✓、`_ruleset_id` 21930388、CODEOWNERS 在、四個 script 都不是佔位——`progress.sh` 卻一直列「SETUP-GITHUB.md 還在」當待辦，等於一條永遠不會清的假警報。
+
+**為什麼不拿模板 #30 的 SETUP-GITHUB 第 8 節**：那節是「複製後一次性要做的事」（plugin 名單重判、登記 `targets.json`、Actions secrets），本 repo 都做過了（#471、真源 `targets.json` 已有本 repo、CI 不用 secret）。留一份寫著已完成事項的一次性文件，只會再變成一條假待辦。模板 README 的〈安裝〉改動也不拿——本 repo 的 README 是專案的，不是模板的。
+
+**逐字的代價**：`SETUP-MACHINE.md` 內文提到 `SETUP-GITHUB.md`（模板流程的下一步），本 repo 已經沒有那個檔；不改字（改了就是漂），README 目錄表那一列說明它已設好、線上設定用 `check-ruleset.sh` 對。
