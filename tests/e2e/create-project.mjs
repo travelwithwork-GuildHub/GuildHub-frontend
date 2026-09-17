@@ -31,7 +31,7 @@ const OUT = process.env.OUT ?? '/tmp/guildhub-create-project-shots'
 const HEADED = process.env.HEADED === '1'
 assertLoopback(FRONTEND)
 
-/** 每次跑都是新標題：同一個資料庫重跑時，上一輪的案子也在列表裡，「第一筆」要分得出是這一輪的。時間戳給人讀、UUID 片段保證不撞。 */
+/** 每次跑都是新標題：同一個資料庫重跑時，上一輪的案子也在列表裡，「第一筆」要分得出是這一輪的。時間戳給人讀、UUID 前 8 碼把同秒撞名的機率壓到可忽略（不是保證）。 */
 const TITLE = `瀏覽器發的案 ${new Date().toISOString().slice(11, 19)} ${randomUUID().slice(0, 8)}`
 const PAYLOAD_KEYS = ['title', 'body', 'needed_skills', 'seat_count']
 

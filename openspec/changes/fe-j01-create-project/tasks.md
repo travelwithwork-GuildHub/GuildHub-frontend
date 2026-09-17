@@ -59,7 +59,7 @@
 ## 5. `--e2e`：真瀏覽器（`S08`）
 
 - [x] 5.1 `tests/e2e/create-project.mjs`：`next start`＋本機 `internal`；兩個 context 各建身分（沿用 `identity-flow.mjs` 的 signUp）；
-      第一人走到看板按 E（沿用 `lib/world.mjs`／`board-panel.mjs` 的走位）→ 發案 → 第一筆；`page.route` 旁觀 POST body 恰好四鍵；reload 後仍在；第二人看到且有「發案」
+      第一人走到看板按 E（沿用 `lib/world.mjs`／`board-panel.mjs` 的走位）→ 發案 → 第一筆；`context.on('request')` 旁觀（不攔截；規格括號寫的 `page.route` 是攔截後放行，審查後改用事件）POST body 恰好四鍵；reload 後仍在；第二人看到且有「發案」
 - [x] 5.2 實跑結束碼 0；截圖存 scratchpad；紀錄貼 PR。突變：e2e 的第二人改成不登入 → 紅（沒有列表）
 - [x] 5.3 `vercel deploy --prod` 之後對閘道人工走一次（只走不壓）；記在 PR
 
