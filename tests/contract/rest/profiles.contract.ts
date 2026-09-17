@@ -58,7 +58,7 @@ describe('不存在與不假裝存在', () => {
     const probes: Record<string, () => Promise<{ status: number; contentType: string }>> = {
       // `fe-j01-create-project` 起替身有 POST（真後端是 201）；宣稱沒做的只剩 seats（真後端沒房間票是 403 —— 不是 404／405／501）。
       'POST /api/projects': () => c.raw('POST', '/api/projects', { body: { title: 'x', body: 'y' } }),
-      `GET /api/projects/{id}/seats`: () => c.raw('GET', `/api/projects/${ZERO}/seats`),
+      'GET /api/projects/{id}/seats': () => c.raw('GET', `/api/projects/${ZERO}/seats`),
     }
     const missing = unimplemented()
     for (const [key, probe] of Object.entries(probes)) {
