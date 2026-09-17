@@ -117,7 +117,7 @@
 - **THEN** SHALL 再次出現確認層（不是關掉整個面板）；按「丟棄」→ 表單 SHALL 不在，列表 SHALL 在且頁碼不變
 - **AND WHEN**（另一個全新 render）在標題打了字之後按「取消」
 - **THEN** SHALL 出現確認層
-- **AND WHEN** 什麼都沒打就按「取消」
+- **AND WHEN**（另一個全新 render）什麼都沒打就按「取消」
 - **THEN** 表單 SHALL 直接關閉、SHALL NOT 出現確認層；面板 SHALL 仍開著
 - **AND WHEN** 送出中（替身尚未回應）各按一次 Escape、「取消」、面板的關閉鈕
 - **THEN** 表單 SHALL 仍開著、SHALL NOT 出現確認層、面板 SHALL 仍開著

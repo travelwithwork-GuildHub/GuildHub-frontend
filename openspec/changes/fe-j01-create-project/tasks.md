@@ -25,7 +25,7 @@
 
 - [ ] 3.1 動 tsx 之前過 `ui-ux-pro-max`（`--domain` 表單；輸出不進版控）；按鈕用 `@/design/controls`
 - [ ] 3.2 `tests/create-project.test.tsx`（真 `BoardPanel`＋`ListPanelProvider`＋`IdentityProvider` 替身＋`contract-server`）：
-      `S01`（signed-in 有「發案」、人才面板沒有、訪客沒有）、`S02`（四個標籤、座位數 4、列表 `inert`、沒有預算等字樣）、
+      `S01`（signed-in 有「發案」、人才面板沒有、`guest` 沒有、`resolving` 沒有 —— 四個各一個 render）、`S02`（四個標籤、座位數 4、列表 `inert`、沒有預算等字樣）、
       `S03`（五種超上限即時＋停用＋沒請求；`FORM_LIMITS.seatCount.max` 換 6 訊息跟著變 —— `vi.mock('@/forms/limits')`；模組層 `LIMITS.seatIndex.max` 換 5 → `FORM_LIMITS.seatCount.max` 是 6，放 `tests/form-limits.test.ts` 或同檔）、
       `S04`（空白送出：兩個錯誤、焦點在標題；打字後只剩內容的）、`S05`（在 `page=1`；body 逐字相等；GET 卡 pending 時 `aria-busy` 且沒有樂觀項目；GET 回「（伺服器版）」後第一筆是它；恰好一次 `GET ?page=0`；`onShownPage(0)`；焦點在列表）、
       `S06`（500 留值＋alert＋沒有 GET；重送 201 關閉重取；網路 reject 同樣、不自動重送）、`S11`（POST pending 連按兩次＋Enter 只一個 POST）、

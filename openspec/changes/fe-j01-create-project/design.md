@@ -82,8 +82,8 @@ dirty 確認與送出中不可關全部被繞過（codex 審查抓到的；`S07`
 
 **刻意不寫「空 title／`seat_count` 0 或 9 → 201」的契約 Scenario**（codex 建議加、這裡拒絕）：契約套件在 CI 對 `internal` 跑，
 那條會把 anomaly 釘成替身的**義務**；`FE-O08` 的決定是 anomaly 只住在演練帳（`create-unvalidated`，對真後端跑、後端改了會紅、
-紅的意思是重新分類），不進替身。替身多驗一條的風險由「handler SHALL NOT 自行檢查長度上限」這條既有規則與 code review 守；
-使用者面向的保護在表單（`S03`），跟替身驗不驗無關。
+紅的意思是重新分類），不進替身。所以 Requirement 裡**沒有**「SHALL NOT 驗長度與範圍」這句（codex 第二輪指出：寫成 SHALL 又不給判準是自相矛盾）——
+替身「只解析型別」是這裡的實作決定，不是規範義務；使用者面向的保護在表單（`S03`），跟替身驗不驗無關。
 
 `expires_at`：Requirement 只寫行為（建立時刻 ＋7 天 ±5 分），資料庫預設值是實作位置、不是判準。
 
