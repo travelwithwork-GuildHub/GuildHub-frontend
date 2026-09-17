@@ -5,9 +5,10 @@ import { LoginForm } from '@/app/login/LoginForm'
 import { RECOVERY_KEY_STORAGE_KEY } from '@/identity/recoveryKey'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
-// `LoginForm` 在 `FE-A08` 之後有 `useRouter()`（帳號密碼成功導向 `/world`）；測試環境沒有 Next 的 app router context —— 只換掉導航。
-// 這裡的判準不走那條路，所以 push 什麼都不做。
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {}, replace: () => {} }) }))
+// `LoginForm` 有 `useRouter()`（帳號密碼成功 `push('/world')`、恢復金鑰成功 `replace('/world')`）；測試環境沒有 Next 的 app router context ——
+// 只換掉導航。`S17` 要看的是「回得去」，所以 `replace` 記下去哪裡；push 這裡用不到。
+const replaced: string[] = []
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {}, replace: (href: string) => replaced.push(href) }) }))
 
 
 // 規格：openspec/changes/fe-a01-login/specs/identity-session/spec.md
@@ -36,6 +37,7 @@ beforeEach(async () => {
   process.env.NEXT_PUBLIC_GUILDHUB_REST = server.base
   process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
   localStorage.clear()
+  replaced.length = 0
 })
 
 afterEach(async () => {
@@ -148,9 +150,10 @@ describe('登入畫面', () => {
     type(screen.getByLabelText('貼上你的恢復金鑰'), ME)
     submit(screen.getByRole('button', { name: '用金鑰回來' }))
 
-    await waitFor(() => expect(screen.getByText('阿福')).toBeDefined())
-    // **送出去的是 resume_token。** 只看畫面的話，一個改送 nickname 的
-    // 實作會建一張新名片，而畫面長得一模一樣
+    // 回得去＝到達世界（`fe-a06-login-entry` 之後金鑰路不再重新顯示金鑰，直接取代成 `/world`）。
+    await waitFor(() => expect(replaced).toEqual(['/world']))
+    // **送出去的是 resume_token。** 只看網址的話，一個改送 nickname 的
+    // 實作會建一張同名的新名片，而網址長得一模一樣 —— 這一條是「同一張名片」的證據，不得刪
     expect(server.calls[0]?.body).toEqual({ resume_token: ME })
   })
 
