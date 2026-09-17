@@ -57,7 +57,7 @@
   `S14` 金鑰路成功後 `replace('/world')`（不是 `push`）且 DOM 上沒有 `recovery-key`、沒有金鑰文字；
   `S15` 複製失敗不導向；`S17` 填錯尾碼不導向（各自全新 render）。`next/navigation` 與 `src/identity/session` 用替身（跟 `tests/login-account.test.tsx` 同一套）。
 - 端到端（真瀏覽器、`next start`、本機 internal 後端）：`tests/e2e/identity-flow.mjs` 補三條路各到 `/world`
-  且 badge 是名片上的名字、金鑰路的 `/api/me` id 等於第一條路的金鑰、`goBack()` 不回 `/login`（`S16`）；
+  且 badge 是名片上的名字、金鑰路的 `/api/me` id 等於第一條路建立身分後從 `/api/me` 取得的 id、`goBack()` 不回 `/login`（`S16`）；
   剪貼簿在 Chromium 授權 `clipboard-read`／`clipboard-write` 後真讀回（沿用 `first-entry.mjs` 的做法）。
 - 突變：`KeyHandoff` 的「進入世界」`disabled` 拿掉 → `S13` 紅；渲染金鑰畫面時就 `markFirstEntryDone()` → `S13` 紅；
   金鑰路改回顯示 `RecoveryKeyPanel` → `S14` 紅；金鑰路改 `push` → `S14` 紅；
