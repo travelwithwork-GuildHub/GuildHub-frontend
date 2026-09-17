@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import type { ProjectOut } from '@/api/contract/rest'
 import { ProjectCard } from '@/projects/ProjectCard'
 
 // 規格：openspec/changes/fe-b02-project-card/specs/project-directory/spec.md
-//   Requirement: 案件卡讓人一眼判斷「要什麼」「還在招嗎」「剩幾天」「幾個座位」—— S01～S05
+//   Requirement: 案件卡讓人一眼判斷「要什麼」「還在招嗎」「剩幾天」「幾個座位」—— S01～S05、S08（FE-B03 起：整張卡是唯一的控制項）
+// 規格：openspec/changes/fe-b03-project-detail/specs/project-directory/spec.md
+//   Requirement: 卡片是控制項，滑鼠與鍵盤都開得了詳情 —— S02 的元件半邊（S01「開的是那一筆」在 project-board-detail.test.tsx）
 //
 // 元件判準直接掛載，時鐘用 `now` prop 釘住（design D2）。不連任何外部服務。
 
@@ -30,7 +32,7 @@ const card = () => screen.getByTestId('project-card')
 describe('案件卡讓人一眼判斷', () => {
   it('[FE-B02-S01] 標題、技能、狀態、剩幾天（ceil）、座位數都在；expires_at 是 <time dateTime>', () => {
     const p = project()
-    render(<ProjectCard project={p} now={NOW} />)
+    render(<ProjectCard project={p} now={NOW} onOpen={() => {}} />)
     expect(card().dataset.projectId).toBe(p.id)
     expect(screen.getByTestId('project-card-title').textContent).toBe(p.title)
     expect(screen.getAllByTestId('project-skill').map((n) => n.textContent)).toEqual(['Three.js', 'TypeScript'])
@@ -45,7 +47,7 @@ describe('案件卡讓人一眼判斷', () => {
   it('[FE-B02-S02] 三種狀態三種字，跟著 status 變', () => {
     const seen = new Set<string>()
     for (const status of ['recruiting', 'active', 'closed'] as const) {
-      const view = render(<ProjectCard project={project({ status })} now={NOW} />)
+      const view = render(<ProjectCard project={project({ status })} now={NOW} onOpen={() => {}} />)
       seen.add(screen.getByTestId('project-status').textContent ?? '')
       view.unmount()
     }
@@ -53,20 +55,20 @@ describe('案件卡讓人一眼判斷', () => {
   })
 
   it('[FE-B02-S03] 剩 2 小時是 1 天；過了是「已到期」、沒有負數', () => {
-    const soon = render(<ProjectCard project={project({ expires_at: at(2 * HOUR) })} now={NOW} />)
+    const soon = render(<ProjectCard project={project({ expires_at: at(2 * HOUR) })} now={NOW} onOpen={() => {}} />)
     expect(screen.getByTestId('project-expires').textContent).toBe('剩 1 天')
     soon.unmount()
     // 恰等於 now：`≤ 0` 寫成 `< 0` 會印「剩 0 天」
-    const exact = render(<ProjectCard project={project({ expires_at: at(0) })} now={NOW} />)
+    const exact = render(<ProjectCard project={project({ expires_at: at(0) })} now={NOW} onOpen={() => {}} />)
     expect(screen.getByTestId('project-expires').textContent, '到期那一刻不是「剩 0 天」').toBe('已到期')
     exact.unmount()
-    render(<ProjectCard project={project({ expires_at: at(-3 * 24 * HOUR) })} now={NOW} />)
+    render(<ProjectCard project={project({ expires_at: at(-3 * 24 * HOUR) })} now={NOW} onOpen={() => {}} />)
     expect(screen.getByTestId('project-expires').textContent).toContain('已到期')
     expect(card().textContent, '過期的案子印出了負數').not.toMatch(/[-−]\s*\d/)
   })
 
   it('[FE-B02-S04] 沒有指定技能不是空白', () => {
-    render(<ProjectCard project={project({ needed_skills: [] })} now={NOW} />)
+    render(<ProjectCard project={project({ needed_skills: [] })} now={NOW} onOpen={() => {}} />)
     expect(screen.queryAllByTestId('project-skill')).toEqual([])
     const missing = within(card()).getByText((_, el) => el?.getAttribute('data-missing') === 'needed_skills')
     expect(missing.textContent, '「未提供」是「這個人沒填」；發案者沒指定技能是「未指定」').toBe('未指定')
@@ -75,7 +77,7 @@ describe('案件卡讓人一眼判斷', () => {
   it('[FE-B02-S05] body、updated_at、owner_id 不上卡片；唯一的 <time> 是 expires_at', () => {
     const SENTINEL = '這段內容是哨兵-3e9a'
     const p = project({ body: SENTINEL, updated_at: '2091-01-01T00:00:00Z', room_template: 42 })
-    render(<ProjectCard project={p} now={NOW} />)
+    render(<ProjectCard project={p} now={NOW} onOpen={() => {}} />)
     const text = card().textContent ?? ''
     expect(text).not.toContain(SENTINEL)
     expect(text).not.toContain('2091')
@@ -86,15 +88,28 @@ describe('案件卡讓人一眼判斷', () => {
     expect(times[0]?.getAttribute('datetime')).toBe(p.expires_at)
   })
 
-  it('[FE-B02-S08] 卡片在這一份不是控制項：<article>、卡內沒有任何可聚焦元素', () => {
-    render(<ProjectCard project={project()} now={NOW} />)
+  it('[FE-B02-S08] 卡片在這一份不是控制項 → 自 FE-B03 起：整張卡是唯一的控制項，裡面沒有第二個', () => {
+    render(<ProjectCard project={project()} now={NOW} onOpen={() => {}} />)
     const c = card()
-    expect(c.tagName, '詳情還沒有，做成按鈕是一顆按下去沒反應的控制項').toBe('ARTICLE')
-    // 兩條各自獨立（codex 審查抓到合在一起會放過 `<button tabIndex={-1}>`）：
-    // (1) 控制項一個都不能有，不管 tabindex；(2) 沒有任何 tabindex ≥ 0。都含根節點自己（`matches`）。
+    expect(c.tagName, '卡片不是 <button> —— Space 一定會漏掉').toBe('BUTTON')
     const CONTROLS = 'button, a, input, select, textarea, [role="button"], [role="link"]'
-    const all = [c, ...c.querySelectorAll<HTMLElement>('*')]
-    expect(all.filter((el) => el.matches(CONTROLS)), '卡片裡有控制項 —— 做成 div role=button、或 button tabIndex=-1 都會在這裡紅').toEqual([])
-    expect(all.filter((el) => el.hasAttribute('tabindex') && Number(el.getAttribute('tabindex')) >= 0), '卡片裡有 tabindex ≥ 0 的元素').toEqual([])
+    const inner = [...c.querySelectorAll<HTMLElement>('*')]
+    expect(inner.filter((el) => el.matches(CONTROLS)), '卡片裡有第二個控制項 —— 巢狀控制項對螢幕閱讀器是壞掉的語意').toEqual([])
+    expect(inner.filter((el) => el.hasAttribute('tabindex') && Number(el.getAttribute('tabindex')) >= 0)).toEqual([])
+    // `<button>` 裡只能放 phrasing content：h3／p 在裡面是無效 HTML，瀏覽器會把它們拆出來
+    expect(inner.filter((el) => /^(H[1-6]|P|DIV|SECTION|ARTICLE)$/.test(el.tagName)), '按鈕裡有 flow content').toEqual([])
+  })
+
+  it('[FE-B03-S02] 鍵盤也開得了：Tab 得到、啟動開的是那一筆', () => {
+    const opened: string[] = []
+    const p = project()
+    render(<ProjectCard project={p} now={NOW} onOpen={(id) => opened.push(id)} />)
+    const c = card()
+    expect(c.tabIndex, '卡片被拿出了 Tab 順序').toBeGreaterThanOrEqual(0)
+    c.focus()
+    expect(document.activeElement, '卡片不可聚焦 —— 鍵盤使用者 Tab 不到').toBe(c)
+    // jsdom 不會把 Enter／Space 轉成 click；`<button>` 在真瀏覽器會。這裡驗「是 button 且 click 開的是那一筆」，真的按鍵在 e2e（S14）。
+    fireEvent.click(c)
+    expect(opened).toEqual([p.id])
   })
 })
