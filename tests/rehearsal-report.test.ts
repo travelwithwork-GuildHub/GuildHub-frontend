@@ -1,7 +1,7 @@
-import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { DIRTY_DIR, REPORT_DIR, finishRehearsal, renderReport } from '../scripts/rehearsal-report.mjs'
 
 // 規格：openspec/changes/fe-o08-guildhub-rehearsal/specs/switch-rehearsal/spec.md
@@ -101,8 +101,13 @@ describe('renderReport()', () => {
 })
 
 describe('finishRehearsal()', () => {
+  const roots: string[] = []
+  afterAll(async () => {
+    for (const r of roots) await rm(r, { recursive: true, force: true })
+  })
   async function dirs() {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rehearsal-'))
+    roots.push(root)
     const outDir = path.join(root, 'evidence')
     const dirtyDir = path.join(root, 'dirty')
     const jsonPath = path.join(root, 'result.json')
