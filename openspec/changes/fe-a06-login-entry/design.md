@@ -39,8 +39,10 @@
 `tests/e2e/identity-flow.mjs` 4.4c 那段在 `/login` 貼金鑰之後 `waitForSelector('[data-testid="recovery-key"]')`
 再讀金鑰比對 `keyBack === keyA` —— 「畫面上有那把金鑰」是實作細節，但 **`keyBack === keyA` 是 `FE-A01-S17`
 「同一張名片」的證據**，不能只換成「badge 顯示原本的名字」：一個拿到有效金鑰卻建一張同名新名片的實作，
-名字對、id 錯（審查抓到的）。改成：等網址變成 `/world`，然後 `page.request.get('/api/me')`（帶 context 的 cookie）
-讀回 `id`，斷言 `=== keyA`；badge 的名字照舊比。返回上一頁 SHALL NOT 回到 `/login`（`page.goBack()` 後網址不是 `/login`）。
+名字對、id 錯（審查抓到的）。改成：第一條路建立身分之後就用 `page.request.get('/api/me')`（帶 context 的 cookie）讀回 `idA`；
+金鑰路等網址變成 `/world`，再讀 `/api/me` 得 `idB`，斷言 `idB === idA`；badge 的名字照舊比。
+**不斷言 `idB === keyA`**：今天 `session.ts` 的 `persist(store, profile.id, …)` 確實把名片 id 當金鑰，
+但主規格只說金鑰「指向」名片、沒保證編碼 —— 靠它的話，後端哪天把 `resume_token` 換成不透明字串，這條斷言會把正確的實作打紅（第二輪審查抓到的）。返回上一頁 SHALL NOT 回到 `/login`（`page.goBack()` 後網址不是 `/login`）。
 
 ## D4｜量過的事實
 

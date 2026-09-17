@@ -35,8 +35,8 @@
 
 ## 4. 真瀏覽器（`S16`；同一個 PR 或 `--e2e`）
 
-- [ ] 4.1 `tests/e2e/identity-flow.mjs`：4.4c 改成等 `/world`＋`/api/me` 的 `id === keyA`＋badge＋`goBack()` 不回 `/login`（design D3，
-      同一張名片的證據不降級）；新增三條路各到 `/world`＋badge、剪貼簿讀回
+- [ ] 4.1 `tests/e2e/identity-flow.mjs`：第一條路建立身分後讀 `/api/me` 存 `idA`；4.4c 改成等 `/world`＋`/api/me` 的 `idB === idA`＋badge＋`goBack()` 不回 `/login`
+      （design D3，同一張名片的證據不降級、不拿金鑰當 id 比）；新增三條路各到 `/world`＋badge、剪貼簿讀回
       （`context.grantPermissions(['clipboard-read','clipboard-write'])`，沿用 `first-entry.mjs`）
 - [ ] 4.2 對 `next start`＋本機 internal 後端實跑，結束碼 0；截圖存 scratchpad；紀錄貼 PR
 - [ ] 4.3 效能影響：`/login` 多載入 `KeyHandoff`（本來就在 `/` 的 chunk 裡）；量 `/login` 首屏 JS 前後差，貼 PR
