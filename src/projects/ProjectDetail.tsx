@@ -108,7 +108,7 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
 
       {/* 完整內容只在 ready 之後（`S03`：畫的是回應，不是列表那一筆） */}
       {ready && (
-        <p data-testid="project-body" className="whitespace-pre-wrap break-words">
+        <p data-testid="project-body" className="max-w-prose leading-relaxed whitespace-pre-wrap break-words">
           {project.body}
         </p>
       )}

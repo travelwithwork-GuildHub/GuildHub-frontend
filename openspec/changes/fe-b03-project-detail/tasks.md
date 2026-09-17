@@ -16,9 +16,9 @@
 
 ## 3. `--detail`：詳情、發案者名片、動作列（ADDED 四條；design D1／D2／D3）
 
-- [ ] 3.1 `tests/project-detail.test.tsx`：`S03`～`S12`、`S15`、`S16`（`contract-server` 替身；`S06` 用 `renderHook` 逐格看沒有「B 的 id 配 A 的內容」；`S16` 用 `replyFor` 的 `after` 把 X 的名片壓到最後；`S09` 發案者 500 時案子 ready、重試只打 profiles；`S11` 訪客走 401；`S12` 掃控制項名字；`S10`「看板關、進對話」要有 `BoardPanel` → 移到 4.1）；先 commit 紅
-- [ ] 3.2 `useProjectDetail.ts`（照 `useProfileDetail` 的紀律）、`OwnerCard.tsx`（重用 `useProfileDetail`＋`TalentFacts` 精簡版）、`ProjectDetail.tsx`（overlay、返回、Escape 層、焦點、`data-phase`、`FE-X04` 三種失敗、owner 標示＋ `ownerActions` 插槽）、`SendMessageButton` 多 `label`
-- [ ] 3.3 **突變**：詳情用預覽不打 id → `S03` 紅；identity 檢查拿掉 → `S06` 紅；發案者失敗把本體標成 error → `S09` 紅；owner 也長「私訊發案者」→ `S11` 紅；404 畫成載入失敗 → `S05` 紅
+- [x] 3.1 `tests/project-detail.test.tsx`：`S03`～`S12`、`S15`、`S16`（`contract-server` 替身；`S06` 用 `renderHook` 逐格看沒有「B 的 id 配 A 的內容」；`S16` 用 `replyFor` 的 `after` 把 X 的名片壓到最後；`S09` 發案者 500 時案子 ready、重試只打 profiles；`S11` 訪客走 401；`S12` 掃控制項名字；`S10`「看板關、進對話」要有 `BoardPanel` → 移到 4.1）；先 commit 紅
+- [x] 3.2 `useProjectDetail.ts`（照 `useProfileDetail` 的紀律）、`OwnerCard.tsx`（重用 `useProfileDetail`＋`TalentFacts` 精簡版）、`ProjectDetail.tsx`（overlay、返回、Escape 層、焦點、`data-phase`、`FE-X04` 三種失敗、owner 標示＋ `ownerActions` 插槽）、`SendMessageButton` 多 `label`
+- [x] 3.3 **突變**：詳情用預覽不打 id → `S03` 紅；identity 檢查拿掉 → `S06` 紅；發案者失敗把本體標成 error → `S09` 紅；owner 也長「私訊發案者」→ `S11` 紅；404 不用 X03 的 `not-found` 語彙 → `S05` 紅（`FE-X04` 的五種狀態封閉、沒有「找不到」那一種：404 是 `load-failed` 形狀＋`not-found` 的句子）；另 案子沒成功就打發案者 → S04／S05 紅、標示給每個人 → S11 紅、floor → S07 紅、預覽 body 當正式 → S04 紅
 
 ## 4. `--wire`：卡片變控制項、接上看板、e2e（MODIFIED 卡片；`S01`／`S02`／`S13`／`S14`；design D5）
 
