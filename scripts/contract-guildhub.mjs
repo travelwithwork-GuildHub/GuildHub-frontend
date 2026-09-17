@@ -64,9 +64,12 @@ export async function preflight({ backendDir, port, testUrl, devUrl }) {
   return { runSh }
 }
 
-async function waitFor401(base, ms) {
+/** `cancelled()` 回訊號名就立刻放棄 —— 等 ready 的這 60 秒裡按 Ctrl-C 也要收得掉（審查抓到：不然會繼續等、甚至把 vitest 跑起來）。 */
+async function waitFor401(base, ms, cancelled = () => null) {
   const deadline = Date.now() + ms
   while (Date.now() < deadline) {
+    const sig = cancelled()
+    if (sig) throw new WrapperError(`收到 ${sig}，不等後端 ready 了。`)
     try {
       const r = await fetch(`${base}/api/me`)
       if (r.status === 401) return
@@ -194,6 +197,7 @@ export async function run({ argv, env, deps, io = console }) {
   let signalled = null
   let tmpDir = null
   // Ctrl-C／被工作管理員砍：一樣要把後端那一組收掉，不然留一個孤兒 uvicorn 咬著 8000（審查抓到的）。
+  // 不在這裡 process.exit：記下訊號，讓正在等的那一步（waitFor401 或 vitest）自己退出，收尾一律走 finally。
   const onSignal = (sig) => {
     io.log(`${tag} 收到 ${sig}，收拾中`)
     signalled = sig
@@ -216,8 +220,9 @@ export async function run({ argv, env, deps, io = console }) {
     const base = `http://127.0.0.1:${port}`
     process.once('SIGINT', onSignal)
     process.once('SIGTERM', onSignal)
-    await waitFor401(base, 60_000)
+    await waitFor401(base, 60_000, () => signalled)
     if (backend.exitCode !== null) throw new WrapperError(`真後端在 ready 之前就退出了（code ${backend.exitCode}）。`)
+    if (signalled) throw new WrapperError(`收到 ${signalled}，不跑套件了。`)
 
     let args = ['run', '--config', 'vitest.contract.mts', ...rest]
     if (suite === 'rehearsal') {
@@ -254,14 +259,18 @@ export async function run({ argv, env, deps, io = console }) {
     return signalled ? 130 : result.code
   } catch (e) {
     io.error(e instanceof WrapperError || e instanceof DbScriptError ? e.message : e)
-    return 1
+    return signalled ? 130 : 1
   } finally {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
-    if (tmpDir) await rm(tmpDir, { recursive: true, force: true })
-    if (backend) {
-      await stop(backend, port)
-      io.log(`${tag} 後端已關`)
+    try {
+      if (tmpDir) await rm(tmpDir, { recursive: true, force: true })
+    } finally {
+      // 暫存目錄刪不掉也要關後端 —— 留孤兒比留暫存檔嚴重得多。
+      if (backend) {
+        await stop(backend, port)
+        io.log(`${tag} 後端已關`)
+      }
     }
   }
 }

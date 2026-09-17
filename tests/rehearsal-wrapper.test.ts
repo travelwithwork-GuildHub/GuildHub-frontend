@@ -173,3 +173,35 @@ describe('run() 的 preflight 四條，各自擋在 reset／spawn 之前', () =>
     expect(deps.spawn).toHaveBeenCalledTimes(0)
   })
 })
+
+describe('run() 的訊號處理（沿用 contract 那一輪的契約：Ctrl-C 要收得掉後端、不得留孤兒）', () => {
+  it('等後端 ready 期間收到 SIGINT：不起 vitest、走 finally 關後端、回 130（審查抓到：重構後這段會繼續等 60 秒）', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'fake-backend-'))
+    await writeFile(path.join(dir, 'run.sh'), '#!/usr/bin/env bash\necho fake\n')
+    const s = net.createServer()
+    await new Promise<void>((r) => s.listen(0, '127.0.0.1', r))
+    const port = (s.address() as net.AddressInfo).port
+    await new Promise<void>((r) => s.close(() => r()))
+    // 假的後端子程序：pid 不存在，stop() 對它送訊號會被 try/catch 吃掉、groupAlive 立刻 false。
+    const spawn = vi.fn(() => ({ pid: 2_147_483_000, exitCode: null }))
+    const logs: string[] = []
+    try {
+      const pending = run({
+        argv: [],
+        env: { GUILDHUB_BACKEND_DIR: dir, CONTRACT_GUILDHUB_PORT: String(port), INTERNAL_TEST_DATABASE_URL: 'postgresql://guildhub:guildhub@127.0.0.1:5432/guildhub_frontend_test' },
+        deps: { preflight, reset: vi.fn(async () => []), spawn, finish: vi.fn() },
+        io: { log: (m: unknown) => logs.push(String(m)), error: (m: unknown) => logs.push(String(m)) },
+      })
+      // 等到後端被「起」了（進入 waitFor401）再送訊號。
+      await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(1))
+      // Node 真的送訊號時 handler 會拿到訊號名當參數；用 emit 模擬要自己帶。
+      process.emit('SIGINT' as never, 'SIGINT' as never)
+      const code = await pending
+      expect(code).toBe(130)
+      expect(spawn, 'vitest 不該被起').toHaveBeenCalledTimes(1)
+      expect(logs.join('\n')).toMatch(/後端已關/)
+    } finally {
+      await rm(dir, { recursive: true })
+    }
+  }, 15_000)
+})
