@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import http from 'node:http'
 import net from 'node:net'
@@ -239,6 +240,47 @@ describe('run() 的訊號處理（沿用 contract 那一輪的契約：Ctrl-C �
       })
       expect(code).toBe(130)
       expect(spawn, '只有後端那一次，vitest 不該被起').toHaveBeenCalledTimes(1)
+    } finally {
+      server.close()
+      await rm(dir, { recursive: true })
+      await rm(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('vitest 退了之後（finish 期間）才收到 SIGINT：這一輪已完整 —— finish 拿到的 signal 是 null、回傳沿用 finish 的結束碼', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'fake-backend-'))
+    await writeFile(path.join(dir, 'run.sh'), '#!/usr/bin/env bash\necho fake\n')
+    const server = http.createServer((_req, res) => {
+      res.statusCode = 401
+      res.end()
+    })
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+    const port = (server.address() as net.AddressInfo).port
+    // 第一次 spawn 是後端（假 pid）、第二次是 vitest：一個會自己「退出」的假子程序，exit code 0。
+    const fakeVitest = Object.assign(new EventEmitter(), { pid: 2_147_483_001, exitCode: null as number | null })
+    const spawn = vi.fn<(...args: unknown[]) => unknown>().mockImplementationOnce(() => ({ pid: 2_147_483_000, exitCode: null })).mockImplementationOnce(() => {
+      setTimeout(() => {
+        fakeVitest.exitCode = 0
+        fakeVitest.emit('exit', 0, null)
+      }, 10)
+      return fakeVitest
+    })
+    const finish = vi.fn(async () => {
+      await new Promise<void>((r) => server.close(() => r()))
+      process.emit('SIGINT' as never, 'SIGINT' as never)
+      return { code: 0, path: '/x', message: 'ok' }
+    })
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rehearsal-'))
+    try {
+      const code = await run({
+        argv: ['--suite', 'rehearsal'],
+        env: { GUILDHUB_BACKEND_DIR: dir, CONTRACT_GUILDHUB_PORT: String(port), INTERNAL_TEST_DATABASE_URL: 'postgresql://guildhub:guildhub@127.0.0.1:5432/guildhub_frontend_test' },
+        deps: { preflight: vi.fn(async () => ({ runSh: path.join(dir, 'run.sh') })), reset: vi.fn(async () => []), spawn, finish, mkdtemp: vi.fn(async () => tmp) },
+        io: { log: () => {}, error: () => {} },
+      })
+      expect(finish).toHaveBeenCalledTimes(1)
+      expect((finish.mock.calls[0] as unknown as [{ signal: string | null; exitCode: number | null }])[0]).toMatchObject({ signal: null, exitCode: 0 })
+      expect(code).toBe(0)
     } finally {
       server.close()
       await rm(dir, { recursive: true })

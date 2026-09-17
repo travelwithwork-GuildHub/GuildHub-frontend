@@ -252,18 +252,21 @@ export async function run({ argv, env, deps, io = console }) {
       detached: true,
     })
     const [code, signal] = await new Promise((resolve) => vitest.once('exit', (c, sig) => resolve([c, sig])))
-    if (suite !== 'rehearsal') return signalled ? 130 : (code ?? 1)
+    // vitest 退了之後這一輪就是完整的：訊號從這裡起再到（取 SHA、寫報告那幾十 ms）不改結果 —— 報告照產、結束碼沿用 vitest 的；
+    // 用退出當下的快照，不看之後才變的 `signalled`（審查抓到：不然會寫了報告卻回 130，或反過來）。
+    const cancelled = signalled
+    if (suite !== 'rehearsal') return cancelled ? 130 : (code ?? 1)
 
     const [backendSha, frontendSha, porcelain] = await Promise.all([git(['rev-parse', 'HEAD'], backendDir), git(['rev-parse', 'HEAD'], ROOT), git(['status', '--porcelain'], ROOT)])
     const result = await deps.finish({
       jsonPath: path.join(tmpDir, 'result.json'),
       exitCode: code,
-      signal: signalled ?? signal,
+      signal: cancelled ?? signal,
       shas: { backend: backendSha, frontend: frontendSha },
       dirty: porcelain !== '',
     })
     ;(result.code === 0 ? io.log : io.error)(`${tag} ${result.message}`)
-    return signalled ? 130 : result.code
+    return cancelled ? 130 : result.code
   } catch (e) {
     io.error(e instanceof WrapperError || e instanceof DbScriptError ? e.message : e)
     return signalled ? 130 : 1
