@@ -168,7 +168,7 @@ describe('閉環', () => {
     const p = checked(e, await close(owner(), project().id)) as ProjectOut
     expect(p.status, `${e.key}: status`).toBe(e.expect.projectStatus)
   })
-  step('rooms-excludes', ['close'], async (e) => {
+  step('rooms-excludes', ['login-member', 'close'], async (e) => {
     const r = await rooms(member())
     checked(e, r)
     expect(door(r, project().id), `${e.key}: /api/rooms 有沒有 ${project().id}`).toBe(e.expect.door)

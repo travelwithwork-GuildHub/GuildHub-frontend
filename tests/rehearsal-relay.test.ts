@@ -21,6 +21,18 @@ describe('閉環的接力', () => {
     await expect(relay.run('rooms-excludes', ['close'], ok)).rejects.toThrow('blocked: close')
   })
 
+  it('[FE-O08-S04] 步驟自己丟的 blocked（宣告漏掉的前置）也算進根因鏈', async () => {
+    const relay = new Relay()
+    await expect(relay.run('login-member', [], boom)).rejects.toThrow()
+    await relay.run('close', [], ok)
+    // rooms-excludes 只宣告了 close，但裡面用到 B 的名片：它自己丟 blocked: login-member。
+    await expect(relay.run('rooms-excludes', ['close'], async () => {
+      throw new Error('blocked: login-member')
+    })).rejects.toThrow('blocked: login-member')
+    // 再靠它的那一步要指到 login-member，不是 rooms-excludes。
+    await expect(relay.run('after', ['rooms-excludes'], ok)).rejects.toThrow('blocked: login-member')
+  })
+
   it('[FE-O08-S04] 不靠紅掉那一步的照跑；被擋的步驟不會被算成過', async () => {
     const relay = new Relay()
     await expect(relay.run('form-team', [], boom)).rejects.toThrow()
