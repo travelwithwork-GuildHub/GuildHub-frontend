@@ -167,7 +167,8 @@ describe('送出的是白名單 payload，成功後列表回第 0 頁重取', ()
     expect(list().getAttribute('aria-busy')).toBe('true')
     expect(within(list()).queryByText('找一個會 Three.js 的人'), '先把 POST 的回應插進畫面了').toBeNull()
     reload.release()
-    await waitFor(() => expect(within(list()).getAllByRole('listitem')[0]?.textContent).toBe('找一個會 Three.js 的人（伺服器版）'))
+    // 列項是整張卡（`FE-B02`）：比標題節點，不比整個 `li`
+    await waitFor(() => expect(within(list()).getAllByTestId('project-card-title')[0]?.textContent).toBe('找一個會 Three.js 的人（伺服器版）'))
     expect(queryForm()).toBeNull()
     expect(gets(server), '第 0 頁取了不只一次').toEqual(['?page=1', '?page=0'])
     // 頁碼回報是 passive effect，比第一筆出現在 DOM 晚一拍
