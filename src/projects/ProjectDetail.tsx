@@ -15,13 +15,15 @@ import { useProjectDetail } from './useProjectDetail'
 // 案件詳情。規格 `FE-B03`〈詳情在同一個面板裡，案子本體一律來自 `GET /api/projects/{id}`〉、〈動作列只放做得到的〉。
 //
 // 蓋在列表上（`ListPanel` 的 `overlay` 插槽），列表不卸載 —— 返回時頁碼與捲動位置才還在。形狀跟 `TalentDetail` 同一種：
-// 載入中／失敗看 `phase`（`data-phase`、`aria-busy`），預覽不得冒充成功（`S04`）；失敗用 `FE-X04` 的 `EmptyState`（401 權限阻擋、
+// 載入中／失敗看 `phase`（`data-phase`、`aria-busy`），預覽不得冒充成功（`S04`）：**預覽只出標題**（讓人知道是哪一筆在載／載不到），
+// 狀態、座位、技能、內容、剩幾天、發案者全部等 `ready`（審查抓到「狀態／座位／技能在 error 時還畫著」會讓失敗看起來像半個成功）；失敗用 `FE-X04` 的 `EmptyState`（401 權限阻擋、
 // 404 是 `FE-X03` 的 `not-found` 語彙、其餘載入失敗可重試）；Escape 先關它、面板留著；焦點進詳情。
 //
 // ⚠️ **發案者名片是獨立的載入單元**（`OwnerCard`，design D2）：案子本體 `ready` 之後才掛它（沒有 `owner_id` 就不打），它的失敗不碰這裡的 `phase`。
 //
 // ⚠️ **動作列只放做得到的**（design D3）：
-// - `actions(project)`：呼叫端決定（`BoardPanel` 放「私訊發案者」= `SendMessageButton`，它自己會在訪客／owner 時不長出來）。
+// - `actions(project)`：呼叫端決定（`BoardPanel` 放「私訊發案者」= `SendMessageButton`）；**只給已登入且不是 owner 的人** —— 這裡就擋，不依賴呼叫端的元件自己藏
+//   （訪客拿到 200 的話 `!isOwner` 是 true，審查抓到的）。
 // - owner（`owner_id` 等於自己的 `id`，推導、不另設狀態）：「這是你發的案子」的標示＋ `ownerActions` 插槽（`FE-J04` 把成軍／結案接進來）。
 //   **這一份不渲染成軍／結案／應徵／收藏／檢舉** —— 沒有 handler 的控制項對鍵盤與螢幕閱讀器使用者是騙人的（`S12`）。
 
@@ -49,8 +51,12 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
     root.current?.focus()
   }, [])
   const project = detail.project
-  const ready = detail.phase === 'ready' && project !== undefined && detail.fetchedAt !== null
-  const isOwner = ready && identity.state === 'signed-in' && identity.profile.id === project.owner_id
+  // `ready` 把三個一起收窄：之後的分支裡 `project`、`fetchedAt` 都是有值的
+  const fetchedAt = detail.fetchedAt
+  const ready = detail.phase === 'ready' && project !== undefined && fetchedAt !== null
+  const signedIn = identity.state === 'signed-in' ? identity.profile.id : null
+  const isOwner = ready && signedIn !== null && signedIn === project.owner_id
+  const isVisitor = ready && signedIn !== null && signedIn !== project.owner_id
   const back = (
     <button type="button" className={SECONDARY} onClick={onBack}>
       {labels.back}
@@ -78,20 +84,18 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
 
       {detail.phase === 'error' && <EmptyState kind="failure" error={toUiError(detail.error)} retry={detail.retry} />}
 
-      {project !== undefined && (
+      {ready && (
         <p className="text-caption text-ink-muted flex flex-wrap items-center gap-x-3 gap-y-1">
           <span data-testid="project-status">{PROJECT_STATUS_LABEL[project.status]}</span>
-          {/* 剩幾天只在 ready 之後算：時鐘是回應到達那一刻（預覽沒有可信的時鐘） */}
-          {ready && detail.fetchedAt !== null && (
-            <time data-testid="project-expires" dateTime={project.expires_at}>
-              {expiry(project.expires_at, detail.fetchedAt)}
-            </time>
-          )}
+          {/* 時鐘是回應到達那一刻（`fetchedAt`），不是這一格 render 的時刻 */}
+          <time data-testid="project-expires" dateTime={project.expires_at}>
+            {expiry(project.expires_at, fetchedAt)}
+          </time>
           <span data-testid="project-seats">{project.seat_count} 個座位</span>
         </p>
       )}
 
-      {project !== undefined &&
+      {ready &&
         (project.needed_skills.length > 0 ? (
           <span className="flex flex-wrap gap-1">
             {project.needed_skills.map((skill) => (
@@ -123,7 +127,7 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
           {ownerActions}
         </div>
       )}
-      {ready && !isOwner && actions?.(project)}
+      {isVisitor && actions?.(project)}
     </article>
   )
 }

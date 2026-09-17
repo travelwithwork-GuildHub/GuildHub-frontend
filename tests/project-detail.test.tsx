@@ -102,8 +102,16 @@ describe('案子本體一律來自 GET /api/projects/{id}', () => {
     expect(detail().dataset.phase).toBe('loading')
     expect(detail().getAttribute('aria-busy')).toBe('true')
     expect(within(detail()).getByTestId('project-detail-title').textContent).toBe('案件0')
-    expect(within(detail()).queryByTestId('project-body'), '載入中就把預覽的內容當正式內容畫了').toBeNull()
+    // 預覽只出標題：狀態、座位、技能、內容都不能拿列表那一筆冒充（載入中與失敗都一樣）
+    const notYet = () => {
+      for (const id of ['project-body', 'project-status', 'project-seats', 'project-expires', 'project-skill', 'owner-card']) {
+        expect(within(detail()).queryAllByTestId(id), `${id} 拿預覽冒充了正式資料`).toEqual([])
+      }
+    }
+    notYet()
     await waitFor(() => expect(detail().dataset.phase).toBe('error'))
+    expect(within(detail()).getByTestId('project-detail-title').textContent, '失敗時要看得出是哪一筆載不到').toBe('案件0')
+    notYet()
     const empty = within(detail()).getByTestId('empty-state')
     expect(empty.dataset.emptyState).toBe('load-failed')
     expect(detail().getAttribute('aria-busy')).toBe('false')
@@ -158,7 +166,7 @@ describe('案子本體一律來自 GET /api/projects/{id}', () => {
 
   it('[FE-B03-S07] 欄位齊全：已成軍、剩 2 天、<time dateTime>、2 個座位、未指定技能、換行；沒有 owner_id／room_template', async () => {
     const p = project(0, { status: 'active', needed_skills: [], seat_count: 2, expires_at: new Date(NOW_ISH() + 47 * 3_600_000).toISOString(), body: '第一行\n第二行', room_template: 42 })
-    await mountReady(p)
+    const view = await mountReady(p)
     const d = detail()
     expect(within(d).getByTestId('project-status').textContent).toBe('已成軍')
     const time = within(d).getByTestId('project-expires')
@@ -170,6 +178,14 @@ describe('案子本體一律來自 GET /api/projects/{id}', () => {
     expect(within(d).getByTestId('project-body').textContent).toBe('第一行\n第二行')
     expect(d.textContent).not.toContain(OWNER)
     expect(d.textContent).not.toContain('42')
+    // 時鐘是回應到達的那一刻：之後時間過了、畫面重繪，剩幾天不變（改回 render 時的 Date.now() 這裡要紅）
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3 * 86_400_000)
+    try {
+      view.rerender(<ProjectDetail id={p.id} preview={undefined} onBack={() => {}} labels={{ back: '返回！' }} />)
+      expect(within(detail()).getByTestId('project-expires').textContent, '剩幾天跟著 render 的時鐘走了').toContain('剩 2 天')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 
@@ -256,6 +272,16 @@ describe('動作列只放做得到的', () => {
     expect(within(detail()).queryByTestId('owner-mark')).toBeNull()
     expect(within(detail()).queryByTestId('j04-slot'), '非 owner 看到了 J04 的插槽').toBeNull()
     asOther.unmount()
+
+    // 訪客／身分未知卻拿到 200（adapter 意外放行）：actions 也不能長出來 —— 這裡就擋，不靠呼叫端的按鈕自己藏（codex 審查抓到）
+    for (const who of [{ state: 'guest', reason: 'no-session' } as Identity, { state: 'unknown' } as Identity]) {
+      identity.current = who
+      const v = await mountReady(project(3), { actions: () => <button type="button">私訊發案者</button>, ownerActions: <output data-testid="j04-slot">插槽</output> })
+      expect(within(detail()).queryByRole('button', { name: '私訊發案者' }), `${who.state} 拿到 200 也長出了私訊`).toBeNull()
+      expect(within(detail()).queryByTestId('owner-mark')).toBeNull()
+      v.unmount()
+      server.calls.length = 0
+    }
 
     identity.current = { state: 'guest', reason: 'no-session' } as Identity
     server.replyFor(projectPath(UUID(2)), 401, { detail: '未登入' })
