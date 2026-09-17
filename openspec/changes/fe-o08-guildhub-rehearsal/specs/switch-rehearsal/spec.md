@@ -1,111 +1,147 @@
 ## Purpose
 
 真後端上線之後，前端對它的每一個假設都要有一條會變紅的東西守著。這份 capability 定義「切換演練」：
-一個只在本機、只對自起的真後端跑的套件，走一次完整的案件閉環，把量到的後端行為釘成期望，
-並把每次演練的結果落成不可變的證據。它補的是契約套件涵蓋不到的那一塊 —— `internal` 沒有的操作。
+一個只在本機、只對自起的真後端跑的套件，走一次完整的案件閉環，把量到的後端行為釘成**觀測基線**
+（不是前端認可的長期契約），並把每次演練的結果落成不可變的證據。它補的是契約套件涵蓋不到的那一塊 ——
+`internal` 沒有的操作。
 
 ## Applicability
 
 權限：不適用 —— 演練用兩張名片走流程，不判斷授權規則本身（那是各功能的規格）
 併發：不適用 —— 演練循序執行，一次一個請求
 持久資料相容性：不適用 —— 演練寫進的是可拋棄庫，跑前重設
-失敗路徑：適用 —— 期望不符、後端起不來、port 被占、報告產不出來
+失敗路徑：適用 —— 期望不符、後端起不來、port 被占、報告產不出來、報告撞名
 測試連到什麼：演練套件連**本機自起的可拋棄真後端**（`127.0.0.1`，由 wrapper 起、跑完關；庫是 `INTERNAL_TEST_DATABASE_URL`，跑前重設）；
-單元測試（`suiteConfig`、`renderReport`、期望表比對）不連任何外部服務
+單元測試（`parseSuite`、`renderReport`、`finishRehearsal`、期望表比對）不連任何外部服務，檔案系統只用暫存目錄
 
 ## ADDED Requirements
 
 ### Requirement: 演練只對自起的、loopback 的真後端跑
 
 演練 SHALL 經由 `scripts/contract-guildhub.mjs --suite rehearsal` 執行，沿用契約套件 `guildhub`
-那一輪的 preflight 與起停：後端 repo 不在、port 已有人在聽、庫不是 loopback 或跟開發庫是同一個，
-任一條不過 SHALL 什麼都不起、結束碼非零並說明是哪一條。演練 MUST NOT 接受任何既有的後端位址。
-`--suite` 缺席時 SHALL 跑契約套件（既有行為不變）；`--suite` 的值不是 `contract` 或 `rehearsal` 時 SHALL 拒絕，不是退回預設。
+那一輪的 preflight 與起停。preflight 的四條 —— 後端 repo 不在、port 已有人在聽、`INTERNAL_TEST_DATABASE_URL`
+缺席或不是 loopback、跟 `INTERNAL_DATABASE_URL` 是同一個庫 —— 任一條不過 SHALL 在 `reset()` 與 `spawn()`
+之前失敗、結束碼非零並說明是哪一條。演練 MUST NOT 接受任何既有的後端位址。
 
-#### Scenario: [FE-O08-S01] 套件選擇與拒絕
+`--suite` 的文法由純函式 `parseSuite(argv)` 決定：接受 `--suite rehearsal` 與 `--suite=rehearsal` 兩種寫法；
+合法值只有 `contract`（預設）與 `rehearsal`；缺席時 SHALL 是 `contract`（既有行為不變）；出現兩次、缺值、
+值不合法 SHALL 拒絕（不是退回預設）；`--` 之後的 token 不解析、原樣轉傳。回傳的 `rest` SHALL 只拿掉 `--suite`
+那一或兩個 token，其餘一個都不動。`rehearsal` 時 wrapper 擁有 `--config`、`--reporter`、`--outputFile`：
+使用者再傳任何一個 SHALL 拒絕。
 
-- **WHEN** wrapper 收到 `--suite rehearsal`
-- **THEN** 選到的 vitest 設定是 `vitest.rehearsal.mts`，且傳給 vitest 的參數不再含 `--suite` 那一對
-- **WHEN** 沒有 `--suite`
-- **THEN** 選到的是 `vitest.contract.mts`
-- **WHEN** `--suite` 是別的值或沒有值
-- **THEN** 拋錯，訊息列出兩個合法值
+#### Scenario: [FE-O08-S01] `--suite` 的文法
 
-#### Scenario: [FE-O08-S02] preflight 不過就什麼都不起
+- **WHEN** argv 是 `['--suite', 'rehearsal', '-t', 'seat']`、或 `['--suite=rehearsal', '-t', 'seat']`
+- **THEN** suite 是 `rehearsal`，`rest` 是 `['-t', 'seat']`
+- **WHEN** argv 不含 `--suite`
+- **THEN** suite 是 `contract`，`rest` 是原 argv
+- **WHEN** argv 是 `['--', '--suite', 'rehearsal']`
+- **THEN** suite 是 `contract`，`rest` 是原 argv（`--` 之後不解析）
+- **WHEN** `--suite` 出現兩次、或缺值、或值是 `foo`、或 `rehearsal` 配上 `--config`／`--reporter`／`--outputFile` 任一個
+- **THEN** 拋錯，訊息含兩個合法值或那個被拒的旗標名
 
-- **WHEN** port 已有程序在聽，或 `INTERNAL_TEST_DATABASE_URL` 不是 loopback
-- **THEN** 結束碼非零、訊息指出是哪一條，沒有任何子程序被啟動（跟 `FE-O05` 的 S04／S05 同一條路）
+#### Scenario: [FE-O08-S02] preflight 四條各自擋在起任何東西之前
+
+- **WHEN** 後端目錄沒有 `run.sh`、或 port 已有人在聽、或 `INTERNAL_TEST_DATABASE_URL` 缺席或主機不是 loopback、或它跟 `INTERNAL_DATABASE_URL` 指到同一個庫
+- **THEN** `preflight()` 拋出說明那一條的錯誤；`reset()` 與 `spawn()` 都沒有被呼叫，結束碼非零
 
 ### Requirement: 閉環的每一步都對照期望表
 
-演練 SHALL 用兩張名片（發案者、隊員）循序走：登入 → 建案 → 列表含它、詳情 → 成軍 → 門（`/api/rooms`）含它 →
-隊員進房 → 座位列表與認領 → 私訊發案者 → 結案 → 門不含它。每一步的狀態碼與回應形狀 SHALL 對照
-`tests/rehearsal/expectations.ts` 的一條期望；任何一步不符 SHALL 讓該步失敗、套件結束碼非零，
-且失敗訊息含期望值與實測值。期望表是唯一來源：測試 MUST NOT 在斷言裡另寫數字。
+演練 SHALL 用兩張名片（發案者 A、隊員 B）循序走下列十三步。每一步是期望表裡一條有穩定 `key` 的項目，
+含請求、期望狀態碼、回應要通過的 schema（`src/api/contract/rest.ts`）；任何一步不符 SHALL 讓該步失敗、
+套件結束碼非零，失敗訊息含 `key`、期望值與實測值。期望表是唯一來源：測試 MUST NOT 在斷言裡另寫數字。
 
-#### Scenario: [FE-O08-S03] 閉環走完
+| # | key | 請求 | 期望 |
+|---|---|---|---|
+| 1 | `login-owner` | A `POST /api/login` 暱稱 | 200 `ProfileOut` |
+| 2 | `login-member` | B `POST /api/login` 暱稱 | 200 `ProfileOut` |
+| 3 | `create` | A `POST /api/projects`（`seat_count` 2） | 201 `ProjectOut`，`status` `recruiting`，`expires_at` 在建立時間後 7 天（±5 分鐘） |
+| 4 | `list-contains` | B `GET /api/projects` | 200 `ProjectOut[]`，含第 3 步的 id |
+| 5 | `get` | B `GET /api/projects/{id}` | 200 `ProjectOut`，同一個 id |
+| 6 | `form-team` | A `POST …/form-team` 密碼 | 200 `ProjectOut`，`status` `active`，`room_template` 是整數 |
+| 7 | `rooms-contains` | B `GET /api/rooms` | 200 `RoomDoorOut[]`，含它 |
+| 8 | `enter` | B `POST …/enter` 正確密碼 | 200 `EnterOut` |
+| 9 | `seats-empty` | B `GET …/seats` | 200 `[]` |
+| 10 | `seat-claim` | B `POST …/seats` `seat_index` 0 | 201 `SeatOut`，`user_id` 是 B |
+| 11 | `message` | B `POST /api/messages` 給 A | 201 `MessageOut` |
+| 12 | `close` | A `POST …/close` | 200 `ProjectOut`，`status` `closed` |
+| 13 | `rooms-excludes` | B `GET /api/rooms` | 200，不含它 |
 
-- **WHEN** 對 c6f3928 跑演練
-- **THEN** 十一步全部通過，回應形狀通過 `src/api/contract/rest.ts` 對應的 schema（`ProjectOut`／`EnterOut`／`SeatOut`／`MessageOut`／`RoomDoorOut`）
+#### Scenario: [FE-O08-S03] 閉環十三步
+
+- **WHEN** 對基準後端 `c6f3928` 跑演練
+- **THEN** 十三步全部通過；期望表裡標為 `step` 的 `key` 集合恰好是上表十三個，沒有重複、沒有缺
 
 #### Scenario: [FE-O08-S04] 期望不符就紅
 
-- **WHEN** 期望表裡「成軍」那一條的狀態碼被改成 201
-- **THEN** 成軍那一步失敗，訊息含 `201` 與實測的 `200`，套件結束碼非零
+- **WHEN** 期望表裡 `form-team` 的狀態碼被改成 201
+- **THEN** 第 6 步失敗，訊息含 `form-team`、`201` 與實測的 `200`；套件結束碼非零
 
-### Requirement: 已知行為釘成期望，後端改了要紅
+### Requirement: 已知行為釘成觀測基線，並區分契約與異常
 
-期望表 SHALL 至少釘住下列已量到的行為（2026-09-17，後端 `c6f3928`）；後端改變任一條，演練 SHALL 紅：
+期望表 SHALL 另外釘住下列十條 2026-09-17 對 `c6f3928` 量到的行為。每一條 SHALL 有 `kind`：
+`contract`（前端要相容的後端行為）或 `anomaly`（觀測到、疑似後端缺陷、**送回後端裁定**）；
+`anomaly` 的 `report` MUST 是 `true`。每一條 SHALL 有 `owner`（前端哪一個工作項目接手，`FE-` 開頭）。
+這些期望是**基線**：演練變紅的意思是「後端的觀測值變了，要重新分類與更新規格」，不是後端 regression。
+`owner` 的規格 MUST NOT 把 `anomaly` 當成可以開放給使用者的行為（例如不得因為 `form-team-after-close` 是 200
+就給 `closed` 的案子放成軍入口）。
 
-| key | 行為 |
-|---|---|
-| `create-unvalidated` | `POST /api/projects` 空 `title`、`seat_count` 0 與 9 都 201 |
-| `list-default-recruiting` | `GET /api/projects` 不帶 `status` 只回 `recruiting`；`?status=active` 才回成軍的 |
-| `form-team-repeat` | 成軍後再成軍 200，舊密碼 `enter` 403、新密碼 200 |
-| `form-team-after-close` | `closed` 之後成軍 200 且狀態回到 `active`、`/api/rooms` 再含它 |
-| `seat-409-detail` | 同一人再坐 409 `你已經在這個房間有座位了`；坐別人的位 409 `這個座位已經有人了` |
-| `seat-out-of-range` | `seat_index` ≥ `seat_count` 是 400，訊息含座位數 |
-| `close-idempotent` | 重複結案 200 |
-| `close-keeps-token` | 結案後隊員用舊 token 列座位 200、認領 201 |
-| `owner-needs-enter` | 發案者沒 `enter` 也看不到座位（403） |
+| key | kind | 行為 |
+|---|---|---|
+| `create-unvalidated` | anomaly | `POST /api/projects` 空 `title`、`seat_count` 0 與 9 都 201 |
+| `list-default-recruiting` | contract | `GET /api/projects` 不帶 `status` 只回 `recruiting`；`?status=active` 才回成軍的 |
+| `form-team-repeat` | contract | 成軍後再成軍 200 換密碼：舊密碼 `enter` 403、新密碼 200 |
+| `form-team-after-close` | anomaly | `closed` 之後成軍 200、狀態回到 `active`、`/api/rooms` 再含它 |
+| `seat-409-detail` | contract | 同一人再坐 409 `你已經在這個房間有座位了`；坐別人的位 409 `這個座位已經有人了` |
+| `seat-out-of-range` | contract | `seat_index` ≥ `seat_count` 是 400，訊息含座位數 |
+| `owner-needs-enter` | contract | 發案者沒 `enter` 也看不到座位（403） |
+| `close-idempotent` | contract | 重複結案 200 |
+| `close-clears-seats` | contract | 結案後 `GET …/seats`（持有效 token）是 `[]` |
+| `close-keeps-token` | anomaly | 結案後隊員用舊 token 仍能 `POST …/seats` 201 |
 
-每一條 SHALL 有 `report`（是否送回後端）與 `owner`（前端哪一個工作項目接手）。
+#### Scenario: [FE-O08-S05] 十條基線
 
-#### Scenario: [FE-O08-S05] 九條已知行為
+- **WHEN** 對基準後端 `c6f3928` 跑演練
+- **THEN** 十條全部通過；每一條的失敗訊息含 `key`，讓報告指得出是哪一條變了
 
-- **WHEN** 對 c6f3928 跑演練
-- **THEN** 上表九條全部通過；每一條的失敗訊息含 `key`，讓報告指得出是哪一條變了
-
-#### Scenario: [FE-O08-S06] 期望表的每一條都有歸屬
+#### Scenario: [FE-O08-S06] 期望表的形狀
 
 - **WHEN** 讀期望表
-- **THEN** 每一條都有 `report` 布林與非空的 `owner`（`FE-` 開頭的工作項目 ID）；缺一個就是單元測試失敗
+- **THEN** 每一條有 `kind`（`step`／`contract`／`anomaly`）、`report` 布林、非空且 `FE-` 開頭的 `owner`；所有 `anomaly` 的 `report` 都是 `true`；`key` 不重複。缺一個就是單元測試失敗
 
 ### Requirement: 每次演練產一份不可變的報告
 
-wrapper 在 `--suite rehearsal` 跑完後 SHALL 把 vitest 的 JSON 結果與後端的 commit SHA 渲染成
-`docs/evidence/fe-o08/<YYYY-MM-DD>-<sha 前 7 碼>.md`，內容 SHALL 含：後端 commit、前端 commit、
-每一步／每一條期望的通過與否、失敗步驟的訊息、〈送回後端〉節（期望表裡 `report: true` 的條目）。
-JSON 讀不到、解析失敗、或後端 SHA 拿不到時 MUST NOT 產出檔案，結束碼 SHALL 非零。
-報告 MUST NOT 複製期望表的說明全文，只引用 `key`。
+`--suite rehearsal` 時 wrapper SHALL 以 `--reporter=json --outputFile=<唯一暫存檔>` 跑 vitest，跑完（不論結束碼）
+由 `finishRehearsal()` 決定：
+- vitest 是被訊號終止的、JSON 檔缺席、或不是合法的 vitest JSON → MUST NOT 寫任何檔案，結束碼非零；
+- JSON 完整（含有失敗的情況）→ 渲染報告到 `docs/evidence/fe-o08/<YYYY-MM-DD>-<後端 SHA 前 7 碼>-<前端 SHA 前 7 碼>.md`，
+  結束碼沿用 vitest 的；
+- 目標檔已存在 → MUST NOT 覆寫，結束碼非零、訊息含路徑；
+- 前端工作樹不乾淨 → 檔名多一段 `-dirty`，報告首行寫明；`-dirty` 的報告 MUST NOT 進版控（單元測試掃 `docs/evidence/fe-o08/`）。
+暫存檔 SHALL 在 finally 清除。報告內容 SHALL 含：後端 SHA、前端 SHA、每一條 `key` 的通過與否、失敗訊息、
+〈送回後端〉節（`report: true` 的 `key`）；MUST NOT 複製期望表的說明全文。後端 SHA 拿不到（空字串）視同 JSON 缺席。
 
 #### Scenario: [FE-O08-S07] 報告渲染
 
-- **WHEN** 給 `renderReport()` 一份含通過與失敗的 JSON、兩個 SHA、日期
-- **THEN** 輸出含後端與前端 SHA、每個標題一行且標示通過／失敗、失敗那行含錯誤訊息、〈送回後端〉列出 `report: true` 的 `key`
+- **WHEN** 給 `renderReport()` 一份含通過與失敗的 vitest JSON、兩個 SHA、日期、dirty 旗標
+- **THEN** 輸出含兩個 SHA、每個 `key` 一行標示通過／失敗、失敗那行含錯誤訊息、〈送回後端〉列出 `report: true` 的 `key`；dirty 時首行寫明
 
-#### Scenario: [FE-O08-S08] 半份報告不產
+#### Scenario: [FE-O08-S08] 半份報告不產、撞名不覆寫、有失敗照樣產
 
-- **WHEN** JSON 缺席、或不是合法 JSON、或後端 SHA 是空字串
-- **THEN** `renderReport()` 拋錯，wrapper 不寫任何檔案，結束碼非零
+- **WHEN** JSON 缺席、或不是合法 JSON、或後端 SHA 是空字串、或 vitest 被訊號終止
+- **THEN** `finishRehearsal()` 不寫任何檔案、回傳非零結束碼
+- **WHEN** JSON 完整但 vitest 結束碼是 1
+- **THEN** 報告寫出、內含失敗的 `key`，回傳 1
+- **WHEN** 目標檔已存在
+- **THEN** 檔案內容不變、回傳非零、訊息含路徑
 
 ### Requirement: README 的差異清單跟期望表一致
 
-`docs/evidence/fe-o08/README.md` SHALL 列出送回後端的每一條與前端各自接手的工作項目。
-它 MUST 跟期望表對得上：README 提到的每個 `key` 存在於期望表；期望表 `report: true` 的每個 `key` 出現在 README。
-任一邊多或少，單元測試 SHALL 失敗。
+`docs/evidence/fe-o08/README.md` SHALL 分兩節列：〈前端要相容的契約〉（`kind: contract`）與〈送回後端裁定的異常〉
+（`kind: anomaly`），每一條寫 `key` 與接手的工作項目。它 MUST 跟期望表對得上：README 提到的每個 `key`
+存在於期望表且在正確的那一節；期望表 `report: true` 的每個 `key` 出現在 README。任一邊多或少或放錯節，單元測試 SHALL 失敗。
 
 #### Scenario: [FE-O08-S09] 兩邊一致
 
-- **WHEN** README 少列一條 `report: true` 的 `key`，或多寫一個期望表沒有的 `key`
+- **WHEN** README 少列一條 `report: true` 的 `key`、或多寫一個期望表沒有的 `key`、或把 `anomaly` 放進〈契約〉那一節
 - **THEN** 比對測試失敗，訊息含那個 `key`
