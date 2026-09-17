@@ -7,6 +7,9 @@ import { z } from 'zod'
 import { registerAccount, signInWithNickname, signInWithPassword, signInWithRecoveryKey } from '@/identity/session'
 import { CredentialsRejectedError, LoginIdTakenError, NicknameLengthError, RecoveryKeyRejectedError, type Identity } from '@/identity/types'
 import { CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
+import type { ClipboardPort } from '@/identity/clipboard'
+import { KeyHandoff } from '@/first-entry/KeyHandoff'
+import { markFirstEntryDone } from '@/first-entry/seen'
 import { LIMITS, remaining, violates } from '@/api/contract/limits'
 import { useForm, type FormApi } from '@/forms/useForm'
 import { SubmitError } from '@/forms/SubmitError'
@@ -34,32 +37,14 @@ import { SubmitError } from '@/forms/SubmitError'
 // 密碼管理員與無障礙樹），兩個 `useForm` 都掛在這裡；切換不丟值靠切走前存值、切回來 `reset`（RHF 會把卸載欄位的值拿掉）。
 // 成功**導向 `/world`**、不顯示恢復金鑰畫面：帳號密碼就是這個人回來的路（那個畫面是匿名路的義務）。
 // 任一入場表單送出中，當下的三個送出鈕與兩個切換鈕全部禁用（送出中切走，回來的 403 會掛在看不見的表單上）。
-
-/** 建立身分之後要給使用者看的東西。`S09` 要求兩件事都得說。 */
-function RecoveryKeyPanel({ identity }: { identity: Identity }) {
-  if (identity.state !== 'signed-in') return null
-  return (
-    <section aria-labelledby="recovery-key-heading" className="border-line border p-gutter">
-      <h2 id="recovery-key-heading" className="text-title">
-        你的恢復金鑰
-      </h2>
-      <p>
-        歡迎，<strong>{identity.profile.display_name}</strong>。
-      </p>
-      {/* **金鑰本身要看得到、選得起來。** 只說「我們幫你記住了」的話，
-          沒勾記住的人什麼都拿不到，而 S09 要求無論有沒有勾都拿得到 */}
-      <p>
-        <code data-testid="recovery-key">{identity.profile.id}</code>
-      </p>
-      {/* ⚠️ **這兩句是義務，不是提示。**（規格逐字：「最後那一條是義務不是提示。
-          沒有它，『預設不存』就從一個知情的選擇變成一個默默弄丟身分的陷阱」） */}
-      <p className="text-danger">拿到這把金鑰的人，就能成為你 —— 它不是密碼，不會驗證任何身分。</p>
-      <p className="text-danger">
-        沒有把它抄下來、又清掉瀏覽器資料的話，這個身分就回不來了。
-      </p>
-    </section>
-  )
-}
+//
+// 三條路的終點都是 `/world`（規格 `fe-a06-login-entry`，`FE-A06-S13`～`S17`）：
+// - 暱稱路建立的是**新名片**，所以 `signed-in` 之後渲染跟 `/` 同一個 `KeyHandoff`（金鑰、警語、複製或填回尾碼才開鎖），
+//   過閘才 `markFirstEntryDone()`＋`router.replace('/world')` —— **渲染時不得先記**（看到金鑰就關分頁的人不算走完）。
+//   原本這裡自己畫的 `RecoveryKeyPanel`（沒有閘）就是 design D1 禁止的第二套，已刪。
+// - 恢復金鑰路拿回的是既有的名片、使用者手上就是那把金鑰，成功直接 `router.replace('/world')`，不再顯示一次（design D2）。
+//   `replace` 不是 `push`：登入頁不該留在返回鍵的歷史裡。帳號密碼路照 `FE-A08-S02` 的 `push` 不動。
+// `clipboard` prop 只為了讓判準注入「會成功／會失敗」的剪貼簿（跟 `tests/first-entry-flow.test.tsx` 同一種替身）。
 
 /** 前端自己定義的領域錯誤，用它們自己的話。其餘回 `null` → `toUiError`。**不在這裡重新判斷原因。** */
 function describeDomainError(cause: unknown): string | null {
@@ -109,8 +94,9 @@ export const ACCOUNT_LABELS = {
   submitRegister: '建立帳號',
 }
 
-export function LoginForm() {
+export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
   const [identity, setIdentity] = useState<Identity>({ state: 'unknown' })
+  const router = useRouter()
   const nick = useForm({
     schema: NicknameSchema,
     defaultValues: { nickname: '', remember: false },
@@ -121,10 +107,12 @@ export function LoginForm() {
     schema: RecoveryKeySchema,
     defaultValues: { key: '' },
     // 「記住我」只有一個勾選框，兩個表單共用；金鑰那邊在送出的當下讀它。
-    onSubmit: async ({ key }) => setIdentity(await signInWithRecoveryKey(key, { remember: nick.form.getValues('remember') })),
+    onSubmit: async ({ key }) => {
+      await signInWithRecoveryKey(key, { remember: nick.form.getValues('remember') })
+      router.replace('/world')
+    },
     describeError: describeDomainError,
   })
-  const router = useRouter()
   const [accountTab, setAccountTab] = useState<'login' | 'register'>('login')
   const [showPassword, setShowPassword] = useState(false)
   // 切換不丟值（`FE-A08-S01`）：RHF 對卸載的欄位會 `unregister`（值跟預設值都拿掉，不論 `shouldUnregister`），
@@ -172,7 +160,18 @@ export function LoginForm() {
   // 任一入場表單在送，別的都不能按（一個人一次只建立一個身分）；切換鈕也鎖（`FE-A08-S12`）。
   const anyBusy = nick.busy || recovery.busy || account.busy || signup.busy
 
-  if (identity.state === 'signed-in') return <RecoveryKeyPanel identity={identity} />
+  if (identity.state === 'signed-in') {
+    return (
+      <KeyHandoff
+        identity={identity}
+        clipboard={clipboard}
+        onDone={() => {
+          markFirstEntryDone()
+          router.replace('/world')
+        }}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-section">
