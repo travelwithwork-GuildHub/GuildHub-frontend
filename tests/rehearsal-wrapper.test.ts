@@ -204,4 +204,30 @@ describe('run() 的訊號處理（沿用 contract 那一輪的契約：Ctrl-C �
       await rm(dir, { recursive: true })
     }
   }, 15_000)
+
+  it('reset 期間收到 SIGINT：不起後端也不起 vitest、回 130（handler 要在 preflight 之前就掛上）', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'fake-backend-'))
+    await writeFile(path.join(dir, 'run.sh'), '#!/usr/bin/env bash\necho fake\n')
+    const spawn = vi.fn()
+    try {
+      const code = await run({
+        argv: [],
+        env: { GUILDHUB_BACKEND_DIR: dir, CONTRACT_GUILDHUB_PORT: '1', INTERNAL_TEST_DATABASE_URL: 'postgresql://guildhub:guildhub@127.0.0.1:5432/guildhub_frontend_test' },
+        deps: {
+          preflight,
+          reset: vi.fn(async () => {
+            process.emit('SIGINT' as never, 'SIGINT' as never)
+            return []
+          }),
+          spawn,
+          finish: vi.fn(),
+        },
+        io: { log: () => {}, error: () => {} },
+      })
+      expect(code).toBe(130)
+      expect(spawn).toHaveBeenCalledTimes(0)
+    } finally {
+      await rm(dir, { recursive: true })
+    }
+  })
 })

@@ -197,7 +197,9 @@ export async function run({ argv, env, deps, io = console }) {
   let signalled = null
   let tmpDir = null
   // Ctrl-C／被工作管理員砍：一樣要把後端那一組收掉，不然留一個孤兒 uvicorn 咬著 8000（審查抓到的）。
-  // 不在這裡 process.exit：記下訊號，讓正在等的那一步（waitFor401 或 vitest）自己退出，收尾一律走 finally。
+  // 不在這裡 process.exit：記下訊號，讓正在等的那一步（reset 之後的檢查、waitFor401 或 vitest）自己退出，收尾一律走 finally。
+  // `on` 不是 `once`、註冊在 preflight 之前、finally 最後才拆：stop() 等 port 釋放的那幾秒再按一次 Ctrl-C 也不會退回 Node 的
+  // 預設行為把 wrapper 秒殺、留下孤兒（審查抓到的）。
   const onSignal = (sig) => {
     io.log(`${tag} 收到 ${sig}，收拾中`)
     signalled = sig
@@ -210,19 +212,22 @@ export async function run({ argv, env, deps, io = console }) {
       }
     }
   }
+  const bail = () => new WrapperError(`收到 ${signalled}，不往下走了。`)
+  process.on('SIGINT', onSignal)
+  process.on('SIGTERM', onSignal)
   try {
     const { runSh } = await deps.preflight({ backendDir, port, testUrl, devUrl: env.INTERNAL_DATABASE_URL })
+    if (signalled) throw bail()
     io.log(`${tag} reset ${testUrl}`)
     await deps.reset({ url: testUrl })
+    if (signalled) throw bail()
 
     io.log(`${tag} 起 ${runSh} 在 ${port}`)
     backend = spawnBackend(deps.spawn, { runSh, backendDir, port, testUrl, env })
     const base = `http://127.0.0.1:${port}`
-    process.once('SIGINT', onSignal)
-    process.once('SIGTERM', onSignal)
     await waitFor401(base, 60_000, () => signalled)
     if (backend.exitCode !== null) throw new WrapperError(`真後端在 ready 之前就退出了（code ${backend.exitCode}）。`)
-    if (signalled) throw new WrapperError(`收到 ${signalled}，不跑套件了。`)
+    if (signalled) throw bail()
 
     let args = ['run', '--config', 'vitest.contract.mts', ...rest]
     if (suite === 'rehearsal') {
@@ -261,15 +266,18 @@ export async function run({ argv, env, deps, io = console }) {
     io.error(e instanceof WrapperError || e instanceof DbScriptError ? e.message : e)
     return signalled ? 130 : 1
   } finally {
-    process.off('SIGINT', onSignal)
-    process.off('SIGTERM', onSignal)
     try {
       if (tmpDir) await rm(tmpDir, { recursive: true, force: true })
     } finally {
-      // 暫存目錄刪不掉也要關後端 —— 留孤兒比留暫存檔嚴重得多。
-      if (backend) {
-        await stop(backend, port)
-        io.log(`${tag} 後端已關`)
+      try {
+        // 暫存目錄刪不掉也要關後端 —— 留孤兒比留暫存檔嚴重得多。
+        if (backend) {
+          await stop(backend, port)
+          io.log(`${tag} 後端已關`)
+        }
+      } finally {
+        process.off('SIGINT', onSignal)
+        process.off('SIGTERM', onSignal)
       }
     }
   }
