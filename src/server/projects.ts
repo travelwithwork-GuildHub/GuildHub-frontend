@@ -32,6 +32,27 @@ export async function listProjects(status: ProjectStatus, page: number): Promise
   return r.rows
 }
 
+/** 建案的輸入：跟 `contract.ProjectCreate` 一樣的四個鍵（預設值由 Zod 填好再進來）。 */
+export interface ProjectInput {
+  title: string
+  body: string
+  needed_skills: string[]
+  seat_count: number
+}
+
+/**
+ * 建一筆。規格 `FE-J01`〈建案：形狀、預設值與到期日照真後端〉。
+ * 只帶這四欄＋ owner：`status`、`room_template`、`expires_at`（＋7 天）都由資料庫預設 —— 真後端 `create_project` 亦然
+ * （「expires_at 用資料庫預設值，不在應用層算」）。**不驗長度**（`handle()` 檔頭那段）。
+ */
+export async function insertProject(ownerId: string, input: ProjectInput): Promise<ProjectRow> {
+  const r = await db().query<ProjectRow>(
+    `insert into projects (owner_id, title, body, needed_skills, seat_count) values ($1, $2, $3, $4, $5) returning ${COLUMNS}`,
+    [ownerId, input.title, input.body, input.needed_skills, input.seat_count],
+  )
+  return r.rows[0] as ProjectRow
+}
+
 export async function projectById(id: string): Promise<ProjectRow | null> {
   const r = await db().query<ProjectRow>(`select ${COLUMNS} from projects where id = $1`, [id])
   return r.rows[0] ?? null

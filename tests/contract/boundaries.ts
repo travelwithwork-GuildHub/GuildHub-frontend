@@ -46,10 +46,12 @@ export const BOUNDARY_CASES = {
   statusText: { pending: 'WS 的 12 字上限在 tests/contract/ws/lobby.contract.ts（S20：12 個 emoji 收、13 個丟），不走 REST 這張表' },
   facing: { pending: 'WS 的 move.f 0～3：不合法的 f 靜默丟棄，屬 WS 契約（S20 的形狀），不走 REST 這張表' },
   // 後端沒有上限的欄位：`min: 1` 是**前端**的規則（`FE-X05`），後端 `text not null` 收空字串 —— 對後端跑「min-1 拒絕」會是假的紅。
-  projectTitle: { pending: 'FE-X05 前端自訂上限（後端沒有 check；min 是前端的規則，不對後端驗）' },
-  projectBody: { pending: 'FE-X05 前端自訂上限（後端沒有 check；min 是前端的規則，不對後端驗）' },
-  skillCount: { pending: 'FE-X05（後端 text[] 沒有 check）' },
-  skillLength: { pending: 'FE-X05（後端 text[] 沒有 check）' },
+  // `FE-J01` 之後 `POST /api/projects` 兩邊都有了，但這四個欄位仍然**沒有邊界可驗**：後端一個 check 都沒有（`FE-O08` 演練帳的 anomaly），
+  // 端點存在不等於有東西可以成對。
+  projectTitle: { pending: 'FE-J01 有 POST /api/projects 了，但後端沒有 check；min 是前端的規則（FE-X05），不對後端驗' },
+  projectBody: { pending: 'FE-J01 有 POST /api/projects 了，但後端沒有 check；min 是前端的規則（FE-X05），不對後端驗' },
+  skillCount: { pending: 'FE-J01 有 POST /api/projects 了，但後端 text[] 沒有 check，沒有邊界可成對' },
+  skillLength: { pending: 'FE-J01 有 POST /api/projects 了，但後端 text[] 沒有 check，沒有邊界可成對' },
   chatBody: { pending: 'WS 的 chat.body 只驗是字串、沒有上限（FE-R11 design D5；BE-G16 未解），不走 REST 這張表' },
 } satisfies Record<keyof typeof LIMITS, BoundaryCase>
 
