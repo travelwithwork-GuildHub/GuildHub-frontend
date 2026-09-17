@@ -16,8 +16,8 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </InteractionProvider>
 )
 
-describe('[FE-B09-S14] provider：選中的案件', () => {
-  it('restore 帶 project：面板是案件、selected 是那一筆；帶 profile：selected 是人才那一筆', () => {
+describe('provider：選中的案件', () => {
+  it('[FE-B09-S14] restore 帶 project：面板是案件、selected 是那一筆；帶 profile：selected 是人才那一筆', () => {
     const { result } = renderHook(() => useListPanel(), { wrapper })
     act(() => result.current.restore({ panel: 'projects', profile: null, project: PID, page: 1 }))
     expect(result.current.open).toBe('projects')
@@ -27,7 +27,7 @@ describe('[FE-B09-S14] provider：選中的案件', () => {
     expect(result.current.selected).toBe(ID)
   })
 
-  it('selectProject 只在案件面板下有效；selectProfile 只在人才面板下有效；換面板選中清掉', () => {
+  it('[FE-B09-S14] selectProject 只在案件面板下有效；selectProfile 只在人才面板下有效；換面板選中清掉', () => {
     const { result } = renderHook(() => useListPanel(), { wrapper })
     act(() => result.current.openPanel('profiles'))
     act(() => result.current.selectProject(PID))

@@ -70,7 +70,7 @@ describe('serializePanelUrl', () => {
     expect(serializePanelUrl({ panel: 'profiles', profile: null, project: null, page: 0 })).toBe('?panel=profiles')
     expect(serializePanelUrl({ panel: 'profiles', profile: ID, project: null, page: 3 })).toBe(`?panel=profiles&profile=${ID}&page=3`)
   })
-  it('depthOf：世界 0、清單 1、詳情 2', () => {
+  it('[FE-B09-S14] depthOf：世界 0、清單 1、詳情 2（profile 與 project 都是第 2 層）', () => {
     expect(depthOf(CLOSED)).toBe(0)
     expect(depthOf({ panel: 'projects', profile: null, project: null, page: 4 })).toBe(1)
     expect(depthOf({ panel: 'profiles', profile: ID, project: null, page: 0 })).toBe(2)
