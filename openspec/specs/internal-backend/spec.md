@@ -47,8 +47,10 @@ handler SHALL NOT 自行檢查長度上限 —— 那是資料庫的事，跟真
 
 #### Scenario: [FE-O03-S05] W2 沒做的端點不假裝存在
 
-- **WHEN** 登入後打 `POST /api/projects`（路由檔存在但沒有 `POST`）、`GET /api/messages`（沒有路由檔）
-- **THEN** 分別 SHALL 是 Next 自己的 `405` 與 `404`（不是 `{"detail":…}` 的 JSON，也不是 `501`）—— 之後那些能力來的時候自己加
+- **WHEN** 登入後打替身宣稱沒做的端點（目前只剩 `GET /api/projects/{id}/seats`，清單在契約 harness 的 `contractUnimplemented`；真後端是空清單）
+- **THEN** SHALL 是 Next 自己的 `405`（路由檔在、沒那個 method）或 `404`（沒有路由檔），不是 `{"detail":…}` 的 JSON、也不是 `501`
+- **AND WHEN** 登入後打 `POST /api/projects`（`fe-j01-create-project` 起替身有它）
+- **THEN** SHALL NOT 是 `404`／`405`／`501`
 
 ### Requirement: session 是簽章的 HttpOnly cookie
 
@@ -187,3 +189,29 @@ body 是 `{}` → 不更新、回目前的名片；成功 SHALL 更新 `updated_
 
 - **WHEN** 兩條連線進 `lobby`，`GET /online?scene=lobby`；一條斷線，100 ms 後再查；查 `?scene=room:<沒人的 uuid>`
 - **THEN** SHALL 分別是 `{"count":2}`、`{"count":1}`、`{"count":0}`
+
+### Requirement: 建案：形狀、預設值與到期日照真後端
+
+`POST /api/projects` SHALL 經 `handle()`（`auth: 'required'`）以 `contract.ProjectCreate` 解析 body（`title`、`body` 必填字串；
+`needed_skills` 預設 `[]`；`seat_count` 預設 4），插入 `projects`（`owner_id` = session 的名片、`status` `recruiting`、`room_template` NULL、`expires_at` 是建立時刻 ＋7 天），
+回 `201`，body 的鍵 SHALL 恰好是 `ProjectOut` 的十個鍵（`id`、`owner_id`、`title`、`body`、`needed_skills`、`status`、`room_template`、`seat_count`、`expires_at`、`updated_at`），
+SHALL NOT 含 `password_hash`。
+型別錯的 body → `422`（`FE-O03-S03` 的形狀）；未登入 → `401`（`FE-O03-S01`）。
+長度與範圍**不在這條 Requirement 裡**：使用者面向的上限由前端的 `FORM_LIMITS` 守（`project-posting`），真後端對這個端點什麼都不驗是 `FE-O08` 演練帳裡的 anomaly、不是任何一方的義務。
+
+#### Scenario: [FE-J01-S09] 建案回 201，欄位與預設值對，7 天後到期，列表第一筆是它
+
+- **WHEN** 登入後 `POST /api/projects` 送 `{"title":"契約建案","body":"內容","needed_skills":["a"],"seat_count":2}`
+- **THEN** SHALL 是 `201`，原始 JSON 的鍵集合 SHALL 恰好是 `ProjectOut` 的十個鍵（沒有 `password_hash`），通過 `ProjectOut` 的 Zod 解析，`owner_id` SHALL 等於 `/api/me` 的 `id`，`status` SHALL 是 `recruiting`，
+      `room_template` SHALL 是 `null`，`seat_count` 2、`needed_skills` `["a"]`，`expires_at` SHALL 在建立時刻 ＋7 天的 ±5 分鐘內，`updated_at` SHALL 是有效的 ISO 時間
+- **AND WHEN** 只送 `{"title":"預設值","body":"內容"}`
+- **THEN** SHALL 是 `201`，`needed_skills` SHALL 是 `[]`、`seat_count` SHALL 是 4
+- **AND WHEN** 接著 `GET /api/projects?page=0`
+- **THEN** 第一筆的 `id` SHALL 是剛建的那一筆
+
+#### Scenario: [FE-J01-S10] 型別錯是 422、未登入是 401
+
+- **WHEN** 登入後送 `{"title":1,"body":"x"}`、`{"title":"x","body":"y","seat_count":"four"}`、`{"body":"沒有標題"}`
+- **THEN** 三個都 SHALL 是 `422`，`detail` 是陣列且每項通過 `ValidationError` 解析，`loc` 以 `"body"` 開頭
+- **AND WHEN** 沒有 cookie 送合法的 body
+- **THEN** SHALL 是 `401 {"detail":"未登入"}`，SHALL NOT 建立任何一筆
