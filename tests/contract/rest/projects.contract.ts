@@ -50,22 +50,27 @@ describe('建案', () => {
     expect((list.json as Array<{ id: string }>)[0]?.id, '剛建的要在第 0 頁第一筆').toBe(defaults.id)
   })
 
-  it('[FE-J01-S10] 型別錯是 422（loc 以 body 開頭）；未登入 401 且沒建任何一筆', async () => {
+  it('[FE-J01-S10] 型別錯是 422（loc 以 body 開頭）且沒建；未登入 401（JSON）且沒建任何一筆', async () => {
     const c = new ContractClient(baseUrl())
     await c.login('送錯型別的人')
-    for (const body of [{ title: 1, body: 'x' }, { title: 'x', body: 'y', seat_count: 'four' }, { body: '沒有標題' }]) {
+    const seen = await c.raw('GET', '/api/projects?page=0')
+    // `seat_count: 2.5`：Pydantic 的 `int` 拒絕小數 —— `z.number()` 會放過它再撞資料庫的 smallint（審查抓到的型別不一致）。
+    for (const body of [{ title: 1, body: 'x' }, { title: 'x', body: 'y', seat_count: 'four' }, { body: '沒有標題' }, { title: 'x', body: 'y', seat_count: 2.5 }]) {
       const r = await post(c, body)
       expect(r.status, JSON.stringify(body)).toBe(422)
+      expect(r.contentType, JSON.stringify(body)).toMatch(/application\/json/)
       const detail = (r.json as { detail: unknown }).detail
       expect(Array.isArray(detail), JSON.stringify(body)).toBe(true)
       expect((detail as unknown[]).length).toBeGreaterThan(0)
       for (const item of detail as unknown[]) expect(ValidationError.parse(item).loc[0]).toBe('body')
     }
+    // 解析失敗不得先寫再回 422：清單要跟四次之前一模一樣。
+    expect((await c.raw('GET', '/api/projects?page=0')).json, '422 卻建了一筆').toEqual(seen.json)
 
-    const seen = await c.raw('GET', '/api/projects?page=0')
     const anon = new ContractClient(baseUrl())
     const r = await post(anon, { title: '沒登入', body: '不該建' })
     expect(r.status).toBe(401)
+    expect(r.contentType).toMatch(/application\/json/)
     expect(r.json).toEqual({ detail: '未登入' })
     const again = await c.raw('GET', '/api/projects?page=0')
     expect(again.json, '未登入卻建了一筆').toEqual(seen.json)
