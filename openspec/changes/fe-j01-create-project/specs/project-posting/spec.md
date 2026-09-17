@@ -32,7 +32,7 @@
 - **THEN** 列表上方 SHALL 有「發案」按鈕；人才看板的面板 SHALL NOT 有
 - **AND WHEN** 訪客（`identity.state === 'guest'`）開專案看板的面板
 - **THEN** 面板裡 SHALL NOT 有任何名為「發案」的按鈕或連結（包括停用的）
-- **AND WHEN** 身分仍在解析（`identity.state === 'resolving'`）時開專案看板的面板
+- **AND WHEN** 身分仍在解析（`identity.state === 'unknown'`，「還沒問完」）時開專案看板的面板
 - **THEN** 同樣 SHALL NOT 有任何名為「發案」的按鈕或連結（包括停用的）
 
 #### Scenario: [FE-J01-S02] 表單恰好四個欄位、預設值對
@@ -105,21 +105,24 @@
 
 ### Requirement: 未送出就關要確認；送出中不可關
 
-表單有輸入（任一欄位跟初始值不同）時，取消鈕、Escape、面板的關閉鈕三種關閉意圖 SHALL 先開確認層（沿用 `DiscardConfirm`）：
+表單有輸入（任一欄位跟初始值不同）時，取消鈕與殼的關閉意圖（`PanelShell.onCloseRequest`：Escape 與殼的關閉鈕走的是同一條）SHALL 先開確認層（沿用 `DiscardConfirm`）：
 「丟棄」SHALL 關閉表單回到列表（頁碼與捲動位置不變）、「繼續編輯」SHALL 回到表單且值原樣。表單乾淨時 SHALL 直接關閉。
-送出中三種關閉意圖 SHALL 都無效。
+送出中所有關閉意圖 SHALL 都無效。
+
+殼的關閉鈕在表單開著時位於 `inert` 的內容區裡、真瀏覽器按不到（跟 `FE-B04` 詳情開著時一樣）；使用者可操作的殼關閉意圖是 Escape。
+判準對「殼的關閉意圖」用 Escape 驗，不把對 `inert` 節點派送事件當成可操作性的證據。
 
 #### Scenario: [FE-J01-S07] 有輸入就問；乾淨就直接關；送出中關不掉
 
 - **WHEN** 在標題打了字之後按 Escape
 - **THEN** SHALL 出現確認層，表單 SHALL 仍在 DOM 裡（`inert`）；按「繼續編輯」→ 表單回來、標題的字還在
-- **AND WHEN** 接著按面板（殼）的關閉鈕
+- **AND WHEN** 接著再按一次 Escape（殼的關閉意圖；確認層已關、這一下到的是殼）
 - **THEN** SHALL 再次出現確認層（不是關掉整個面板）；按「丟棄」→ 表單 SHALL 不在，列表 SHALL 在且頁碼不變
 - **AND WHEN**（另一個全新 render）在標題打了字之後按「取消」
 - **THEN** SHALL 出現確認層
 - **AND WHEN**（另一個全新 render）什麼都沒打就按「取消」
 - **THEN** 表單 SHALL 直接關閉、SHALL NOT 出現確認層；面板 SHALL 仍開著
-- **AND WHEN**（另一個全新 render）填好合法的四欄送出、替身把 `POST` 卡在 pending，期間各按一次 Escape、「取消」、面板的關閉鈕
+- **AND WHEN**（另一個全新 render）填好合法的四欄送出、替身把 `POST` 卡在 pending，期間各按一次 Escape、「取消」
 - **THEN** 表單 SHALL 仍開著、SHALL NOT 出現確認層、面板 SHALL 仍開著
 
 ### Requirement: 真瀏覽器裡發的案，別人重新載入也看得到
