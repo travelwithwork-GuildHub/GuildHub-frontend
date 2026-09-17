@@ -34,7 +34,7 @@
 - [ ] 3.4 `src/projects/projectRules.ts`：`CreateProjectSchema`（title／body trim＋min／max；skills `transform(normalizeSkills)`＋count／length；seat_count `string → int`＋`refine` 範圍）、`toPayload`、`isDirty`
 - [ ] 3.5 `src/projects/CreateProjectForm.tsx`：`useForm`＋`SubmitError`；四欄；`onDone(created)`；`closeIntentRef`／`askDiscard` 跟 `ProfileForm` 同一個形狀
 - [ ] 3.6 `src/list-panel/paging.ts` 加 `reload` 事件（identity → page 0、loading、shown null）＋ `useListPage` 回 `reload`；`ListPanel` 把它交給 overlay（design D2 二選一）
-- [ ] 3.7 `src/list-panel/BoardPanel.tsx`：signed-in 才渲染「發案」；overlay 三態（表單／確認層／無）；`onClose` 顯式分支 `if (requestClose) requestClose(); else closePanel()`（**不得用 `?.() ??`**，design D5；dirty 與送出中的判斷在表單的 `requestClose`）；成功 → 關表單、`reload()`、焦點回列表
+- [ ] 3.7 `src/list-panel/BoardPanel.tsx`：signed-in 才渲染「發案」；overlay 兩態（無／表單容器）；確認層疊在容器裡、表單留在 DOM 標 `inert`（不是換掉 overlay，design D5）；`onClose` 顯式分支 `if (requestClose) requestClose(); else closePanel()`（**不得用 `?.() ??`**，design D5；dirty 與送出中的判斷在表單的 `requestClose`）；成功 → 關表單、`reload()`、焦點回列表
 - [ ] 3.8 突變（先 commit）：「發案」不看 identity → `S01` 紅；`seatCount.max` 寫死 8 → `S03` 紅；payload 多送一個鍵 → `S05` 紅；
       成功後不 `reload`／樂觀插入 → `S05` 紅；失敗也 `reload` → `S06` 紅；拿掉送出 guard → `S11` 紅；dirty 不問 → `S07` 紅；送出中可關 → `S07` 紅；
       `onClose` 改成 `?.() ??` → `S07` 紅；殼關閉鈕不走 `closeIntentRef` → `S07` 紅；紀錄貼 PR

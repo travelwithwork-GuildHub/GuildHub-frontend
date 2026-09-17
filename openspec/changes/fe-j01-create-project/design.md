@@ -62,7 +62,8 @@
 ### D5 未送出就關要確認：三種關閉意圖走同一條路
 
 取消鈕、Escape、殼的關閉鈕都會關掉表單。有輸入（任一欄跟預設值不同，座位數 4 不算）時 SHALL 先開確認層
-（`DiscardConfirm`，殼的 overlay 換成它、表單 `inert`）：「丟棄」回列表、「繼續編輯」回表單。乾淨時直接關。
+（`DiscardConfirm` **疊在仍掛載的表單上面**：`ListPanel` 的 overlay 插槽只有一個，所以 overlay 裡放一個容器，
+表單一直在裡面、確認時容器上的表單節點標 `inert`、`DiscardConfirm` 渲染在它旁邊 —— **不是把 overlay 換成確認層**，那會卸載表單、丟掉還沒送出的值）：「丟棄」回列表、「繼續編輯」回表單。乾淨時直接關。
 送出中三種關閉都無效（`FE-A04-S10` 同一條規則）。
 
 實作照 `FE-A04` 的形狀，**dirty 與送出中的判斷留在表單裡**：`CreateProjectForm` 收 `closeIntentRef`（殼的 Escape／關閉鈕與自己的取消鈕都走它的 `requestClose`：送出中 → 無效；dirty → `askDiscard()`；否則 → `onDone()`），
