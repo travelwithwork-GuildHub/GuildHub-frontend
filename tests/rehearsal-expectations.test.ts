@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { EXPECTATIONS, type Expectation } from './rehearsal/expectations'
 
@@ -10,7 +11,7 @@ import { EXPECTATIONS, type Expectation } from './rehearsal/expectations'
 // 期望表是唯一來源（design D2）：README 三節各自跟它的 `(key, owner)` 集合相等，owner 寫錯也紅。
 // 不連網、不寫檔；只讀 repo 裡的 README。
 
-const README_URL = new URL('../docs/evidence/fe-o08/README.md', import.meta.url)
+const README = path.resolve(__dirname, '..', 'docs', 'evidence', 'fe-o08', 'README.md')
 
 /** 規格〈閉環的每一步都對照期望表〉那張表的十三個 key，照順序。 */
 const STEP_KEYS = [
@@ -77,7 +78,7 @@ function listed(body: string): Map<string, string> {
   const out = new Map<string, string>()
   for (const line of body.split('\n')) {
     const m = /^\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|/.exec(line)
-    if (m) out.set(m[1], m[2])
+    if (m?.[1] && m[2]) out.set(m[1], m[2])
   }
   return out
 }
@@ -105,7 +106,7 @@ describe('README 三節跟期望表一致', () => {
   ]
 
   it.each(SECTIONS)('[FE-O08-S09] 〈%s〉的 (key, owner) 集合跟期望表相等', async (heading, pick) => {
-    const md = await readFile(README_URL, 'utf8')
+    const md = await readFile(README, 'utf8')
     const problems = diff(heading, EXPECTATIONS.filter(pick), listed(section(md, heading)))
     expect(problems, problems.join('\n')).toEqual([])
   })
