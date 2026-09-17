@@ -65,10 +65,12 @@ async function openProjectBoard(page, who) {
   if (panel === null) throw new Error(`${who}按 E 沒有開出專案面板`)
   return panel
 }
-const firstItemText = (page) => page.$eval('[data-testid="list-panel-list"] li', (n) => n.textContent?.trim() ?? '').catch(() => null)
+// 第一筆的**標題節點**（`FE-B02` 之後列項是整張卡：狀態、剩幾天、座位數都在 `li` 的文字裡，整個 `li` 比不出標題）
+const FIRST_TITLE = '[data-testid="list-panel-list"] li [data-testid="project-card-title"]'
+const firstItemText = (page) => page.$eval(FIRST_TITLE, (n) => n.textContent?.trim() ?? '').catch(() => null)
 /** 等列表載完、第一筆是 `title`（最多 15 秒），然後**讀出來比對**：等不到就讀到什麼比什麼 —— 判準在 `check`，不在這裡。 */
 async function expectFirstItem(page, label, title) {
-  await page.waitForFunction((t) => document.querySelector('[data-testid="list-panel-list"] li')?.textContent?.includes(t), title, { timeout: 15_000 }).catch(() => {})
+  await page.waitForFunction(([sel, t]) => document.querySelector(sel)?.textContent?.includes(t), [FIRST_TITLE, title], { timeout: 15_000 }).catch(() => {})
   check(label, await firstItemText(page), title)
 }
 // 只看面板裡的、名字完全相等：標題列的「我的名片：發案的人」也含「發案」兩個字（第一次跑就撞到）

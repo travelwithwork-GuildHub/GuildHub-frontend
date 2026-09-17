@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
+import { useEffect, useRef, useState } from 'react'
+import type { ProfileOut } from '@/api/contract/rest'
 import { PRIMARY } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { DiscardConfirm } from '@/profile/DiscardConfirm'
 import { CreateProjectForm } from '@/projects/CreateProjectForm'
+import { ProjectCard } from '@/projects/ProjectCard'
 import { TalentCard } from '@/talent/TalentCard'
 import { SendMessageButton } from '@/inbox/SendMessageButton'
 import { TalentDetail } from '@/talent/TalentDetail'
@@ -30,8 +31,8 @@ import type { ListKind } from './paging'
 // 這個檔案是第一個呼叫端，不該自己先示範繞過。
 //
 // 人才那一支是真的卡片與詳情（`FE-B04`）：卡片開詳情，詳情蓋在列表上（`overlay`），
-// 列表不卸載 —— 返回時頁碼與捲動位置都還在。案件那一支的列項仍是佔位（`FE-B02`），
-// 但已經有「發案」（`FE-J01`）：只給已登入的人、表單住在同一個 overlay 插槽、成功後回第 0 頁重取。
+// 列表不卸載 —— 返回時頁碼與捲動位置都還在。案件那一支的列項是案件卡（`FE-B02`，純呈現、還不是控制項 —— 詳情是 `FE-B03`），
+// 加「發案」（`FE-J01`）：只給已登入的人、表單住在同一個 overlay 插槽、成功後回第 0 頁重取。
 //
 // 「開著哪一筆詳情」「第幾頁」住在 `ListPanelProvider`，不在這裡（`FE-B09`：網址要能還原它們）。
 // 這裡只留「列表手上那一筆」當詳情的載入中預覽 —— 深連結直達時沒有預覽，詳情自己去載。
@@ -41,11 +42,6 @@ const LABELS = { next: '下一頁', close: '關閉' }
 const DETAIL_LABELS = { back: '返回' }
 const CREATE_LABEL = '發案'
 
-const LINE = 'block overflow-hidden text-ellipsis whitespace-nowrap'
-
-function projectLine(item: ProjectOut): ReactNode {
-  return <span className={LINE}>{item.title}</span>
-}
 /** 人才那一支：選中的 id 在 provider，列表手上的那一筆（詳情的載入中預覽）在這裡。 */
 function TalentBoard({ onClose }: { onClose: () => void }) {
   const { selected, selectProfile, page, reportPage, closePanel } = useListPanel()
@@ -114,6 +110,8 @@ function ProjectBoard() {
   const signedIn = identity.state === 'signed-in'
   const [composing, setComposing] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  // 卡片「剩幾天」的時鐘：面板開起來那一刻讀一次（粒度是天，`FE-B02` design D2；render 裡不讀 `Date.now()`）。
+  const [now] = useState(() => Date.now())
   const closeIntentRef = useRef<(() => void) | null>(null)
   const focusBeforeConfirm = useRef<HTMLElement | null>(null)
   // 表單開著時身分不再是 signed-in（登出、問不到）：入口沒了，表單跟著收（推導，不另設狀態）。
@@ -145,7 +143,7 @@ function ProjectBoard() {
       kind="projects"
       title={TITLES.projects}
       labels={LABELS}
-      renderItem={projectLine}
+      renderItem={(item) => <ProjectCard project={item} now={now} />}
       onClose={onClose}
       page={page}
       onShownPage={reportPage}

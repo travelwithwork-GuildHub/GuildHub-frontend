@@ -29,16 +29,17 @@ const OUT = process.env.OUT ?? 'docs/evidence/fe-b01'
 const HEADED = process.env.HEADED === '1'
 
 const uuid = (n) => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`
+// `expires_at` 釘在「當下 ＋7 天」：卡片的「剩幾天」是 `ceil`（`FE-B02-S07`），從這裡到瀏覽器畫出來差的那幾百毫秒吸得掉、一定是 7。
 const PROJECTS = ['案件甲', '案件乙', '案件丙'].map((title, i) => ({
   id: uuid(i + 1),
   owner_id: uuid(99),
   title,
   body: '內容',
-  needed_skills: [],
+  needed_skills: i === 0 ? ['Three.js'] : [],
   status: 'recruiting',
   room_template: null,
   seat_count: 4,
-  expires_at: '2026-09-16T00:00:00Z',
+  expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
   updated_at: '2026-09-09T00:00:00Z',
 }))
 const PROFILES = ['人才丁', '人才戊'].map((display_name, i) => ({
@@ -141,6 +142,19 @@ try {
     const text = await panel.textContent()
     if (kind === 'projects' && text?.includes('案件甲')) ok(`[S01] 專案看板開的是案件清單（攔到 ${hits.projects} 次 /api/projects）`)
     else bad('[S01] 面板開了但不是案件', `data-kind=${kind}，內容：${text?.slice(0, 80)}`)
+
+    // ── FE-B02-S07：第一個列項是整張卡，欄位各自讀得出來 ──
+    const first = await panel.$('[data-testid="list-panel-list"] li [data-testid="project-card"]')
+    if (first === null) {
+      bad('[FE-B02-S07] 第一個列項不是案件卡', '`BoardPanel` 的 `renderItem` 還是一行標題？')
+    } else {
+      const read = async (testid) => (await first.$eval(`[data-testid="${testid}"]`, (n) => n.textContent?.trim() ?? '').catch(() => null))
+      const skills = await first.$$eval('[data-testid="project-skill"]', (ns) => ns.map((n) => n.textContent?.trim()))
+      const got = { title: await read('project-card-title'), skills, status: await read('project-status'), expires: await read('project-expires'), seats: await read('project-seats') }
+      const want = { title: '案件甲', skills: ['Three.js'], status: '招募中', expires: '剩 7 天', seats: '4 個座位' }
+      if (JSON.stringify(got) === JSON.stringify(want)) ok('[FE-B02-S07] 卡片上的標題、技能、狀態、剩 7 天、4 個座位都讀得出來')
+      else bad('[FE-B02-S07] 卡片欄位對不上', `要 ${JSON.stringify(want)}，是 ${JSON.stringify(got)}`)
+    }
   }
   await page.screenshot({ path: path.join(OUT, 'project-board-open.png') })
 
