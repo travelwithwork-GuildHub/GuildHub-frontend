@@ -25,5 +25,5 @@
 ## 4. 收尾
 
 - [x] 4.1 `ui-ux-pro-max` pre-delivery：狀態不靠顏色、chip 不換行、對比；`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm exec tsc --noEmit`、`pnpm test`；`bash .github/scripts/pr-size.sh`
-- [ ] 4.2 量 client JS 前後差貼 PR（全部 chunk gz 1291.2 → 1291.5 KB；BoardPanel 那個 chunk 157.0 → 157.3 KB，+0.3 KB）；合併後 `vercel deploy --prod`
-- [ ] 4.3 `archive/fe-b02-project-card`：`openspec validate --archived --strict` 與 `--all --strict`；Sheet `FE-B02` Done
+- [x] 4.2 量 client JS 前後差貼 PR（全部 chunk gz 1291.2 → 1291.5 KB；BoardPanel 那個 chunk 157.0 → 157.3 KB，+0.3 KB）；合併後 `vercel deploy --prod` —— #493 合併（main `5ab2362`）、已部署 READY
+- [x] 4.3 `archive/fe-b02-project-card`：`openspec validate --archived --strict` 與 `--all --strict`；Sheet `FE-B02` Done
