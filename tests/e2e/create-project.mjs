@@ -5,9 +5,9 @@
 // 「送出去的案子第二個人看得到」「重新整理還在」「瀏覽器真的只送四個鍵」——
 // 這三件事只在真的瀏覽器、真的 Route Handler、真的 Postgres 上成立或不成立。
 //
-// **不攔任何 `/api/*`。** `POST /api/projects` 只用 `context.on('request')` 旁觀 —— 事件監聽不接管請求；
-// 規格括號裡寫的 `page.route` 其實是攔截後放行（`route.continue()`），兩個審查者都指出純旁觀該用事件（規格要的是「旁觀，不攔截」，這一條比它更嚴）。
-// 攔下來偽造的話，「恰好四鍵」證明的是測試自己。
+// **不偽造任何 `/api/*`。** `POST /api/projects` 依規格用 `page.route` 旁觀：攔到之後**不改寫、原樣 `route.continue()` 放行**到真的 Route Handler，
+// 只抄下瀏覽器送出的 body 是哪幾個鍵（`route.continue()` 不帶參數就不會改 method／headers／postData）。
+// 攔下來偽造回應的話，「恰好四鍵」證明的是測試自己。（審查者提過 `context.on('request')` 是更純的旁觀；規格括號寫的是 `page.route`，規格贏。）
 // **只打本機自己起的 `next start` 與可拋棄的資料庫**（`assertLoopback`／`guardLoopback`）。
 //
 // 用法（**要先 build、起 internal adapter 的正式 server**；`next dev` 會 HMR panic 假紅，`FE-V01` 記著）：
@@ -83,9 +83,10 @@ try {
   const first = await browser.newContext({ viewport: { width: 1280, height: 720 } })
   guardLoopback(first)
   const posts = []
-  // 旁觀、不攔截：事件監聽只讀，不接管請求 —— 送到真的 Route Handler 的就是這一份
-  first.on('request', (request) => {
-    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/projects') posts.push(request.postDataJSON())
+  // 旁觀：抄下 body，然後**原樣放行**（不帶參數的 `continue()`）—— 送到真的 Route Handler 的就是這一份
+  await first.route('**/api/projects', async (route) => {
+    if (route.request().method() === 'POST') posts.push(route.request().postDataJSON())
+    await route.continue()
   })
   const page = await signUpAndEnter(first, '發案的人')
   ok('[S08] 第一個人在全新的儲存空間建立了身分並進到世界')
