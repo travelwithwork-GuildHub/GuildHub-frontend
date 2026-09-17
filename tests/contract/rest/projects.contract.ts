@@ -13,6 +13,17 @@ const KEYS = ['id', 'owner_id', 'title', 'body', 'needed_skills', 'status', 'roo
 const DAY = 24 * 60 * 60 * 1_000
 const post = (c: ContractClient, body: unknown) => c.raw('POST', '/api/projects', { body })
 
+/** Requirement 的「型別錯的 body → 422（`FE-O03-S03` 的形狀）」：JSON、`detail` 陣列、每項 `loc` 以 `body` 開頭。 */
+async function expect422(c: ContractClient, body: unknown) {
+  const r = await post(c, body)
+  expect(r.status, JSON.stringify(body)).toBe(422)
+  expect(r.contentType, JSON.stringify(body)).toMatch(/application\/json/)
+  const detail = (r.json as { detail: unknown }).detail
+  expect(Array.isArray(detail), JSON.stringify(body)).toBe(true)
+  expect((detail as unknown[]).length).toBeGreaterThan(0)
+  for (const item of detail as unknown[]) expect(ValidationError.parse(item).loc[0]).toBe('body')
+}
+
 describe('建案', () => {
   it('[FE-J01-S09] 201、恰好十個鍵、owner 是我、預設值、7 天後到期、列表第 0 頁第一筆是它', async () => {
     const c = new ContractClient(baseUrl())
@@ -54,17 +65,8 @@ describe('建案', () => {
     const c = new ContractClient(baseUrl())
     await c.login('送錯型別的人')
     const seen = await c.raw('GET', '/api/projects?page=0')
-    // `seat_count: 2.5`：Pydantic 的 `int` 拒絕小數 —— `z.number()` 會放過它再撞資料庫的 smallint（審查抓到的型別不一致）。
-    for (const body of [{ title: 1, body: 'x' }, { title: 'x', body: 'y', seat_count: 'four' }, { body: '沒有標題' }, { title: 'x', body: 'y', seat_count: 2.5 }]) {
-      const r = await post(c, body)
-      expect(r.status, JSON.stringify(body)).toBe(422)
-      expect(r.contentType, JSON.stringify(body)).toMatch(/application\/json/)
-      const detail = (r.json as { detail: unknown }).detail
-      expect(Array.isArray(detail), JSON.stringify(body)).toBe(true)
-      expect((detail as unknown[]).length).toBeGreaterThan(0)
-      for (const item of detail as unknown[]) expect(ValidationError.parse(item).loc[0]).toBe('body')
-    }
-    // 解析失敗不得先寫再回 422：清單要跟四次之前一模一樣。
+    for (const body of [{ title: 1, body: 'x' }, { title: 'x', body: 'y', seat_count: 'four' }, { body: '沒有標題' }]) await expect422(c, body)
+    // 解析失敗不得先寫再回 422：清單要跟三次之前一模一樣。
     expect((await c.raw('GET', '/api/projects?page=0')).json, '422 卻建了一筆').toEqual(seen.json)
 
     const anon = new ContractClient(baseUrl())
@@ -74,5 +76,13 @@ describe('建案', () => {
     expect(r.json).toEqual({ detail: '未登入' })
     const again = await c.raw('GET', '/api/projects?page=0')
     expect(again.json, '未登入卻建了一筆').toEqual(seen.json)
+  })
+
+  // Requirement 那句「型別錯的 body → 422」不只 S10 列的三個：`seat_count` 在真後端是 Pydantic 的 `int`，小數是 422。
+  // 這一條**只能在契約層驗**（要兩個目標同意）：替身用 `z.number()` 的話會放過 2.5、再撞資料庫的 smallint 變 500 —— 單元測試看不到真後端怎麼回。
+  it('[FE-J01-S10] seat_count 是整數：2.5 也是 422', async () => {
+    const c = new ContractClient(baseUrl())
+    await c.login('送小數座位的人')
+    await expect422(c, { title: 'x', body: 'y', seat_count: 2.5 })
   })
 })
