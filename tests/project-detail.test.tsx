@@ -192,13 +192,18 @@ describe('發案者名片是獨立的載入單元', () => {
 
   it('[FE-B03-S15] 案子 ready、發案者還在載：兩塊各自的狀態', async () => {
     server.replyFor(projectPath(UUID(0)), 200, project(0))
-    // 發案者刻意不回
+    // 發案者壓著不回（沒排回應的話替身會立刻回 500，那是另一條）；結尾要放行，server 才關得掉
+    const held = { release: () => {} }
+    server.replyFor(profilePath(OWNER), 200, profile(OWNER), { after: new Promise<void>((r) => (held.release = r)) })
     mount(UUID(0), undefined)
     await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
     expect(within(detail()).getByTestId('project-body').textContent).toBe('內容0')
     const o = owner()
     expect(o.dataset.phase).toBe('loading')
+    expect(o.getAttribute('aria-busy')).toBe('true')
     expect(within(o).queryByTestId('owner-name')).toBeNull()
+    held.release()
+    await waitFor(() => expect(owner().dataset.phase).toBe('ready'))
   })
 
   it('[FE-B03-S16] 切換案件後，舊發案者（X）的回應不得覆蓋新案子的發案者（Y）', async () => {
