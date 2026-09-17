@@ -29,11 +29,6 @@ const PROFILE = { id: ME, display_name: '阿福', avatar_id: 0, skills: [], hour
 const FIRST_ENTRY_DONE = 'guildhub.first-entry-done'
 
 const workingClipboard: ClipboardPort = { async write() {} }
-const brokenClipboard: ClipboardPort = {
-  async write() {
-    throw new Error('這個瀏覽器（或這個連線）不允許自動複製。')
-  },
-}
 
 beforeEach(async () => {
   server = await startContractServer()
@@ -119,8 +114,16 @@ describe('登入頁的每一條路都通到世界，而新建的名片要先帶�
   })
 
   it('[FE-A06-S15] 複製失敗：不說成功、仍鎖著、不離開；而且給得出手動保存的路與填回的入口', async () => {
-    await reachKey(brokenClipboard)
+    // 寫入要等到回報之後才算：一個「先說已複製、失敗再改回來」的實作**最終狀態跟正確的一樣**，
+    // 只有卡在 pending 的那一瞬間分得出來（`first-entry-flow.test.tsx` 的 `S08` 同一招；突變 M5 抓到這一條原本漏了）。
+    let fail: (err: Error) => void = () => {}
+    const failingLater: ClipboardPort = { write: () => new Promise<void>((_, reject) => (fail = reject)) }
+    await reachKey(failingLater)
     click(screen.getByRole('button', { name: '複製鑰匙' }))
+    expect(screen.queryByRole('status'), '寫入還沒回報就說已複製').toBeNull()
+    expect(enterButton().disabled, '寫入還沒回報就放行了').toBe(true)
+
+    await act(async () => fail(new Error('這個瀏覽器（或這個連線）不允許自動複製。')))
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('不允許自動複製'))
     expect(screen.queryByText(/已經複製/), '寫入失敗卻說已複製').toBeNull()
