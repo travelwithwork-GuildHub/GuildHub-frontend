@@ -119,7 +119,7 @@
 - **THEN** SHALL 出現確認層
 - **AND WHEN**（另一個全新 render）什麼都沒打就按「取消」
 - **THEN** 表單 SHALL 直接關閉、SHALL NOT 出現確認層；面板 SHALL 仍開著
-- **AND WHEN** 送出中（替身尚未回應）各按一次 Escape、「取消」、面板的關閉鈕
+- **AND WHEN**（另一個全新 render）填好合法的四欄送出、替身把 `POST` 卡在 pending，期間各按一次 Escape、「取消」、面板的關閉鈕
 - **THEN** 表單 SHALL 仍開著、SHALL NOT 出現確認層、面板 SHALL 仍開著
 
 ### Requirement: 真瀏覽器裡發的案，別人重新載入也看得到
