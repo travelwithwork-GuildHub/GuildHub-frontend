@@ -73,7 +73,8 @@ export function useListPage<K extends ListKind>(kind: K, { page: wantedPage = 0,
     const identity = { kind: activeKind, page }
     const controller = new AbortController()
     void FETCH[activeKind](page, controller.signal).then(
-      (items) => dispatch({ type: 'resolved', identity, items: items as ListItemOf[K][] }),
+      // `at`：回來的時刻。在這裡讀時鐘（effect 的回呼），不在 reducer 或 render 裡（要純）。
+      (items) => dispatch({ type: 'resolved', identity, items: items as ListItemOf[K][], at: Date.now() }),
       (error: unknown) => {
         // 被自己中止的請求不是失敗。identity 變了的那種，reducer 會擋；
         // **identity 沒變、效果卻被重跑的那種擋不住** —— React StrictMode 在開發模式

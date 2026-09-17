@@ -65,10 +65,12 @@ async function openProjectBoard(page, who) {
   if (panel === null) throw new Error(`${who}按 E 沒有開出專案面板`)
   return panel
 }
-const firstItemText = (page) => page.$eval('[data-testid="list-panel-list"] li', (n) => n.textContent?.trim() ?? '').catch(() => null)
+// 第一筆的**標題節點**（`FE-B02` 之後列項是整張卡：狀態、剩幾天、座位數都在 `li` 的文字裡，整個 `li` 比不出標題）
+const FIRST_TITLE = '[data-testid="list-panel-list"] li [data-testid="project-card-title"]'
+const firstItemText = (page) => page.$eval(FIRST_TITLE, (n) => n.textContent?.trim() ?? '').catch(() => null)
 /** 等列表載完、第一筆是 `title`（最多 15 秒），然後**讀出來比對**：等不到就讀到什麼比什麼 —— 判準在 `check`，不在這裡。 */
 async function expectFirstItem(page, label, title) {
-  await page.waitForFunction((t) => document.querySelector('[data-testid="list-panel-list"] li')?.textContent?.includes(t), title, { timeout: 15_000 }).catch(() => {})
+  await page.waitForFunction(([sel, t]) => document.querySelector(sel)?.textContent?.includes(t), [FIRST_TITLE, title], { timeout: 15_000 }).catch(() => {})
   check(label, await firstItemText(page), title)
 }
 // 只看面板裡的、名字完全相等：標題列的「我的名片：發案的人」也含「發案」兩個字（第一次跑就撞到）
@@ -110,6 +112,8 @@ try {
   const closed = await page.waitForSelector('[data-testid="create-project-form"]', { state: 'detached', timeout: 15_000 }).then(() => true).catch(() => false)
   check('[S08] 送出之後表單關閉', closed, true)
   await expectFirstItem(page, '[S08] 列表第一筆是剛發的標題', TITLE)
+  // 剛發的案子是「剩 7 天」（`FE-B02`：建立 ＋7 天、`ceil`）。時鐘釘在面板開起來那一刻的實作會在這裡讀到 8 天（實測抓到的）。
+  check('[FE-B02] 剛發的案子在卡片上是「剩 7 天」', await page.$eval('[data-testid="list-panel-list"] li [data-testid="project-expires"]', (n) => n.textContent?.trim()).catch(() => null), '剩 7 天')
   await page.screenshot({ path: path.join(OUT, '3-after-submit.png') })
 
   check('[S08] 建案時瀏覽器送出了恰好一個 POST /api/projects', posts.length, 1)

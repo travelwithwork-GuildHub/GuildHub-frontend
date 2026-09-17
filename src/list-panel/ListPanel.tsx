@@ -30,7 +30,8 @@ export interface ListPanelProps<K extends ListKind> {
   /** 面板的名字（也是 `aria-label`）。 */
   title: string
   labels: { next: string; close: string }
-  renderItem: (item: ListItemOf[K]) => ReactNode
+  /** `fetchedAt`：這一頁回來的時刻（epoch ms）—— 要畫相對時間（剩幾天）的卡片用它當時鐘，不自己讀 `Date.now()`。 */
+  renderItem: (item: ListItemOf[K], ctx: { fetchedAt: number }) => ReactNode
   /** 首次無資料時顯示的節點。沒給就什麼都不顯示（`S13`）。 */
   empty?: ReactNode
   /** 翻到底時顯示的節點。 */
@@ -74,6 +75,7 @@ export function ListPanel<K extends ListKind>({
   const overlayNode = typeof overlay === 'function' ? overlay({ reload }) : overlay
   const edge = edgeState(state)
   const items = state.shown?.items ?? []
+  const fetchedAt = state.shown?.at ?? 0
   // 沒有項目時列表不佔空間，狀態節點（首次無資料、權限阻擋⋯⋯）從上面開始，
   // 不是躲在一個空白大框的底下。列表仍然在（`aria-busy` 與 `role="list"` 的判準要找得到它）。
   const hasItems = items.length > 0
@@ -112,7 +114,7 @@ export function ListPanel<K extends ListKind>({
         }
       >
         {items.map((item) => (
-          <li key={item.id}>{renderItem(item)}</li>
+          <li key={item.id}>{renderItem(item, { fetchedAt })}</li>
         ))}
       </ul>
 

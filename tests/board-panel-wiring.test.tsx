@@ -11,6 +11,8 @@ import { startContractServer, type ContractServer } from './support/contract-ser
 // 規格：openspec/changes/fe-b01-list-container/specs/list-panel/spec.md
 //   Requirement: 走到看板前按 E，開得起對應的面板 —— S01／S02
 //   Requirement: Escape 關閉面板，並把世界的輸入還回去 —— S16／S17 的接線那一半
+// 規格：openspec/changes/fe-b02-project-card/specs/project-directory/spec.md
+//   Requirement: 專案看板的列項就是案件卡 —— S06
 //
 // ⚠️⚠️ **這一份驗的是接線，不是容器。** 容器自己的行為在 `list-panel-container.test.tsx`。
 // 這裡的每一個元件都是正式碼：`BoardTargets` 把 `onInteract` 註冊進真的 registry、
@@ -118,6 +120,25 @@ describe('走到看板前按 E，開得起對應的面板', () => {
     await waitFor(() => expect(screen.getByText(seen)).toBeInTheDocument())
     // 面板讀的是**那一種**資料：只打了對應的端點。
     expect(server.calls.map((c) => c.pathname + c.search)).toEqual([`${path}?page=0`])
+  })
+
+  it('[FE-B02-S06] 案件面板的每一筆都是案件卡，data-project-id 對得上', async () => {
+    // `replyFor` 是佇列：`beforeEach` 排的那一筆先被拿走，所以先開一次面板消耗它、關掉、再開一次拿兩筆的。
+    const SECOND = { ...PROJECT, id: UUID(3), title: '案件乙' }
+    server.replyFor('/api/projects', 200, [PROJECT, SECOND])
+    const { pressE } = mount()
+    pressE(boardId('projectBoard'))
+    await waitFor(() => expect(screen.getByText('案件甲')).toBeInTheDocument())
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
+    })
+    await waitFor(() => expect(screen.queryByTestId('list-panel')).toBeNull())
+    pressE(boardId('projectBoard'))
+    await waitFor(() => expect(screen.getByText('案件乙')).toBeInTheDocument())
+    const items = screen.getByTestId('list-panel-list').querySelectorAll('li')
+    expect(items.length).toBe(2)
+    const cards = [...items].map((li) => li.querySelector('[data-testid="project-card"]'))
+    expect(cards.map((c) => c?.getAttribute('data-project-id')), '列項不是卡片（還是一行標題？）').toEqual([PROJECT.id, SECOND.id])
   })
 
   it('[FE-B01-S02] 對照：兩塊看板開的不是同一種', async () => {
