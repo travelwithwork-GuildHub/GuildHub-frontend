@@ -65,5 +65,5 @@
 
 ## 6. 收尾
 
-- [ ] 6.1 `archive/fe-j01-create-project`：`openspec validate --archived --strict` 與 `--all --strict`（全勾之後才會綠）
-- [ ] 6.2 Sheet `FE-J01` 進度更新
+- [x] 6.1 `archive/fe-j01-create-project`：`openspec validate --archived --strict` 與 `--all --strict`（全勾之後才會綠）
+- [x] 6.2 Sheet `FE-J01` 進度更新
