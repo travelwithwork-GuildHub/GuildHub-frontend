@@ -20,6 +20,7 @@
     "db:seed": "node scripts/db.mjs seed",
     "test:contract:internal": "CONTRACT_TARGET=internal vitest run --config vitest.contract.mts",
     "test:contract:guildhub": "node scripts/contract-guildhub.mjs",
+    "test:rehearsal:guildhub": "node scripts/contract-guildhub.mjs --suite rehearsal",
     "realtime:stub": "tsx scripts/realtime-stub.ts"
   },
   "dependencies": {
