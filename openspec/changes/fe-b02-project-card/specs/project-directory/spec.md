@@ -68,7 +68,7 @@
 #### Scenario: [FE-B02-S08] 卡片在這一份不是控制項
 
 - **WHEN** 掛載一張案件卡
-- **THEN** 卡片的根節點 SHALL 是 `<article>`；卡片內 SHALL NOT 有 `button`、`a`、`role="button"`、`role="link"`，SHALL NOT 有任何 `tabIndex ≥ 0` 的元素；Tab 一次焦點 SHALL NOT 落在卡片裡
+- **THEN** 卡片的根節點 SHALL 是 `<article>`；卡片內（含根節點）SHALL NOT 有 `button`、`a`、`input`、`role="button"`、`role="link"`，SHALL NOT 有任何 `tabindex ≥ 0` 的元素 —— 也就是可聚焦元素的查詢在卡片內 SHALL 是空的
 
 ### Requirement: 專案看板的列項就是案件卡
 

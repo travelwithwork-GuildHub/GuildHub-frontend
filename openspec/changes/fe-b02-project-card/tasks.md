@@ -9,7 +9,7 @@
 
 ## 2. 案件卡（`src/projects/ProjectCard.tsx`、`src/projects/projectStatus.ts`）—— Requirement〈案件卡讓人一眼判斷…〉
 
-- [ ] 2.1 `tests/project-card.test.tsx`：`S01`～`S05`、`S08`（`now` 以 prop 釘住；`S02` 三種狀態互不相同且跟著 `status` 變；`S03` 含恰等於 `now`、沒有 `-\d`；`S04` 屬性＋「未指定」文字；`S05` 含 `room_template`、唯一的 `<time>` 是 `expires_at`；`S08` 根是 `article`、沒有 button／a／role／tabIndex、Tab 不進卡）；**先 commit 紅**
+- [ ] 2.1 `tests/project-card.test.tsx`：`S01`～`S05`、`S08`（`now` 以 prop 釘住；`S02` 三種狀態互不相同且跟著 `status` 變；`S03` 含恰等於 `now`、沒有 `-\d`；`S04` 屬性＋「未指定」文字；`S05` 含 `room_template`、唯一的 `<time>` 是 `expires_at`；`S08` 根是 `article`、卡內可聚焦元素查詢為空）；**先 commit 紅**
 - [ ] 2.2 `projectStatus.ts`：`PROJECT_STATUS_LABEL`（唯一一份）；`ProjectCard`：`<article data-testid="project-card" data-project-id>`、標題、技能 chip（`data-testid="project-skill"`，單行不換行）、
       狀態（`data-testid="project-status"`）、`<time dateTime={expires_at}>`（`data-testid="project-expires"`，`ceil`、≤0 →「已到期」）、座位數（`data-testid="project-seats"`，「N 個座位」）；`Missing` 多 `label` prop（預設「未提供」）、`field` 多 `needed_skills`
 - [ ] 2.3 **突變**：`floor` → `S01` 紅；狀態寫死「招募中」→ `S02` 紅；`≤ 0` 改 `< 0` → `S03` 紅；空技能不畫 `Missing`／印「未提供」→ `S04` 紅；把 `body` 或 `room_template` 印上 → `S05` 紅；根改 `<button>` → `S08` 紅
