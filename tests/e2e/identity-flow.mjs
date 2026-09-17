@@ -160,6 +160,9 @@ try {
   ok('[4.4b] 按下入口之後到得了登入流程')
 
   const keyA = await signUp(page, '阿福', false)
+  // 這一條是從 `/login` 的 `LoginForm` 開始的（不是 `/` 或 `/world` 引導層的 `FirstEntryFlow`）—— 審查問過，所以寫進紀錄
+  check('[S16] 第一條路是在 /login 的暱稱表單建立身分', new URL(page.url()).pathname, '/login')
+  check('[S16] /login 上的閘就是 KeyHandoff（標題「帶走這把鑰匙，再進去」）', await page.isVisible('h2:has-text("帶走這把鑰匙，再進去")'), true)
   check(
     '[4.1] 金鑰看起來是一個 UUID',
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(keyA),
