@@ -63,7 +63,9 @@
 
 #### Scenario: [FE-B09-S14] `?panel=projects&project=<id>` 開著那一筆案件詳情；帶錯面板的參數被去掉
 
-- **WHEN** 載入 `/world?panel=projects&project=<id>`
-- **THEN** 案件面板 SHALL 開著且詳情蓋在上面，並已送出 `GET /api/projects/<id>`；開詳情 SHALL 多一層瀏覽紀錄、Escape 或上一頁 SHALL 回到 `/world?panel=projects`
+- **WHEN** 直接載入 `/world?panel=projects&project=<id>`（本站沒有上一層紀錄）
+- **THEN** 案件面板 SHALL 開著且詳情蓋在上面，並已送出 `GET /api/projects/<id>`；SHALL NOT 新增瀏覽紀錄；按 Escape 後詳情 SHALL 不再顯示且網址 SHALL 被**替換**成 `/world?panel=projects`（`FE-B09-S11` 的案件版，不離站）
+- **AND WHEN** 案件清單開著（`/world?panel=projects`），使用者在清單裡開某一筆案件的詳情
+- **THEN** 網址 SHALL 變成 `/world?panel=projects&project=<id>` 且瀏覽紀錄 SHALL 多一層；瀏覽器的上一頁 SHALL 回到 `/world?panel=projects`（詳情關、清單仍開）
 - **AND WHEN** 載入 `/world?panel=projects&profile=<id>`、`/world?panel=profiles&project=<id>`、`/world?project=<id>&page=2`、`/world?profile=<a>&project=<b>`、`/world?panel=projects&project=<b>&profile=<a>`、`/world?panel=bogus&project=<id>`、`/world?project=not-a-uuid`、`/world?project=<a>&project=<b>` 各一次
 - **THEN** 網址 SHALL 分別被改成 `/world?panel=projects`、`/world?panel=profiles`、`/world?panel=projects&project=<id>&page=2`、`/world?panel=profiles&profile=<a>`、`/world?panel=projects&project=<b>`、`/world`、`/world`、`/world?panel=projects&project=<a>`，每一次都是可操作的畫面，且這些 canonical 化 SHALL NOT 新增瀏覽紀錄（replace）

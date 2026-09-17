@@ -10,9 +10,9 @@
 
 ## 2. `--url`：網址與選中狀態（`deep-link` MODIFIED；design D4）
 
-- [ ] 2.1 `tests/url-state.test.ts`：`FE-B09-S14` 的解析／序列化／canonical（四種錯位組合、`depthOf` 把 `project` 算第 2 層）；`tests/deep-link.test.tsx`：載入 `?panel=projects&project=<id>` 送出 `GET /api/projects/<id>`、Escape 回 `?panel=projects`；**先 commit 紅**
+- [ ] 2.1 `tests/url-state.test.ts`：`FE-B09-S14` 的解析／序列化／canonical（**八種輸入逐一**：帶錯面板 ×2、單獨 `project`＋`page`、兩個單獨 detail、顯式 panel＋兩個 detail、`panel=bogus&project`、不合 UUID、同名重複；定點；`depthOf` 把 `project` 算第 2 層）；`tests/deep-link.test.tsx`：直達 `?panel=projects&project=<id>` 送出 `GET /api/projects/<id>`、不多一層紀錄、Escape 用 replace 回 `?panel=projects`；清單裡開詳情 push 一層、上一頁回清單；**先 commit 紅**
 - [ ] 2.2 `urlState.ts`：`project` 欄位、canonical 規則；`ListPanelProvider`：`selected` = 開著面板的那一筆、`selectProject`；`PanelUrlSync`：層數含 `project`
-- [ ] 2.3 **突變**：`panel=projects` 帶 `profile` 不去掉 → `S14` 紅；`depthOf` 不算 `project` → `S14`（Escape 那一半）紅
+- [ ] 2.3 **突變**：`panel=projects` 帶 `profile` 不去掉 → `S14` 紅；`depthOf` 不算 `project` → `S14`（push／Escape 那一半）紅；直達時也 push → `S14` 紅
 
 ## 3. `--detail`：詳情、發案者名片、動作列（ADDED 四條；design D1／D2／D3）
 
