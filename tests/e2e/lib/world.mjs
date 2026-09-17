@@ -69,6 +69,27 @@ export async function hold(page, code, ms) {
   await page.keyboard.up(code)
 }
 export const promptText = (page) => page.$eval('[data-testid="interaction-prompt"]', (n) => n.textContent ?? '').catch(() => null)
+
+/**
+ * 走到某塊看板前，直到互動提示指名它（`board-panel.mjs` 的走位，搬過來讓後面的腳本共用）。
+ * `steps`：先按住的幾段 `[code, ms]`；之後一小步一小步往上，最多 8 步。每一步之後停 400 ms 讓相機收斂。
+ * 走不到就把畫面上的提示說出來、截圖到 `out`。
+ */
+export async function approach(page, label, steps, out) {
+  const step = async (code, ms) => {
+    await hold(page, code, ms)
+    await page.waitForTimeout(400)
+  }
+  for (const [code, ms] of steps) await step(code, ms)
+  for (let i = 0; i < 8; i++) {
+    const prompt = await promptText(page)
+    if (prompt !== null && prompt.includes(label)) return prompt
+    await step('ArrowUp', 120)
+  }
+  const prompt = (await promptText(page)) ?? '（沒有提示）'
+  await page.screenshot({ path: path.join(out, 'lost.png') })
+  throw new Error(`走不到「${label}」前面。畫面上的提示：${prompt}（截圖 ${out}/lost.png）`)
+}
 export const pathAndSearch = (page) => page.evaluate(() => `${location.pathname}${location.search}`)
 
 export async function expectUrl(page, label, want) {

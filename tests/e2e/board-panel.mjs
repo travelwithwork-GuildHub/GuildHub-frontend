@@ -22,6 +22,7 @@ import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
 import { burst, stableDiff } from './lib/pixels.mjs'
+import { approach } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-b01'
@@ -57,27 +58,6 @@ const ok = (l) => console.log(`✅ ${l}`)
 const bad = (l, d) => {
   failures++
   console.log(`❌ ${l}\n   ${d}`)
-}
-
-/** 按住某個鍵走一段。 */
-async function hold(page, code, ms) {
-  await page.keyboard.down(code)
-  await page.waitForTimeout(ms)
-  await page.keyboard.up(code)
-  await page.waitForTimeout(400)
-}
-
-/** 走到某塊看板前，直到提示指名它。走不到就把畫面上有什麼說出來。 */
-async function approach(page, label, steps) {
-  for (const [code, ms] of steps) await hold(page, code, ms)
-  for (let i = 0; i < 8; i++) {
-    const prompt = await page.$eval('[data-testid="interaction-prompt"]', (n) => n.textContent ?? '').catch(() => null)
-    if (prompt !== null && prompt.includes(label)) return prompt
-    await hold(page, 'ArrowUp', 120)
-  }
-  const prompt = await page.$eval('[data-testid="interaction-prompt"]', (n) => n.textContent ?? '').catch(() => '（沒有提示）')
-  await page.screenshot({ path: path.join(OUT, 'lost.png') })
-  throw new Error(`走不到「${label}」前面。畫面上的提示：${prompt}（截圖 ${OUT}/lost.png）`)
 }
 
 /** 按住方向鍵前後，WebGL 畫面的穩定差異像素數。 */
@@ -149,7 +129,7 @@ try {
   // ── S01：專案看板 ─────────────────────────────────────────
   // 出生點 (0, -1)，剛剛的對照組往右走了 0.5 秒（速度 4 ⇒ x ≈ 2）。
   // 專案看板在 (-3.5, -6.5)：往左 5.5、往上 4 左右到互動範圍（2）內，面向它。
-  const prompt = await approach(page, '看專案看板', [['ArrowLeft', 1400], ['ArrowUp', 1000]])
+  const prompt = await approach(page, '看專案看板', [['ArrowLeft', 1400], ['ArrowUp', 1000]], OUT)
   ok(`走到了專案看板前：提示是「${prompt.trim()}」`)
 
   await page.keyboard.press('KeyE')
@@ -183,7 +163,7 @@ try {
 
   // ── S02：人才看板 ─────────────────────────────────────────
   // 剛剛 motion() 往右走了兩段；人才看板在 (3.5, -6.5)，跟專案看板同一排。
-  const prompt2 = await approach(page, '看人才看板', [['ArrowRight', 900]])
+  const prompt2 = await approach(page, '看人才看板', [['ArrowRight', 900]], OUT)
   ok(`走到了人才看板前：提示是「${prompt2.trim()}」`)
   await page.keyboard.press('KeyE')
   const panel2 = await page.waitForSelector('[data-testid="list-panel"]', { timeout: 5_000 }).catch(() => null)
