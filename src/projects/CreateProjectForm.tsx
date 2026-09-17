@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
-import { useWatch } from 'react-hook-form'
 import type { ProjectOut } from '@/api/contract/rest'
 import { createProject } from '@/api/operations'
 import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
@@ -41,18 +40,18 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
   const { form, visibleErrors, canSubmit, busy, submitError, onSubmit } = useForm({
     schema: CreateProjectSchema,
     defaultValues: INITIAL,
+    // ⚠️ 送出前**不改寫任何欄位**：失敗時四欄要原樣（`S06`；codex 審查抓到「先把技能欄洗成正規化字串」會違反它）。正規化在 schema／`toPayload`。
     onSubmit: async (values) => {
-      form.setValue('skills', joinSkills(values.skills))
       onCreated(await createProject(toPayload(values)))
     },
   })
-  const dirty = isDirty(useWatch({ control: form.control }))
 
+  // dirty 只在關閉意圖那一刻算（`getValues`），不訂閱每一次輸入（Gemini 審查：`useWatch` 會讓每個字都重繪整張表單）。
   const requestClose = useCallback(() => {
     if (busy) return // 送出中任何關閉意圖都無效（`S07`）
-    if (dirty) askDiscard()
+    if (isDirty(form.getValues())) askDiscard()
     else onDismiss()
-  }, [busy, dirty, onDismiss, askDiscard])
+  }, [busy, form, onDismiss, askDiscard])
   useEffect(() => {
     closeIntentRef.current = requestClose
     return () => {

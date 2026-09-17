@@ -175,15 +175,17 @@ describe('送出的是白名單 payload，成功後列表回第 0 頁重取', ()
     expect(document.activeElement, '焦點沒回到列表').toBe(list())
   })
 
-  it('[FE-J01-S06] 500：留值、一個 alert、列表不動；再送 201 才關閉重取', async () => {
+  it('[FE-J01-S06] 500：留值（連沒洗過的技能字串都原樣）、一個 alert、列表不動；再送 201 才關閉重取', async () => {
     await openForm()
-    await fill()
+    // 技能欄故意留空白與大小寫重複：失敗時要**逐字原樣**，不能被送出流程洗成正規化字串（codex 審查抓到的）
+    const messy = { ...VALID, 需要的技能: ' three.js, TypeScript ,three.js ', 標題: '  找一個會 Three.js 的人  ' }
+    await fill(messy)
     server.replyFor('/api/projects', 500, { detail: '壞了' })
     await submit()
     const alert = await within(form()).findByRole('alert')
     expect(within(form()).getAllByRole('alert')).toHaveLength(1)
     expect(alert.compareDocumentPosition(button('送出')) & Node.DOCUMENT_POSITION_FOLLOWING, 'alert 不在送出鈕上方').toBeTruthy()
-    for (const [label, value] of Object.entries(VALID)) expect(field(label).value, `${label} 的值被清掉了`).toBe(value)
+    for (const [label, value] of Object.entries(messy)) expect(field(label).value, `${label} 的值被改了`).toBe(value)
     expect(gets(server), '失敗還重取了列表').toEqual(['?page=0'])
     expect(shownPage()).toBe(0)
 
@@ -241,6 +243,8 @@ describe('未送出就關要確認；送出中不可關', () => {
     expect(confirm()).toBeNull()
     expect(field('標題').value).toBe('半途')
 
+    // 殼的關閉意圖再來一次。**真瀏覽器裡表單開著時殼的關閉鈕在 inert 的內容區裡、按不到**（跟 `FE-B04` 詳情開著時一樣），
+    // 使用者走的是 Escape；這裡直接 dispatch 到那顆鈕只是驗「同一條 `onCloseRequest` 接線」，不是可操作性的證據（codex 審查指出）。
     click(within(panel()).getByRole('button', { name: '關閉' }))
     expect(panel(), '殼的關閉鈕把整個面板關了').toBeDefined()
     expect(confirm(), '殼的關閉鈕沒有走表單的關閉意圖').not.toBeNull()
