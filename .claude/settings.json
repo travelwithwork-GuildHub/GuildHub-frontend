@@ -1,0 +1,11 @@
+{
+  "enabledPlugins": {
+    "neon@claude-plugins-official": false,
+    "stripe@claude-plugins-official": false,
+    "vercel@claude-plugins-official": false,
+    "resend@claude-plugins-official": false,
+    "aws-serverless@claude-plugins-official": false,
+    "bigquery-data-analytics@claude-plugins-official": false,
+    "cloudflare@claude-plugins-official": false
+  }
+}
