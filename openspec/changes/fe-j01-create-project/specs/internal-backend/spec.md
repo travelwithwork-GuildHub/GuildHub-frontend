@@ -11,14 +11,15 @@
 ### Requirement: 建案：形狀、預設值與到期日照真後端
 
 `POST /api/projects` SHALL 經 `handle()`（`auth: 'required'`）以 `contract.ProjectCreate` 解析 body（`title`、`body` 必填字串；
-`needed_skills` 預設 `[]`；`seat_count` 預設 4），插入 `projects`（`owner_id` = session 的名片、`status` 由資料庫預設 `recruiting`、
-`room_template` NULL、`expires_at` 由資料庫預設 `now() + 7 days`），回 `201` 與 `ProjectOut`（不含 `password_hash`）。
+`needed_skills` 預設 `[]`；`seat_count` 預設 4），插入 `projects`（`owner_id` = session 的名片、`status` `recruiting`、`room_template` NULL、`expires_at` 是建立時刻 ＋7 天），
+回 `201`，body 的鍵 SHALL 恰好是 `ProjectOut` 的十個鍵（`id`、`owner_id`、`title`、`body`、`needed_skills`、`status`、`room_template`、`seat_count`、`expires_at`、`updated_at`），
+SHALL NOT 含 `password_hash`。
 跟真後端一樣 SHALL NOT 檢查長度與範圍（那些在前端的 `FORM_LIMITS`）；型別錯的 body → `422`（`FE-O03-S03` 的形狀）；未登入 → `401`（`FE-O03-S01`）。
 
 #### Scenario: [FE-J01-S09] 建案回 201，欄位與預設值對，7 天後到期，列表第一筆是它
 
 - **WHEN** 登入後 `POST /api/projects` 送 `{"title":"契約建案","body":"內容","needed_skills":["a"],"seat_count":2}`
-- **THEN** SHALL 是 `201`，body 通過 `ProjectOut` 的 Zod 解析，`owner_id` SHALL 等於 `/api/me` 的 `id`，`status` SHALL 是 `recruiting`，
+- **THEN** SHALL 是 `201`，原始 JSON 的鍵集合 SHALL 恰好是 `ProjectOut` 的十個鍵（沒有 `password_hash`），通過 `ProjectOut` 的 Zod 解析，`owner_id` SHALL 等於 `/api/me` 的 `id`，`status` SHALL 是 `recruiting`，
       `room_template` SHALL 是 `null`，`seat_count` 2、`needed_skills` `["a"]`，`expires_at` SHALL 在建立時刻 ＋7 天的 ±5 分鐘內，`updated_at` SHALL 是有效的 ISO 時間
 - **AND WHEN** 只送 `{"title":"預設值","body":"內容"}`
 - **THEN** SHALL 是 `201`，`needed_skills` SHALL 是 `[]`、`seat_count` SHALL 是 4

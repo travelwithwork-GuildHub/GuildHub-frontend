@@ -66,10 +66,12 @@
 送出中三種關閉都無效（`FE-A04-S10` 同一條規則）。
 
 實作照 `FE-A04` 的形狀，**dirty 與送出中的判斷留在表單裡**：`CreateProjectForm` 收 `closeIntentRef`（殼的 Escape／關閉鈕與自己的取消鈕都走它的 `requestClose`：送出中 → 無效；dirty → `askDiscard()`；否則 → `onDone()`），
-`BoardPanel` 的 `onClose` 只做 `closeIntentRef.current ? closeIntentRef.current() : closePanel()`，並持有「確認層開著沒有」這一個布林。
+`BoardPanel` 的 `onClose` 只做顯式分支 —— `const requestClose = closeIntentRef.current; if (requestClose) requestClose(); else closePanel()` ——
+並持有「確認層開著沒有」這一個布林。**不得寫成 `closeIntentRef.current?.() ?? closePanel()`**：`requestClose()` 回 `void`，`??` 右邊照樣執行，
+dirty 確認與送出中不可關全部被繞過（codex 審查抓到的；`S07` 對殼的關閉鈕有判準）。
 不把 dirty 提升到 `BoardPanel`：那會讓每打一個字整個 `ListPanel` 重繪（Gemini 審查抓到的，跟 3.5 的 `closeIntentRef` 形狀也矛盾）。`PanelShell` 不改。
 
-### D6 替身補 `POST`，跟真後端一樣不驗
+### D6 替身補 `POST`，跟真後端一樣不驗；但「不驗」不進契約套件
 
 `src/server/projects.ts` 加 `insertProject(owner, input)`；route 用既有的 `handle()`＋`contract.ProjectCreate` 解析
 （型別錯 → 422，形狀 `S03`）。**不多驗長度與範圍** —— `internal-backend` 既有規則「handler SHALL NOT 自行檢查長度上限」，
@@ -77,6 +79,13 @@
 前端不依賴它（表單守住），也不開放它（使用者送不出空標題）。`expires_at`：資料庫預設值（`db/schema/001_schema.sql:40` 已有 `now() + interval '7 days'`），跟真後端一樣不在應用層算。
 
 `contractUnimplemented`（`internal`）拿掉 `POST /api/projects`；`FE-O03-S05` 的清單改成只剩 `GET /api/projects/{id}/seats`。
+
+**刻意不寫「空 title／`seat_count` 0 或 9 → 201」的契約 Scenario**（codex 建議加、這裡拒絕）：契約套件在 CI 對 `internal` 跑，
+那條會把 anomaly 釘成替身的**義務**；`FE-O08` 的決定是 anomaly 只住在演練帳（`create-unvalidated`，對真後端跑、後端改了會紅、
+紅的意思是重新分類），不進替身。替身多驗一條的風險由「handler SHALL NOT 自行檢查長度上限」這條既有規則與 code review 守；
+使用者面向的保護在表單（`S03`），跟替身驗不驗無關。
+
+`expires_at`：Requirement 只寫行為（建立時刻 ＋7 天 ±5 分），資料庫預設值是實作位置、不是判準。
 
 ### D7 效能
 

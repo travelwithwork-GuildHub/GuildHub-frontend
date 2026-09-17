@@ -30,8 +30,10 @@
 
 - **WHEN** 已登入的人開專案看板的面板
 - **THEN** 列表上方 SHALL 有「發案」按鈕；人才看板的面板 SHALL NOT 有
-- **AND WHEN** 訪客（`identity.state` 不是 `signed-in`）開專案看板的面板
+- **AND WHEN** 訪客（`identity.state === 'guest'`）開專案看板的面板
 - **THEN** 面板裡 SHALL NOT 有任何名為「發案」的按鈕或連結（包括停用的）
+- **AND WHEN** 身分仍在解析（`identity.state === 'resolving'`）時開專案看板的面板
+- **THEN** 同樣 SHALL NOT 有任何名為「發案」的按鈕或連結（包括停用的）
 
 #### Scenario: [FE-J01-S02] 表單恰好四個欄位、預設值對
 
@@ -54,7 +56,8 @@
 
 - **WHEN** 標題打到 61 字、或內容 2001 字、或技能第 11 項、或某一項技能 41 字、或座位數 0／9／2.5
 - **THEN** 對應欄位 SHALL 立刻有錯誤訊息（`aria-invalid`＋`aria-describedby` 指到它），送出鈕 SHALL 停用，SHALL NOT 送出任何請求
-- **AND** 訊息裡的數字 SHALL 等於 `FORM_LIMITS` 對應的值（把 `FORM_LIMITS.seatCount.max` 改成 6 之後，「座位數」的上限訊息與判準 SHALL 跟著變 6）
+- **AND** 訊息裡的數字 SHALL 等於 `FORM_LIMITS` 對應的值（把 `FORM_LIMITS.seatCount.max` 換成 6 之後，「座位數」的上限訊息與判準 SHALL 跟著變 6）
+- **AND** 在模組層 `FORM_LIMITS.seatCount.max` SHALL 恆等於 `LIMITS.seatIndex.max + 1`（把 `LIMITS.seatIndex.max` 換成 5 之後，`FORM_LIMITS.seatCount.max` SHALL 是 6 —— 寫死 8 這裡要紅）
 
 #### Scenario: [FE-J01-S04] 必填空白要按下去才說
 
@@ -68,18 +71,20 @@
 送出 SHALL 呼叫 `createProject`，payload 恰好是 `{ title, body, needed_skills, seat_count }`：`title`／`body` 前後空白去掉、
 `needed_skills` 已正規化、`seat_count` 是整數。連按兩次 SHALL 只送一次（`FE-X05-S05`）。
 
-成功之後表單 SHALL 關閉，列表 SHALL **回到第 0 頁並重新向伺服器取**（不得只把回應插進目前畫面），第一筆 SHALL 是剛建的案子
-（後端依 `updated_at desc`）；`FE-B09` 的網址頁碼 SHALL 是 0。焦點 SHALL 回到列表。
+成功之後表單 SHALL 關閉，列表 SHALL **回到第 0 頁並重新向伺服器取**，畫面上呈現的 SHALL 是重取回來的結果（不得把 `POST` 的回應插進畫面），
+第一筆 SHALL 是剛建的案子（後端依 `updated_at desc`）；`FE-B09` 的網址頁碼 SHALL 是 0。焦點 SHALL 回到列表。
 
-失敗（後端非 2xx、網路錯誤）SHALL 照 `FE-X05-S06`：值留著、一個 `role="alert"` 在送出鈕上方、可再送；列表 SHALL 不動
-（不重取、頁碼不變）。
+失敗（後端非 2xx、或 `createProject` 以網路錯誤 reject）SHALL 照 `FE-X05-S06`：值留著、一個 `role="alert"` 在送出鈕上方、可再送、不自動重送；
+列表 SHALL 不動（不重取、頁碼不變）。
 
 #### Scenario: [FE-J01-S05] 成功：payload 白名單、回第 0 頁、第一筆是它
 
 - **GIVEN** 已登入的人在專案看板面板的第 1 頁（`page=1`）
 - **WHEN** 填「標題 `  找一個會 Three.js 的人  `（前後各兩個空白）、內容 `做一個小房間。\n`（尾端一個換行）、技能 ` three.js, TypeScript ,three.js `、座位數 `3`」並送出，替身回 `201 ProjectOut`
 - **THEN** 替身收到的 body SHALL 恰好是 `{"title":"找一個會 Three.js 的人","body":"做一個小房間。","needed_skills":["three.js","TypeScript"],"seat_count":3}`（沒有別的鍵；標題與內容的前後空白已去掉 —— 漏寫 `trim` 這裡要紅）
-- **AND** 表單 SHALL 關閉；替身 SHALL 收到一次 `GET /api/projects?page=0`；列表第一筆 SHALL 顯示 `找一個會 Three.js 的人`；回報的頁碼 SHALL 是 0
+- **AND** 替身對 `GET /api/projects?page=0` 回的第一筆標題刻意是 `找一個會 Three.js 的人（伺服器版）`（跟 `POST` 回應不同）
+- **AND** 在那個 `GET` 還沒回應時，列表 SHALL 是 `aria-busy` 且 SHALL NOT 出現 `找一個會 Three.js 的人`（不得先樂觀插入）
+- **AND** `GET` 回應後表單 SHALL 已關閉；替身 SHALL 恰好收到一次 `GET /api/projects?page=0`；列表第一筆 SHALL 顯示 `找一個會 Three.js 的人（伺服器版）`；回報的頁碼 SHALL 是 0
 - **AND** 焦點 SHALL 在列表上
 
 #### Scenario: [FE-J01-S06] 失敗留值、列表不動
@@ -87,6 +92,15 @@
 - **WHEN** 送出而替身回 `500`
 - **THEN** 表單 SHALL 仍開著、四個欄位的值 SHALL 原樣，送出鈕上方 SHALL 有一個 `role="alert"`，替身 SHALL NOT 收到任何 `GET /api/projects`
 - **AND WHEN** 再按一次送出而替身回 `201`
+- **THEN** 表單 SHALL 關閉、列表 SHALL 重取第 0 頁
+- **AND WHEN**（另一個全新 render）送出而 `createProject` 以網路錯誤 reject（不是 HTTP 回應）
+- **THEN** 同樣 SHALL 留值、一個 `role="alert"`、替身 SHALL NOT 收到 `GET /api/projects`，且 SHALL NOT 自動再送 `POST`
+
+#### Scenario: [FE-J01-S11] 送出中連按只送一次
+
+- **WHEN** 送出而替身把 `POST` 卡在 pending，期間再按送出鈕兩次、再按一次 Enter
+- **THEN** 替身 SHALL 只收到一個 `POST /api/projects`，送出鈕 SHALL 停用
+- **AND WHEN** 替身回 `201`
 - **THEN** 表單 SHALL 關閉、列表 SHALL 重取第 0 頁
 
 ### Requirement: 未送出就關要確認；送出中不可關
@@ -98,11 +112,15 @@
 #### Scenario: [FE-J01-S07] 有輸入就問；乾淨就直接關；送出中關不掉
 
 - **WHEN** 在標題打了字之後按 Escape
-- **THEN** SHALL 出現確認層，表單 SHALL 仍在 DOM 裡（`inert`）；按「繼續編輯」→ 表單回來、標題的字還在；再按 Escape 再按「丟棄」→ 表單 SHALL 不在，列表 SHALL 在且頁碼不變
+- **THEN** SHALL 出現確認層，表單 SHALL 仍在 DOM 裡（`inert`）；按「繼續編輯」→ 表單回來、標題的字還在
+- **AND WHEN** 接著按面板（殼）的關閉鈕
+- **THEN** SHALL 再次出現確認層（不是關掉整個面板）；按「丟棄」→ 表單 SHALL 不在，列表 SHALL 在且頁碼不變
+- **AND WHEN**（另一個全新 render）在標題打了字之後按「取消」
+- **THEN** SHALL 出現確認層
 - **AND WHEN** 什麼都沒打就按「取消」
-- **THEN** 表單 SHALL 直接關閉、SHALL NOT 出現確認層
-- **AND WHEN** 送出中（替身尚未回應）按 Escape 與「取消」
-- **THEN** 表單 SHALL 仍開著、SHALL NOT 出現確認層
+- **THEN** 表單 SHALL 直接關閉、SHALL NOT 出現確認層；面板 SHALL 仍開著
+- **AND WHEN** 送出中（替身尚未回應）各按一次 Escape、「取消」、面板的關閉鈕
+- **THEN** 表單 SHALL 仍開著、SHALL NOT 出現確認層、面板 SHALL 仍開著
 
 ### Requirement: 真瀏覽器裡發的案，別人重新載入也看得到
 
