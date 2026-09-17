@@ -20,6 +20,11 @@ import { useListPage, type ListItemOf } from './useListPage'
 // 殼（section、Escape 層、focus trap、關閉鈕、overlay 的 `inert`）是 `src/panel/PanelShell`（`FE-A04` design `D1` 抽出去的）；
 // 這裡只剩清單：列表、翻頁、邊界狀態、焦點進列表。
 
+/** overlay 拿得到的清單動作：`reload` 回第 0 頁重取（`FE-J01` design D2 的二選一，選了 render-prop）。 */
+export interface ListPanelSlot {
+  reload: () => void
+}
+
 export interface ListPanelProps<K extends ListKind> {
   kind: K
   /** 面板的名字（也是 `aria-label`）。 */
@@ -42,7 +47,9 @@ export interface ListPanelProps<K extends ListKind> {
    * 蓋在列表上的東西（例如一筆的詳情，`FE-B04`）。有它的時候列表**不卸載、不 `display: none`**，
    * 只標成 `inert` —— 頁碼與捲動位置才留得住（`FE-B04-S11`／`S12`／`S16`）。
    */
-  overlay?: ReactNode
+  overlay?: ReactNode | ((slot: ListPanelSlot) => ReactNode)
+  /** 列表上方的動作（例如「發案」，`FE-J01`）。跟列表一起在內容區，overlay 開著時一樣 `inert`。 */
+  toolbar?: ReactNode
   onClose: () => void
   /** 要看的頁與頁次回報（`FE-B09`）：見 `useListPage` 的 `ListPageOptions`。 */
   page?: number
@@ -58,11 +65,13 @@ export function ListPanel<K extends ListKind>({
   exhausted,
   error,
   overlay,
+  toolbar,
   onClose,
   page,
   onShownPage,
 }: ListPanelProps<K>) {
-  const { state, next, retry } = useListPage(kind, { page, onShownPage })
+  const { state, next, retry, reload } = useListPage(kind, { page, onShownPage })
+  const overlayNode = typeof overlay === 'function' ? overlay({ reload }) : overlay
   const edge = edgeState(state)
   const items = state.shown?.items ?? []
   // 沒有項目時列表不佔空間，狀態節點（首次無資料、權限阻擋⋯⋯）從上面開始，
@@ -75,7 +84,7 @@ export function ListPanel<K extends ListKind>({
   // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，
   // 下一個 Tab 跑去標題列 —— 真瀏覽器的 e2e 抓到的。呼叫端可以再覆蓋（`BoardPanel` 把焦點放回那張卡）。
   // **這不是 `FE-B01-S18` 的防禦** —— 那把鎖在 `InteractionProvider`，就算焦點被搶走，人也不會走。
-  const overlayOpen = overlay !== undefined && overlay !== null
+  const overlayOpen = overlayNode !== undefined && overlayNode !== null
   useEffect(() => {
     if (!overlayOpen) list.current?.focus()
   }, [overlayOpen])
@@ -88,9 +97,10 @@ export function ListPanel<K extends ListKind>({
       bodyTestId="list-panel-list"
       overlayTestId="list-panel-overlay"
       data={{ 'data-kind': kind }}
-      overlay={overlay}
+      overlay={overlayNode}
       onCloseRequest={onClose}
     >
+      {toolbar}
       <ul
         ref={list}
         tabIndex={-1}

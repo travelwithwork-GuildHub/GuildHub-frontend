@@ -37,23 +37,24 @@
 
 ## 4. `--form`：入口、表單、回第 0 頁重取、確認層（`S01`～`S07`、`S11`）
 
-- [ ] 4.1 動 tsx 之前過 `ui-ux-pro-max`（`--domain` 表單；輸出不進版控）；按鈕用 `@/design/controls`
-- [ ] 4.2 `tests/create-project.test.tsx`（真 `BoardPanel`＋`ListPanelProvider`＋`IdentityProvider` 替身＋`contract-server`）：
+- [x] 4.1 過 `ui-ux-pro-max`（`--domain ux`：inline error＋aria-describedby、一個 role=alert、disabled 看得出來、label 在上、type=number；`--stack nextjs` 的 Server Actions 建議與 `src/api/` 規則衝突、規格贏）；按鈕用 `@/design/controls`
+- [x] 4.2 `tests/create-project.test.tsx`（共用樹在 `tests/support/project-board.tsx`；`S03` 換數字那半在 `create-project-limits.test.tsx`）（真 `BoardPanel`＋`ListPanelProvider`＋`IdentityProvider` 替身＋`contract-server`）：
       `S01`（signed-in 有「發案」、人才面板沒有、`guest` 沒有、`resolving` 沒有 —— 四個各一個 render）、`S02`（四個標籤、座位數 4、列表 `inert`、沒有預算等字樣）、
       `S03`（五種超上限即時＋停用＋沒請求；`FORM_LIMITS.seatCount.max` 換 6 訊息跟著變 —— `vi.mock('@/forms/limits')`；模組層 `LIMITS.seatIndex.max` 換 5 → `FORM_LIMITS.seatCount.max` 是 6，放 `tests/form-limits.test.ts` 或同檔）、
       `S04`（空白送出：兩個錯誤、焦點在標題；打字後只剩內容的）、`S05`（在 `page=1`；body 逐字相等；GET 卡 pending 時 `aria-busy` 且沒有樂觀項目；GET 回「（伺服器版）」後第一筆是它；恰好一次 `GET ?page=0`；`onShownPage(0)`；焦點在列表）、
       `S06`（500 留值＋alert＋沒有 GET；重送 201 關閉重取；網路 reject 同樣、不自動重送）、`S11`（POST pending 連按兩次＋Enter 只一個 POST）、
-      `S07`（Escape → 問 → 繼續編輯 → 殼關閉鈕 → 問 → 丟棄；取消 dirty 問；乾淨直接關且面板還在；送出中三種都關不掉）；**先 commit 紅**
+      `S07`（Escape → 問 → 繼續編輯 → 殼關閉鈕 → 問 → 丟棄；取消 dirty 問；乾淨直接關且面板還在；送出中三種都關不掉）；**先 commit 紅** —— `92178d2`（沒有「發案」）
 - [x] 4.3 `src/forms/limits.ts`：`seatCount` —— 移到 3.2
 - [x] 4.4 `src/projects/projectRules.ts` —— 移到 3.3
-- [ ] 4.5 `src/projects/CreateProjectForm.tsx`：`useForm`＋`SubmitError`；四欄；`onDone(created)`；`closeIntentRef`／`askDiscard` 跟 `ProfileForm` 同一個形狀
-- [ ] 4.6 `src/list-panel/paging.ts` 加 `reload` 事件（identity → page 0、loading、shown null）＋ `useListPage` 回 `reload`；`ListPanel` 把它交給 overlay（design D2 二選一）
-- [ ] 4.7 `src/list-panel/BoardPanel.tsx`：signed-in 才渲染「發案」；overlay 兩態（無／表單容器）；確認層疊在容器裡、表單留在 DOM 標 `inert`（不是換掉 overlay，design D5）；`onClose` 顯式分支 `if (requestClose) requestClose(); else closePanel()`（**不得用 `?.() ??`**，design D5；dirty 與送出中的判斷在表單的 `requestClose`）；成功 → 關表單、`reload()`、焦點回列表
-- [ ] 4.8 突變（先 commit）：「發案」不看 identity → `S01` 紅；`seatCount.max` 寫死 8 → `S03` 紅；payload 多送一個鍵 → `S05` 紅；
+- [x] 4.5 `src/projects/CreateProjectForm.tsx`：`useForm`＋`SubmitError`；四欄；`onCreated(created)`／`onDismiss()`；`closeIntentRef`／`askDiscard` 跟 `ProfileForm` 同一個形狀；**送出前不改寫欄位**（S06 原樣）；dirty 用 `getValues` 不訂閱輸入
+- [x] 4.6 `src/list-panel/paging.ts` 加 `reload` 事件（＝ `opened(kind, 0)`）＋ `useListPage` 回 `reload`；`ListPanel` 的 `overlay` 接受 render-prop `({ reload }) => node`（design D2 選了這邊）、新 `toolbar` 插槽放列表上方
+- [x] 4.7 `src/list-panel/BoardPanel.tsx`（`ProjectBoard`）：signed-in 才渲染「發案」；overlay 兩態（無／表單容器）；確認層疊在容器裡、表單留在 DOM 標 `inert`（不是換掉 overlay，design D5）；`onClose` 顯式分支 `if (requestClose) requestClose(); else closePanel()`（**不得用 `?.() ??`**，design D5；dirty 與送出中的判斷在表單的 `requestClose`）；成功 → 關表單、`reload()`、焦點回列表
+- [x] 4.8 突變（先 commit `19bd4eb`；12 條各紅、一條存活：表單多送一鍵被 `operations.createProject` 的 `ProjectCreate.parse` 剝掉、body 仍四鍵 —— `toPayload` 多鍵在 `--rules` 是紅的）：「發案」不看 identity → `S01` 紅；`seatCount.max` 寫死 8 → `S03` 紅；payload 多送一個鍵 → `S05` 紅；
       成功後不 `reload`／樂觀插入 → `S05` 紅；失敗也 `reload` → `S06` 紅；拿掉送出 guard → `S11` 紅；dirty 不問 → `S07` 紅；送出中可關 → `S07` 紅；
       `onClose` 改成 `?.() ??` → `S07` 紅；殼關閉鈕不走 `closeIntentRef` → `S07` 紅；紀錄貼 PR
-- [ ] 4.9 效能：量 `/world` 首屏 JS 前後差（playwright 加總 script bytes），貼 PR；>10 KB gz 改 `next/dynamic`
-- [ ] 4.10 eslint／tsc／`pnpm test`／pr-size
+- [x] 4.9 效能：`/world` 首屏 JS（next start＋playwright 加總 script 回應）main 16 檔 raw 3895.7 KB／gz 1249.1 KB → 本片 raw 3900.8／gz 1250.2：**+5.1 KB raw／+1.1 KB gz**，不用 `next/dynamic`
+- [x] 4.10 eslint／tsc／`pnpm test`（159 檔全綠）／pr-size（產品 245、手寫 ≤800）。
+      審查中規格用詞對不上實際結構 → `spec/fe-j01-create-project` #487（S01 `unknown`、S07 殼的關閉意圖以 Escape 驗）先合併
 
 ## 5. `--e2e`：真瀏覽器（`S08`）
 

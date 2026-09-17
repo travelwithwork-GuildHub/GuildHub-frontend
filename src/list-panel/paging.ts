@@ -58,6 +58,8 @@ export type PagingEvent<T> =
   | { type: 'goto'; page: number }
   | { type: 'next' }
   | { type: 'retry' }
+  /** 回第 0 頁、重新向伺服器取（發案成功之後，`FE-J01` design D2）。不樂觀插入：畫面上呈現的一定是重取回來的。 */
+  | { type: 'reload' }
   | { type: 'resolved'; identity: RequestIdentity; items: readonly T[] }
   | { type: 'failed'; identity: RequestIdentity; error: unknown }
 
@@ -98,6 +100,10 @@ export function reduce<T>(state: PagingState<T>, event: PagingEvent<T>): PagingS
     case 'retry':
       if (state.phase !== 'error') return state
       return { ...state, phase: 'loading', error: null }
+
+    case 'reload':
+      // 跟「重開這一種清單」同一個結果：identity 換成第 0 頁、`shown` 清掉 —— 舊頁的回應之後靠 identity 擋掉。
+      return opened(state.identity.kind, 0)
 
     case 'resolved': {
       if (!sameIdentity(event.identity, state.identity)) return state
