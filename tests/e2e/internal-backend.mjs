@@ -9,6 +9,7 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
+import { approach } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3103'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-o03'
@@ -17,21 +18,6 @@ const ok = (l) => console.log(`✅ ${l}`)
 const bad = (l, d) => {
   failures++
   console.log(`❌ ${l}\n   ${d}`)
-}
-async function hold(page, code, ms) {
-  await page.keyboard.down(code)
-  await page.waitForTimeout(ms)
-  await page.keyboard.up(code)
-  await page.waitForTimeout(400)
-}
-async function approach(page, label, steps) {
-  for (const [code, ms] of steps) await hold(page, code, ms)
-  for (let i = 0; i < 8; i++) {
-    const prompt = await page.$eval('[data-testid="interaction-prompt"]', (n) => n.textContent ?? '').catch(() => null)
-    if (prompt !== null && prompt.includes(label)) return prompt
-    await hold(page, 'ArrowUp', 120)
-  }
-  throw new Error(`走不到「${label}」前面`)
 }
 
 await mkdir(OUT, { recursive: true })
@@ -57,7 +43,7 @@ try {
   if (loginCall && loginCall.includes(new URL(FRONTEND).host)) ok(`登入打的是同源的 Route Handler：${loginCall}`)
   else bad('登入沒有打同源的 /api/login', apiCalls.join('\n   '))
 
-  await approach(page, '看人才看板', [['ArrowRight', 700], ['ArrowUp', 1000]])
+  await approach(page, '看人才看板', [['ArrowRight', 700], ['ArrowUp', 1000]], OUT)
   await page.keyboard.press('KeyE')
   await page.waitForSelector('[data-testid="talent-card"]', { timeout: 10_000 })
   const names = await page.$$eval('[data-testid="talent-card"]', (els) => els.map((e) => e.textContent ?? ''))
