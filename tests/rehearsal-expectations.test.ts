@@ -60,7 +60,6 @@ describe('閉環十三步', () => {
   it('[FE-O08-S03] 標為 step 的 key 恰好是規格那張表的十三個、照順序', () => {
     const steps = EXPECTATIONS.filter((e) => e.kind === 'step').map((e) => e.key)
     expect(steps).toEqual(STEP_KEYS)
-    expect(new Set(steps).size).toBe(13)
   })
 })
 
@@ -73,12 +72,17 @@ function section(md: string, heading: string): string {
   return lines.slice(start + 1, end < 0 ? lines.length : end).join('\n')
 }
 
-/** 一節裡表格列的 `(key, owner)`：`| \`key\` | FE-Xnn | …`。header 與分隔列沒有反引號 key，自然略過。 */
-function listed(body: string): Map<string, string> {
+/**
+ * 一節裡表格列的 `(key, owner)`：`| \`key\` | FE-Xnn | …`。header 與分隔列沒有反引號 key，自然略過。
+ * 同一節列兩次同一個 key 直接拋（審查抓到：`Map.set` 會靜默蓋掉，集合大小照樣相等）。
+ */
+function listed(heading: string, body: string): Map<string, string> {
   const out = new Map<string, string>()
   for (const line of body.split('\n')) {
     const m = /^\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|/.exec(line)
-    if (m?.[1] && m[2]) out.set(m[1], m[2])
+    if (!m?.[1] || !m[2]) continue
+    if (out.has(m[1])) throw new Error(`〈${heading}〉把 \`${m[1]}\` 列了兩次`)
+    out.set(m[1], m[2])
   }
   return out
 }
@@ -107,7 +111,7 @@ describe('README 三節跟期望表一致', () => {
 
   it.each(SECTIONS)('[FE-O08-S09] 〈%s〉的 (key, owner) 集合跟期望表相等', async (heading, pick) => {
     const md = await readFile(README, 'utf8')
-    const problems = diff(heading, EXPECTATIONS.filter(pick), listed(section(md, heading)))
+    const problems = diff(heading, EXPECTATIONS.filter(pick), listed(heading, section(md, heading)))
     expect(problems, problems.join('\n')).toEqual([])
   })
 })
