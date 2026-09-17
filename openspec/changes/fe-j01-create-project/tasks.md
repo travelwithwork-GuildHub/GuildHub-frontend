@@ -32,8 +32,8 @@
 - [x] 3.2 `src/forms/limits.ts`：`seatCount: { min: 1, max: LIMITS.seatIndex.max + 1 }`（註解寫推導理由）
 - [x] 3.3 `src/projects/projectRules.ts`：`CreateProjectSchema`（title／body trim＋min／refine(codePointLength)；skills `transform(normalizeSkills)`＋count／length refine；
       seat_count `string → number`＋`.int()`＋`refine` 範圍）、`INITIAL`、`toPayload`、`isDirty`
-- [ ] 3.4 突變（先 commit）：`seatCount.max` 寫死 8；title 用 `.length` 數；座位數範圍改 `.min/.max`（變 too_small）；`toPayload` 多送一鍵；skills 不正規化 —— 各紅；紀錄貼 PR
-- [ ] 3.5 eslint／tsc／`pnpm test`／pr-size
+- [x] 3.4 突變（先 commit `1cb7246`）：`seatCount.max` 寫死 8；title 用 `.length` 數；座位數範圍改 `.min/.max`（變 too_small）；`toPayload` 多送一鍵；skills 不正規化；title 不 trim —— 六條各紅；紀錄貼 PR
+- [x] 3.5 eslint／tsc／`pnpm test`（157 檔全綠）／pr-size（產品 72、手寫 209）
 
 ## 4. `--form`：入口、表單、回第 0 頁重取、確認層（`S01`～`S07`、`S11`）
 

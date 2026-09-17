@@ -33,7 +33,7 @@ describe('上限由前端守，數字有出處，時機照全站規則', () => {
   })
 
   it('[FE-J01-S03] 標題／內容超上限即時紅，數字是 FORM_LIMITS 的；單位是 code point', () => {
-    // 60 個「𠮷」是 120 個 UTF-16 code unit —— 用 `.length` 數的實作這裡會紅。**每個欄位各自驗**（codex 審查：只驗標題的話，內容改用 `.length` 照樣綠）
+    // 上限個「𠮷」是兩倍的 UTF-16 code unit（標題 60→120、內容 2000→4000）—— 用 `.length` 數的實作這裡會紅。**每個欄位各自驗**（codex 審查：只驗標題的話，內容改用 `.length` 照樣綠）
     expect(parse({ title: '𠮷'.repeat(FORM_LIMITS.projectTitle.max) }).success).toBe(true)
     expect(immediateIssues({ title: '𠮷'.repeat(FORM_LIMITS.projectTitle.max + 1) }, 'title')).toContain(String(FORM_LIMITS.projectTitle.max))
     expect(parse({ body: '𠮷'.repeat(FORM_LIMITS.projectBody.max) }).success).toBe(true)
