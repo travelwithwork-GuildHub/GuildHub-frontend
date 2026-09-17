@@ -5,21 +5,23 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-j01-create-project` 合併進 `main`）。
-      驗證：`pnpm exec openspec validate fe-j01-create-project --strict` 通過且 PR 已合併
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-j01-create-project` 合併進 `main`）。
+      驗證：`pnpm exec openspec validate fe-j01-create-project --strict` 通過且 PR 已合併 —— #484，main `a1bbee9`
 
 ## 2. `--backend`：替身的 `POST /api/projects` ＋ 契約判準（`S09`／`S10`／`FE-O03-S05`）
 
-- [ ] 2.1 `tests/contract/rest/projects.contract.ts`：`S09`（201 形狀、`owner_id` = me、預設值、`expires_at` ±5 分、列表第 0 頁第一筆）、
-      `S10`（三種型別錯 422 形狀、未登入 401 且 `GET /api/projects` 沒多一筆）；`S09` 的鍵集合用原始 JSON 的 `Object.keys` 比、不靠 Zod；**先 commit 紅**
-- [ ] 2.2 `tests/contract/harness.ts`：`internal` 的 `contractUnimplemented` 拿掉 `POST /api/projects`；
+- [x] 2.1 `tests/contract/rest/projects.contract.ts`：`S09`（201 形狀、`owner_id` = me、預設值、`expires_at` ±5 分、列表第 0 頁第一筆）、
+      `S10`（三種型別錯 422 形狀、未登入 401 且 `GET /api/projects` 沒多一筆）；`S09` 的鍵集合用原始 JSON 的 `Object.keys` 比、不靠 Zod；**先 commit 紅** —— `eb8bbfd`（S09／S10 對 internal 都是 405）
+- [x] 2.2 `tests/contract/harness.ts`：`internal` 的 `contractUnimplemented` 拿掉 `POST /api/projects`；
       `tests/contract/rest/profiles.contract.ts` 的 `S05` probes 加 `GET /api/projects/{id}/seats`、拿掉 `GET /api/messages`（早就有了）
-- [ ] 2.3 `src/server/projects.ts`：`insertProject(ownerId, input)`（`insert … returning ${COLUMNS}`，**不算 `expires_at`**、不驗長度）；
+- [x] 2.3 `src/server/projects.ts`：`insertProject(ownerId, input)`（`insert … returning ${COLUMNS}`，**不算 `expires_at`**、不驗長度）；
       `src/app/api/projects/route.ts`：`export const POST = handle({ auth: 'required' }, …)`，body 用 `contract.ProjectCreate`；route 檔頭那句「沒有 POST」拿掉
-- [ ] 2.4 對 `internal` 跑契約套件綠；對 `guildhub`（`scripts/contract-guildhub.mjs`，本機自起）跑一次綠、`todo` 數從 11 減少（記在 PR）
-- [ ] 2.5 突變（先 commit）：`insertProject` 忘了帶 `seat_count`（用預設）→ `S09` 紅；route 拿掉 `auth: 'required'` → `S10` 紅；
+- [x] 2.4 對 `internal` 跑契約套件綠（54 passed｜11 todo）；對 `guildhub`（`scripts/contract-guildhub.mjs`，本機自起）跑一次綠（51 passed｜3 skipped｜11 todo）。
+      `todo` **沒有減少**：那 11 條裡跟 projects 有關的四條（title／body／skillCount／skillLength）pending 的理由是「後端沒有 check」，不是「端點不存在」——
+      端點有了仍然沒有邊界可以成對（`tests/contract/boundaries.ts` 的理由已更新）
+- [x] 2.5 突變（先 commit `3326b74`；四條各紅一個判準、紀錄在 PR）：`insertProject` 忘了帶 `seat_count`（用預設）→ `S09` 紅；route 拿掉 `auth: 'required'` → `S10` 紅；
       `unimplemented` 沒拿掉 `POST /api/projects` → `S05` 紅
-- [ ] 2.6 `pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm exec tsc --noEmit`、`pnpm test`；`bash .github/scripts/pr-size.sh`
+- [x] 2.6 `pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm exec tsc --noEmit`、`pnpm test`；`bash .github/scripts/pr-size.sh`
 
 ## 3. `--form`：入口、表單、回第 0 頁、確認層（`S01`～`S07`）
 

@@ -121,14 +121,17 @@ export const ProjectStatus = z.enum(['recruiting', 'active', 'closed'])
  * `needed_skills` 與 `seat_count` 在後端有預設值，可以不送 —— 用 `.default()`
  * 讓**輸入**可以省略、**輸出**是必填，正好對上產出的型別。
  *
- * ⚠️ `title` 與 `body` **後端完全沒有上限**（`sql/001_schema.sql` 沒有 check），
- * 所以這裡也沒有 `.max()`。前端自己的上限由 `FE-X05` 決定 —— 見 `limits.ts`。
+ * ⚠️ `title` 與 `body` **後端什麼都不驗**（Pydantic 只有 `str`；`sql/001_schema.sql` 沒有 check，連空字串都收），
+ * 所以這裡**只有型別**：沒有 `.max()`、也沒有 `.min()` —— 替身的 `POST /api/projects` 拿它解析 body（`FE-J01`），
+ * 掛了 `.min(1)` 的話替身會對空字串回 422、真後端回 201，那是替身比真後端「好用」的假象（審查抓到的）。
+ * 使用者面向的上限由 `FE-X05` 的 `FORM_LIMITS` 在表單層守。
+ * `seat_count` 是 Pydantic 的 `int`：`2.5` 在真後端是 422，所以這裡是 `.int()`（`z.number()` 會放過它、再撞資料庫的 smallint → 500）。
  */
 export const ProjectCreate = z.object({
-  title: z.string().min(LIMITS.projectTitle.min),
-  body: z.string().min(LIMITS.projectBody.min),
+  title: z.string(),
+  body: z.string(),
   needed_skills: z.array(z.string()).default([]),
-  seat_count: z.number().default(4),
+  seat_count: z.number().int().default(4),
 })
 
 export const ProjectOut = z.object({
