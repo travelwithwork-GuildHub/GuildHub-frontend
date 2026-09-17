@@ -1,4 +1,5 @@
-// `FE-A01` 的端到端驗證。tasks 第 4 節。
+// `FE-A01` 的端到端驗證。tasks 第 4 節。`fe-a06-login-entry` 之後也是 `FE-A06-S16` 的證據：
+// `/login` 三條路（暱稱＋複製、恢復金鑰、帳號密碼註冊）在真瀏覽器裡的終點都是 `/world`。
 //
 // ⚠️⚠️ **為什麼要有這一支：`FE-W12` 的 444 條測試全綠，而畫面上六扇門是
 // 10 像素的細縫。** jsdom 裡的判準驗得到「元件回傳了什麼」，驗不到
@@ -9,6 +10,9 @@
 // 用法（**要先起後端與前端**）：
 //
 //   FRONTEND=http://127.0.0.1:3100 node tests/e2e/identity-flow.mjs
+//
+// `API`（預設等於 `FRONTEND`）：`GET /api/me` 的位址 —— internal adapter 是同源的 Route Handlers；
+// 打真後端時設成它的 origin。**只打本機自己起的東西。**
 //
 // ⚠️ **位址預設是 127.0.0.1 而不是 localhost，兩者不能混用。**
 // 瀏覽器把它們當成不同的 host：頁面在 `localhost:3100`、API 在 `127.0.0.1:8000`
@@ -37,6 +41,7 @@
 import { chromium } from 'playwright-core'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3100'
+const API = process.env.API ?? FRONTEND
 const SHOTS = process.env.SHOTS ?? '/tmp/guildhub-identity-shots'
 const ARGS = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader']
 
@@ -112,7 +117,7 @@ async function worldPixels(page) {
   )
 }
 
-/** 走完一次登入。回傳畫面上顯示的那把恢復金鑰。 */
+/** 在 `/login` 用暱稱建立身分，走到「帶走這把鑰匙」那一步。回傳畫面上顯示的那把恢復金鑰。 */
 async function signUp(page, nickname, remember) {
   await page.goto(`${FRONTEND}/login`)
   await page.fill('input >> nth=0', nickname)
@@ -122,11 +127,25 @@ async function signUp(page, nickname, remember) {
   return (await page.textContent('[data-testid="recovery-key"]')).trim()
 }
 
+/**
+ * 「我是誰」的名片 id —— 帶著這個 context 的 cookie 問後端。
+ *
+ * ⚠️ **同一張名片用 id 證明，不用名字、也不拿金鑰當 id 比**（`fe-a06-login-entry` design D3）：
+ * 名字相同的新名片會讓名字對、id 錯；而金鑰只「指向」名片，規格不保證它的編碼。
+ */
+async function whoAmI(page) {
+  const res = await page.request.get(`${API}/api/me`)
+  if (!res.ok()) return { error: `GET /api/me → ${res.status()}` }
+  return res.json()
+}
+
 const browser = await chromium.launch({ args: ARGS })
 
 try {
   // ── 4.1 第一次來的人：世界 → 入口 → 取名字 → 世界裡有自己的名字 ──────
   const first = await browser.newContext()
+  // 真的剪貼簿：授權之後由測試自己讀回來比對（沿用 `first-entry.mjs`；`S16` 那一條 MUST NOT 用替身）
+  await first.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: FRONTEND })
   const page = await first.newPage()
 
   await page.goto(`${FRONTEND}/world`)
@@ -150,8 +169,30 @@ try {
   checkContains('[S09] 畫面說了「拿到金鑰的人就能成為你」', panel, '就能成為你')
   checkContains('[S09] 畫面說了「清掉資料就回不來」', panel, '回不來')
   await page.screenshot({ path: `${SHOTS}/2-recovery-key.png` })
+  const me1 = await whoAmI(page)
+  const idA = me1.id
+  check('[S16] 建立身分之後問得到「我是誰」', typeof idA, 'string')
 
-  await page.goto(`${FRONTEND}/world`)
+  // ── S13／S16 第一條路：帶走金鑰才進得了世界，而終點是 /world ──────
+  check('[S13] 剛拿到金鑰時「進入世界」不可用', await page.isDisabled('button:has-text("進入世界")'), true)
+  check(
+    '[S13] 按之前 first-entry-done 沒有被記下',
+    await page.evaluate(() => localStorage.getItem('guildhub.first-entry-done')),
+    null,
+  )
+  await page.click('button:has-text("複製鑰匙")')
+  await page.waitForSelector('[role="status"]:has-text("已經複製")', { timeout: 15_000 })
+  const fromClipboard = await page.evaluate(() => navigator.clipboard.readText())
+  check('[S16] 剪貼簿讀回來的內容跟畫面上的金鑰逐字相同', fromClipboard, keyA)
+  check('[S13] 複製成功之後「進入世界」可用', await page.isDisabled('button:has-text("進入世界")'), false)
+  await page.click('button:has-text("進入世界")')
+  await page.waitForURL('**/world', { timeout: 15_000 })
+  ok('[S16] 暱稱路的終點是 /world（不必知道任何網址）')
+  check(
+    '[S13] 走完之後 first-entry-done 記下了',
+    await page.evaluate(() => localStorage.getItem('guildhub.first-entry-done')),
+    '1',
+  )
   check('[4.1] 世界裡的名字是自己輸入的那個（BE-G02 的第一次可見證明）', await badge(page), '阿福')
   await page.screenshot({ path: `${SHOTS}/3-signed-in-world.png` })
 
@@ -201,7 +242,10 @@ try {
   const second = await browser.newContext()
   const page2 = await second.newPage()
   const keyB = await signUp(page2, '小美', true)
-  await page2.goto(`${FRONTEND}/world`)
+  // 第二個人走另一條閘：填回金鑰結尾 6 個字（手抄的人的路）
+  await page2.getByLabel(/最後 6 個字/).fill(keyB.slice(-6))
+  await page2.click('button:has-text("進入世界")')
+  await page2.waitForURL('**/world', { timeout: 15_000 })
   check('[4.1] 第二個人的名字也是自己輸入的', await badge(page2), '小美')
 
   const storedAfter = await page2.evaluate(() => localStorage.getItem('guildhub.recovery-key'))
@@ -217,13 +261,33 @@ try {
   await page3.goto(`${FRONTEND}/login`)
   await page3.fill('input >> nth=2', keyA)
   await page3.click('button:has-text("用金鑰回來")')
-  await page3.waitForSelector('[data-testid="recovery-key"]', { timeout: 15_000 })
-  const keyBack = (await page3.textContent('[data-testid="recovery-key"]')).trim()
-  check('[4.4c/S17] 換一個環境只貼金鑰，取回的是同一張名片', keyBack, keyA)
-
-  await page3.goto(`${FRONTEND}/world`)
+  // `fe-a06-login-entry` D2：金鑰路不再重新顯示金鑰，直接到 /world
+  await page3.waitForURL('**/world', { timeout: 15_000 })
+  ok('[S14/S16] 金鑰路的終點是 /world')
+  check('[S14] 沒有再顯示一次金鑰畫面', await page3.$('[data-testid="recovery-key"]'), null)
+  const me3 = await whoAmI(page3)
+  // ⚠️ **這一條是「同一張名片」的承重斷言**：只比名字的話，拿到有效金鑰卻建一張同名新名片的實作也綠
+  check('[4.4c/S17/S16] 換一個環境只貼金鑰，「我是誰」的 id 跟第一條路建立的那張一樣', me3.id, idA)
   check('[4.4c/S17] 而且世界裡是原本那個名字', await badge(page3), '阿福')
   await page3.screenshot({ path: `${SHOTS}/4-resumed-elsewhere.png` })
+  await page3.goBack()
+  await page3.waitForTimeout(500)
+  check('[S14] 返回上一頁不會回到登入頁', new URL(page3.url()).pathname === '/login', false)
+
+  // ── S16 第三條路：帳號密碼註冊，終點也是 /world ────────────────────
+  const fifth = await browser.newContext()
+  const page5 = await fifth.newPage()
+  await page5.goto(`${FRONTEND}/login`)
+  await page5.getByRole('button', { name: '註冊', exact: true }).click()
+  const registerForm = page5.getByTestId('account-register-form')
+  await registerForm.getByLabel('帳號', { exact: true }).fill(`e2e-${Date.now().toString(36)}`)
+  await registerForm.getByLabel('密碼', { exact: true }).fill('correct horse battery')
+  await registerForm.getByLabel('在世界裡顯示的名字（註冊）').fill('小明')
+  await registerForm.getByRole('button', { name: '建立帳號' }).click()
+  await page5.waitForURL('**/world', { timeout: 15_000 })
+  ok('[S16] 帳號密碼路的終點是 /world')
+  check('[S16] 世界裡是註冊時取的名字', await badge(page5), '小明')
+  await page5.screenshot({ path: `${SHOTS}/5-registered.png` })
 
   // ── S10：無效的金鑰不得靜默放行 ──────────────────────────────────
   const fourth = await browser.newContext()
