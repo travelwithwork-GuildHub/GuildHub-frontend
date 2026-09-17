@@ -14,7 +14,8 @@
 `needed_skills` 預設 `[]`；`seat_count` 預設 4），插入 `projects`（`owner_id` = session 的名片、`status` `recruiting`、`room_template` NULL、`expires_at` 是建立時刻 ＋7 天），
 回 `201`，body 的鍵 SHALL 恰好是 `ProjectOut` 的十個鍵（`id`、`owner_id`、`title`、`body`、`needed_skills`、`status`、`room_template`、`seat_count`、`expires_at`、`updated_at`），
 SHALL NOT 含 `password_hash`。
-跟真後端一樣 SHALL NOT 檢查長度與範圍（那些在前端的 `FORM_LIMITS`）；型別錯的 body → `422`（`FE-O03-S03` 的形狀）；未登入 → `401`（`FE-O03-S01`）。
+型別錯的 body → `422`（`FE-O03-S03` 的形狀）；未登入 → `401`（`FE-O03-S01`）。
+長度與範圍**不在這條 Requirement 裡**：使用者面向的上限由前端的 `FORM_LIMITS` 守（`project-posting`），真後端對這個端點什麼都不驗是 `FE-O08` 演練帳裡的 anomaly、不是任何一方的義務。
 
 #### Scenario: [FE-J01-S09] 建案回 201，欄位與預設值對，7 天後到期，列表第一筆是它
 
