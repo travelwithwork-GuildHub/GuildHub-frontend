@@ -1,5 +1,6 @@
 'use client'
 
+import { useId } from 'react'
 import { avatarLook } from '@/design/avatar'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
@@ -14,16 +15,18 @@ import { useProfileDetail } from '@/talent/useProfileDetail'
 export function OwnerCard({ ownerId }: { ownerId: string }) {
   const detail = useProfileDetail(ownerId, undefined)
   const profile = detail.profile
+  // 每個實例自己的標題 id：同一頁兩張名片（之後 `FE-J03`）不能共用一個 id，`aria-labelledby` 會指錯
+  const headingId = useId()
   return (
     <section
       data-testid="owner-card"
       data-profile-id={ownerId}
       data-phase={detail.phase}
       aria-busy={detail.phase === 'loading'}
-      aria-labelledby="owner-card-heading"
+      aria-labelledby={headingId}
       className="flex flex-col gap-2"
     >
-      <h4 id="owner-card-heading" className="text-caption text-ink-muted">
+      <h4 id={headingId} className="text-caption text-ink-muted">
         發案者
       </h4>
       {detail.phase === 'error' && <EmptyState kind="failure" error={toUiError(detail.error)} retry={detail.retry} />}
