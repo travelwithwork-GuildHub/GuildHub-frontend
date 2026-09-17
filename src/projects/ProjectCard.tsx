@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { ProjectOut } from '@/api/contract/rest'
 import { Missing } from '@/talent/Missing'
 import { PROJECT_STATUS_LABEL, daysLeft } from './projectStatus'
@@ -16,13 +17,16 @@ import { PROJECT_STATUS_LABEL, daysLeft } from './projectStatus'
 //
 // ⚠️ **不可聚焦、沒有 button／a**（`S08`）：`FE-B03` 之前這張卡不接任何事件。
 //
-// ⚠️ **`now` 是 prop，而且是必填**（design D2）：判準要釘住時鐘；而元件本身不讀時鐘（render 要純，`react-hooks/purity`）。
-// 呼叫端在面板開起來時讀一次（`BoardPanel` 的 `useState(() => Date.now())`）；不裝計時器，粒度是「天」。
+// ⚠️ **時鐘在掛載那一刻讀一次**（design D2；`useState` 的初始化，render 本體不呼叫 `Date.now()`，`react-hooks/purity`）。
+// 列表每次重取都會把 `li` 重新掛載（`shown: null` → 新的 items），所以每張卡的時鐘 ≈ 它被取回來的時刻 ——
+// 剛發的案子（`expires_at = 建立 ＋7 天`）才會是「剩 7 天」。時鐘釘在**面板開起來**那一刻的話，發案之後回來的那一筆是 7 天 ＋幾秒 → `ceil` 成 8（真瀏覽器截圖抓到的）。
+// `now` prop 給判準釘時鐘用；不裝計時器，粒度是「天」。
 
 const CHIP = 'bg-surface text-caption whitespace-nowrap rounded px-1.5 py-0.5'
 
-export function ProjectCard({ project, now }: { project: ProjectOut; now: number }) {
-  const days = daysLeft(project.expires_at, now)
+export function ProjectCard({ project, now }: { project: ProjectOut; now?: number }) {
+  const [mountedAt] = useState(() => Date.now())
+  const days = daysLeft(project.expires_at, now ?? mountedAt)
   return (
     <article
       data-testid="project-card"

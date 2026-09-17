@@ -112,6 +112,8 @@ try {
   const closed = await page.waitForSelector('[data-testid="create-project-form"]', { state: 'detached', timeout: 15_000 }).then(() => true).catch(() => false)
   check('[S08] 送出之後表單關閉', closed, true)
   await expectFirstItem(page, '[S08] 列表第一筆是剛發的標題', TITLE)
+  // 剛發的案子是「剩 7 天」（`FE-B02`：建立 ＋7 天、`ceil`）。時鐘釘在面板開起來那一刻的實作會在這裡讀到 8 天（實測抓到的）。
+  check('[FE-B02] 剛發的案子在卡片上是「剩 7 天」', await page.$eval('[data-testid="list-panel-list"] li [data-testid="project-expires"]', (n) => n.textContent?.trim()).catch(() => null), '剩 7 天')
   await page.screenshot({ path: path.join(OUT, '3-after-submit.png') })
 
   check('[S08] 建案時瀏覽器送出了恰好一個 POST /api/projects', posts.length, 1)

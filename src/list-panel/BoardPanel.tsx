@@ -110,8 +110,6 @@ function ProjectBoard() {
   const signedIn = identity.state === 'signed-in'
   const [composing, setComposing] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  // 卡片「剩幾天」的時鐘：面板開起來那一刻讀一次（粒度是天，`FE-B02` design D2；render 裡不讀 `Date.now()`）。
-  const [now] = useState(() => Date.now())
   const closeIntentRef = useRef<(() => void) | null>(null)
   const focusBeforeConfirm = useRef<HTMLElement | null>(null)
   // 表單開著時身分不再是 signed-in（登出、問不到）：入口沒了，表單跟著收（推導，不另設狀態）。
@@ -143,7 +141,7 @@ function ProjectBoard() {
       kind="projects"
       title={TITLES.projects}
       labels={LABELS}
-      renderItem={(item) => <ProjectCard project={item} now={now} />}
+      renderItem={(item) => <ProjectCard project={item} />}
       onClose={onClose}
       page={page}
       onShownPage={reportPage}
