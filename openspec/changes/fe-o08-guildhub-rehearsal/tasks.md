@@ -45,4 +45,4 @@ design D6 的 `--wrapper` 一個 slice 實作出來量到 633 行（判準 358�
 
 ## 5. 封存
 
-- [ ] 5.1 `archive/fe-o08-guildhub-rehearsal`：`openspec validate --archived --strict` 與 `--all --strict`
+- [x] 5.1 `archive/fe-o08-guildhub-rehearsal`：`openspec validate --archived --strict` 與 `--all --strict` —— 本機在 archive 分支上跑過：--archived --strict 56／56、--all --strict 50／50、progress.sh --check exit 0；勾勾先進 main（AGENTS.md〈archive 之前先把 tasks 打勾〉），接著開 `archive/fe-o08-guildhub-rehearsal`
