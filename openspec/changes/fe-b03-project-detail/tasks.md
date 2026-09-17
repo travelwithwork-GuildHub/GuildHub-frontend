@@ -5,14 +5,14 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-b03-project-detail` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-b03-project-detail --strict` 通過且 PR 已合併
-- [ ] 1.2 `governance/wbs-fe-b03-owner-entry`：`docs/WBS.md` 的 `FE-B03` 兩列改寫（owner 標示＋插槽；成軍／結案可見入口歸 `FE-J04`；進房不在詳情），`progress.sh --check` 綠 —— 先於 1.1 合併
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-b03-project-detail` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-b03-project-detail --strict` 通過且 PR 已合併 —— #496
+- [x] 1.2 `governance/wbs-fe-b03-owner-entry`：`docs/WBS.md` 的 `FE-B03` 兩列改寫（owner 標示＋插槽；成軍／結案可見入口歸 `FE-J04`；進房不在詳情），`progress.sh --check` 綠 —— 先於 1.1 合併 —— #497
 
 ## 2. `--url`：網址與選中狀態（`deep-link` MODIFIED；design D4）
 
-- [ ] 2.1 `tests/url-state.test.ts`：`FE-B09-S14` 的解析／序列化／canonical（**八種輸入逐一**：帶錯面板 ×2、單獨 `project`＋`page`、兩個單獨 detail、顯式 panel＋兩個 detail、`panel=bogus&project`、不合 UUID、同名重複；定點；`depthOf` 把 `project` 算第 2 層）；`tests/deep-link.test.tsx`：直達 `?panel=projects&project=<id>` 送出 `GET /api/projects/<id>`、不多一層紀錄、Escape 用 replace 回 `?panel=projects`；清單裡開詳情 push 一層、上一頁回清單；**先 commit 紅**
-- [ ] 2.2 `urlState.ts`：`project` 欄位、canonical 規則；`ListPanelProvider`：`selected` = 開著面板的那一筆、`selectProject`；`PanelUrlSync`：層數含 `project`
-- [ ] 2.3 **突變**：`panel=projects` 帶 `profile` 不去掉 → `S14` 紅；`depthOf` 不算 `project` → `S14`（push／Escape 那一半）紅；直達時也 push → `S14` 紅
+- [x] 2.1 `tests/url-state.test.ts`：`FE-B09-S14` 的解析／序列化／canonical（**八種輸入逐一**：帶錯面板 ×2、單獨 `project`＋`page`、兩個單獨 detail、顯式 panel＋兩個 detail、`panel=bogus&project`、不合 UUID、同名重複；定點；`depthOf` 把 `project` 算第 2 層）；`tests/list-panel-route.test.tsx`（provider 層）：`restore` 帶 `project` 時 `selected` 是它、`selectProject` 只在案件面板下有效；**先 commit 紅**。（`deep-link.test.tsx` 的 `S14` 整棵樹判準要有詳情元件才驗得到 → 移到 4.1）
+- [x] 2.2 `urlState.ts`：`project` 欄位、canonical 規則；`ListPanelProvider`：`selected` = 開著面板的那一筆、`selectProject`；`PanelUrlSync`：層數含 `project`
+- [x] 2.3 **突變**：`panel=projects` 帶 `profile` 不去掉 → `S14` 紅；`depthOf` 不算 `project` → `S14`（push／Escape 那一半）紅；直達時也 push → `S14` 紅（整棵樹的那一半在 4.x；這一片：不驗 UUID／bogus 推導面板／兩個單獨取 project／selected 永遠讀 profile 各紅；「selectProject 在人才面板下也生效」是等價突變 —— `selected` 依面板讀，看不到）
 
 ## 3. `--detail`：詳情、發案者名片、動作列（ADDED 四條；design D1／D2／D3）
 
@@ -22,7 +22,7 @@
 
 ## 4. `--wire`：卡片變控制項、接上看板、e2e（MODIFIED 卡片；`S01`／`S02`／`S13`／`S14`；design D5）
 
-- [ ] 4.1 `tests/project-card.test.tsx`：`FE-B02-S08` 改成「根是 `button`、裡面沒有第二個控制項」、加 `S02`（Enter／Space）；`tests/board-panel-wiring.test.tsx`：`S01`、`S13`（第 1 頁、非零 `scrollTop`、列表請求總次數不增加）；先 commit 紅
+- [ ] 4.1 `tests/project-card.test.tsx`：`FE-B02-S08` 改成「根是 `button`、裡面沒有第二個控制項」、加 `S02`（Enter／Space）；`tests/board-panel-wiring.test.tsx`：`S01`、`S13`（第 1 頁、非零 `scrollTop`、列表請求總次數不增加）；`tests/deep-link.test.tsx`：`FE-B09-S14` 直達 `?panel=projects&project=<id>` 送出 `GET /api/projects/<id>`、不多一層紀錄、Escape 用 replace 回 `?panel=projects`；清單裡開詳情 push 一層、上一頁回清單；先 commit 紅
 - [ ] 4.2 `ProjectCard` → `<button>`＋`onOpen`；`BoardPanel` 案件那一支：`selected` → overlay 放 `ProjectDetail`（預覽是列表那一筆）、返回焦點回那張卡、`SendMessageButton label="私訊發案者"`；`create-project` 表單與詳情共用 overlay 插槽（一次只開一個）
 - [ ] 4.3 `tests/e2e/board-panel.mjs` 案件那一段：Tab 到第一張卡按 Enter、詳情 `body` 是詳情端點的、發案者名字、返回焦點回卡（`S14`）；對 `next start` 重跑綠；`create-project.mjs` 重跑綠
 - [ ] 4.4 **突變**：卡片改回 `<article>` → `S02` 紅；返回時卸載列表 → `S13` 紅

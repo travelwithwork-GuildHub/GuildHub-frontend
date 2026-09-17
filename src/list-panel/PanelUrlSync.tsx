@@ -67,7 +67,8 @@ export function WorldUrlSync(): null {
   const { applyUrl, settleDenied } = scene
   const room = scene.scene.id === 'room' ? scene.scene.projectId : null
   // 房間裡沒有看板，也就沒有清單那一層（`FE-V01-S08`）。
-  const world = { room, panel: room === null ? { panel: open, profile: selected, page } : CLOSED }
+  // `selected` 依面板種類落到 `profile` 或 `project`（`FE-B03`）
+  const world = { room, panel: room === null ? { panel: open, profile: open === 'profiles' ? selected : null, project: open === 'projects' ? selected : null, page } : CLOSED }
   const search = serializeWorldUrl(world)
   const depth = depthOf(world.panel)
   const [session] = useState(() => Math.random().toString(36).slice(2))
