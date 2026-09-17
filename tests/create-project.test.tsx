@@ -170,7 +170,8 @@ describe('送出的是白名單 payload，成功後列表回第 0 頁重取', ()
     await waitFor(() => expect(within(list()).getAllByRole('listitem')[0]?.textContent).toBe('找一個會 Three.js 的人（伺服器版）'))
     expect(queryForm()).toBeNull()
     expect(gets(server), '第 0 頁取了不只一次').toEqual(['?page=1', '?page=0'])
-    expect(shownPage()).toBe(0)
+    // 頁碼回報是 passive effect，比第一筆出現在 DOM 晚一拍
+    await waitFor(() => expect(shownPage()).toBe(0))
     expect(document.activeElement, '焦點沒回到列表').toBe(list())
   })
 
@@ -197,22 +198,13 @@ describe('送出的是白名單 payload，成功後列表回第 0 頁重取', ()
   it('[FE-J01-S06] 網路錯誤（沒有 HTTP 回應）：同樣留值、alert、不重取、不自動重送', async () => {
     await openForm()
     await fill()
-    const realFetch = globalThis.fetch
-    let attempts = 0
-    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
-      const request = input instanceof Request ? input : new Request(input, init)
-      if (request.method === 'POST' && new URL(request.url).pathname === '/api/projects') {
-        attempts += 1
-        return Promise.reject(new TypeError('Failed to fetch'))
-      }
-      return realFetch(input, init)
-    })
+    // 替身收下請求就斷線：沒有任何 HTTP 回應，`fetch` 以網路錯誤 reject。
+    server.replyFor('/api/projects', 0, null, { drop: true })
     await submit()
     await within(form()).findByRole('alert')
     for (const [label, value] of Object.entries(VALID)) expect(field(label).value).toBe(value)
     await new Promise((r) => setTimeout(r, 50))
-    expect(attempts, '自動重送了').toBe(1)
-    expect(posts(server)).toHaveLength(0)
+    expect(posts(server), '自動重送了').toHaveLength(1)
     expect(gets(server)).toEqual(['?page=0'])
     expect(button('送出').disabled, '失敗後要能再送').toBe(false)
   })

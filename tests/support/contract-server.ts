@@ -61,7 +61,7 @@ export interface ContractServer {
   base: string
   calls: RecordedCall[]
   /** 下一個回應。**沒有設定的話回 500** —— 忘記設定不該看起來像成功。`after` 有給的話，等它 resolve 才回（模擬慢的後端）。 */
-  reply(status: number, body: unknown, options?: { after?: Promise<void> }): void
+  reply(status: number, body: unknown, options?: ReplyOptions): void
   /**
    * 只給某個路徑的下一個回應；比 `reply()` 的佇列優先。
    *
@@ -69,13 +69,20 @@ export interface ContractServer {
    * 而「哪一個先到」在被中止的請求上是不確定的：中止得夠早的話它根本不會到，
    * 排給它的那個回應就會被下一個請求拿走（規格 `FE-B01-S15` 的判準踩過）。
    */
-  replyFor(pathname: string, status: number, body: unknown, options?: { after?: Promise<void> }): void
+  replyFor(pathname: string, status: number, body: unknown, options?: ReplyOptions): void
   close(): Promise<void>
+}
+
+export interface ReplyOptions {
+  /** 等它 resolve 才回（模擬慢的後端）。 */
+  after?: Promise<void>
+  /** 不回任何 HTTP 回應、直接斷線：`fetch` 會以網路錯誤 reject（`status`／`body` 不會用到）。 */
+  drop?: boolean
 }
 
 export async function startContractServer(): Promise<ContractServer> {
   const calls: RecordedCall[] = []
-  type Reply = { status: number; body: unknown; after?: Promise<void> }
+  type Reply = { status: number; body: unknown } & ReplyOptions
   const queue: Reply[] = []
   const byPath = new Map<string, Reply[]>()
 
@@ -126,6 +133,10 @@ export async function startContractServer(): Promise<ContractServer> {
         return
       }
       void (next.after ?? Promise.resolve()).then(() => {
+        if (next.drop) {
+          req.socket.destroy()
+          return
+        }
         res.writeHead(next.status, { 'content-type': 'application/json' })
         res.end(JSON.stringify(next.body))
       })
@@ -141,10 +152,10 @@ export async function startContractServer(): Promise<ContractServer> {
     base: `http://127.0.0.1:${port}`,
     calls,
     reply(status, body, options) {
-      queue.push({ status, body, after: options?.after })
+      queue.push({ status, body, ...options })
     },
     replyFor(pathname, status, body, options) {
-      byPath.set(pathname, [...(byPath.get(pathname) ?? []), { status, body, after: options?.after }])
+      byPath.set(pathname, [...(byPath.get(pathname) ?? []), { status, body, ...options }])
     },
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   }

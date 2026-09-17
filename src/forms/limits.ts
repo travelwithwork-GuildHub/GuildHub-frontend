@@ -14,6 +14,12 @@ export const FORM_LIMITS = {
   skillLength: { min: 1, max: 40 },
   /** `hours_per_week`：後端 smallint、沒有 check；`LIMITS` 沒有這個鍵。 */
   hoursPerWeek: { min: 0, max: 80 },
+  /**
+   * 案子的座位數（`FE-J01`）：後端 smallint、沒有 check。`max` **推導自房間模板的格數**（`LIMITS.seatIndex` 是 0～7，八個工位）——
+   * 建一個 `seat_count=9` 的案子，第 9 格永遠坐不到（後端 `claim_seat` 回 400）。不寫死 8：模板加格子時只改一處。
+   * 下限 1：0 座位的案子成軍後沒有人坐得下。
+   */
+  seatCount: { min: 1, max: LIMITS.seatIndex.max + 1 },
 } as const satisfies Record<string, { min: number; max: number }>
 
 export type FormLimitKey = keyof typeof FORM_LIMITS

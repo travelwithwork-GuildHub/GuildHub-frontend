@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
+import { PRIMARY } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
+import { useIdentity } from '@/identity/IdentityProvider'
+import { DiscardConfirm } from '@/profile/DiscardConfirm'
+import { CreateProjectForm } from '@/projects/CreateProjectForm'
 import { TalentCard } from '@/talent/TalentCard'
 import { SendMessageButton } from '@/inbox/SendMessageButton'
 import { TalentDetail } from '@/talent/TalentDetail'
@@ -26,7 +30,8 @@ import type { ListKind } from './paging'
 // 這個檔案是第一個呼叫端，不該自己先示範繞過。
 //
 // 人才那一支是真的卡片與詳情（`FE-B04`）：卡片開詳情，詳情蓋在列表上（`overlay`），
-// 列表不卸載 —— 返回時頁碼與捲動位置都還在。案件那一支仍是佔位（`FE-B02`，W6）。
+// 列表不卸載 —— 返回時頁碼與捲動位置都還在。案件那一支的列項仍是佔位（`FE-B02`），
+// 但已經有「發案」（`FE-J01`）：只給已登入的人、表單住在同一個 overlay 插槽、成功後回第 0 頁重取。
 //
 // 「開著哪一筆詳情」「第幾頁」住在 `ListPanelProvider`，不在這裡（`FE-B09`：網址要能還原它們）。
 // 這裡只留「列表手上那一筆」當詳情的載入中預覽 —— 深連結直達時沒有預覽，詳情自己去載。
@@ -34,6 +39,7 @@ import type { ListKind } from './paging'
 const TITLES: Record<ListKind, string> = { projects: '專案看板', profiles: '人才看板' }
 const LABELS = { next: '下一頁', close: '關閉' }
 const DETAIL_LABELS = { back: '返回' }
+const CREATE_LABEL = '發案'
 
 const LINE = 'block overflow-hidden text-ellipsis whitespace-nowrap'
 
@@ -94,25 +100,99 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
   )
 }
 
-export function BoardPanel() {
-  const { open, closePanel, page, reportPage } = useListPanel()
-  if (open === null) return null
-  // 分兩支寫而不是一個 `renderItem: (item: A | B)`：
-  // 型別讓「案件面板拿到人才資料」在 typecheck 就紅。
-  return open === 'projects' ? (
+/**
+ * 案件那一支：列表＋「發案」（`FE-J01`）。
+ *
+ * 入口只在 `identity.state === 'signed-in'` 時渲染（`S01`）—— 訪客按 E 拿到的是 `FE-X04` 的權限阻擋，那裡已經有「先登入」；
+ * 身分還沒問完也不放，一顆等一下會消失的按鈕比沒有更糟。
+ *
+ * 表單住在 overlay（列表 `inert`、不卸載，`S02`）。確認層**疊在仍掛載的表單上**（design D5）：overlay 裡是一個容器，
+ * 表單一直在裡面、確認時標 `inert`、`DiscardConfirm` 渲染在它旁邊 —— 換掉 overlay 會卸載表單、丟掉還沒送出的值。
+ *
+ * ⚠️ dirty 與送出中的判斷在表單的 `requestClose` 裡；這裡的 `onClose` 只做顯式分支。
+ * **不得寫成 `closeIntentRef.current?.() ?? closePanel()`**：`requestClose()` 回 `void`，`??` 右邊照樣執行，
+ * dirty 確認與送出中不可關全部被繞過（codex 審查抓到的，`S07` 對殼的關閉鈕有判準）。
+ */
+function ProjectBoard() {
+  const { closePanel, page, reportPage } = useListPanel()
+  const identity = useIdentity()
+  const signedIn = identity.state === 'signed-in'
+  const [composing, setComposing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const closeIntentRef = useRef<(() => void) | null>(null)
+  const focusBeforeConfirm = useRef<HTMLElement | null>(null)
+  // 表單開著時身分不再是 signed-in（登出、問不到）：入口沒了，表單跟著收（推導，不另設狀態）。
+  const formOpen = composing && signedIn
+
+  const onClose = () => {
+    const requestClose = closeIntentRef.current
+    if (requestClose) requestClose()
+    else closePanel()
+  }
+  const closeForm = () => {
+    setConfirming(false)
+    setComposing(false)
+  }
+  const askDiscard = () => {
+    focusBeforeConfirm.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setConfirming(true)
+  }
+  const keepEditing = () => {
+    setConfirming(false)
+    const back = focusBeforeConfirm.current
+    focusBeforeConfirm.current = null
+    // 表單的 `inert` 拿掉之後再還焦點（同一個 commit 之後）。
+    queueMicrotask(() => back?.focus())
+  }
+
+  return (
     <ListPanel
       kind="projects"
       title={TITLES.projects}
       labels={LABELS}
       renderItem={projectLine}
-      onClose={closePanel}
+      onClose={onClose}
       page={page}
       onShownPage={reportPage}
+      toolbar={
+        signedIn ? (
+          <button type="button" className={PRIMARY} onClick={() => setComposing(true)}>
+            {CREATE_LABEL}
+          </button>
+        ) : undefined
+      }
       empty={<EmptyState kind="first-empty" />}
       exhausted={<EmptyState kind="exhausted" />}
       error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
+      overlay={
+        formOpen
+          ? ({ reload }) => (
+              <div className="flex min-h-0 flex-col gap-gutter overflow-y-auto">
+                <div inert={confirming}>
+                  <CreateProjectForm
+                    // 成功：關表單、列表回第 0 頁重取（不插入回應，design D2）；焦點由 `ListPanel` 還給列表。
+                    onCreated={() => {
+                      closeForm()
+                      reload()
+                    }}
+                    onDismiss={closeForm}
+                    closeIntentRef={closeIntentRef}
+                    askDiscard={askDiscard}
+                  />
+                </div>
+                {confirming && <DiscardConfirm onDiscard={closeForm} onKeep={keepEditing} />}
+              </div>
+            )
+          : undefined
+      }
     />
-  ) : (
-    <TalentBoard onClose={closePanel} />
   )
+}
+
+export function BoardPanel() {
+  const { open, closePanel } = useListPanel()
+  if (open === null) return null
+  // 分兩支寫而不是一個 `renderItem: (item: A | B)`：
+  // 型別讓「案件面板拿到人才資料」在 typecheck 就紅。
+  return open === 'projects' ? <ProjectBoard /> : <TalentBoard onClose={closePanel} />
 }
