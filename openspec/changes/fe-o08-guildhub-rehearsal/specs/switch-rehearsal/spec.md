@@ -119,11 +119,11 @@
 `--suite rehearsal` 時 wrapper SHALL 以 `--reporter=json --outputFile=<唯一暫存檔>` 跑 vitest，跑完（不論結束碼）
 由 `finishRehearsal()` 決定：
 - vitest 是被訊號終止的、JSON 檔缺席、或不是合法的 vitest JSON → MUST NOT 寫任何檔案，結束碼非零；
-- JSON 完整（含有失敗的情況）→ 渲染報告，檔名 `<YYYYMMDD>T<HHMMSS>Z-<後端 SHA 前 7 碼>-<前端 SHA 前 7 碼>.md`
-  （UTC 時間；同一秒不會跑兩次），結束碼沿用 vitest 的；
+- JSON 完整（含有失敗的情況）→ 渲染報告，檔名 `<YYYYMMDD>T<HHMMSS>Z-<後端 SHA 前 7 碼>-<前端 SHA 前 7 碼>-<6 位十六進位隨機>.md`
+  （UTC 時間＋隨機後綴，由 `finishRehearsal` 的 `now` 與 `random` 注入；每一次執行都拿到自己的檔名），結束碼沿用 vitest 的；
 - 前端工作樹乾淨 → 落在 `docs/evidence/fe-o08/`（進版控的證據）；不乾淨 → 落在 `.local/rehearsal/`（已 gitignore），
   報告首行寫明 dirty。**證據目錄裡永遠只有乾淨工作樹產的報告**，不靠掃描、不靠人記得刪；
-- 目標檔已存在（時鐘倒退之類）→ MUST NOT 覆寫，結束碼非零、訊息含路徑。
+- 目標檔已存在（注入的 `random` 撞了、時鐘倒退之類）→ MUST NOT 覆寫，結束碼非零、訊息含路徑 —— 這是最後一道保險，不是預期路徑。
 暫存檔 SHALL 在 finally 清除。報告內容 SHALL 含：後端 SHA、前端 SHA、每一條 `key` 的 `passed`／`failed`／`blocked`、
 失敗訊息、〈送回後端〉節（`report: true` 的 `key`）；MUST NOT 複製期望表的說明全文。後端 SHA 拿不到（空字串）視同 JSON 缺席。
 

@@ -13,8 +13,9 @@ vitest 的 JSON）。
 
 **選項 B（採用）：`tests/rehearsal/*.rehearsal.ts` ＋ `vitest.rehearsal.mts`。**
 斷言、逾時、JSON reporter 都是現成的；標題帶 `[FE-O08-Sxx]` 就進覆蓋報告。
-wrapper 加一個 `--suite rehearsal` 旗標決定 config（純函式 `parseSuite(argv)`，可單測），
-其餘（preflight、起停、環境變數）一行不改。
+wrapper 加一個 `--suite rehearsal` 旗標決定 config（純函式 `parseSuite(argv)`，可單測）；
+preflight、起停、環境變數**沿用既有的函式與語意**，但 `main()` 的流程為了可測性重構成
+`run({ argv, env, deps })`（第 3 輪審查指出第一版寫「一行不改」跟這件事矛盾）。
 
 **argv 的邊界**（審查抓到：現在 wrapper 是 `process.argv.slice(2)` 原封轉傳給 vitest）：`parseSuite` 只認
 `--suite <v>` 與 `--suite=<v>`，只拿掉那一或兩個 token；`--` 之後不看；重複、缺值、非法值都拒絕；wrapper 的 `main()` 拆成 `run({ argv, env, deps })`
@@ -31,17 +32,17 @@ JSON 會被覆蓋成別的 reporter，`finishRehearsal` 讀到的不是它要的
 
 `tests/rehearsal/expectations.ts` 是一張表：每一條有 `key`、人讀的說明、期望的
 狀態碼與 `detail`、`report`（要不要送回後端）、`owner`（前端哪一份規格接手）。
-演練的斷言從表讀；報告的〈送回後端〉從表的 `report: true` 產；`README.md` 的清單
-由測試比對「README 提到的每個 `key` 都在表裡、表裡 `report: true` 的每個 `key`
-README 都提到」。三份講同一件事，只有一份是來源。
+演練的斷言從表讀；報告的〈送回後端〉從表的 `report: true` 產；`README.md` 分三節
+（契約全部、異常全部、送回後端全部），每一節由測試比對成「跟期望表的對應集合相等」——
+不是只驗 `report: true`（第 2 輪審查：那樣 `report: false` 的契約漏掉也綠）。三份講同一件事，只有一份是來源。
 
 ## D3｜報告從 vitest 的 JSON 產，落在 `docs/evidence/fe-o08/`
 
 vitest `--reporter=json --outputFile=<唯一暫存檔>`；wrapper 跑完（**不論結束碼**）交給 `finishRehearsal()`：
 JSON 完整就渲染（`renderReport()` 純函式）到 `docs/evidence/fe-o08/<YYYY-MM-DD>-<後端 sha7>-<前端 sha7>.md`，
 結束碼沿用 vitest 的 —— **有失敗的那一次正是最需要報告的那一次**（審查抓到第一版寫反了）。
-被訊號終止、JSON 缺席或不合法、後端 sha 空 → 不產、非零。檔名帶 UTC 秒（`<YYYYMMDD>T<HHMMSS>Z-<be7>-<fe7>.md`），
-「每次都留證據」與「不可變」才不打架；已存在仍不覆寫（第二輪審查抓到第一版要人手動刪舊證據，那跟不可變矛盾）。
+被訊號終止、JSON 缺席或不合法、後端 sha 空 → 不產、非零。檔名帶 UTC 秒＋6 位隨機（`<YYYYMMDD>T<HHMMSS>Z-<be7>-<fe7>-<rand>.md`，`now`／`random` 都注入），
+「每次都留證據」與「不可變」才不打架；已存在仍不覆寫，但那是保險不是預期路徑（第 3 輪審查：「同一秒不會跑兩次」是假設不是機制）。
 前端工作樹不乾淨 → 落 `.local/rehearsal/`（gitignore），證據目錄裡永遠只有乾淨工作樹的報告 ——
 第二版寫「單元測試掃目錄擋 `-dirty`」，兩個審查者都指出那會讓本機留一份 dirty 報告之後 `pnpm test` 一直紅。
 暫存檔在 finally 清掉。
@@ -83,7 +84,7 @@ commit 進 main 的報告就是 `FE-O11` 那種「不可變、離線取得回」
 
 ## 驗證方式
 
-- 單元（不連網）：`parseSuite()`、`renderReport()`、`finishRehearsal()`（暫存目錄）、`preflight()` 四條、期望表形狀、期望表 ↔ README 比對、`docs/evidence/fe-o08/` 沒有 `-dirty` 檔。
+- 單元（不連網）：`parseSuite()`、`run()` 的 preflight 四條（注入 deps）、`renderReport()`、`finishRehearsal()`（暫存目錄：dirty 只寫 `dirtyDir`、`outDir` 沒新檔；撞名不覆寫）、期望表形狀、期望表 ↔ README 三節集合相等、`.gitignore` 含 `/.local/rehearsal/`。
 - 演練（本機、自起後端、loopback）：`GUILDHUB_BACKEND_DIR=… INTERNAL_TEST_DATABASE_URL=… node scripts/contract-guildhub.mjs --suite rehearsal`；
   結束碼 0 且 `docs/evidence/fe-o08/` 多一份報告。
 - 突變：把後端行為「改掉」做不到（不動別人的 repo），改成把期望表 `form-team` 改成 201 → 演練那一步紅；

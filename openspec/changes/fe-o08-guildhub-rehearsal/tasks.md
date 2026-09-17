@@ -12,7 +12,7 @@
 - [ ] 2.2 判準先紅：`tests/rehearsal-report.test.ts` —— `S07` 渲染（`passed`／`failed`／`blocked`、dirty 首行）；`S08` 四種不產、有失敗照樣產且回 1、撞名不覆寫、dirty 落 `dirtyDir` 而 `outDir` 沒新檔
 - [ ] 2.3 **commit 紅的判準**
 - [ ] 2.4 `scripts/contract-guildhub.mjs`：`main()` 拆成 `run({ argv, env, deps })`（export，回傳結束碼）；`parseSuite()` export；`--suite rehearsal` 走 `vitest.rehearsal.mts`＋`--reporter=json --outputFile=<唯一暫存檔>`；跑完交 `deps.finish`；暫存檔 finally 清；後端 SHA 用 `git -C <backendDir> rev-parse HEAD`、前端 SHA 與 dirty 用 `git rev-parse HEAD`／`git status --porcelain`
-- [ ] 2.5 `scripts/rehearsal-report.mjs`：`renderReport()`、`finishRehearsal({ jsonPath, exitCode, signal, shas, dirty, outDir, dirtyDir, now })`（fs 只在 `outDir`／`dirtyDir` 底下）；`.gitignore` 加 `/.local/rehearsal/`（現在只有 `archive-review` 與 `llm-team` 兩條，`.local/` 整個沒有被排除）
+- [ ] 2.5 `scripts/rehearsal-report.mjs`：`renderReport()`、`finishRehearsal({ jsonPath, exitCode, signal, shas, dirty, outDir, dirtyDir, now, random })`（fs 只在 `outDir`／`dirtyDir` 底下）；`.gitignore` 加 `/.local/rehearsal/`（現在只有 `archive-review` 與 `llm-team` 兩條，`.local/` 整個沒有被排除）
 - [ ] 2.6 突變（先 commit）：`finishRehearsal()` sha 空字串照寫 → `S08` 紅；撞名覆寫 → `S08` 紅；dirty 寫進 `outDir` → `S08` 紅；`parseSuite` 重複 `--suite` 取最後一個 → `S01` 紅；`run()` 在 preflight 失敗後仍呼叫 `reset` → `S02` 紅；紀錄貼 PR
 - [ ] 2.7 `bash .github/scripts/pr-size.sh` 手寫 ≤ 500（design D6）；這個 slice 合併後 `--suite rehearsal` 會因缺 `vitest.rehearsal.mts` 失敗（預期）
 
