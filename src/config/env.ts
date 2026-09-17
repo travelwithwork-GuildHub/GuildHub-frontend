@@ -99,7 +99,8 @@ export function internalRealtimePort(): number {
 /**
  * 本地後端 session cookie 的 HMAC secret。規格 `FE-O03`〈session 是簽章的 HttpOnly cookie〉。
  * 本機（`local`）缺席用固定的開發值（重啟 dev server 之後 cookie 仍有效）；部署出去的版本缺席 → 第一次用到時拋
- * `ConfigError`（不進 `FE-O14` 的建置閘門，理由見下面 `DEPLOY_CONFIG_ITEMS` 那一項）。
+ * `ConfigError`。不進建置閘門：`internal` 只在本機合法（`dataAdapter()`），部署出去的版本用不到這把 secret ——
+ * 理由見下面 `DEPLOY_CONFIG_ITEMS` 那一項。
  */
 export function internalSessionSecret(): string {
   const raw = read(process.env.INTERNAL_SESSION_SECRET)
@@ -180,15 +181,23 @@ function resolve(
 }
 
 /**
- * 目前的資料來源。
+ * 目前的資料來源。規格 `FE-O14-S13`（`fe-o14-rest-build-gate`）。
  *
- * 缺席時預設 `guildhub` —— 今天只有它是可用的（`internal` 的後端是 `FE-O03`，W2）。
+ * 缺席時預設 `guildhub`，**所有環境都是** —— 部署出去的版本只有一個合法值，
+ * 逼人宣告一個只有一個合法值的變數，就是「填假的也沒差」的變數（跟即時層不同：那一軸在部署環境真的二選一）。
+ *
+ * ⚠️ **`internal` 只在本機合法。** 部署出去的 `internal` 沒有契約（`INTERNAL_DATABASE_URL`、
+ * `INTERNAL_SESSION_SECRET` 都不在建置閘門裡）—— 放行的話是建置綠、部署綠、第一個請求 500。
+ * 要解禁的 spec PR 要一併把 `INTERNAL_*` 翻成必驗（design D2）。
  *
  * ⚠️ **值無法辨識時拋錯，MUST NOT 退回預設。** 退回去的話，
  * 一個把 `internal` 打成 `intenral` 的環境會安靜地連到真後端 ——
  * 而症狀是「我的本地資料改了沒有反應」，不是「設定錯了」。
  */
 export function dataAdapter(): DataAdapter {
+  // 先解析環境代號：`FE-O09-S07` 說「讀取設定」時代號打錯或部署版缺席都要拋，這個讀取端也算 ——
+  // 缺席分支直接回 `guildhub` 的話，`prod` 這種打錯字在這裡會被安靜放過（審查抓到的）。
+  const env = appEnv()
   const raw = read(process.env.NEXT_PUBLIC_DATA_ADAPTER)
   if (raw === null) return 'guildhub'
   if (!(DATA_ADAPTERS as readonly string[]).includes(raw)) {
@@ -196,6 +205,13 @@ export function dataAdapter(): DataAdapter {
       `NEXT_PUBLIC_DATA_ADAPTER 的值 ${JSON.stringify(raw)} 無法辨識。` +
         `只能是 ${DATA_ADAPTERS.join(' / ')}。**打錯字不會退回預設** —— ` +
         '退回去的話，一個打錯字的環境會安靜地連到另一個資料來源。',
+    )
+  }
+  if (raw === 'internal' && env !== 'local') {
+    throw new ConfigError(
+      `NEXT_PUBLIC_DATA_ADAPTER=internal 只在本機合法，而目前的環境是 ${env}。` +
+        '部署出去的 internal 沒有契約（資料庫連線字串與 session secret 都不在建置閘門裡），' +
+        '放行的話是建置綠、部署綠、第一個請求 500。要部署 internal 先開 spec PR 把 INTERNAL_* 翻成必驗。',
     )
   }
   return raw as DataAdapter
@@ -234,8 +250,19 @@ export function realtimeAdapter(): RealtimeAdapter {
   return raw as RealtimeAdapter
 }
 
-/** 後端 REST 的 base URL。 */
-export function restBase(): string {
+/**
+ * 後端 REST 的 base URL，**資料層資料來源是 `internal` 時是 `null`**。規格 `FE-O14-S14`。
+ *
+ * ⚠️ `null` ＝「這個 adapter 不適用 REST base」，**不是「缺席」** —— 缺席在部署環境是拋錯，
+ * 在本機是本機預設值，兩者都不會回 `null`。跟 `wsUrl()` 在 `none` 時的規則同一條：
+ * `internal` 打同源 `/api`（`src/api/transport.ts`），這個位址永遠不會被讀取，
+ * 所以殘留一個合法值、殘留一個協定錯誤的值、完全不設，三種都回 `null`，不拋錯。
+ *
+ * `internal` 只在本機合法（`dataAdapter()` 擋），所以部署出去的版本永遠走 `resolve()` 那條 ——
+ * 這就是 `DEPLOY_CONFIG_ITEMS` 裡它能無條件 `checkedAtBuild: true` 的理由。
+ */
+export function restBase(): string | null {
+  if (dataAdapter() === 'internal') return null
   return resolve(
     read(process.env.NEXT_PUBLIC_GUILDHUB_REST),
     LOCAL_DEFAULTS.restBase,
@@ -289,6 +316,9 @@ export type DeployConfigItem =
       readonly skipReason: string
     }
 
+/** 三個 `INTERNAL_*` 共用的理由 —— 它們一起翻成必驗，不會只翻一個。 */
+const INTERNAL_ONLY_LOCAL_REASON = '只有 internal adapter 用，而 internal 只在本機合法（FE-O14-S13）；解禁部署版 internal 時翻成必驗'
+
 /**
  * 部署建置要驗哪些設定。**這是唯一一份清單。**
  *
@@ -296,10 +326,11 @@ export type DeployConfigItem =
  * 兩份清單會漂，而漂掉的方向必然是建置時比執行時鬆 ——
  * 於是閘門看起來還在、實際上已經漏了。
  *
- * `FE-O14-S06` 的測試也**由這份清單驅動**：對每個 `checkedAtBuild` 的項目
- * 逐一移除它的變數，斷言驗證失敗且訊息含變數名。所以新增一個項目時，
+ * `FE-O14-S06` 的測試也**由這份清單驅動**：對每個 `checkedAtBuild: true` 的項目
+ * 逐一移除它的變數，斷言驗證失敗且訊息含變數名。所以新增一個必驗項目時，
  * 那條測試自動涵蓋它 —— 而如果新項目缺席時不會失敗，測試會紅，
- * 那時要回來想清楚它到底該不該是必驗的。
+ * 那時要回來想清楚它到底該不該是必驗的。**它只保證必驗項目的入口被執行**；
+ * 項目之間的相依（REST base 跟著資料來源走）由 `FE-O14-S14` 保障，不在這條裡。
  */
 export const DEPLOY_CONFIG_ITEMS: readonly DeployConfigItem[] = [
   { name: 'NEXT_PUBLIC_APP_ENV', resolve: appEnv, checkedAtBuild: true },
@@ -308,27 +339,26 @@ export const DEPLOY_CONFIG_ITEMS: readonly DeployConfigItem[] = [
     resolve: internalSessionSecret,
     checkedAtBuild: false,
     // 這份清單的項目是**無條件**的（`FE-O14-S06`：每一個必驗項目缺席都要失敗）。而這把 secret 只有
-    // `internal` adapter 的本地後端用；`guildhub` 的部署被要求它，就是一個「填假的也沒差」的變數 ——
-    // 這個 repo 明文拒絕那種變數（上面 `NEXT_PUBLIC_GUILDHUB_REST` 的理由）。
-    // 所以不進建置閘門：非 local 缺席時，`internalSessionSecret()` 在**第一次被用到**時拋 `ConfigError`
-    // （那一個請求是 500，伺服器 log 有訊息）。今天沒有任何 internal 的部署，本地後端只在本機跑。
-    skipReason: '只有 internal adapter 用；清單是無條件的，不該要求 guildhub 部署填一把沒用的 secret',
+    // `internal` adapter 的本地後端用，而 `internal` 只在本機合法（`dataAdapter()`，`FE-O14-S13`）——
+    // 部署出去的版本用不到它，要求填就是「填假的也沒差」的變數。
+    // 解禁部署版 `internal` 的 spec PR 要把這一項（與下面兩個 `INTERNAL_*`）翻成 `true`（design D2）。
+    skipReason: INTERNAL_ONLY_LOCAL_REASON,
+  },
+  { name: 'INTERNAL_DATABASE_URL', resolve: internalDatabaseUrl, checkedAtBuild: false, skipReason: INTERNAL_ONLY_LOCAL_REASON },
+  { name: 'INTERNAL_REALTIME_PORT', resolve: internalRealtimePort, checkedAtBuild: false, skipReason: INTERNAL_ONLY_LOCAL_REASON },
+  {
+    name: 'NEXT_PUBLIC_DATA_ADAPTER',
+    resolve: dataAdapter,
+    checkedAtBuild: false,
+    // 缺席合法（預設 `guildhub`，所有環境）。部署版 `internal` 的限制不在這裡驗，在 `restBase()` 解析時驗：
+    // `restBase()` 先問 `dataAdapter()`，部署環境讀到 `internal` 就在那裡拋（design D1）。
+    skipReason: '缺席合法（預設 guildhub）；部署版 internal 的限制在 restBase() 解析時驗',
   },
   { name: 'NEXT_PUBLIC_REALTIME_ADAPTER', resolve: realtimeAdapter, checkedAtBuild: true },
   { name: 'NEXT_PUBLIC_GUILDHUB_WS', resolve: wsUrl, checkedAtBuild: true },
-  {
-    name: 'NEXT_PUBLIC_GUILDHUB_REST',
-    resolve: restBase,
-    checkedAtBuild: false,
-    // 量過（`FE-O14` design 的 M3）：`src/` 底下沒有任何元件 import
-    // `@/api/operations` 或 `@/api/transport`，所以 `restBase()` 今天
-    // 一次都不會被呼叫。把它列成必驗等於要求一個什麼都不做的變數，
-    // 而那種變數會教人「這些設定填假的也沒差」。
-    //
-    // ⚠️ **有人把資料存取接上畫面的那天，這裡要翻成 `true`。**
-    // 沒有機器擋著這件事 —— 它靠的是這行理由被讀到。
-    skipReason: '今天沒有任何元件呼叫 REST（FE-O14 design 的 M3）',
-  },
+  // `/talent`、`/inbox`、登入畫面都走 `restBase()`（`FE-B04`／`FE-K01`／`FE-A04` 之後）。**無條件**必驗：
+  // 部署出去的版本永遠是 `guildhub`（`internal` 只在本機），所以這裡不需要條件（`FE-O14-S14`）。
+  { name: 'NEXT_PUBLIC_GUILDHUB_REST', resolve: restBase, checkedAtBuild: true },
 ]
 
 /**

@@ -6,6 +6,7 @@ import {
   REALTIME_ADAPTERS,
   REST_CREDENTIALS,
   appEnv,
+  dataAdapter,
   realtimeAdapter,
   restBase,
   validateDeployConfig,
@@ -22,6 +23,10 @@ import {
 //   Requirement: 即時層的資料來源是一個明確的選擇 —— FE-O14-S01 / S02
 //   Requirement: 要驗哪些設定只有一份清單 —— FE-O14-S06
 //   Requirement: 部署出去的版本缺少設定時要立刻失敗（MODIFIED）—— FE-O09-S03
+//
+// 規格：openspec/changes/fe-o14-rest-build-gate/specs/runtime-config/spec.md
+//   Requirement: 資料層的資料來源是一個明確的選擇 —— FE-O14-S13 / S14（讀設定那一半）
+//   Requirement: 部署出去的版本缺少設定時要立刻失敗（MODIFIED）—— FE-O09-S03 補「資料來源為 guildhub」的前提
 //
 // ⚠️ Scenario ID 只放在 `it` 標題上，而且那條 `it` 要把該 Scenario 的每一個
 // WHEN/THEN 子句都跑過（`FE-O01` 踩過：寫在 `describe` 上等於沒寫）。
@@ -53,6 +58,9 @@ describe('執行期設定', () => {
     // 沒有它 `wsUrl()` 會先因為那個變數拋錯 —— 而那不是這條在驗的東西。
     set('NEXT_PUBLIC_REALTIME_ADAPTER', 'guildhub')
     set('NEXT_PUBLIC_GUILDHUB_WS', 'wss://guildhub.example/ws')
+    // **這一行是 fe-o14-rest-build-gate 加的前提**：REST base 只在資料來源為 `guildhub` 時必填
+    //（`internal` 時它會被忽略，`FE-O14-S14`）。缺席也是 `guildhub`，這裡明寫是為了讓前提看得見。
+    set('NEXT_PUBLIC_DATA_ADAPTER', 'guildhub')
     // 只驗一個變數的話，另一個沒被當成必填也會過（審查者抓到的）。
     expect(() => restBase()).toThrow(/NEXT_PUBLIC_GUILDHUB_REST/)
 
@@ -84,6 +92,8 @@ describe('執行期設定', () => {
     expect(() => appEnv(), 'production 打成 prod 應該拋錯').toThrow(ConfigError)
     // 「MUST NOT 當成本機處理」—— 退回本機的話它會安靜地連到 localhost
     expect(() => restBase()).toThrow(/prod/)
+    // 資料層資料來源也是「讀取設定」：缺席分支不能略過環境代號的驗證（fe-o14-rest-build-gate 審查抓到的）
+    expect(() => dataAdapter(), '代號打錯時 dataAdapter() 竟然安靜地回了預設值').toThrow(/prod/)
 
     set('NEXT_PUBLIC_APP_ENV', undefined)
     set('NODE_ENV', 'production')
@@ -179,6 +189,64 @@ describe('即時層的資料來源（FE-O14）', () => {
     // 沒有這一段，一個「永遠回 null」的 `wsUrl()` 也會讓上面全綠。
     set('NEXT_PUBLIC_REALTIME_ADAPTER', 'guildhub')
     expect(() => wsUrl()).toThrow(/NEXT_PUBLIC_GUILDHUB_WS/)
+  })
+})
+
+describe('資料層的資料來源（fe-o14-rest-build-gate）', () => {
+  it('[FE-O14-S13] 資料層資料來源的四種情形', () => {
+    // 缺席 → guildhub，本機與 production 都是（不逼人宣告一個只有一個合法值的變數）
+    expect(dataAdapter()).toBe('guildhub')
+    deployAs('production')
+    expect(dataAdapter()).toBe('guildhub')
+
+    // 本機明確設成 internal → internal
+    vi.unstubAllEnvs()
+    set('NEXT_PUBLIC_DATA_ADAPTER', 'internal')
+    expect(dataAdapter()).toBe('internal')
+
+    // production／preview 設成 internal → 拋錯，訊息含變數名、說明只在本機
+    for (const env of ['production', 'preview'] as const) {
+      deployAs(env)
+      expect(() => dataAdapter(), `${env} 的 internal 竟然被放行`).toThrow(/NEXT_PUBLIC_DATA_ADAPTER/)
+      expect(() => dataAdapter()).toThrow(/只在本機/)
+    }
+
+    // 未列舉的值 → 拋錯，指出那個值，且 MUST NOT 回傳任一合法值
+    vi.unstubAllEnvs()
+    set('NEXT_PUBLIC_DATA_ADAPTER', 'intenral')
+    expect(() => dataAdapter()).toThrow(/intenral/)
+    let returned: string | null = null
+    try {
+      returned = dataAdapter()
+    } catch {
+      /* 預期會拋 */
+    }
+    expect(returned, '打錯字竟然安靜地退回了一個合法值').toBeNull()
+  })
+
+  it('[FE-O14-S14] REST base 的必填跟著資料層資料來源走（讀設定那一半；建置那一半在 deploy-build-gate.test.ts）', () => {
+    // production、資料來源缺席（guildhub）、沒有 REST → 拋錯含變數名
+    deployAs('production')
+    set('NEXT_PUBLIC_REALTIME_ADAPTER', 'none')
+    expect(() => restBase()).toThrow(/NEXT_PUBLIC_GUILDHUB_REST/)
+
+    // 本機 internal：REST base 「不適用」—— 回 null，不是位址、不是本機預設值
+    vi.unstubAllEnvs()
+    set('NEXT_PUBLIC_DATA_ADAPTER', 'internal')
+    set('NEXT_PUBLIC_GUILDHUB_REST', 'ws://localhost:8000')
+    expect(() => restBase(), '協定錯誤的值在 internal 下不該被檢查').not.toThrow()
+    expect(restBase()).toBeNull()
+
+    // 合法值與完全不設也一樣 —— 不是只有錯誤值走特殊分支
+    set('NEXT_PUBLIC_GUILDHUB_REST', 'https://guildhub.example')
+    expect(restBase()).toBeNull()
+    set('NEXT_PUBLIC_GUILDHUB_REST', undefined)
+    expect(restBase(), 'internal 竟然退回了本機預設位址').toBeNull()
+
+    // **對照**：同一個壞值在 guildhub 下必須拋 —— 沒有這段，一個「永遠回 null」的 restBase() 也全綠。
+    set('NEXT_PUBLIC_DATA_ADAPTER', undefined)
+    set('NEXT_PUBLIC_GUILDHUB_REST', 'ws://localhost:8000')
+    expect(() => restBase()).toThrow(/ws:/)
   })
 })
 
