@@ -25,16 +25,9 @@ const PATTERNS: ReadonlyArray<readonly [kind: string, re: RegExp]> = [
 /** 這一行要求豁免。**冒號後面要有理由**；沒有理由算違規。 */
 export const ALLOW = ['dom', 'token', 'allow'].join('-') + ':'
 
-export interface TokenViolation {
-  line: number
-  kind: string
-  text: string
-}
-export interface TokenScan {
-  violations: TokenViolation[]
-  /** 帶理由、而且那一行真的有東西要豁免的行數。 */
-  exemptions: number
-}
+export interface TokenViolation { line: number; kind: string; text: string }
+/** `exemptions`：帶理由、而且那一行真的有東西要豁免的行數。 */
+export interface TokenScan { violations: TokenViolation[]; exemptions: number }
 
 export function domTokenScan(source: string): TokenScan {
   const violations: TokenViolation[] = []

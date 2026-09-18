@@ -5,12 +5,10 @@
    規格只約束門檻（4.5:1、3:1、≥ 16px⋯⋯），不約束值 —— 值在這裡量出來、寫在旁邊。
    **堆疊層級刻意不在這裡**（FE-X01-S14）：在 src/design/layers.ts，理由見它的 design D5（CSS 自訂屬性取不到只會回空字串）。 */
 @theme {
-  /* 字體堆疊：系統字體，不載 webfont（FE-X16 design D1：效能、離線 build、截圖的問題不在字體）。
-     `Noto Sans TC`／`PingFang TC`／`Microsoft JhengHei` 是三個平台的繁中家族 —— 少了它們 CJK 會落到瀏覽器預設的襯線字（S02）。 */
+  /* 字體堆疊：系統字體，不載 webfont（FE-X16 design D1）。三個繁中家族各對一個平台 —— 少了它們 CJK 會落到瀏覽器預設的襯線字（S02）。 */
   --font-sans: ui-sans-serif, system-ui, 'SF Pro Text', 'Segoe UI', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
 
-  /* 色票。對比全部畫到 canvas 讀 pixel 算（getComputedStyle 對 oklch() 原樣回字串）。
-     surface 2026-09-18 量到 rgb(247 248 251)。 */
+  /* 色票。對比全部畫到 canvas 讀 pixel 算（getComputedStyle 對 oklch() 原樣回字串）。surface 量到 rgb(247 248 251)。 */
   --color-surface: oklch(0.98 0.004 260);
   --color-surface-raised: oklch(1 0 0);
   /* hover 的底、卡片上的 chip。對 surface-raised 只有 1.14:1 —— 它**不是**用來達標的，是「有東西在這裡」的低語。 */
@@ -18,8 +16,7 @@
   --color-ink: oklch(0.24 0.02 260);
   /* 說明文字。對 surface 5.21:1、對 surface-raised 5.53:1（S04 要 4.5）。 */
   --color-ink-muted: oklch(0.52 0.02 260);
-  /* 主要按鈕的填色、文字級的字色、焦點環。**白字對它 5.58:1**（S04／S10）—— 原本的 L 0.58 只有 4.35:1，不夠。
-     對 surface 5.25:1。 */
+  /* 主要按鈕的填色、文字級的字色。**白字對它 5.58:1**（S04／S10；原本的 L 0.58 只有 4.35:1）；對 surface 5.25:1。 */
   --color-accent: oklch(0.52 0.16 258);
   --color-accent-hover: oklch(0.46 0.16 258);
   /* 危險色文字對 surface 4.84:1、對 surface-raised 5.14:1。 */
@@ -34,8 +31,7 @@
   /* 焦點環：對 surface 5.25:1、對 surface-raised 5.58:1（S10 要 3）。獨立一個 token，之後要跟 accent 分開時不用改呼叫端。 */
   --color-focus: oklch(0.52 0.16 258);
 
-  /* 字級五級（S03）：頁面標題 > 面板標題 > 條目標題 > 內文 ≥ 說明。
-     內文 16px／1.5、說明 13px；面板標題 22px = 1.375 × 內文（要 ≥ 1.25）；頁面標題 32px = 2 × 內文（要 ≥ 1.5）。 */
+  /* 字級五級（S03）：內文 16px／1.5、說明 13px；面板標題 22px = 1.375 × 內文（要 ≥ 1.25）；頁面標題 32px = 2 ×（要 ≥ 1.5）。 */
   --text-caption: 0.8125rem;
   --text-caption--line-height: 1.4;
   --text-body: 1rem;
@@ -71,10 +67,7 @@
 
   /* 所有控制項共有的：高度下限（S11）、過渡（S12，只動顏色類，不動寬高）。
      勾選框不吃高度下限 —— 它的框是瀏覽器畫的，拉高只會把框拉歪。 */
-  button,
-  textarea,
-  select,
-  input:not([type='checkbox']):not([type='radio']) {
+  button, textarea, select, input:not([type='checkbox']):not([type='radio']) {
     min-height: 2.5rem;
     transition-property: color, background-color, border-color, box-shadow, opacity;
     transition-duration: var(--motion);
@@ -89,11 +82,6 @@
 
   /* 減少動態：過渡與動畫**全部**歸零（S12）。`!important` 是刻意的 —— 它要贏過每一個 utility。 */
   @media (prefers-reduced-motion: reduce) {
-    *,
-    ::before,
-    ::after {
-      transition-duration: 0s !important;
-      animation-duration: 0s !important;
-    }
+    *, ::before, ::after { transition-duration: 0s !important; animation-duration: 0s !important; }
   }
 }
