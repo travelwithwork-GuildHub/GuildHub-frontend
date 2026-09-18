@@ -14,10 +14,8 @@ import { FormTeamSchema } from './projectRules'
 // owner 在案件詳情裡的動作：成軍（recruiting）、結案（active）。規格 `FE-J04`〈動作跟著狀態走，只給 owner〉、〈成軍…〉、〈結案要確認…〉。
 // 密碼的一次性呈現（〈密碼只在這一次詳情裡呈現…〉）在下一片 `--reveal`。
 //
-// ⚠️ **狀態機就是 `project.status`**（design D1）：這裡沒有「成軍中／已成軍」的旗標，成功後呼叫端拿回應 `replace` 詳情，畫面從新的 `status` 推導。
-//
-// ⚠️ **三個副作用互相獨立**（design D6）：成功後呼叫端先同步 `replace(response)`，再各自啟動列表 `reload()` 與門 `refreshRooms()`；這裡不等它們、不看它們的結果。
-//
+// ⚠️ **狀態機就是 `project.status`**（design D1）：沒有「成軍中／已成軍」旗標，成功後呼叫端拿回應 `replace` 詳情，畫面從新的 `status` 推導。
+// ⚠️ **三個副作用互相獨立**（design D6）：呼叫端先同步 `replace(response)`，再各自啟動列表 `reload()` 與門 `refreshRooms()`；這裡不等、不看結果。
 // ⚠️ 送出中（成軍或結案）不可關：`onBusyChange` 讓呼叫端把返回／關閉／Escape 擋住（`S04`／`S07`）。
 
 export const OWNER_ACTION_LABELS = {
