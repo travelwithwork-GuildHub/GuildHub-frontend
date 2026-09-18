@@ -4,8 +4,8 @@
 產生指令    npm run contract:generate
 產生器      openapi-typescript@7.13.0
 來源        http://localhost:8000/openapi.json
-後端 commit cd2929c（GuildHub-backend）
-產生時間    2026-09-10
+後端 commit 6e588bd（GuildHub-backend，feat/be-g12-project-resources）
+產生時間    2026-09-18
 ```
 
 ## 它是哨兵，不是型別來源
@@ -40,6 +40,24 @@ cd ~/Desktop/workshop/fergus/GuildHub-backend
 
 REST 的型別不需要資料庫 —— OpenAPI 是從程式碼標註產的，
 DB 沒接上時後端仍然會回 `/openapi.json`。
+
+## 2026-09-18 這次重產（`FE-J14` 的 `--contract`）
+
+⚠️ **來源不是後端的 `main`，是 `feat/be-g12-project-resources`（`6e588bd`，PR #1，開著沒合併）。**
+交接的決定是「先當作它一定會被合併」——`BE-G12` 那條分支相對後端 `main` 只落後
+`c6f3928`（只改 `deploy/README.md`），合併不會動到形狀，也不會動到
+`sql/001_schema.sql` 的行號（`LIMIT_SOURCES` 指著 97 與 100 行）。
+**後端 PR 真的合併之後要再產一次確認** —— 那時這一段就可以改寫成 main 的 commit。
+
+後端沒有跑 `bash run.sh`（CRLF 的問題還在），用的是 repo 裡的 `.venv`：
+
+```bash
+cd ~/Desktop/TWW/GuildHub-backend
+./.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+`/api/*` 從 17 組變成 21 組（`FE-J14-S26` 驗它），`components.schemas` 多了
+`ResourceType`、`ProjectResourceCreate`／`Update`／`Out` 四個。
 
 ## 這次重產證明了什麼
 
