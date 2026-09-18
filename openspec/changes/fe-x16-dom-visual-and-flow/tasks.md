@@ -36,10 +36,10 @@
 
 ## 4. `--flow`：協調者、提示讓位、聊天收起、網址（Requirement〈同一時間只有一個阻斷式面板〉）
 
-- [ ] 4.1 判準先紅（jsdom）：`S13`（看板→收件匣→名片→收件匣、寄信那條路、焦點只動一次、網址退）、`S14`（成軍送出中拒絕＋`role="status"`＋焦點留在按鈕；回來後接受；名片 dirty 拒絕且不出確認）、
+- [ ] 4.1 判準先紅（jsdom）：`S13`（看板→收件匣→名片→收件匣、寄信那條路、焦點不經開啟者與 `body`、網址退）、`S14`（成軍送出中拒絕＋`role="status"`＋焦點留在按鈕；回來後接受；名片 dirty 拒絕且不出確認）、
       `S15`（提示讓位／回來／關掉不回來／走完不回來）、`S16`（收起顯示 3、不持鎖；展開有 3 則在底部；往上讀時收起再展開位置不動＋回到最新）、
-      `S17`（下一頁：接受重開；送出中拒絕 → `replaceState` 一次、`pushState` 零次、再上一頁回原本那一筆）、`S18`（彈出層：成功就關、被拒也因焦點離開而關）、`S21`（同一次事件兩個請求：第一個贏、第二個拒）
-- [ ] 4.2 `src/panel/BlockingPanelCoordinator.tsx`（D3）：登記表是 ref；`register({ id, canYield, yield })` 冪等、卸載釋放並解除同 id 的保留；`requestOpen(id)` 同步回 boolean、成功就 `reserved = id`、保留期間別的 id 拒絕（D3）、拒絕發 `role="status"`（`toast` 層）；
+      `S17`（下一頁：接受重開；送出中拒絕 → `replaceState` 一次、`pushState` 零次、再上一頁回原本那一筆）、`S18`（彈出層：成功就關、被拒也因焦點離開而關）、`S21`（同一個 handler 連續兩次 `requestOpen`，在 commit 前斷言兩個同步回傳值）、`S22`（請求成功但殼沒掛成：下一個 task 別人能開；`release` 後同事件能開）
+- [ ] 4.2 `src/panel/BlockingPanelCoordinator.tsx`（D3）：登記表是 ref；`register({ id, canYield, yield })` 冪等、卸載釋放並解除同 id 的保留；`requestOpen(id)` 同步回 boolean、成功就 `reserved = id`、保留期間別的 id 拒絕；`release(id)`；保留在 task 結束自動失效（D3）、拒絕發 `role="status"`（`toast` 層）；
       `useBlockingPanelOpen()` 從登記表推導。`PanelShell` 掛載時登記（新 prop `canYield`、`onYield`）
 - [ ] 4.3 三個 provider：`openX()` 先 `requestOpen()`；`yield` 走既有關閉路徑但**不還焦點**（`ProfilePanelProvider` 的還焦點 effect 加旗標）；`FE-K01-S02` 的「看板關」改走協調者；
       `PanelUrlSync.restore` 經過 `requestOpen()`，被拒 → `replaceState` 目前這一筆回實際狀態（不 push）
@@ -62,7 +62,7 @@
 - [ ] 6.1 拿掉 `--font-sans` 的繁中家族 → `S02` 紅；把某個表面的內文改成 `14px` → `S03` 紅；`ink-muted` 調淡 → `S04` 紅；假輸入六段任一掃不到 → `S01` 紅
 - [ ] 6.2 面板底改成半透明 → `S05` 紅；給面板加一層世界遮罩 → `S05` 紅；確認視窗遮罩拿掉 → `S06` 紅；關閉搬到標題列最前 → `S07` 紅；`<header>` 放進捲動容器 → `S08` 紅
 - [ ] 6.3 場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
-- [ ] 6.4 協調者不 `yield()` 就開 → `S13` 紅；讓位時還焦點給開啟者 → `S13` 紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
+- [ ] 6.4 協調者不 `yield()` 就開 → `S13` 紅；讓位時還焦點給開啟者 → `S13` 紅；保留不自動失效 → `S22` 紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
       聊天框展開不還原 `scrollTop` → `S16` 紅；下一頁被拒不 `replaceState`（或用了 `pushState`）→ `S17` 紅；被拒時彈出層留著 → `S18` 紅；拿掉保留 → `S21` 紅
 - [ ] 6.5 每次突變前 commit；突變後還原並重 build `.next`
 

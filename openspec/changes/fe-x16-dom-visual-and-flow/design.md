@@ -46,11 +46,13 @@ React 的 state 更新也不同步 —— `claim()` 不可能同步知道結果�
   「掛載中的阻斷式面板 ≤ 1」因此是協調者**看得到**的事實（登記表的大小），不是各 provider 的 `open` 旗標各自宣稱。
 - **`canYield(): boolean` 同步**：每個面板今天就同步知道自己能不能立刻關 —— 送出中（`busy` ref）、名片有未儲存的修改（dirty）→ `false`。
   讓位**不替使用者回答**「要放棄修改嗎」：那是非同步的問題，讓位直接算拒絕（`S14` 第三段）。
-- **`yield(): void` 同步**：確定關閉，走 provider 既有的關閉路徑（看板的網址退照舊），但**不把焦點還給開啟者**（`S13` 焦點只動一次）——
+- **`yield(): void` 同步**：確定關閉，走 provider 既有的關閉路徑（看板的網址退照舊），但**不把焦點還給開啟者**（`S13` 的 `focusin` 序列裡不得有開啟者）——
   今天 `ProfilePanelProvider` 在卸載後的 effect 裡還焦點，讓位時要跳過那一步（用一個「這次關閉是讓位」的旗標）。
 - **請求同步＋保留**：provider 的 `openX()` 先 `coordinator.requestOpen(id)`。codex 第二輪抓到：只靠登記表（殼在 effect 裡登記）判斷「沒有持有者」，
   同一次事件裡 A、B 兩個請求都會看到空表、都拿到 `true`、commit 後兩個都掛。所以協調者多一個 **`reserved: id | null`**（ref，同步）：請求成功就保留給那個 id，
-  殼登記時解除；保留期間別的 id 一律拒絕（`S21`）。請求成功的 provider 在同一次事件裡 `setOpen(true)`，所以保留不會懸空（provider 只有這一種用法）。
+  殼登記時解除、`release(id)` 解除、**最晚在目前 task 結束時自動失效**（`setTimeout(…, 0)` 清掉；React 對離散事件的更新在事件結束時同步 commit，所以殼來得及登記）；
+  保留期間別的 id 一律拒絕（`S21`）。codex 第三輪抓到「provider 一定會 setOpen(true) 所以不會懸空」不是 React 保證的事（commit 前卸載、條件變了都掛不成）——
+  自動失效讓最壞情況只是「同一個 task 裡別人被拒」，不會永久鎖死（`S22`）。
   沒有持有者 → 保留、`true`；`canYield()` → `yield()`、保留、`true`；否則 `false` 並發一則 `role="status"` 的回饋（`toast` 層；文案不是契約）。
   呼叫端拿到 `false` 就不動自己的 state —— 不會先開再關、不閃。
 - **網址**：看板讓位走既有關閉路徑 → `PanelUrlSync` 照 `FE-B09` 退網址。下一頁的 `restore`（讓位是 `go(-1)`，帶 `panel` 的那一筆在**前進**紀錄 —— codex 第二輪抓到第一版寫成上一頁）也經過 `requestOpen()`；
@@ -97,7 +99,7 @@ React 的 state 更新也不同步 —— `claim()` 不可能同步知道結果�
   新 `tests/e2e/dom-visual.mjs`，沿用 `control-contrast.mjs` 的量法（畫到 canvas 讀 pixel）。跑法同 `FE-J04`：`next start`＋`internal`。
 - 結構（標題列順序、返回／關閉位置、一次一個面板、提示讓位、聊天收起、主要動作計數）：jsdom 判準，`tests/dom-visual-*.test.tsx`。
   `S09` 的「至多一個」用 `data-tier="primary"` 這種**由常數帶出來**的屬性數（常數是唯一來源，屬性跟著它走；判準不比 class 字串）。
-- 突變（tasks 第 6 節）：拿掉 token → `S01`／`S03`／`S05` 紅；協調者不 `yield()` 就開 → `S13` 紅；`canYield` 恆真 → `S14` 紅；讓位時還焦點給開啟者 → `S13` 焦點只動一次紅；上一頁被拒不 `replaceState` → `S17` 紅；
+- 突變（tasks 第 6 節）：拿掉 token → `S01`／`S03`／`S05` 紅；協調者不 `yield()` 就開 → `S13` 紅；`canYield` 恆真 → `S14` 紅；讓位時還焦點給開啟者 → `S13` 的 `focusin` 序列紅；上一頁被拒不 `replaceState` → `S17` 紅；
   聊天框不讀協調者 → `S16` 紅；把 `reduce` 的 media query 拿掉 → `S12` 紅；`PanelShell` 的 `<header>` 留在捲動容器裡 → `S08` 紅（Gemini 抓到 tasks 第一版把 overflow 加在含標題列的容器上）。
 
 ### D8｜效能預算：零新靜態請求、JS `≤ +4 KB`、CSS `≤ +6 KB`（gzip）、基線固定
