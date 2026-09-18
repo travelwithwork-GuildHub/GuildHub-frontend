@@ -13,7 +13,7 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
-import { HALL_SPAWN, assertLoopback, bad, countOverlays, failureCount, fakeRealtime, fakeRest, guardLoopback, ok, profile, uuid, waitForTransition, waitForWorld, walker } from './lib/world.mjs'
+import { HALL_SPAWN, assertLoopback, bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, guardLoopback, ok, overlaysSeen, profile, uuid, waitForTransition, waitForWorld, walker } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-w08'
@@ -62,11 +62,11 @@ const near = (a, b, tol = 1) => Math.abs(a - b) <= tol
 await mkdir(OUT, { recursive: true })
 const browser = await chromium.launch({ headless: !HEADED, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 
-async function open(others, { url = '/world', room = false } = {}) {
+async function open(others, { url = '/world', room = false, token = room } = {}) {
   const sockets = []
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
   guardLoopback(context)
-  if (room) await context.addInitScript(([key, token]) => sessionStorage.setItem(key, token), [tokenKey(P.id), TOKEN])
+  if (token) await context.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [tokenKey(P.id), TOKEN])
   await countOverlays(context)
   await fakeRealtime(context, sockets, { others })
   const page = await context.newPage()
@@ -164,6 +164,18 @@ try {
     const overflows = edge.x + TAG_WIDTH / 2 > edge.canvasWidth
     if (edge.x < edge.canvasWidth && overflows && edge.visibility === 'visible') ok(`[S08] 錨點在畫面內（x=${edge.x.toFixed(0)}）、牌子矩形越出右緣 → 仍然呈現`)
     else bad('[S08] 錨點在畫面內、矩形越界時牌子不該消失', JSON.stringify(edge))
+    // 越界的部分要被容器裁掉（規格「由容器裁掉越界的部分」）：容器 overflow 不是 visible，而且牌子在視窗裡看得見的寬度確實比 176 窄
+    const clip = await page.evaluate(() => {
+      const c = document.querySelector('[data-testid="name-tags"]')
+      const el = [...document.querySelectorAll('[data-testid="name-tag"]')].find((t) => t.textContent === '小玉')
+      const cs = getComputedStyle(c)
+      const cr = c.getBoundingClientRect()
+      const r = el.getBoundingClientRect()
+      const visibleWidth = Math.max(0, Math.min(r.right, cr.right) - Math.max(r.left, cr.left))
+      return { overflowX: cs.overflowX, overflowY: cs.overflowY, visibleWidth, width: r.width, beyond: r.right - cr.right }
+    })
+    if (clip.overflowX !== 'visible' && clip.overflowY !== 'visible' && clip.beyond > 0 && clip.visibleWidth < clip.width) ok(`[S08] 越界的 ${clip.beyond.toFixed(0)} px 由容器裁掉（overflow ${clip.overflowX}／${clip.overflowY}）`)
+    else bad('[S08] 容器沒有裁掉越界的部分', JSON.stringify(clip))
     await page.screenshot({ path: path.join(OUT, 'edge.png') })
     send(sockets, { t: 'pos', p: [['u-yu', Math.round((HALL_SPAWN.x + 13) * PX), Math.round(HALL_SPAWN.z * PX), 0]] })
     if (await waitVisibility(page, '小玉', 'hidden')) ok('[S08] 錨點出畫面 → hidden')
@@ -248,14 +260,23 @@ try {
     await context.close()
   }
 
-  // ── D：S10（房間） ──
+  // ── D：S10（從大廳走進房間：大廳的牌子隨舊子樹卸載、房間的牌子由新名單建立） ──
   {
-    const { page, context } = await open((scene) => (scene === `room:${ROOM}` ? [at('u-owner', '房主', 1, 0)] : [at('u-yu', '小玉', 1, 0)]), { url: `/world?room=${ROOM}`, room: true })
+    const { page, context } = await open((scene) => (scene === `room:${ROOM}` ? [at('u-owner', '房主', 1, 0)] : [at('u-yu', '小玉', 1, 0)]), { token: true })
+    if (await waitTags(page, 1) && (await tagsText(page)).includes('小玉')) ok('[S10] 大廳裡先看到「小玉」')
+    else bad('[S10] 大廳的牌子沒出現', JSON.stringify(await tagsText(page)))
+    const { approachDoor } = walker({ room: ROOM, decoy: uuid(2), title: '星際導航', out: OUT })
+    await approachDoor(page)
+    const since = await overlaysSeen(page)
+    await page.keyboard.press('KeyE')
+    await waitForTransition(page, '按 E 進房間', since, 'S10')
+    await expectUrl(page, '[S10] 進房間', `/world?room=${ROOM}`)
+    await waitForWorld(page)
     if (await waitTags(page, 1)) ok('[S10] 房間裡有一塊牌子')
     else bad('[S10] 房間裡牌子數不是 1', JSON.stringify(await tagsText(page)))
     const texts = await tagsText(page)
-    if (texts.includes('房主') && !texts.includes('小玉')) ok('[S10] 是房間裡的人，大廳的人不在 DOM 裡')
-    else bad('[S10] 房間的名單不對', JSON.stringify(texts))
+    if (texts.includes('房主') && !texts.includes('小玉')) ok('[S10] 是房間裡的人；大廳的「小玉」隨舊子樹卸載、不在 DOM 裡')
+    else bad('[S10] 房間的名單不對（大廳的牌子沒卸載？）', JSON.stringify(texts))
     await page.screenshot({ path: path.join(OUT, 'room.png') })
     await context.close()
   }
