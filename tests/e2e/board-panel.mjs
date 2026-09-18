@@ -99,6 +99,15 @@ try {
   await page.route('**/api/rooms', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
   )
+  // 案件詳情（FE-B03-S14）：詳情端點回的 body 刻意跟列表那一筆不同；發案者名片另一個端點。
+  const PROJECT_DETAIL = { ...PROJECTS[0], body: '詳情端點回的內容：做一個小房間。' }
+  const OWNER = { id: uuid(99), display_name: '發案的人', avatar_id: 1, skills: ['React'], hours_per_week: null, bio: null, updated_at: '2026-09-09T00:00:00Z' }
+  await page.route(`**/api/projects/${PROJECTS[0].id}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROJECT_DETAIL) }),
+  )
+  await page.route(`**/api/profiles/${OWNER.id}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(OWNER) }),
+  )
   // 兩張卡的詳情都攔：返回之後焦點回到那張卡（FE-X06-S12），下一個 Tab 到的是**第二張**卡。
   for (const p of PROFILES) {
     await page.route(`**/api/profiles/${p.id}`, (route) =>
@@ -154,6 +163,38 @@ try {
       const want = { title: '案件甲', skills: ['Three.js'], status: '招募中', expires: '剩 7 天', seats: '4 個座位' }
       if (JSON.stringify(got) === JSON.stringify(want)) ok('[FE-B02-S07] 卡片上的標題、技能、狀態、剩 7 天、4 個座位都讀得出來')
       else bad('[FE-B02-S07] 卡片欄位對不上', `要 ${JSON.stringify(want)}，是 ${JSON.stringify(got)}`)
+
+      // ── FE-B03-S14：Tab 到第一張卡按 Enter → 詳情（詳情端點的 body、發案者名字）→ 返回，焦點回那張卡 ──
+      // 面板開了焦點在列表（`ul`）上：Tab 一次先到工具列？訪客沒有「發案」，所以第一下 Tab 就到第一張卡。
+      await page.keyboard.press('Tab')
+      const focusedId = await page.evaluate(() => document.activeElement?.getAttribute('data-project-id') ?? null)
+      if (focusedId === PROJECTS[0].id) ok('[FE-B03-S14] Tab 一下就到了第一張案件卡')
+      else bad('[FE-B03-S14] Tab 之後焦點不在第一張案件卡', `activeElement: ${await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120))}`)
+      await page.keyboard.press('Enter')
+      const pd = await page.waitForSelector('[data-testid="project-detail"][data-phase="ready"]', { timeout: 5_000 }).catch(() => null)
+      if (pd === null) bad('[FE-B03-S14] 按 Enter 沒有開出案件詳情（或沒載完）', '')
+      else {
+        const body = await pd.$eval('[data-testid="project-body"]', (n) => n.textContent?.trim()).catch(() => null)
+        if (body === PROJECT_DETAIL.body) ok('[FE-B03-S14] 詳情呈現的是詳情端點回的 body（不是列表那一筆）')
+        else bad('[FE-B03-S14] 詳情的 body 不對', `要「${PROJECT_DETAIL.body}」，是「${body}」`)
+        const ownerName = await pd.waitForSelector('[data-testid="owner-card"][data-phase="ready"] [data-testid="owner-name"]', { timeout: 5_000 }).then((n) => n.textContent()).catch(() => null)
+        if (ownerName === OWNER.display_name) ok('[FE-B03-S14] 發案者名片載到了：「發案的人」')
+        else bad('[FE-B03-S14] 發案者名片沒載到', `是「${ownerName}」`)
+        const listInert = await page.$eval('[data-testid="list-panel-list"]', (n) => n.hasAttribute('inert'))
+        if (listInert) ok('[FE-B03-S13] 詳情開著時列表區是 inert')
+        else bad('[FE-B03-S13] 詳情開著時列表區不是 inert', '')
+        await page.screenshot({ path: path.join(OUT, 'project-detail-open.png') })
+        await page.getByTestId('project-detail').getByRole('button', { name: '返回' }).click()
+        await page.waitForSelector('[data-testid="project-detail"]', { state: 'detached', timeout: 5_000 })
+        const backTo = await page.evaluate(() => document.activeElement?.getAttribute('data-project-id') ?? null)
+        if (backTo === PROJECTS[0].id) ok('[FE-B03-S14] 返回之後焦點回到那張卡')
+        else bad('[FE-B03-S14] 返回之後焦點沒回到那張卡', `activeElement: ${await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120))}`)
+        const stillThree = await page.$$eval('[data-testid="project-card"]', (ns) => ns.length)
+        if (stillThree === PROJECTS.length) ok(`[FE-B03-S13] 返回之後列表還在（${stillThree} 張卡）`)
+        else bad('[FE-B03-S13] 返回之後列表不對', `${stillThree} 張卡`)
+        if (hits.projects === 1) ok('[FE-B03-S13] 返回沒有重打列表（仍是 1 次 /api/projects）')
+        else bad('[FE-B03-S13] 返回時重打了列表', `${hits.projects} 次`)
+      }
     }
   }
   await page.screenshot({ path: path.join(OUT, 'project-board-open.png') })
