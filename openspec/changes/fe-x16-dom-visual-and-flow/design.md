@@ -53,13 +53,18 @@
   讓位**不替使用者回答**「要放棄修改嗎」：直接算拒絕（`S14` 第三段）。
 - **`onYield` 的收尾**：被讓位的面板不還焦點給開啟者（`ProfilePanelProvider` 卸載後的還焦點 effect 要看一個「這次是讓位」的旗標 —— Gemini 第二輪提醒）；
   看板的網址退照 `FE-B09`（`PanelUrlSync` 看的是狀態，狀態從 `active` 推導，所以不用改它的寫法）。
+- **開啟的副作用搬到殼的掛載生命週期**（codex 第五輪抓到）：今天 `ListPanelProvider.openPanel` 同步 `holdInputLock()`、名片記 opener、收件匣記 opener 與世代 ——
+  一個成功但被同事件後者取代、從未掛載的請求會留下這些。改成：世界命令鎖由 `PanelShell` 在 mount effect 取得、unmount 釋放（`FE-X06` 的鎖是可合成的，持有者換成殼不改語意）；
+  opener 與焦點旗標由 provider 在殼掛載後才記（或跟著 `active` 的 commit 記）；重取世代在殼掛載時推進。`S21` 斷言關掉後鎖放開、`active` 為 `null`。
+- **compare-and-clear**：登記的 cleanup 與 `active` 的清空都只在「仍然是自己」時做；Strict Mode 的舊 cleanup 不得清掉新的（`S22` 第三段）。provider 整個卸載也 compare-and-clear，
+  畫面上沒有面板時 `active` 一定是 `null`（不然提示與聊天框會被幽靈壓著 —— codex 第五輪）。
 - **provider 保留自己的子狀態**（看板的 kind／page／selected、收件匣的 view／thread、名片的草稿）—— 只有「開不開」搬到協調者。關閉＝`requestClose(id)`（`active = null`）。
 - **網址**：下一頁的 `restore`（讓位是 `go(-1)`，帶 `panel` 的那一筆在**前進**紀錄 —— codex 第二輪抓到第一版寫成上一頁）也經過 `requestOpen()`；
   被拒 → `replaceState` 把目前這一筆改回實際狀態（`FE-B09-S05` canonical 的同一招）、不 `pushState`、不動畫面（`S17`）。
 - 換角色彈出層：成功開面板時關；被拒時照 `FE-X06-S16` 焦點離開就關（第一版寫「被拒不動」跟那條矛盾，codex 抓到）。
 
 非阻斷的表面（訪客提示、聊天框、彈出層）**只讀** `useBlockingPanelOpen()`（`active !== null`），不登記。
-為什麼不做成「路由決定開哪個」：見 ADR 0011 選項 B。**代價**：三個 provider 的 `open` 各改成從協調者推導（每個約 10 行）、殼多兩個 prop、
+為什麼不做成「路由決定開哪個」：見 ADR 0011 選項 B。**代價**：三個 provider 的 `open` 各改成從協調者推導（每個約 10 行）、世界鎖與 opener 的取得時機從「開啟呼叫」搬到「殼掛載」、殼多兩個 prop、
 provider 的開／關 API 名稱不變但實作換成呼叫協調者。**Supersedes**: 無。ADR：`docs/adr/0011-one-blocking-panel-at-a-time.md`。
 
 ### D4｜三級控制項仍然是字串常數；「至多一個主要動作」以操作區為單位、由判準守
