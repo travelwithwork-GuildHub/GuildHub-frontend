@@ -25,9 +25,9 @@
 
 ## 4. 本地後端：房間票的伺服器端記錄（PR：`--room-grants`；前置：3）
 
-- [ ] 4.1 先寫 `tests/contract/rest/enter.contract.ts` 的 `[FE-J14-S34]`，與 `[FE-J14-S37]`（本地獨有：cookie 屬性、偽造、換身分）、`[FE-J14-S29]` 的持票兩列
-- [ ] 4.2 本地 `enter` 成功時 `Set-Cookie: room_grant_<project_id>`（一間房一個 cookie；**HMAC 同時簽 `project_id` 與 profile id**，design D4）；資源端點驗它
-- [ ] 4.3 突變：不記票 → S34 第一個 200 紅；grant 用一個裝集合的 cookie → S37 的**並行 enter C、D** 那段紅（只對 `local`）；HMAC 只簽 profile id → S37 的「A 的值改放 B 的名稱」紅；不綁身分 → S34／S37 換人紅；明文不簽章 → S37 偽造紅
+- [x] 4.1 先寫 `tests/contract/rest/enter.contract.ts` 的 `[FE-J14-S34]`，與 `[FE-J14-S37]`（本地獨有：cookie 屬性、偽造、換身分）、`[FE-J14-S29]` 的持票兩列
+- [x] 4.2 本地 `enter` 成功時 `Set-Cookie: room_grant_<project_id>`（一間房一個 cookie；**HMAC 同時簽 `project_id` 與 profile id**，design D4）；資源端點驗它
+- [x] 4.3 突變：不記票 → S34 第一個 200 紅；grant 用一個裝集合的 cookie → S37 的**並行 enter C、D** 那段紅（只對 `local`）；HMAC 只簽 profile id → S37 的「A 的值改放 B 的名稱」紅；不綁身分 → S34／S37 換人紅；明文不簽章 → S37 偽造紅
 
 ## 5. 資料存取（PR：`--api`；前置：2）
 
