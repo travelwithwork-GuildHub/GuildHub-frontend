@@ -71,3 +71,40 @@ export async function activeRooms(): Promise<Array<{ project_id: string; title: 
   )
   return r.rows
 }
+
+// ── 成軍／結案（`FE-J04`）：照真後端 `projects.py` 的 `form_team`／`close_project`。owner 檢查在 route（403 原句），這裡只做資料。
+
+/** 只給 route 判 owner 用：不存在 → null。 */
+export async function projectOwner(id: string): Promise<string | null> {
+  const r = await db().query<{ owner_id: string }>('select owner_id from projects where id = $1', [id])
+  return r.rows[0]?.owner_id ?? null
+}
+
+/**
+ * 成軍：`status → active`、`room_template`、`password_hash`。**不看原本的 status**（真後端亦然：active 再成軍是換密碼；closed 再成軍會復活 —— 那是 anomaly，前端圍堵）。
+ * `room_template` 照真後端固定挑 0（只有一種模板；`FE-W16` 的 `project-room-layout` 只有一種）。
+ */
+export async function formTeam(id: string, passwordHash: string): Promise<ProjectRow | null> {
+  const r = await db().query<ProjectRow>(
+    `update projects set status = 'active', room_template = 0, password_hash = $2, updated_at = now() where id = $1 returning ${COLUMNS}`,
+    [id, passwordHash],
+  )
+  return r.rows[0] ?? null
+}
+
+/** 結案：`status → closed`、座位整批刪（真後端 `BE-G07`）；`password_hash`／`room_template` 留著（`closed` 但有密碼的 enter 仍 200，`FE-N08-S12`）。冪等。 */
+export async function closeProject(id: string): Promise<ProjectRow | null> {
+  const client = await db().connect()
+  try {
+    await client.query('begin')
+    await client.query('delete from seats where project_id = $1', [id])
+    const r = await client.query<ProjectRow>(`update projects set status = 'closed', updated_at = now() where id = $1 returning ${COLUMNS}`, [id])
+    await client.query('commit')
+    return r.rows[0] ?? null
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
+  }
+}
