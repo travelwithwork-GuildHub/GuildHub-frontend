@@ -57,8 +57,9 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
   const signedIn = identity.state === 'signed-in' ? identity.profile.id : null
   const isOwner = ready && signedIn !== null && signedIn === project.owner_id
   const isVisitor = ready && signedIn !== null && signedIn !== project.owner_id
+  // 長標題會把返回鈕擠成兩行（真瀏覽器截圖抓到）：不縮、不換行
   const back = (
-    <button type="button" className={SECONDARY} onClick={onBack}>
+    <button type="button" className={`${SECONDARY} shrink-0 whitespace-nowrap`} onClick={onBack}>
       {labels.back}
     </button>
   )
