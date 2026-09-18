@@ -206,7 +206,15 @@ try {
       const el = [...document.querySelectorAll('[data-testid="name-tag"]')].find((t) => t.textContent === '小玉')
       if (!el) return { missing: true }
       const r = el.getBoundingClientRect()
+      // 量的是**堆疊順序**不是指標事件：牌子本來 pointer-events: none，命中一定穿過它 —— 暫時開回 auto 再 hit-test，
+      // 牌子若畫在面板上面就會命中牌子（突變「z-index 改到面板之上」在只看 elementFromPoint 時是綠的）
+      const container = el.parentElement
+      const was = [el.style.pointerEvents, container.style.pointerEvents]
+      el.style.pointerEvents = 'auto'
+      container.style.pointerEvents = 'auto'
       const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+      el.style.pointerEvents = was[0]
+      container.style.pointerEvents = was[1]
       return { inPanel: hit !== null && hit.closest('[data-testid="list-panel"]') !== null, x: r.x, hit: hit ? `${hit.tagName.toLowerCase()}#${hit.getAttribute('data-testid') ?? ''}` : null }
     })
     if (covered.inPanel) ok(`[S09] 看板開著時牌子中心命中的是面板（x=${covered.x.toFixed(0)}）`)
