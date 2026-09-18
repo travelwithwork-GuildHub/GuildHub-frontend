@@ -130,10 +130,11 @@ const install = (page) =>
       text(root) {
         const rgba = (css) => (css !== '' && CSS.supports('color', css) ? toRgba(css) : null)
         const composite = (el) => {
+          // opacity 要看完整條祖先鏈（不透明的面板外面再包一層 opacity: .1，面板的底也跟著透）；背景只收到第一個不透明層
+          for (let n = el; n; n = n.parentElement) { const o = getComputedStyle(n).opacity; if (parseFloat(o) !== 1) return `${n.tagName.toLowerCase()} 的 opacity=${o}` }
           const stack = []
           for (let n = el; n; n = n.parentElement) {
             const cs = getComputedStyle(n)
-            if (parseFloat(cs.opacity) !== 1) return `${n.tagName.toLowerCase()} 的 opacity=${cs.opacity}`
             if (cs.backgroundImage !== 'none') return `${n.tagName.toLowerCase()} 有背景圖／漸層`
             const c = rgba(cs.backgroundColor)
             if (c === null) return `${n.tagName.toLowerCase()} 的 background-color=${JSON.stringify(cs.backgroundColor)}`
@@ -239,9 +240,10 @@ async function inspect(page, surface, reduce) {
       const who = `${surface.name}「${t.label}」`
       if (t.level === 'body') t.size >= 16 && t.leading >= 1.5 ? ok(`[S03] ${who}內文 ${t.size}px／${t.leading.toFixed(2)}`) : bad(`[S03] ${who}內文 ${t.size}px／行高 ${t.leading}`, '下限 16px、1.5')
       if (t.level === 'caption') t.size >= 13 ? ok(`[S03] ${who}說明 ${t.size}px`) : bad(`[S03] ${who}說明只有 ${t.size}px`, '下限 13px')
+      // 量不到就紅 —— 對每一個被算進 S03 的元素都是（審查：透明的 title 不在 S04 的對比清單裡，也不能綠著過 S03）
+      if (t.text === null || !Array.isArray(t.bg)) { bad(`[S04] ${who}的顏色或背景量不到`, `color=${JSON.stringify(t.raw)}、合成背景=${JSON.stringify(t.bg)}`); continue }
       if (t.level !== 'body' && t.level !== 'caption' && !t.alert) continue
       if (t.alert) alertsMeasured += 1
-      if (t.text === null || !Array.isArray(t.bg)) { bad(`[S04] ${who}的顏色或背景量不到`, `color=${JSON.stringify(t.raw)}、合成背景=${JSON.stringify(t.bg)}`); continue }
       const r = contrast(over(t.text, t.bg), t.bg)
       r >= 4.5 ? ok(`[S04] ${who}${t.alert ? 'alert ' : ''}${r.toFixed(2)}:1`) : bad(`[S04] ${who}只有 ${r.toFixed(2)}:1`, `字 ${JSON.stringify(t.text)} 底 ${JSON.stringify(t.bg)}（下限 4.5）`)
     }
