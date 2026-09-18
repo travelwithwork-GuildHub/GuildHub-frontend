@@ -16,6 +16,9 @@ import { NAME_TAG_ANCHOR_Y } from './nameTag'
 
 // 相機相對 target 的固定偏移（`WorldCamera` 用同一份）。拿一份私有的複本，不每幀重建。
 const CAMERA_OFFSET = cameraOffset()
+// 投影用的兩個暫存物件：每幀 40 個角色各配置兩個物件會給 GC 加壓（審查指出）；render loop 是單執行緒、`screenPixelFor` 當場讀完，共用一份安全。
+const ANCHOR = { x: 0, y: NAME_TAG_ANCHOR_Y, z: 0 }
+const TARGET = { x: 0, z: 0 }
 
 // 一個遠端角色。規格 FE-R07。
 //
@@ -101,8 +104,11 @@ export function RemotePlayer({ id, motion, now, av, tagNodesRef }: RemotePlayerP
     // 上面兩個 return（沒有樣本／樣本剛清掉）也讓牌子停在原地 —— 跟角色一樣，不跳回原點（`S06`）。
     const tag = tagNodesRef?.current.get(id)
     if (tag === undefined) return
-    const target = { x: state.camera.position.x - CAMERA_OFFSET.x, z: state.camera.position.z - CAMERA_OFFSET.z }
-    const px = screenPixelFor({ x: pose.x, y: NAME_TAG_ANCHOR_Y, z: pose.z }, target, state.size)
+    TARGET.x = state.camera.position.x - CAMERA_OFFSET.x
+    TARGET.z = state.camera.position.z - CAMERA_OFFSET.z
+    ANCHOR.x = pose.x
+    ANCHOR.z = pose.z
+    const px = screenPixelFor(ANCHOR, TARGET, state.size)
     if (!px.inside) {
       tag.style.visibility = 'hidden'
       return
