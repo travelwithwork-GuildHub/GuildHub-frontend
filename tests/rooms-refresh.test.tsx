@@ -129,6 +129,10 @@ describe('成軍／結案之後立即重取走廊的門', () => {
     unmount()
     await flush()
     expect(listRooms, '卸載後還打了').toHaveBeenCalledTimes(1)
+    // 卸載之後有人（例如收在 ref 裡的舊把手）再呼叫 refresh：也不能打
+    act(() => result.current.refresh())
+    await flush()
+    expect(listRooms, '卸載後的 refresh 還打了').toHaveBeenCalledTimes(1)
     renderHook(() => useRooms(6))
     await flush()
     expect(listRooms).toHaveBeenCalledTimes(2)
