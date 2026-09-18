@@ -152,6 +152,25 @@ describe('成軍／結案之後立即重取走廊的門', () => {
     expect(listRooms, '回到大廳要恰好一次，不是兩次').toHaveBeenCalledTimes(2)
   })
 
+  it('[FE-J04-S10] 中止的 finally 不得吃掉新一次在飛的待辦（微任務交錯）', async () => {
+    // 背景 → 瞬間回前景（第二次請求起飛）→ 瞬間 refresh（待辦記在第二次上）→ 這時第一次（被中止）的 finally 才跑：
+    // 它若不看 aborted 就會把待辦吃掉（load() 因為第二次在飛而直接 return），第二次回來後就不會再補那一次。
+    const first = abortable()
+    const second = abortable()
+    listRooms.mockImplementationOnce(first.fn).mockImplementationOnce(second.fn).mockResolvedValue([ROOM, NEW_ROOM])
+    const { result } = renderHook(() => useRooms(6))
+    await flush()
+    expect(listRooms).toHaveBeenCalledTimes(1)
+    act(() => setVisibility('hidden'))
+    act(() => setVisibility('visible'))
+    act(() => result.current.refresh())
+    expect(listRooms).toHaveBeenCalledTimes(2)
+    await flush()
+    second.resolve([ROOM])
+    await flush()
+    expect(listRooms, '第二次回來後沒有補打 —— 待辦被中止的 finally 吃掉了').toHaveBeenCalledTimes(3)
+  })
+
   it('[FE-J04-S10] 立即重取回 500：門留在原地、stale', async () => {
     listRooms.mockResolvedValueOnce([ROOM]).mockRejectedValueOnce(new Error('壞了'))
     const { result } = renderHook(() => useRooms(6))
