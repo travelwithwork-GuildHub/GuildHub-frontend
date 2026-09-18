@@ -97,8 +97,8 @@ MUST NOT 換行、MUST NOT 撐大牌子。`name` 的上限是 20 個 code point�
 - **GIVEN** 一個人的 `name` 是二十個全形字、另一個人的是兩個字
 - **THEN** 兩塊牌子的 `getBoundingClientRect().width` 相同、`height` 相同
 - **AND** 長名字的牌子只有一行（高度等於短名字的）、`textContent` 仍是完整的名字
-- **AND** 真的截了：長名字牌子的 `scrollWidth` 大於 `clientWidth`（內容確實超出盒子），而且它的 `overflow-x` 計算值不是 `visible`
-  （超出的部分被裁掉）—— 只量牌子的寬會漏掉「漏寫 `overflow: hidden`、字溢出去蓋到別人」
+- **AND** 真的截了：長名字牌子的 `scrollWidth` 大於 `clientWidth`（內容確實超出盒子）、它的 `overflow-x` 計算值不是 `visible`
+  （超出的部分被裁掉）、`text-overflow` 計算值是 `ellipsis`（省略記號看得見）—— 只量牌子的寬會漏掉「漏寫 `overflow: hidden`、字溢出去蓋到別人」與「只裁不加省略記號」
 
 ### Requirement: 畫面外不呈現、不擋操作、看得清楚
 
