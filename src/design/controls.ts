@@ -1,39 +1,26 @@
-// 控制項的三級與文字的五級。規格 `FE-X13`（看得出來能操作）＋ `FE-X16`（層次與下一步）。
+// 控制項的三級。規格 `FE-X13`（看得出來能操作）＋ `FE-X16`（層次與下一步）。
 //
-// ⚠️⚠️ **這一份是截圖抓到的，不是規劃出來的。**
-// 使用者兩次看了截圖：`FE-X13`「登入畫面也太醜了 / 輸入匡也看不到」（preflight 把 `<button>` 與 `<input>` 的外觀清光了，
-// 沒有任何一行樣式加回去；18 條端到端斷言全綠）；`FE-X16`「非 3D 的網頁介面都醜醜的 / 沒有任何設計 / 不專業 / 不想使用」
-// （功能對了、判準全綠、畫面上三個浮層同時開著、三顆一樣大的藍鈕）。
+// ⚠️⚠️ **這一份是截圖抓到的，不是規劃出來的。** 使用者兩次看了截圖：`FE-X13`「登入畫面也太醜了 / 輸入匡也看不到」
+// （preflight 把 `<button>` 與 `<input>` 的外觀清光了、18 條端到端斷言全綠）；`FE-X16`「非 3D 的網頁介面都醜醜的 / 不專業 / 不想使用」
+// （功能對了、判準全綠、三個浮層同時開著、三顆一樣大的藍鈕）。
 //
 // ⚠️ **不要在這裡長出帶 API、狀態與變體的元件**（`FE-X13` 兩個外部審查者共同的警告，`FE-X16` design D4 再確認一次）。
-// 這些是**常數**，呼叫端自己選；每個常數帶一個 `data-*` 屬性，判準數的是屬性、不比 class 字串（`S09`／`S10`）。
-// 屬性只能從這裡來 —— 在別處把層級標記寫成字面值會被 `tests/dom-token-scan.test.ts` 抓到（`S01`）。
+// 這些是**常數**，呼叫端自己選；每個常數帶一個 `data-tier`，判準數的是屬性、不比 class 字串（`S09`／`S10`）。
+// 屬性只能從這裡來 —— 在別處把層級標記寫成字面值會被 `tests/dom-token-scan.test.ts` 抓到（`S01`）。**一份定義**（`FE-X13-S07`）。
 //
-// ⚠️ **一份定義，不是每個畫面各寫一次**（`FE-X13-S07`）。
+// 為什麼邊界用 `control-edge` 而不是 `line`（`FE-X13-S01`／`S04`，WCAG 2.1 SC 1.4.11 要 3:1）—— 實測：
+//     control-edge 3.70:1 ← 邊界用的；accent 5.25:1 ← PRIMARY 的填色（FE-X16 把 L 從 0.58 降到 0.52：白字要 4.5:1，原本 4.35）
+//     line 1.27:1、surface-raised 1.06:1 ← **都不夠**，而「給輸入框一個白底」看起來像修好了
 //
-// ## 為什麼邊界用 `control-edge` 而不是 `line`
-//
-// 規格要求「識別控制項所必需的視覺資訊，與緊鄰背景合成後對比度 SHALL 至少 3:1」（`FE-X13-S01`／`S04`，WCAG 2.1 SC 1.4.11）。實測：
-//
-//     control-edge    3.70:1   ← 邊界用的
-//     accent          5.25:1   ← PRIMARY 的填色（FE-X16 把 L 從 0.58 降到 0.52：白字對它要 4.5:1，原本只有 4.35）
-//     line            1.27:1   ← **不夠**，但它「不透明而且與父層不同」
-//     surface-raised  1.06:1   ← **不夠**，而「給輸入框一個白底」看起來像修好了
-//
-// 高度下限、過渡、焦點環**不在這裡**：那三樣每一個控制項都要有（`S10`／`S11`／`S12`），所以在 `globals.css` 的 `@layer base` 上，
+// 高度下限、過渡、焦點環**不在這裡**：每一個控制項都要有（`S10`／`S11`／`S12`），所以在 `globals.css` 的 `@layer base`，
 // 卡片、對話列這種不走常數的 `<button>` 也吃得到。
 
 export type Tier = 'primary' | 'secondary' | 'tertiary'
-export type TextLevel = 'display' | 'title' | 'heading' | 'caption'
 
 /** 一個常數：class ＋ 它帶的層級標記。用 `{...PRIMARY}` 展開到元素上。 */
 export interface Control {
   readonly className: string
   readonly 'data-tier': Tier | 'field'
-}
-export interface TextStyle {
-  readonly className: string
-  readonly 'data-text': TextLevel
 }
 
 /** 常數加上呼叫端自己的版面 class（`shrink-0`、`flex`⋯⋯）。標記跟著常數走，不用呼叫端記得帶。 */
@@ -84,10 +71,3 @@ export const FORM = 'flex max-w-prose flex-col items-start gap-gutter'
 
 /** 一個「說明文字 ＋ 輸入框」的欄位。**上下排，不是左右排。** */
 export const FIELD_LABEL = 'flex flex-col gap-2'
-
-// ── 文字五級（`FE-X16-S03`）：頁面標題 > 面板標題 > 條目標題 > 內文 ≥ 說明。內文是預設、不標。字級與行高在 globals.css。
-export const DISPLAY: TextStyle = { 'data-text': 'display', className: 'text-display font-semibold tracking-tight' }
-export const TITLE: TextStyle = { 'data-text': 'title', className: 'text-title font-semibold' }
-export const HEADING: TextStyle = { 'data-text': 'heading', className: 'text-heading font-medium' }
-/** 說明文字。顏色由呼叫端決定（多半是 `text-ink-muted`；錯誤是 `text-danger`）—— 兩個都是 `color`，疊在同一個常數裡誰贏靠運氣。 */
-export const CAPTION: TextStyle = { 'data-text': 'caption', className: 'text-caption' }

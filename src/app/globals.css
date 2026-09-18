@@ -1,12 +1,9 @@
 @import 'tailwindcss';
 
-/* DOM design token 的單一事實來源（規格 FE-X01 開的頭；FE-X16 把它補齊成七類：
-   色票、字級刻度、間距刻度、圓角、陰影、動態時長、字體堆疊）。
+/* DOM design token 的單一事實來源（FE-X01 開的頭；FE-X16 補齊成七類：色票、字級、間距、圓角、陰影、動態時長、字體堆疊）。
    `src/**` 裡只有這一份可以出現色碼、`font-family` 與任意值（`tests/dom-token-scan.test.ts` 掃）。
    規格只約束門檻（4.5:1、3:1、≥ 16px⋯⋯），不約束值 —— 值在這裡量出來、寫在旁邊。
-
-   **堆疊層級刻意不在這裡**（規格 FE-X01-S14）。它在 src/design/layers.ts，
-   理由見 design.md 的 D5：CSS 自訂屬性取不到只會回空字串，靜默退化。 */
+   **堆疊層級刻意不在這裡**（FE-X01-S14）：在 src/design/layers.ts，理由見它的 design D5（CSS 自訂屬性取不到只會回空字串）。 */
 @theme {
   /* 字體堆疊：系統字體，不載 webfont（FE-X16 design D1：效能、離線 build、截圖的問題不在字體）。
      `Noto Sans TC`／`PingFang TC`／`Microsoft JhengHei` 是三個平台的繁中家族 —— 少了它們 CJK 會落到瀏覽器預設的襯線字（S02）。 */
@@ -29,13 +26,8 @@
   --color-danger: oklch(0.56 0.19 26);
   --color-line: oklch(0.9 0.008 260);
 
-  /* 控制項的邊界。**跟 --color-line 是兩個東西，不要合併**（規格 FE-X13）：
-     line 給分隔線與卡片邊界，那些不需要達到可辨識控制項的對比門檻；
-     這一個給按鈕與輸入框，SHALL 對 --color-surface 達 3:1。
-
-     實測 3.70:1（把顏色畫到 canvas 上讀 pixel 算的 —— getComputedStyle
-     對 oklch() 原樣回傳字串，直接 parse 會算出 1.00:1 而且看起來很合理）。
-     對照組：line 是 1.27:1、surface-raised 是 1.06:1，兩個都不夠。 */
+  /* 控制項的邊界。**跟 --color-line 是兩個東西，不要合併**（FE-X13）：line 給分隔線與卡片邊界；
+     這一個給按鈕與輸入框，SHALL 對 --color-surface 達 3:1 —— 實測 3.70:1（對照：line 1.27:1、surface-raised 1.06:1，都不夠）。 */
   --color-control-edge: oklch(0.6 0.02 260);
   /* 確認視窗與世界上的視窗的遮罩：alpha 要在 [0.3, 0.6]（S06）。 */
   --color-scrim: oklch(0 0 0 / 0.45);
