@@ -1,5 +1,6 @@
 'use client'
 
+import { TERTIARY } from '@/design/controls'
 import { useState } from 'react'
 import { FirstEntryFlow } from '@/first-entry/FirstEntryFlow'
 import { firstEntryDone, markFirstEntryDone } from '@/first-entry/seen'
@@ -57,7 +58,7 @@ export function FirstEntryNotice() {
             setDismissed(true)
           }}
         />
-        <button type="button" onClick={() => setDismissed(true)}>
+        <button type="button" {...TERTIARY} onClick={() => setDismissed(true)}>
           先四處看看
         </button>
       </section>

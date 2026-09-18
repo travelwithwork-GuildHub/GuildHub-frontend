@@ -2,7 +2,7 @@
 
 import { useId, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { ChatIn } from '@/api/contract/ws'
-import { FIELD, FIELD_LABEL, PRIMARY } from '@/design/controls'
+import { FIELD, FIELD_LABEL, PRIMARY, withClass } from '@/design/controls'
 import { SubmitError } from '@/forms/SubmitError'
 
 // 場景聊天的輸入。規格 `FE-K04`〈全空白不送、非空白原值送；沒有上限；只有 transport 接受了才清空、失敗保留〉（design D3、D4）。
@@ -76,7 +76,7 @@ export function SceneChatComposer({ send, onEscape }: { send: (input: ChatIn) =>
         {CHAT_COMPOSER_LABELS.field}
         <textarea
           rows={2}
-          className={`${FIELD} resize-none`}
+          {...withClass(FIELD, 'resize-none')}
           value={value}
           onChange={(e) => {
             setValue(e.target.value)
@@ -95,7 +95,7 @@ export function SceneChatComposer({ send, onEscape }: { send: (input: ChatIn) =>
         </p>
       )}
       <SubmitError key={failures} message={failures > 0 ? CHAT_COMPOSER_LABELS.notSent : null} />
-      <button type="submit" className={PRIMARY}>
+      <button type="submit" {...PRIMARY}>
         {CHAT_COMPOSER_LABELS.submit}
       </button>
     </form>

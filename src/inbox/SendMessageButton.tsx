@@ -18,7 +18,7 @@ export function SendMessageButton({ to, onBeforeOpen, label = SEND_MESSAGE_LABEL
   return (
     <button
       type="button"
-      className={SECONDARY}
+      {...SECONDARY}
       data-testid="send-message"
       onClick={() => {
         // 先關看板（它會把焦點放到世界錨、放掉它那把鎖），再開收件匣（掛載時持自己那把、把焦點拿進來）。design `D1` 的交接。

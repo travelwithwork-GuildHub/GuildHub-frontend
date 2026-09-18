@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { SECONDARY } from '@/design/controls'
+import { SECONDARY, withClass } from '@/design/controls'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { useRoomEntryGateIfProvided } from './RoomEntryGate'
 import { dropRoomToken } from './roomTokens'
@@ -53,11 +53,11 @@ export function SceneNotices() {
           <p>{FAILED_TEXT}</p>
           {dropFailed === notice && <p>{DROP_FAILED_TEXT}</p>}
           {gate !== null && (
-            <button type="button" onClick={reenter} className={`${SECONDARY} min-h-11 shrink-0`}>
+            <button type="button" onClick={reenter} {...withClass(SECONDARY, 'min-h-11 shrink-0')}>
               {REENTER_LABEL}
             </button>
           )}
-          <button type="button" onClick={dismissNotice} aria-label="關閉通知" className={`${SECONDARY} min-h-11 shrink-0`}>
+          <button type="button" onClick={dismissNotice} aria-label="關閉通知" {...withClass(SECONDARY, 'min-h-11 shrink-0')}>
             關閉
           </button>
         </div>

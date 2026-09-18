@@ -38,10 +38,10 @@ export function DiscardConfirm({ onDiscard, onKeep }: { onDiscard: () => void; o
       </p>
       <p id="profile-discard-body">{DISCARD_LABELS.confirmBody}</p>
       <div className="flex gap-gutter">
-        <button ref={keep} type="button" className={PRIMARY} onClick={onKeep}>
+        <button ref={keep} type="button" {...PRIMARY} onClick={onKeep}>
           {DISCARD_LABELS.keepEditing}
         </button>
-        <button type="button" className={SECONDARY} onClick={onDiscard}>
+        <button type="button" {...SECONDARY} onClick={onDiscard}>
           {DISCARD_LABELS.discard}
         </button>
       </div>

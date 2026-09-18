@@ -173,7 +173,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
   return (
     <div data-testid="owner-actions-body" className="flex flex-col gap-gutter">
       {project.status === 'recruiting' && !composing && (
-        <button type="button" className={PRIMARY} onClick={() => setComposing(true)}>
+        <button type="button" {...PRIMARY} onClick={() => setComposing(true)}>
           {OWNER_ACTION_LABELS.formTeam}
         </button>
       )}
@@ -183,7 +183,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
           <label className={FIELD_LABEL}>
             {OWNER_ACTION_LABELS.password}
             <input
-              className={FIELD}
+              {...FIELD}
               type="password"
               autoComplete="new-password"
               {...registered}
@@ -206,10 +206,10 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
           )}
           <SubmitError message={submitError} />
           <div className="flex gap-gutter">
-            <button type="submit" className={PRIMARY} disabled={busy}>
+            <button type="submit" {...PRIMARY} disabled={busy}>
               {OWNER_ACTION_LABELS.submit}
             </button>
-            <button type="button" className={SECONDARY} disabled={busy} onClick={() => setComposing(false)}>
+            <button type="button" {...SECONDARY} disabled={busy} onClick={() => setComposing(false)}>
               {OWNER_ACTION_LABELS.cancel}
             </button>
           </div>
@@ -229,11 +229,11 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
           </p>
           <p className="text-caption text-ink-muted">{OWNER_ACTION_LABELS.revealHint}</p>
           <div className="flex flex-wrap gap-gutter">
-            <button type="button" className={SECONDARY} aria-disabled={writingNow} onClick={() => void copy()}>
+            <button type="button" {...SECONDARY} aria-disabled={writingNow} onClick={() => void copy()}>
               {OWNER_ACTION_LABELS.copy}
             </button>
             {onSendToTeam && (
-              <button type="button" className={SECONDARY} aria-disabled={writingNow} onClick={() => void sendToTeam()}>
+              <button type="button" {...SECONDARY} aria-disabled={writingNow} onClick={() => void sendToTeam()}>
                 {OWNER_ACTION_LABELS.sendToTeam}
               </button>
             )}
@@ -257,7 +257,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
       )}
 
       {project.status === 'active' && !confirming && (
-        <button ref={closeButton} type="button" className={SECONDARY} onClick={() => setConfirming(true)}>
+        <button ref={closeButton} type="button" {...SECONDARY} onClick={() => setConfirming(true)}>
           {OWNER_ACTION_LABELS.close}
         </button>
       )}
@@ -295,10 +295,10 @@ function CloseConfirm({ busy, error, onConfirm, onCancel }: { busy: boolean; err
       <p id="close-project-body">{OWNER_ACTION_LABELS.closeBody}</p>
       <SubmitError message={error} />
       <div className="flex gap-gutter">
-        <button ref={cancel} type="button" className={PRIMARY} aria-disabled={busy} onClick={onCancel}>
+        <button ref={cancel} type="button" {...PRIMARY} aria-disabled={busy} onClick={onCancel}>
           {OWNER_ACTION_LABELS.cancel}
         </button>
-        <button type="button" className={SECONDARY} aria-disabled={busy} onClick={onConfirm}>
+        <button type="button" {...SECONDARY} aria-disabled={busy} onClick={onConfirm}>
           {OWNER_ACTION_LABELS.closeConfirm}
         </button>
       </div>

@@ -70,7 +70,7 @@ export function FirstEntryFlow({ onDone, clipboard }: FirstEntryFlowProps) {
       </h2>
       <label className={FIELD_LABEL}>
         在世界裡顯示的名字
-        <input className={FIELD} value={nickname} onChange={(e) => setNickname(e.target.value)} />
+        <input {...FIELD} value={nickname} onChange={(e) => setNickname(e.target.value)} />
       </label>
       <label className={CHECK_ROW}>
         <input
@@ -80,7 +80,7 @@ export function FirstEntryFlow({ onDone, clipboard }: FirstEntryFlowProps) {
         />
         在這台裝置上記住我
       </label>
-      <button type="submit" className={PRIMARY} disabled={busy}>
+      <button type="submit" {...PRIMARY} disabled={busy}>
         建立我的身分
       </button>
       {error !== null && (

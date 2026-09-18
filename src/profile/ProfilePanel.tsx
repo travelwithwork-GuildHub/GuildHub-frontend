@@ -87,7 +87,7 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
           <>
             <TalentFacts profile={profile} />
             {/* 編輯鈕在面板層，不在 `TalentFacts`（design `D2`）：別人的名片走 `BoardPanel`，那裡沒有它（`S03`）。 */}
-            <button ref={editButton} type="button" className={SECONDARY} onClick={() => setMode('edit')}>
+            <button ref={editButton} type="button" {...SECONDARY} onClick={() => setMode('edit')}>
               {PROFILE_PANEL_LABELS.edit}
             </button>
           </>

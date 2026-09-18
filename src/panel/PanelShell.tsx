@@ -63,7 +63,8 @@ export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestI
       {...data}
       // 堆疊層級走 `design/layers`，散在各處的 z-index 會互相打架。
       style={{ zIndex: layer('panel') }}
-      className="bg-surface-raised border-control-edge text-ink absolute top-gutter right-gutter bottom-gutter flex w-[min(26rem,calc(100vw-2rem))] flex-col gap-gutter rounded border p-gutter"
+      // 過渡只動 opacity（`FE-X16-S12`：不動寬高、不用 all）；外觀的其餘解剖（陰影、圓角、標題列）在 `--shell` 那一片
+      className="bg-surface-raised border-control-edge text-ink absolute top-gutter right-gutter bottom-gutter flex w-[min(26rem,calc(100vw-2rem))] flex-col gap-gutter rounded border p-gutter transition-opacity"
     >
       {/* 覆蓋層：絕對定位蓋住整個面板內側。內容區在底下照樣活著。 */}
       {overlayOpen && (
@@ -79,7 +80,7 @@ export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestI
       >
         <header className="flex items-center justify-between gap-gutter">
           <h2 className="text-title">{title}</h2>
-          <button type="button" className={SECONDARY} onClick={onCloseRequest}>
+          <button type="button" {...SECONDARY} onClick={onCloseRequest}>
             {closeLabel}
           </button>
         </header>

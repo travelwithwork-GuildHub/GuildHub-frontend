@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FocusEvent } from 'react'
 import { AVATAR_COUNT, avatarLook } from '@/design/avatar'
 import { layer } from '@/design/layers'
-import { FIELD_LABEL, PRIMARY, SECONDARY } from '@/design/controls'
+import { FIELD_LABEL, PRIMARY, SECONDARY, withClass } from '@/design/controls'
 import { useAvatarDraft } from '@/identity/AvatarDraftProvider'
 import { useAdoptIdentity, useIdentity } from '@/identity/IdentityProvider'
 import { myAvatar } from '@/identity/myAvatar'
@@ -100,7 +100,7 @@ export function AvatarPicker() {
     <>
       {/* ⚠️ **入口在標題列裡，也就是 `<Canvas>` 的兄弟而不是它的子孫** ——
           所以它天生不會被 3D 畫面蓋住（`S13`）。 */}
-      <button ref={trigger} type="button" className={SECONDARY} onClick={() => setOpen((v) => !v)}>
+      <button ref={trigger} type="button" {...SECONDARY} onClick={() => setOpen((v) => !v)}>
         更換角色
       </button>
 
@@ -131,7 +131,7 @@ export function AvatarPicker() {
                     type="button"
                     aria-pressed={picked}
                     onClick={() => setDraft(index)}
-                    className={`${SECONDARY} flex items-center gap-2`}
+                    {...withClass(SECONDARY, 'flex items-center gap-2')}
                   >
                     {/* ⚠️ **色票的顏色從 `avatarLook()` 拿，不是自己寫一份。**
                         寫死的話，換色的那天選擇器上的顏色不會跟著改 ——
@@ -158,14 +158,14 @@ export function AvatarPicker() {
           <div className="flex gap-2">
             <button
               type="button"
-              className={PRIMARY}
+              {...PRIMARY}
               // 沒選過就不能存 —— 也順便擋掉「送出一個沒有變化的更新」。
               disabled={draft === undefined || saving.at === 'saving'}
               onClick={() => void save()}
             >
               {saving.at === 'saving' ? '儲存中⋯' : '就用這個'}
             </button>
-            <button type="button" className={SECONDARY} onClick={dismiss}>
+            <button type="button" {...SECONDARY} onClick={dismiss}>
               取消
             </button>
           </div>

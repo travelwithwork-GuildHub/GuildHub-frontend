@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ProjectOut } from '@/api/contract/rest'
-import { SECONDARY } from '@/design/controls'
+import { SECONDARY, withClass } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { useIdentity } from '@/identity/IdentityProvider'
@@ -59,7 +59,7 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
   const isVisitor = ready && signedIn !== null && signedIn !== project.owner_id
   // 長標題會把返回鈕擠成兩行（真瀏覽器截圖抓到）：不縮、不換行
   const back = (
-    <button type="button" className={`${SECONDARY} shrink-0 whitespace-nowrap`} onClick={onBack}>
+    <button type="button" {...withClass(SECONDARY, 'shrink-0 whitespace-nowrap')} onClick={onBack}>
       {labels.back}
     </button>
   )

@@ -106,7 +106,7 @@ export function KeyHandoff({ identity, onDone, clipboard = browserClipboard() }:
         沒有把它帶走、又清掉瀏覽器資料的話，這個身分就回不來了。
       </p>
 
-      <button type="button" className={SECONDARY} onClick={() => void copy(key)}>
+      <button type="button" {...SECONDARY} onClick={() => void copy(key)}>
         複製鑰匙
       </button>
 
@@ -131,7 +131,7 @@ export function KeyHandoff({ identity, onDone, clipboard = browserClipboard() }:
           或者，把鑰匙<strong>最後 {PROOF_LENGTH} 個字</strong>填回來（抄的、拍照的都算）
         </span>
         <input
-          className={FIELD}
+          {...FIELD}
           value={proof}
           onChange={(e) => {
             const next = e.target.value
@@ -149,7 +149,7 @@ export function KeyHandoff({ identity, onDone, clipboard = browserClipboard() }:
         </p>
       )}
 
-      <button type="button" className={PRIMARY} disabled={!done} onClick={() => onDone(identity)}>
+      <button type="button" {...PRIMARY} disabled={!done} onClick={() => onDone(identity)}>
         進入世界
       </button>
     </section>

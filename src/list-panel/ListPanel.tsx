@@ -128,7 +128,7 @@ export function ListPanel<K extends ListKind>({
         {edge === null && state.shown !== null && (
           <button
             type="button"
-            className={SECONDARY}
+            {...SECONDARY}
             disabled={state.phase === 'loading'}
             onClick={next}
           >

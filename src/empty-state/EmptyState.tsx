@@ -75,7 +75,7 @@ export function EmptyState(props: EmptyStateProps) {
     >
       <p className="text-ink-muted">{props.error.message}</p>
       {kind === 'load-failed' && (
-        <button type="button" className={SECONDARY} onClick={props.retry}>
+        <button type="button" {...SECONDARY} onClick={props.retry}>
           {RETRY_LABEL}
         </button>
       )}

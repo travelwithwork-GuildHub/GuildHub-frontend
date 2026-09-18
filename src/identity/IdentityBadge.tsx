@@ -1,5 +1,6 @@
 'use client'
 
+import { TERTIARY } from '@/design/controls'
 import Link from 'next/link'
 import { useProfilePanel } from '@/profile/ProfilePanelProvider'
 import { useIdentity } from './IdentityProvider'
@@ -47,7 +48,7 @@ export function IdentityBadge() {
           <button
             type="button"
             aria-label={`我的名片：${identity.profile.display_name}`}
-            className="text-accent underline"
+            {...TERTIARY}
             onClick={(e) => openPanel(e.currentTarget)}
           >
             {identity.profile.display_name}

@@ -58,10 +58,10 @@ describe('控制項的外觀只有一份定義', () => {
     expect(buttons.length, '這個檔案裡一個按鈕都沒有 —— 判準抓不到東西就是恆真的').toBeGreaterThan(
       0,
     )
+    // `FE-X16` 之後常數是物件（帶 `data-tier`），套法是 `{...PRIMARY}`／`{...withClass(SECONDARY, …)}`；自己寫 `className={…}` 也算有外觀
+    const STYLED = /className=\{|\{\.\.\.(?:PRIMARY|SECONDARY|TERTIARY|FIELD|withClass\()/
     for (const tag of buttons) {
-      expect(tag, `這個按鈕沒有外觀，preflight 會讓它變成一行漂著的字：\n${tag}`).toMatch(
-        /className=\{/,
-      )
+      expect(tag, `這個按鈕沒有外觀，preflight 會讓它變成一行漂著的字：\n${tag}`).toMatch(STYLED)
     }
 
     // **文字輸入框同理，而且它更嚴重** —— 按鈕至少還有字，
@@ -72,7 +72,7 @@ describe('控制項的外觀只有一份定義', () => {
     )
     expect(inputs.length, '這個檔案裡一個文字輸入框都沒有 —— 同上，那是恆真的').toBeGreaterThan(0)
     for (const tag of inputs) {
-      expect(tag, `這個輸入框沒有外觀，它在畫面上是隱形的：\n${tag}`).toMatch(/className=\{/)
+      expect(tag, `這個輸入框沒有外觀，它在畫面上是隱形的：\n${tag}`).toMatch(STYLED)
     }
   })
 
@@ -81,9 +81,9 @@ describe('控制項的外觀只有一份定義', () => {
     // 把 `PRIMARY` / `FIELD` 全部改成 `''`，上面每一條都還是綠的 ——
     // 因為它們只檢查「有沒有引用」，不檢查引用到的東西有沒有內容。
     // （對比度由 e2e 那一支守，這裡只擋最明顯的那個洞。）
-    for (const name of ['PRIMARY', 'SECONDARY', 'FIELD'] as const) {
-      expect(controls[name], `${name} 是空的 —— 那等於沒有外觀`).not.toBe('')
-      expect(controls[name].length, `${name} 短得不像一組樣式`).toBeGreaterThan(4)
+    for (const name of ['PRIMARY', 'SECONDARY', 'TERTIARY', 'FIELD'] as const) {
+      expect(controls[name].className, `${name} 是空的 —— 那等於沒有外觀`).not.toBe('')
+      expect(controls[name].className.length, `${name} 短得不像一組樣式`).toBeGreaterThan(4)
     }
   })
 
@@ -95,9 +95,9 @@ describe('控制項的外觀只有一份定義', () => {
     // 規格 `D5` 明寫 `line` 給分隔線與卡片邊界用，**控制項要用另一個 token**。
     // e2e 那一支會抓到（實測突變 X2：三個輸入框全部變成 1.27:1 紅燈），
     // 但那一支 CI 不會跑 —— 所以這裡也擋一次。
-    for (const name of ['PRIMARY', 'SECONDARY', 'FIELD'] as const) {
+    for (const name of ['PRIMARY', 'SECONDARY', 'TERTIARY', 'FIELD'] as const) {
       expect(
-        controls[name],
+        controls[name].className,
         `${name} 用了 border-line（實測 1.27:1）。控制項的邊界要用 control-edge（3.70:1）`,
       ).not.toMatch(/\bborder-line\b/)
     }

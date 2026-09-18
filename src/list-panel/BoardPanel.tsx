@@ -195,7 +195,7 @@ function ProjectBoard() {
       onShownPage={reportPage}
       toolbar={
         signedIn ? (
-          <button type="button" className={PRIMARY} onClick={() => setComposing(true)}>
+          <button type="button" {...PRIMARY} onClick={() => setComposing(true)}>
             {CREATE_LABEL}
           </button>
         ) : undefined

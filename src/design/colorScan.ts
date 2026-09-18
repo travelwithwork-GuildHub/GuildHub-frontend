@@ -18,7 +18,7 @@
 /** `#rgb`、`#rrggbb`、`#rrggbbaa`。 */
 const HEX_STRING = /#[0-9a-fA-F]{3,8}\b/g
 
-/** `0xrrggbb` 這種數字形式。**只看 `#` 的判定被 `color={0xff0000}` 繞得過。** */
+/** `0xrrggbb` 這種數字形式。**只看 `#` 的判定被 `color={0x…}` 繞得過。** */
 const HEX_NUMBER = /\b0x[0-9a-fA-F]{3,8}\b/g
 
 /** 這一行要求豁免。用在真的需要字面值的地方（今天沒有）。 */
