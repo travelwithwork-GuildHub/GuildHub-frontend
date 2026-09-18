@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import type { NameTagNodes } from './NameTags'
 import { realtimeAdapter } from '@/config/env'
 import { RealtimeClient } from '@/realtime/client'
 import type { ConnectionEvent } from '@/world/scenes/SceneProvider'
@@ -93,6 +94,14 @@ export interface RemoteWorldProps {
    * 資料往外流，而 context 只往內流。
    */
   onOnlineCountChange?: (count: number | null) => void
+  /**
+   * 名單變了（規格 `name-tag`，design D5）：名字牌是 Canvas 外的 DOM，名單要送出去。
+   * 跟 `onOnlineCountChange` 同一條路、同樣的要求：**身分要穩定**（傳 `useState` 的 setter），它在 effect 的依賴裡。
+   * 卸載時送空名單 —— 舊場景的牌子跟舊子樹一起消失（`FE-W08-S10`）。
+   */
+  onRosterChange?: (roster: ReadonlyMap<string, RemoteIdentity>) => void
+  /** 名字牌的節點登記，直接交給 `RemotePlayers`（每個角色每幀寫自己那一塊）。 */
+  tagNodesRef?: RefObject<NameTagNodes>
 }
 
 const monotonicNow = () => performance.now()
@@ -107,6 +116,8 @@ export function RemoteWorld({
   onConnection,
   chat,
   onOnlineCountChange,
+  onRosterChange,
+  tagNodesRef,
 }: RemoteWorldProps) {
   // **名單進 React**（低頻，決定掛幾個元件）。
   const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(EMPTY_ROSTER)
@@ -181,6 +192,7 @@ export function RemoteWorld({
         if (applyMessage(state, result.message, client.selfId, now())) {
           // 名單真的變了才重繪。**這是唯一會呼叫 setState 的地方。**
           setRoster(state.roster)
+          onRosterChange?.(state.roster)
           reportCount()
         }
       },
@@ -220,6 +232,7 @@ export function RemoteWorld({
       // 或者在新連線的 snapshot 到達之前顯示上一條連線的人數（`FE-R10-S09`）。
       resetRemotePlayers(state)
       setRoster(EMPTY_ROSTER)
+      onRosterChange?.(EMPTY_ROSTER)
       reportCount()
     }
     // `state` 是 `useState` 的初始值，身分穩定 —— 列進來只是讓
@@ -228,11 +241,11 @@ export function RemoteWorld({
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection, chat, onOnlineCountChange])
+  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection, chat, onOnlineCountChange, onRosterChange])
 
   return (
     <>
-      <RemotePlayers roster={roster} motion={motion} now={now} />
+      <RemotePlayers roster={roster} motion={motion} now={now} tagNodesRef={tagNodesRef} />
       <PositionSync clientRef={clientRef} poseRef={poseRef} />
     </>
   )

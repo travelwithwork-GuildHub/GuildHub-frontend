@@ -2,13 +2,20 @@
 
 import type {} from '@react-three/fiber'
 import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
+import { useRef, type RefObject } from 'react'
 import type { Group } from 'three'
 import type { Facing } from '@/world/coords'
 import type { RemoteMotion } from '@/realtime/remotePlayers'
 import { evaluate } from '@/realtime/interpolation'
+import { cameraOffset } from '../camera'
+import type { NameTagNodes } from '../NameTags'
+import { screenPixelFor } from '../rooms/labelProjection'
 import { ChibiPlayer } from './ChibiPlayer'
 import { FACING_ROTATION } from './facing'
+import { NAME_TAG_ANCHOR_Y } from './nameTag'
+
+// 相機相對 target 的固定偏移（`WorldCamera` 用同一份）。拿一份私有的複本，不每幀重建。
+const CAMERA_OFFSET = cameraOffset()
 
 // 一個遠端角色。規格 FE-R07。
 //
@@ -47,12 +54,20 @@ export interface RemotePlayerProps {
    * 每秒 10 次 React 重繪 × 40 個角色。
    */
   av?: unknown
+  /**
+   * 名字牌的節點登記（`NameTags`，Canvas 外的 DOM）。規格 `name-tag`（`FE-W08-S04`～`S06`、`S08`）、ADR 0012。
+   *
+   * ⚠️ **牌子的位置由這裡寫，不另開投影器**（design D2）：角色的位置就是這一幀 `evaluate` 出來的那一次，
+   * 牌子用同一次的結果 —— 另外求值一次會漂、讀 group 的位置會落後一幀。
+   * 查不到自己的節點（沒名字的人、單獨測這個元件）就跳過。
+   */
+  tagNodesRef?: RefObject<NameTagNodes>
 }
 
-export function RemotePlayer({ id, motion, now, av }: RemotePlayerProps) {
+export function RemotePlayer({ id, motion, now, av, tagNodesRef }: RemotePlayerProps) {
   const rootRef = useRef<Group>(null)
 
-  useFrame(() => {
+  useFrame((state) => {
     const root = rootRef.current
     // ⚠️ **這一行是 TypeScript 的型別收斂，不是執行期防禦。**
     // `useRef<Group>(null)` 的型別是 `Group | null`，不寫它編譯不過 ——
@@ -79,6 +94,21 @@ export function RemotePlayer({ id, motion, now, av }: RemotePlayerProps) {
     root.position.x = pose.x
     root.position.z = pose.z
     root.rotation.y = FACING_ROTATION[pose.f as Facing] ?? 0
+
+    // 名字牌：頭頂錨點 → CSS 像素，**跟門標籤／工位錨點同一份投影**（`screenPixelFor` → `toScreen`）。
+    // 相機與畫布尺寸從 `useFrame` 的 state 拿（不另訂閱 `useThree`）。
+    // 判的是**點**在不在畫面內（`S08`）：在 → 寫位置、visible；不在 → hidden（位置不寫，NaN 也到不了 DOM）。
+    // 上面兩個 return（沒有樣本／樣本剛清掉）也讓牌子停在原地 —— 跟角色一樣，不跳回原點（`S06`）。
+    const tag = tagNodesRef?.current.get(id)
+    if (tag === undefined) return
+    const target = { x: state.camera.position.x - CAMERA_OFFSET.x, z: state.camera.position.z - CAMERA_OFFSET.z }
+    const px = screenPixelFor({ x: pose.x, y: NAME_TAG_ANCHOR_Y, z: pose.z }, target, state.size)
+    if (!px.inside) {
+      tag.style.visibility = 'hidden'
+      return
+    }
+    tag.style.transform = `translate3d(${px.x}px, ${px.y}px, 0)`
+    tag.style.visibility = 'visible'
   })
 
   return (

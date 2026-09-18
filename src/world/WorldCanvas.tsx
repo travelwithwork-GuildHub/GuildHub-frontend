@@ -12,6 +12,8 @@ import { WorldShell } from './environment/WorldShell'
 import { WorldCamera } from './WorldCamera'
 import { LocalPlayer } from './player/LocalPlayer'
 import { RemoteWorld } from './RemoteWorld'
+import type { RemoteIdentity } from '@/realtime/remotePlayers'
+import { NameTags, useNameTagNodes } from './NameTags'
 import { EditableFocusLock } from './interaction/EditableFocusLock'
 import { InteractionProvider } from './interaction/InteractionProvider'
 import { InteractionPrompt } from './interaction/InteractionPrompt'
@@ -114,6 +116,10 @@ export default function WorldCanvas() {
   // ⚠️ 傳給 `RemoteWorld` 的是 `setOnlineCount` 本身：React 保證 setter 身分穩定，
   // 它在那個 effect 的依賴裡。包一層 inline 箭頭函式的話，每次人數變動都會重連。
   const [onlineCount, setOnlineCount] = useState<number | null>(null)
+  // 名單（規格 `name-tag`，design D5）：名字牌是 Canvas 外的 DOM，名單從 `RemoteWorld` 用 callback 送出來（低頻，join／leave 才變）。
+  // 同樣傳 setter 本身（身分穩定）。牌子的**位置**不經過這裡 —— 每個 `RemotePlayer` 每幀直接寫進 `tagNodesRef` 登記的節點。
+  const [roster, setRoster] = useState<ReadonlyMap<string, RemoteIdentity>>(() => new Map())
+  const tagNodesRef = useNameTagNodes()
 
   // 現在在哪個場景（`FE-V01`）。渲染的配置、出生點、只屬於大廳的東西都從註冊表推導 —— 不各自 `if`。
   const scene = useSceneRef()
@@ -203,6 +209,8 @@ export default function WorldCanvas() {
                 onConnection={reportConnection}
                 chat={chat}
                 onOnlineCountChange={setOnlineCount}
+                onRosterChange={setRoster}
+                tagNodesRef={tagNodesRef}
               />
               {/* 互動目標的判定（FE-W06）。**它不渲染任何東西** ——
                   提示在 Canvas 外面。今天世界裡還沒有可互動的物件，
@@ -229,6 +237,8 @@ export default function WorldCanvas() {
           <InteractionPrompt />
           {/* 目前 scene 的在線人數（`FE-R10-S07`～`S09`）。兩個場景都有；未就緒時不渲染。 */}
           <OnlineCount count={onlineCount} />
+          {/* 遠端玩家的名字牌（`FE-W08`）：HUD，兩個場景都有；位置每幀由 Canvas 裡的 `RemotePlayer` 寫，這裡只掛節點。 */}
+          <NameTags roster={roster} nodesRef={tagNodesRef} />
           {/* 場景聊天（`FE-K04`）：非阻斷的 HUD，靠左下、不遮提示；只看不鎖，輸入框有焦點才鎖（`EditableFocusLock`）。沒 provider 就不畫。 */}
           <SceneChatHud />
           {/* 看板開出來的清單面板（`FE-B01`）。DOM，`layer('panel')`。 */}

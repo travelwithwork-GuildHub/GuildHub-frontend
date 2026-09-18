@@ -78,7 +78,7 @@ const install = (page) =>
       /**
        * S05：面板開著時世界有沒有被蓋住 —— 掃**整份文件**（不只世界容器的後代：portal、兄弟節點也算）裡「會畫東西」的可見元素：
        * 底色 alpha > 0、背景圖、backdrop-filter、box-shadow、filter，或 ::before／::after 有底色／背景圖／backdrop-filter；跟世界區有正面積的交集；
-       * 排除面板本身與它的後代、canvas 自己的底（它就是世界），以及**點名的合法 HUD**（聊天框、在線人數、走廊提示、門標籤、互動提示）。
+       * 排除面板本身與它的後代、canvas 自己的底（它就是世界），以及**點名的合法 HUD**（聊天框、在線人數、走廊提示、門標籤、名字牌、互動提示）。
        * 世界容器與它的祖先**不整體排除**（審查：`::after` 在容器上就是最自然的 scrim）：它們自己的底色不算（頁面底），但偽元素與 filter 照算。
        * 候選清單要是**空的** —— 零容忍不用取樣（審查：格點會漏窄條）。
        */
@@ -86,7 +86,7 @@ const install = (page) =>
         const worldEl = document.querySelector('[data-testid="world-canvas-container"]')
         const w = rect(worldEl)
         const panel = document.querySelector(panelSel)
-        const HUD = '[data-testid="scene-chat"], [data-testid="online-count"], [data-testid="rooms-notice"], [data-testid="door-labels"], [data-testid="interaction-prompt"]'
+        const HUD = '[data-testid="scene-chat"], [data-testid="online-count"], [data-testid="rooms-notice"], [data-testid="door-labels"], [data-testid="name-tags"], [data-testid="interaction-prompt"]'
         const ancestors = new Set(); for (let n = worldEl; n; n = n.parentElement) ancestors.add(n)
         // 偽元素：底色、背景圖、backdrop-filter、box-shadow 都算（審查：1×1 的 ::after 加 100vmax 的陰影也能把世界變暗）。
         // 偽元素畫在哪裡 DOM 量不到（可能 fixed、可能超出宿主）—— 所以有會畫東西的偽元素就一律算，不看宿主的矩形

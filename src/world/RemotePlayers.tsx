@@ -1,6 +1,8 @@
 'use client'
 
+import type { RefObject } from 'react'
 import type { RemoteIdentity, RemoteMotion } from '@/realtime/remotePlayers'
+import type { NameTagNodes } from './NameTags'
 import { RemotePlayer } from './player/RemotePlayer'
 
 // 畫面上的所有遠端角色。規格 FE-R07。
@@ -18,9 +20,11 @@ export interface RemotePlayersProps {
   motion: ReadonlyMap<string, RemoteMotion>
   /** 單調時間來源。**與寫入樣本用的是同一個。** */
   now: () => number
+  /** 名字牌的節點登記（規格 `name-tag`）。傳給每個 `RemotePlayer`，它們每幀寫自己那一塊。 */
+  tagNodesRef?: RefObject<NameTagNodes>
 }
 
-export function RemotePlayers({ roster, motion, now }: RemotePlayersProps) {
+export function RemotePlayers({ roster, motion, now, tagNodesRef }: RemotePlayersProps) {
   return (
     <>
       {[...roster.entries()].map(([id, identity]) => (
@@ -31,7 +35,7 @@ export function RemotePlayers({ roster, motion, now }: RemotePlayersProps) {
         // 協定早就送得到它（snapshot 的每個人都是
         // `{"id","name","av","x","y","f","st"}`，而 `RemoteIdentity` 也存了），
         // **但在這一行之前沒有任何地方讀它** —— 那正是這一項存在的理由。
-        <RemotePlayer key={id} id={id} motion={motion} now={now} av={identity.av} />
+        <RemotePlayer key={id} id={id} motion={motion} now={now} av={identity.av} tagNodesRef={tagNodesRef} />
       ))}
     </>
   )

@@ -17,11 +17,11 @@ import { appendSample, createTrack, resetTrack, type Track } from './interpolati
 export interface RemoteIdentity {
   readonly id: string
   /**
-   * ⚠️ **目前每個人都是「訪客」**（`BE-G02`：後端讀 `session["name"]`，
-   * 而那個鍵從來沒有被設定過）。照收，但**不要照著它設計功能**。
+   * 顯示名稱。`BE-G02` 已在後端修好（2026-09-06）、2026-09-10 從瀏覽器實測 snapshot 帶的是登入的名字（PR 245，`FE-A01`）；
+   * `FE-A06` 之後沒有匿名連線。**世界裡畫它的是 `NameTags`**（`FE-W08`）—— 空白或不是字串的名字不畫牌子、不顯示替代字。
    */
   readonly name: string
-  /** ⚠️ **遠端玩家一律 `0`**（`BE-G03`）。同上。 */
+  /** 外觀（`avatar-appearance`）。`BE-G03` 已修：登入後 `avatar_id` 送得到，遠端不再一律 `0`。 */
   readonly av: number
   /**
    * 目前的狀態文字（`FE-R10`）。**放在名單裡，不另開第三個 per-player 容器**（design D1）——

@@ -6,13 +6,14 @@
 //   NEXT_PUBLIC_REALTIME_ADAPTER=guildhub … pnpm run build && pnpm exec next start -p 3101
 //   FRONTEND=http://127.0.0.1:3101 node tests/e2e/name-tags.mjs
 //
-// ⚠️ 像素期望值是**手算的常數**：viewport 1280×720 下 1 世界單位 = 60 px（x）、42.43 px（z → 螢幕 y）。不呼叫產品的投影函式算期望值。
+// ⚠️ 像素期望值是**手算的常數**：正交相機的 viewHeight 固定，畫布高 720 px 時 1 世界單位 = 60 px（x）、42.43 px（z → 螢幕 y）；
+// 畫布實際高度（1280×720 的視窗扣掉標題列，約 646）按比例縮 —— 讀的是畫布的 rect，不呼叫產品的投影函式。
 // ⚠️ 「同一幀、同一份投影」的尺是**門標籤**：它由同一份 `screenPixelFor` 投影、每幀寫 DOM。相機動的時候名字牌與門標籤的差要每幀不變。
 
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
-import { HALL_SPAWN, assertLoopback, bad, countOverlays, failureCount, fakeRealtime, fakeRest, guardLoopback, ok, profile, uuid, waitForTransition, waitForWorld } from './lib/world.mjs'
+import { HALL_SPAWN, assertLoopback, bad, countOverlays, failureCount, fakeRealtime, fakeRest, guardLoopback, ok, profile, uuid, waitForTransition, waitForWorld, walker } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-w08'
@@ -28,8 +29,9 @@ const ROOMS = [
 const TOKEN = 'e2e-ticket-W08'
 const tokenKey = (profileId) => `guildhub.roomToken.${profileId}.${ROOM}`
 const PX = 32 // 協定的像素／世界單位（`coords.ts`）
-const PX_PER_UNIT_X = 60 // 螢幕：1280×720 下每世界單位的像素（手算）
-const PX_PER_UNIT_Z = 42.43
+/** 畫布高 720 px 時每世界單位的像素（手算：x 60、z 42.43）；實際畫布高度按比例。 */
+const perUnit = (canvasHeight) => ({ x: (60 * canvasHeight) / 720, z: (42.43 * canvasHeight) / 720 })
+const canvasHeight = (page) => page.$eval('[data-testid="world-canvas-container"]', (el) => el.getBoundingClientRect().height)
 const TAG_WIDTH = 176
 /** 世界座標（相對出生點）→ 協定的 player。 */
 const at = (id, name, dx, dz) => ({ id, name, av: 0, x: Math.round((HALL_SPAWN.x + dx) * PX), y: Math.round((HALL_SPAWN.z + dz) * PX), f: 0, st: '' })
@@ -38,13 +40,15 @@ if ([...LONG].length !== 20) throw new Error(`LONG 不是 20 個字：${[...LONG
 
 const TAGS = '[data-testid="name-tag"]'
 const tagsText = (page) => page.$$eval(TAGS, (t) => t.map((x) => x.textContent))
+/** 牌子的 transform 位置與矩形，**都相對名字牌容器**（容器在標題列底下；transform 是容器座標、rect 是視窗座標）。 */
 const tagOf = (page, name) =>
   page.evaluate((n) => {
     const el = [...document.querySelectorAll('[data-testid="name-tag"]')].find((t) => t.textContent === n)
     if (!el) return null
-    const m = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0\)/.exec(el.style.transform)
+    const m = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0(?:px)?\)/.exec(el.style.transform)
     const r = el.getBoundingClientRect()
-    return { x: m ? Number(m[1]) : NaN, y: m ? Number(m[2]) : NaN, visibility: getComputedStyle(el).visibility, rect: { x: r.x, y: r.y, width: r.width, height: r.height } }
+    const c = document.querySelector('[data-testid="name-tags"]').getBoundingClientRect()
+    return { x: m ? Number(m[1]) : NaN, y: m ? Number(m[2]) : NaN, visibility: getComputedStyle(el).visibility, rect: { x: r.x - c.x, y: r.y - c.y, width: r.width, height: r.height }, canvasWidth: c.width }
   }, name)
 const waitTags = (page, n) => page.waitForFunction((k) => document.querySelectorAll('[data-testid="name-tag"]').length === k, n, { timeout: 8_000 }).then(() => true).catch(() => false)
 const waitVisibility = (page, name, want) =>
@@ -85,24 +89,28 @@ try {
     else bad('[S01] 文字不對', JSON.stringify(texts))
     await page.screenshot({ path: path.join(OUT, 'hall-two.png') })
 
-    // S04：兩個人的位置差 (2, 1) 世界單位 → 螢幕 (120, 42.43) px
+    // S04：兩個人的位置差 (2, 1) 世界單位 → 螢幕 (2·60, 42.43)·(畫布高/720) px
+    const unit = perUnit(await canvasHeight(page))
     const yu = await tagOf(page, '小玉')
     const ada = await tagOf(page, 'Ada Lovelace')
     const dx = ada.x - yu.x
     const dy = ada.y - yu.y
-    if (near(dx, 2 * PX_PER_UNIT_X) && near(dy, 1 * PX_PER_UNIT_Z)) ok(`[S04] 位置差等於投影差（${dx.toFixed(1)}, ${dy.toFixed(1)}）`)
-    else bad('[S04] 位置差不等於投影差', `量到 (${dx}, ${dy})，手算 (${2 * PX_PER_UNIT_X}, ${PX_PER_UNIT_Z})`)
+    if (near(dx, 2 * unit.x) && near(dy, 1 * unit.z)) ok(`[S04] 位置差等於投影差（${dx.toFixed(1)}, ${dy.toFixed(1)}；畫布高 ${(unit.x / 60 * 720).toFixed(0)}）`)
+    else bad('[S04] 位置差不等於投影差', `量到 (${dx}, ${dy})，手算 (${2 * unit.x}, ${unit.z})`)
     // 牌子的底邊中點對齊錨點：rect 的 bottom-center 要等於 transform 的點（±1）
     if (near(yu.rect.x + yu.rect.width / 2, yu.x) && near(yu.rect.y + yu.rect.height, yu.y)) ok('[S04] 牌子的底邊中點對齊錨點')
     else bad('[S04] 牌子沒有以底邊中點對齊錨點', JSON.stringify(yu))
 
+    // 門標籤是 S05 的尺：從出生點看不到走廊，先用 walker 的校準走到兩扇門的標籤都看得見
+    const { odometer } = walker({ room: ROOM, decoy: uuid(2), title: '星際導航', out: OUT })
+    await odometer(page)
     // S05（相機動）：按住 W，連續 12 幀同時抓名字牌與門標籤的 transform —— 每幀都變、兩者的差每幀不變（同一幀、同一份投影）
     await page.keyboard.down('KeyW')
     await page.waitForTimeout(150)
     const frames = await page.evaluate(
       () =>
         new Promise((resolve) => {
-          const parse = (el) => { const m = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0\)/.exec(el?.style.transform ?? ''); return m ? [Number(m[1]), Number(m[2])] : null }
+          const parse = (el) => { const m = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0(?:px)?\)/.exec(el?.style.transform ?? ''); return m ? [Number(m[1]), Number(m[2])] : null }
           const tag = [...document.querySelectorAll('[data-testid="name-tag"]')].find((t) => t.textContent === 'Ada Lovelace')
           const door = document.querySelector('[data-testid="door-label"]')
           const out = []
@@ -126,7 +134,7 @@ try {
     // S05（角色動）：伺服器送 Ada 往 +x 走 1 單位的 pos；牌子相對門標籤往右 60 px、門標籤不動
     await page.waitForTimeout(400)
     const before = await page.evaluate(() => {
-      const parse = (el) => { const m = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0\)/.exec(el?.style.transform ?? ''); return m ? [Number(m[1]), Number(m[2])] : null }
+      const parse = (el) => { const m = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0(?:px)?\)/.exec(el?.style.transform ?? ''); return m ? [Number(m[1]), Number(m[2])] : null }
       return { tag: parse([...document.querySelectorAll('[data-testid="name-tag"]')].find((t) => t.textContent === 'Ada Lovelace')), door: parse(document.querySelector('[data-testid="door-label"]')) }
     })
     const adaPlayer = at('u-ada', 'Ada Lovelace', 4, 1)
@@ -137,26 +145,27 @@ try {
     }
     await page.waitForTimeout(600) // render delay 250 ms ＋ 收斂
     const after = await page.evaluate(() => {
-      const parse = (el) => { const m = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0\)/.exec(el?.style.transform ?? ''); return m ? [Number(m[1]), Number(m[2])] : null }
+      const parse = (el) => { const m = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0(?:px)?\)/.exec(el?.style.transform ?? ''); return m ? [Number(m[1]), Number(m[2])] : null }
       return { tag: parse([...document.querySelectorAll('[data-testid="name-tag"]')].find((t) => t.textContent === 'Ada Lovelace')), door: parse(document.querySelector('[data-testid="door-label"]')) }
     })
     const rel = [after.tag[0] - after.door[0] - (before.tag[0] - before.door[0]), after.tag[1] - after.door[1] - (before.tag[1] - before.door[1])]
-    if (near(rel[0], PX_PER_UNIT_X, 2) && near(rel[1], 0, 2)) ok(`[S05] 角色走了 1 單位，牌子相對門標籤移了 (${rel[0].toFixed(1)}, ${rel[1].toFixed(1)}) px`)
-    else bad('[S05] 角色移動後牌子沒有跟著', `相對位移 ${JSON.stringify(rel)}，手算 (${PX_PER_UNIT_X}, 0)`)
+    if (near(rel[0], unit.x, 2) && near(rel[1], 0, 2)) ok(`[S05] 角色走了 1 單位，牌子相對門標籤移了 (${rel[0].toFixed(1)}, ${rel[1].toFixed(1)}) px`)
+    else bad('[S05] 角色移動後牌子沒有跟著', `相對位移 ${JSON.stringify(rel)}，手算 (${unit.x}, 0)`)
     await context.close()
   }
 
   // ── B：S08、S09（一個人；角色不動，相機停在出生點） ──
   {
-    const { page, sockets, context } = await open(() => [at('u-yu', '小玉', 10, 0)])
+    // 畫布約 53.8 px／單位：+11.5 → 錨點 x≈1259（畫面內），牌子右緣 ≈1347（越界）；+13 → ≈1340（錨點出畫面）
+    const { page, sockets, context } = await open(() => [at('u-yu', '小玉', 11.5, 0)])
     if (!(await waitTags(page, 1))) bad('[S08] 牌子沒出現')
     await page.waitForTimeout(800) // 相機收斂
     const edge = await tagOf(page, '小玉')
-    const overflows = edge.x + TAG_WIDTH / 2 > 1280
-    if (edge.x < 1280 && overflows && edge.visibility === 'visible') ok(`[S08] 錨點在畫面內（x=${edge.x.toFixed(0)}）、牌子矩形越出右緣 → 仍然呈現`)
+    const overflows = edge.x + TAG_WIDTH / 2 > edge.canvasWidth
+    if (edge.x < edge.canvasWidth && overflows && edge.visibility === 'visible') ok(`[S08] 錨點在畫面內（x=${edge.x.toFixed(0)}）、牌子矩形越出右緣 → 仍然呈現`)
     else bad('[S08] 錨點在畫面內、矩形越界時牌子不該消失', JSON.stringify(edge))
     await page.screenshot({ path: path.join(OUT, 'edge.png') })
-    send(sockets, { t: 'pos', p: [['u-yu', Math.round((HALL_SPAWN.x + 11) * PX), Math.round(HALL_SPAWN.z * PX), 0]] })
+    send(sockets, { t: 'pos', p: [['u-yu', Math.round((HALL_SPAWN.x + 13) * PX), Math.round(HALL_SPAWN.z * PX), 0]] })
     if (await waitVisibility(page, '小玉', 'hidden')) ok('[S08] 錨點出畫面 → hidden')
     else bad('[S08] 錨點出畫面牌子還在', JSON.stringify(await tagOf(page, '小玉')))
     const aria = await page.locator('[data-testid="name-tags"]').ariaSnapshot()
