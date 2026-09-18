@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg'
 import { LIMITS } from '@/api/contract/limits'
 import { db } from './db'
 import { HttpError } from './http/errors'
+import { hasRoomGrant } from './roomGrant'
 import { TS } from './profiles'
 
 // 專案資源的 SQL 與權限。規格 `FE-J14`〈本地專案資源四端點：權限、狀態、上限、驗證與真後端相同〉。
@@ -34,13 +35,15 @@ export interface ResourceInput {
 
 /**
  * 讀：發起人一定讀得到（active／closed／recruiting 都是 200）。
- * 今天別人一律 403 —— 「持有本人有效 room token 的人也讀得到」要等本地有伺服器端的票紀錄（`--room-grants` 那一片）。
+ * 別人只有「對這間 **active** 房 `enter` 成功過」才讀得到（`cookie` 帶著那份記錄，`roomGrant.ts`）——
+ * `closed` 仍然簽得出票（真後端亦然），但票不開已結案那扇門，所以這裡看 `status`（矩陣、`FE-J14-S29`）。
+ * 票只換到讀；寫入一律只有發起人（`inLockedActiveProject`）。
  */
-export async function listResources(projectId: string, me: string): Promise<ResourceRow[]> {
-  const project = await db().query<{ owner_id: string }>('select owner_id from projects where id = $1', [projectId])
-  const owner = project.rows[0]?.owner_id
-  if (owner === undefined) throw new HttpError(404, '專案不存在')
-  if (owner !== me) throw new HttpError(403, '尚未通過房間密碼驗證')
+export async function listResources(projectId: string, me: string, cookie: string | null): Promise<ResourceRow[]> {
+  const project = await db().query<{ owner_id: string; status: string }>('select owner_id, status from projects where id = $1', [projectId])
+  const row = project.rows[0]
+  if (row === undefined) throw new HttpError(404, '專案不存在')
+  if (row.owner_id !== me && !(row.status === 'active' && hasRoomGrant(cookie, projectId, me))) throw new HttpError(403, '尚未通過房間密碼驗證')
   const r = await db().query<ResourceRow>(`select ${COLUMNS} from project_resources where project_id = $1 order by created_at asc, id asc`, [projectId])
   return r.rows
 }
