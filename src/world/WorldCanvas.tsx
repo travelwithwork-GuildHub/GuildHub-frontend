@@ -24,6 +24,7 @@ import { labelAnchorsFor } from './rooms/anchors'
 import { DoorLabels, useLabelNodes } from './rooms/DoorLabels'
 import { RoomsNotice } from './rooms/RoomsNotice'
 import { CORRIDOR_SLOTS } from './rooms/slots'
+import { RoomsRefreshProvider } from './rooms/RoomsRefreshContext'
 import { useRooms } from './rooms/useRooms'
 import { SEAT_ANCHORS } from './seats/anchors'
 import { SeatAnchors, useSeatAnchorNodes } from './seats/SeatAnchors'
@@ -146,6 +147,8 @@ export default function WorldCanvas() {
           面板在 Canvas 外面 —— 同樣要包住兩者。**要在 `InteractionProvider` 裡面**：
           面板開著時要鎖世界的移動輸入，那把鎖在互動層。 */}
       <ListPanelProvider>
+      {/* 門的立即重取交給看板面板裡的成軍／結案（`FE-J04`）：不在大廳時 `useRooms` 的 refresh 是 no-op */}
+      <RoomsRefreshProvider refresh={rooms.refresh}>
         {/* 文字輸入框有焦點時打字不是走路（`FE-X06`）。今天世界裡還沒有輸入框 —— 先掛著。 */}
         <EditableFocusLock />
         {/* 網址 ⇄ 開著哪一層、在哪個場景（`FE-B09`、`FE-V01`）。在 Canvas 外面、provider 裡面：它改的是網址不是路由，世界不重掛。 */}
@@ -248,6 +251,7 @@ export default function WorldCanvas() {
               「有位址但連不上」怎麼呈現是 FE-R12（W5），那個可以做 ——
               唯一的限制是不得借用「單人預覽」這種「一切正常」的措辭。 */}
         </div>
+      </RoomsRefreshProvider>
       </ListPanelProvider>
     </InteractionProvider>
   )

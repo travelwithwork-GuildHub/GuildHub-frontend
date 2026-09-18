@@ -80,6 +80,7 @@ describe('A：後端回了重複的 project_id', () => {
 describe('B：背景輪詢不得反覆打擾螢幕閱讀器', () => {
   const view = (over: Partial<RoomsView>): RoomsView => ({
     status: 'ready',
+    refresh: () => {},
     doors: [A],
     hidden: 0,
     all: [A],

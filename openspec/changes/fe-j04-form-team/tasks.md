@@ -5,13 +5,13 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-j04-form-team` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-j04-form-team --strict` 通過且 PR 已合併
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-j04-form-team` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-j04-form-team --strict` 通過且 PR 已合併 —— #504
 
 ## 2. `--rooms`：門的立即重取（`world-interactive-objects` ADDED；design D5）
 
-- [ ] 2.1 `tests/rooms-refresh.test.tsx`：`S10`（沒在飛就打、在飛等結束再打一次不是兩次、`enabled=false`／不可見 no-op、在飛時切背景／卸載／`enabled=false` 都不再打、500 → stale）；`listRooms` 替身；先 commit 紅
-- [ ] 2.2 `useRooms` 回 `refresh`（`pendingRefresh` 只在**沒被中止**的 `finally` 消費；中止時清掉；不可見時 no-op）；新 `RoomsRefreshContext`（`WorldCanvas` 提供、預設 no-op）
-- [ ] 2.3 **突變**：在飛時直接再打 → `S10` 紅；`pendingRefresh` 不消費 → `S10` 紅；中止的 `finally` 也消費 → `S10` 紅；`enabled=false`／不可見也打 → `S10` 紅
+- [x] 2.1 `tests/rooms-refresh.test.tsx`：`S10`（沒在飛就打、在飛等結束再打一次不是兩次、`enabled=false`／不可見 no-op、在飛時切背景／卸載／`enabled=false` 都不再打、500 → stale）；`listRooms` 替身；先 commit 紅
+- [x] 2.2 `useRooms` 回 `refresh`（`pendingRefresh` 只在**沒被中止**的 `finally` 消費；中止時清掉；不可見時 no-op）；新 `RoomsRefreshContext`（`WorldCanvas` 提供、預設 no-op）
+- [x] 2.3 **突變**：在飛時直接再打 → `S10` 紅；`pendingRefresh` 不消費 → `S10` 紅；中止的 `finally` 也消費 → `S10` 紅；`enabled=false`／不可見也打 → `S10` 紅；卸載不清把手 → `S10` 紅。「中止的 finally 也消費」單獨拿掉是等價突變（中止前待辦已被清）—— 跟「背景不清待辦」一起拿掉才紅（兩道防線）
 
 ## 3. `--actions`：成軍／結案（`project-lifecycle` 五條；design D1／D2／D3／D6）
 

@@ -14,6 +14,7 @@ const ROOM: RoomDoorOut = {
 
 const view = (over: Partial<RoomsView>): RoomsView => ({
   status: 'ready',
+    refresh: () => {},
   doors: [ROOM],
   hidden: 0,
   all: [ROOM],
