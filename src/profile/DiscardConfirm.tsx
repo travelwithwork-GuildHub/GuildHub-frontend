@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { PRIMARY, SECONDARY } from '@/design/controls'
+import { PRIMARY, SECONDARY, TITLE } from '@/design/controls'
 import { useEscapeLayer } from '@/world/interaction/escapeLayers'
 
 export const DISCARD_LABELS = {
@@ -33,7 +33,7 @@ export function DiscardConfirm({ onDiscard, onKeep }: { onDiscard: () => void; o
       data-testid="profile-discard-confirm"
       className="bg-surface-raised border-control-edge flex flex-col gap-gutter rounded border p-gutter"
     >
-      <p id="profile-discard-title" className="text-title">
+      <p id="profile-discard-title" {...TITLE}>
         {DISCARD_LABELS.confirmTitle}
       </p>
       <p id="profile-discard-body">{DISCARD_LABELS.confirmBody}</p>

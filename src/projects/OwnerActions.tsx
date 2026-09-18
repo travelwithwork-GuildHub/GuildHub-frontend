@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { ProjectOut } from '@/api/contract/rest'
 import { closeProject, formTeam } from '@/api/operations'
-import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
+import { CAPTION, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, TITLE, withClass } from '@/design/controls'
 import { toUiError } from '@/errors/uiError'
 import { FORM_LIMITS } from '@/forms/limits'
 import { SubmitError } from '@/forms/SubmitError'
@@ -196,11 +196,11 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
             />
           </label>
           {visibleErrors.password ? (
-            <p id="form-team-error-password" data-testid="form-team-error-password" className="text-caption text-danger">
+            <p id="form-team-error-password" data-testid="form-team-error-password" {...withClass(CAPTION, 'text-danger')}>
               {visibleErrors.password}
             </p>
           ) : (
-            <p id="form-team-hint-password" className="text-caption">
+            <p id="form-team-hint-password" {...CAPTION}>
               {OWNER_ACTION_LABELS.passwordHint}
             </p>
           )}
@@ -219,7 +219,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
       {/* 剛成軍：密碼只在這一次呈現 —— `status` 已是 active 才有意義（回應還沒 replace 進來前不畫） */}
       {project.status === 'active' && revealed !== null && (
         <section aria-labelledby="room-password-reveal-heading" className="flex flex-col gap-2">
-          <h4 id="room-password-reveal-heading" className="text-caption text-ink-muted">
+          <h4 id="room-password-reveal-heading" {...withClass(CAPTION, 'text-ink-muted')}>
             {OWNER_ACTION_LABELS.revealTitle}
           </h4>
           <p>
@@ -227,7 +227,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
               {revealed}
             </code>
           </p>
-          <p className="text-caption text-ink-muted">{OWNER_ACTION_LABELS.revealHint}</p>
+          <p {...withClass(CAPTION, 'text-ink-muted')}>{OWNER_ACTION_LABELS.revealHint}</p>
           <div className="flex flex-wrap gap-gutter">
             <button type="button" {...SECONDARY} aria-disabled={writingNow} onClick={() => void copy()}>
               {OWNER_ACTION_LABELS.copy}
@@ -238,7 +238,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
               </button>
             )}
           </div>
-          {onSendToTeam && <p className="text-caption">{OWNER_ACTION_LABELS.sendHint}</p>}
+          {onSendToTeam && <p {...CAPTION}>{OWNER_ACTION_LABELS.sendHint}</p>}
           {copyState === 'copied' && <p role="status">{OWNER_ACTION_LABELS.copied}</p>}
           {copyState === 'failed' && (
             <p role="alert" className="text-danger">
@@ -289,7 +289,7 @@ function CloseConfirm({ busy, error, onConfirm, onCancel }: { busy: boolean; err
       data-testid="close-project-confirm"
       className="bg-surface-raised border-line flex flex-col gap-gutter rounded border p-gutter"
     >
-      <p id="close-project-title" className="text-title">
+      <p id="close-project-title" {...TITLE}>
         {OWNER_ACTION_LABELS.closeTitle}
       </p>
       <p id="close-project-body">{OWNER_ACTION_LABELS.closeBody}</p>

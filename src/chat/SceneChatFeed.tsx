@@ -1,6 +1,7 @@
 'use client'
 
 import type { ChatLog } from '@/realtime/sceneChat'
+import { CAPTION, withClass } from '@/design/controls'
 
 // 場景聊天的列表。規格 `FE-K04`〈列表依接收順序呈現發言者與原始文字；被截斷的看得出來；空狀態不偽造結論〉（design D2、D6）、
 // `output-safety`〈使用者提供的字串以文字呈現（具名元件）〉的 chat 兩個節點。
@@ -23,7 +24,7 @@ export function SceneChatFeed({ log }: { log: ChatLog }) {
   return (
     <div role="log" aria-label={CHAT_FEED_LABELS.log} data-testid="chat-feed" className="flex min-h-0 min-w-0 flex-col gap-1">
       {log.length === 0 ? (
-        <p data-testid="chat-empty" className="text-ink-muted text-caption">
+        <p data-testid="chat-empty" {...withClass(CAPTION, 'text-ink-muted')}>
           {CHAT_FEED_LABELS.empty}
         </p>
       ) : (
@@ -39,7 +40,7 @@ export function SceneChatFeed({ log }: { log: ChatLog }) {
                 {record.body}
               </span>
               {record.truncated && (
-                <span data-testid="chat-truncated" className="text-ink-muted text-caption">
+                <span data-testid="chat-truncated" {...withClass(CAPTION, 'text-ink-muted')}>
                   {CHAT_FEED_LABELS.truncated}
                 </span>
               )}

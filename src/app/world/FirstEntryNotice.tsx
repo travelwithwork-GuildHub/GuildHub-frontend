@@ -1,6 +1,6 @@
 'use client'
 
-import { TERTIARY } from '@/design/controls'
+import { TERTIARY, TITLE } from '@/design/controls'
 import { useState } from 'react'
 import { FirstEntryFlow } from '@/first-entry/FirstEntryFlow'
 import { firstEntryDone, markFirstEntryDone } from '@/first-entry/seen'
@@ -44,7 +44,7 @@ export function FirstEntryNotice() {
         aria-labelledby="notice-heading"
         className="pointer-events-auto border-line bg-surface-raised p-gutter flex max-w-prose flex-col gap-gutter border"
       >
-        <h2 id="notice-heading" className="text-title">
+        <h2 id="notice-heading" {...TITLE}>
           你現在是訪客
         </h2>
         <p>取一個名字，世界裡的其他人就看得到你是誰。</p>

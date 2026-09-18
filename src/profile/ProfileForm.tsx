@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
 import { useWatch } from 'react-hook-form'
 import type { ProfileOut } from '@/api/contract/rest'
-import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
+import { CAPTION, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, withClass } from '@/design/controls'
 import { SubmitError } from '@/forms/SubmitError'
 import { useForm } from '@/forms/useForm'
 import { useAdoptIdentity } from '@/identity/IdentityProvider'
@@ -87,7 +87,7 @@ export function ProfileForm({ profile, onDone, closeIntentRef, askDiscard }: Pro
   const errorId = (name: keyof ProfileFormInput) => (visibleErrors[name] ? `profile-error-${name}` : undefined)
   const fieldError = (name: keyof ProfileFormInput) =>
     visibleErrors[name] ? (
-      <p id={`profile-error-${name}`} data-testid={`profile-error-${name}`} className="text-caption text-danger">
+      <p id={`profile-error-${name}`} data-testid={`profile-error-${name}`} {...withClass(CAPTION, 'text-danger')}>
         {visibleErrors[name]}
       </p>
     ) : null

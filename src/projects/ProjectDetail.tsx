@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ProjectOut } from '@/api/contract/rest'
-import { SECONDARY, withClass } from '@/design/controls'
+import { CAPTION, SECONDARY, TITLE, withClass } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { useIdentity } from '@/identity/IdentityProvider'
@@ -77,7 +77,7 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
       <header className="flex items-center gap-3">
         {back}
         {project !== undefined && (
-          <h3 data-testid="project-detail-title" className="text-title min-w-0 break-words">
+          <h3 data-testid="project-detail-title" {...withClass(TITLE, 'min-w-0 break-words')}>
             {project.title}
           </h3>
         )}
@@ -86,7 +86,7 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
       {detail.phase === 'error' && <EmptyState kind="failure" error={toUiError(detail.error)} retry={detail.retry} />}
 
       {ready && (
-        <p className="text-caption text-ink-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p {...withClass(CAPTION, 'text-ink-muted flex flex-wrap items-center gap-x-3 gap-y-1')}>
           <span data-testid="project-status">{PROJECT_STATUS_LABEL[project.status]}</span>
           {/* 時鐘是回應到達那一刻（`fetchedAt`），不是這一格 render 的時刻 */}
           <time data-testid="project-expires" dateTime={project.expires_at}>
@@ -100,13 +100,13 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
         (project.needed_skills.length > 0 ? (
           <span className="flex flex-wrap gap-1">
             {project.needed_skills.map((skill) => (
-              <span key={skill} data-testid="project-skill" className="bg-surface text-caption whitespace-nowrap rounded px-1.5 py-0.5">
+              <span key={skill} data-testid="project-skill" {...withClass(CAPTION, 'bg-surface whitespace-nowrap rounded px-1.5 py-0.5')}>
                 {skill}
               </span>
             ))}
           </span>
         ) : (
-          <span className="text-caption">
+          <span {...CAPTION}>
             <Missing field="needed_skills" label="未指定" />
           </span>
         ))}
@@ -122,7 +122,7 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
 
       {isOwner && (
         <div data-testid="owner-actions" className="flex flex-col gap-2">
-          <p data-testid="owner-mark" className="text-caption text-ink-muted">
+          <p data-testid="owner-mark" {...withClass(CAPTION, 'text-ink-muted')}>
             {OWNER_MARK}
           </p>
           {typeof ownerActions === 'function' ? ownerActions({ project, replace: detail.replace }) : ownerActions}

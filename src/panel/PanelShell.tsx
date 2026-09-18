@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
-import { SECONDARY } from '@/design/controls'
+import { SECONDARY, TITLE } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { useEscapeLayer } from '@/world/interaction/escapeLayers'
 import { nextTabStop } from './focusTrap'
@@ -79,7 +79,7 @@ export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestI
         className="flex min-h-0 flex-1 flex-col gap-gutter"
       >
         <header className="flex items-center justify-between gap-gutter">
-          <h2 className="text-title">{title}</h2>
+          <h2 {...TITLE}>{title}</h2>
           <button type="button" {...SECONDARY} onClick={onCloseRequest}>
             {closeLabel}
           </button>

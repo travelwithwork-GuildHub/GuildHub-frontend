@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { browserClipboard, type ClipboardPort } from '@/identity/clipboard'
 import type { Identity } from '@/identity/types'
-import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
+import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, TITLE } from '@/design/controls'
 
 // 「帶走這把鑰匙，再進去」—— 首次進入流程的後半段。規格 `FE-A06`〈金鑰要真的被帶走，才進得了世界〉
 // 與 `fe-a06-login-entry`〈登入頁的每一條路都通到世界，而新建的名片要先帶走金鑰〉。
@@ -91,7 +91,7 @@ export function KeyHandoff({ identity, onDone, clipboard = browserClipboard() }:
 
   return (
     <section aria-labelledby="key-heading" className={FORM}>
-      <h2 id="key-heading" className="text-title">
+      <h2 id="key-heading" {...TITLE}>
         帶走這把鑰匙，再進去
       </h2>
       <p>

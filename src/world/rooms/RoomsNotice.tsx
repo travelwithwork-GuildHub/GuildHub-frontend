@@ -2,6 +2,7 @@
 
 import { layer } from '@/design/layers'
 import type { RoomsView } from './useRooms'
+import { CAPTION, withClass } from '@/design/controls'
 
 // 走廊的門「為什麼不在那裡」。規格 `FE-W12-S02`／`S03`／`S04`／`S05`。
 //
@@ -33,7 +34,7 @@ export function RoomsNotice({ view }: { view: RoomsView }) {
       data-testid="rooms-notice"
       role="status"
       style={{ zIndex: layer('hud') }}
-      className="border-line bg-surface text-ink-muted text-caption absolute top-gutter left-1/2 -translate-x-1/2 border px-gutter py-2"
+      {...withClass(CAPTION, 'border-line bg-surface text-ink-muted absolute top-gutter left-1/2 -translate-x-1/2 border px-gutter py-2')}
     >
       {message !== null && <span data-testid={`rooms-${message.tone}`}>{message.text}</span>}
       {/* 規格 `FE-W12-S05`：排不下的**不得靜默消失**。

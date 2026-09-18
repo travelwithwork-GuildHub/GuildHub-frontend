@@ -4,6 +4,7 @@ import { useRef, type RefObject } from 'react'
 import { layer } from '@/design/layers'
 import { LABEL_SIZE } from './labelProjection'
 import type { LabelAnchor } from './anchors'
+import { CAPTION, withClass } from '@/design/controls'
 
 // 門上的名稱與在線數。規格 `FE-W12-S09`／`S12`／`S13`。
 //
@@ -54,7 +55,7 @@ export function DoorLabels({
             // 還沒被投影過之前先藏起來 —— 不然第一幀會閃在左上角。
             visibility: 'hidden',
           }}
-          className="border-line bg-surface text-ink text-caption absolute top-0 left-0 flex items-center justify-center overflow-hidden border px-2 whitespace-nowrap"
+          {...withClass(CAPTION, 'border-line bg-surface text-ink absolute top-0 left-0 flex items-center justify-center overflow-hidden border px-2 whitespace-nowrap')}
         >
           {/* 規格 `FE-W12-S12`：名稱過長**截字**，MUST NOT 把相鄰的標籤擠開。
               名稱的長度由後端決定 —— 讓它影響版面等於把版面交給不可控的輸入。 */}
