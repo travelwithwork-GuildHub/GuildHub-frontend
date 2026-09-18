@@ -44,8 +44,9 @@ export const WORLD_COLORS = {
   /**
    * 第三～第八款 avatar 的軀幹／四肢（`av=2`～`7`）。規格 `avatar-appearance`〈八種可辨識的外觀〉（`FE-A05-S14`／`S16`）。
    *
-   * 色相繞色環分開（紅、琥珀、紫、青、粉、石板灰），四肢一律同色系深一階 —— 跟 `av=1` 的做法一樣。
+   * 色相繞色環分開（紅、琥珀、紫、青、粉、天藍），四肢一律同色系深一階 —— 跟 `av=1` 的做法一樣。
    * 任兩款要在真的畫面上分得開（`tests/e2e/avatar-pixels.mjs` 二十八對）；哪一對太近就換**這裡**的色，不調門檻。
+   * 實測：第八款原本是石板灰 `#6b7280`，跟綠（`av=1`）在 swiftshader 下只差 510 像素（下限 500）—— 換成天藍後最小對 ≥ 80 個通道值。
    */
   avatarBody3: '#c24a4a',
   avatarLimb3: '#9a3535',
@@ -57,8 +58,8 @@ export const WORLD_COLORS = {
   avatarLimb6: '#227a84',
   avatarBody7: '#d4699a',
   avatarLimb7: '#a94e78',
-  avatarBody8: '#6b7280',
-  avatarLimb8: '#4b5563',
+  avatarBody8: '#7fb7e6',
+  avatarLimb8: '#4f8fc4',
   /** 深色細節（眼睛、輪廓）。 */
   ink: '#20232e',
   /** 地面。原本是 `DebugShadowScene` 的平面。 */

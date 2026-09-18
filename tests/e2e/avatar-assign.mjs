@@ -140,10 +140,14 @@ try {
   await enterWorld(p5)
   if (l5.patches.length === 1) ok('[S20] 失敗不重送：PATCH 恰好一次')
   else bad('[S20] PATCH 次數不是 1', String(l5.patches.length))
-  const dialogs = await p5.$$('[role="dialog"], [role="alertdialog"], [role="alert"]')
-  const alertTexts = await Promise.all(dialogs.map((d) => d.textContent()))
-  if (dialogs.length === 0) ok('[S20] 進了世界，沒有錯誤視窗或阻斷式訊息')
-  else bad('[S20] 出現了視窗或 alert', JSON.stringify(alertTexts))
+  // 視窗一個都不能有；`role="alert"` 常駐的 live region 是空的（`SceneNotices`），只算有字的
+  const blocking = await p5.evaluate(() => {
+    const dialogs = [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].map((d) => d.textContent?.trim() ?? '')
+    const alerts = [...document.querySelectorAll('[role="alert"]')].map((d) => d.textContent?.trim() ?? '').filter((t) => t !== '')
+    return { dialogs, alerts }
+  })
+  if (blocking.dialogs.length === 0 && blocking.alerts.length === 0) ok('[S20] 進了世界，沒有錯誤視窗或阻斷式訊息（有字的 alert 也沒有）')
+  else bad('[S20] 出現了視窗或有字的 alert', JSON.stringify(blocking))
   const me5 = await whoAmI(p5)
   if (Number.isInteger(me5.avatar_id)) ok(`[S20] 名片上是後端給的那一款（${me5.avatar_id}）`)
   else bad('[S20] 拿不到名片', JSON.stringify(me5))
