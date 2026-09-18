@@ -65,7 +65,7 @@
   被拒 → `replaceState` 把目前這一筆改回實際狀態（`FE-B09-S05` canonical 的同一招）、不 `pushState`、不動畫面（`S17`）。
 - 換角色彈出層：成功開面板時關；被拒時照 `FE-X06-S16` 焦點離開就關（第一版寫「被拒不動」跟那條矛盾，codex 抓到）。
 
-非阻斷的表面（訪客提示、聊天框、彈出層）**只讀** `useBlockingPanelOpen()`（`active !== null`），不登記。
+非阻斷的表面（訪客提示、聊天框、彈出層）**只讀** `useBlockingPanelOpen()`（＝ `active` 指向的殼目前有有效登記），不登記。
 為什麼不做成「路由決定開哪個」：見 ADR 0011 選項 B。**代價**：三個 provider 的 `open` 各改成從協調者推導（每個約 10 行）、世界鎖與 opener 的取得時機從「開啟呼叫」搬到「殼掛載」、殼多兩個 prop、
 provider 的開／關 API 名稱不變但實作換成呼叫協調者。**Supersedes**: 無。ADR：`docs/adr/0011-one-blocking-panel-at-a-time.md`。
 
