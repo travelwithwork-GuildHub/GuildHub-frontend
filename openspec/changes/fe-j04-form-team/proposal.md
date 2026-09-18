@@ -20,6 +20,7 @@
   - 結案：確認層 → `POST close` → 「已結案」、沒有任何動作；門立即重取（消失）。
   - 失敗留值（`FE-X05` 的全站規則）：500 留密碼、狀態不變、不重取；403 用 `FE-X03` 的語彙；送出中不可關、連按只送一次。
   - 密碼不落地：不進網址、不進 storage（跟 `FE-N08-S05` 同一條線）。
+- **`internal-backend`**（ADDED 一條）：替身補 `POST /api/projects/{id}/form-team` 與 `.../close`（照真後端：owner 才能、不驗密碼、close 冪等且清座位）—— 沒有它們，e2e 對 `internal` 走不到成軍（`--actions` 第一次跑 e2e 才發現替身沒有這兩個端點；規格原本誤寫「替身已有」）。契約套件新增 `lifecycle.contract.ts`，對兩個目標各跑一次。
 - **`world-interactive-objects`**（ADDED 一條）：走廊的門在「成軍／結案」之後 SHALL 立即重取一次 `GET /api/rooms`；有請求在飛時在它結束後再取一次（不疊加，`FE-W12-S21` 不變）。
 - 真瀏覽器 e2e：owner 發案 → 詳情 → 成軍 → 密碼可複製 → 大廳長出那扇門 → 結案 → 門消失。
 - 三個副作用（詳情更新、列表重取、門重取）**互相獨立**：先同步用回應更新詳情，再各自啟動兩個重取；任一重取失敗不得回滾詳情、不得收回密碼、不得擋住另一個。
@@ -38,6 +39,7 @@
 
 ## Impact
 
+- `src/server/projects.ts`（`formTeam`、`closeProject`）、新 `src/app/api/projects/[project_id]/form-team/route.ts`、`.../close/route.ts`；新 `tests/contract/rest/lifecycle.contract.ts`
 - 新 `src/projects/OwnerActions.tsx`（成軍表單、結案確認、密碼一次性呈現）、`src/projects/projectRules.ts`（`FormTeamSchema`）、`src/forms/limits.ts`（`FORM_LIMITS.roomPassword`）
 - `src/projects/ProjectDetail.tsx`／`useProjectDetail.ts`（拿回應更新詳情）、`src/list-panel/BoardPanel.tsx`（把 `OwnerActions` 接進插槽、列表 `reload`）
 - `src/world/rooms/useRooms.ts`（`refresh`）＋ 新 `src/world/rooms/RoomsRefreshContext.tsx`（`WorldCanvas` 提供、詳情呼叫）

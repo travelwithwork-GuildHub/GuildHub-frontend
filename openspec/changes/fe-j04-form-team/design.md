@@ -1,6 +1,6 @@
 ## Context
 
-- `formTeam(id, { password })`、`closeProject(id)` 已在 `src/api/operations.ts`（回 `ProjectOut`）。替身 `internal` 也有這兩個端點（`FE-O05`）。
+- `formTeam(id, { password })`、`closeProject(id)` 已在 `src/api/operations.ts`（回 `ProjectOut`）。**替身 `internal` 沒有這兩個端點**（只有 `enter`；規格第一版誤寫「已有」，`--actions` 的 e2e 第一次跑才發現）—— `--backend` 片補上，照真後端。
 - `ProjectDetail`（`FE-B03`）：owner 推導 `owner_id === me.id`、`ownerActions` 插槽只在 owner 時渲染；`useProjectDetail` 的 `ready` 狀態是 `GET /api/projects/{id}` 的回應。
 - `useRooms`（`FE-W12`）：30 秒輪詢、背景停、單飛（`inFlight` 同時是鎖與中止把手）、失敗退 `stale`。在 `WorldCanvas` 裡呼叫；`BoardPanel` 在同一棵樹底下。
 - 收件匣（`FE-K01`）：`openThreadFromTalent(withId)` 直接進對話；`ComposeForm` 的 `body` 是 `useForm` 的 `defaultValues`。
