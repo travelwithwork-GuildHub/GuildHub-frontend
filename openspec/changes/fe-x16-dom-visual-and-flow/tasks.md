@@ -1,28 +1,36 @@
 # tasks：`fe-x16-dom-visual-and-flow`
 
-四片 `feat/fe-x16-dom-visual-and-flow--<slice>` PR（每片產品碼 ≤250、手寫 ≤800）：`--tokens` → `--shell` → `--flow` → `--surfaces`。
+五片 `feat/fe-x16-dom-visual-and-flow--<slice>` PR（每片產品碼 ≤250、手寫 ≤800）：`--tokens` → `--text` → `--shell` → `--flow` → `--surfaces`。
+（原本四片；`--tokens` 做到一半量出 274 行 —— 60 個呼叫端改成 `{...PRIMARY}` 就吃掉 60 行，文字五級套到表面另外切一片。）
 每片：先寫判準（紅）→ commit → 實作（綠）→ 突變（拔掉防禦要紅、紀錄貼 PR）→ 檢查 → **前後截圖貼 PR**（1280×720：
 `/login`、訪客提示、看板清單、看板詳情（owner 招募中）、收件匣對話；由 review 對，不進 CI）。
 看得見的 tsx 動之前叫 `ui-ux-pro-max`（`--domain ux`／`--stack nextjs`），它是建議不是規格。
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-x16-dom-visual-and-flow` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-x16-dom-visual-and-flow --strict` 通過且 PR 已合併
-- [ ] 1.2 `docs/WBS.md` 的 `FE-X16` 已在 governance #514 加好；ADR `docs/adr/0011` 隨這個 spec PR 進 main（Status: Proposed → 實作合併後改 Accepted、邊界狀態改「已強制」）
-- [ ] 1.3 基線 commit：合併這份規格時 `main` 的 SHA 寫在這裡：`________`（`S20` 的量對它做）
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-x16-dom-visual-and-flow` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-x16-dom-visual-and-flow --strict` 通過且 PR 已合併
+- [x] 1.2 `docs/WBS.md` 的 `FE-X16` 已在 governance #514 加好；ADR `docs/adr/0011` 隨這個 spec PR 進 main（Status: Proposed → 實作合併後改 Accepted、邊界狀態改「已強制」）
+- [x] 1.3 基線 commit：合併這份規格時 `main` 的 SHA 寫在這裡：`16b12d2`（`S20` 的量對它做）
 
-## 2. `--tokens`：token 七類、三級控制項、掃描擴到整個 `src/`（Requirement〈每一類視覺 token 單一來源〉〈文字有五級層次〉〈控制項分三級〉〈動態〉〈預算〉）
+## 2. `--tokens`：token 七類、三級控制項、掃描擴到整個 `src/`（Requirement〈每一類視覺 token 單一來源〉〈控制項分三級〉〈動態〉〈預算〉）
 
-- [ ] 2.1 判準先紅：`tests/e2e/dom-visual.mjs` 的 `S02`（font-family 一致、含繁中家族、零字型請求）、`S03`（五級字級、必備層級）、`S04`（文字對比、空字串要紅）、
+- [x] 2.1 判準先紅：`tests/e2e/dom-visual.mjs` 的 `S02`（font-family 一致、含繁中家族、零字型請求）、
       `S10`（三級可區分、每一個按鈕的焦點環與 hover）、`S11`（高度 `≥ 40px`）、`S12`（每一個按鈕的時長相等、reduce → `0s`、面板不動寬高）；
-      jsdom 的 `S01`（掃描 `src/**`、六段假輸入各被抓、豁免要理由且有上限）
-- [ ] 2.2 `globals.css`：`--font-sans`（design D1）、圓角兩級、陰影兩級、`--motion` 與 `prefers-reduced-motion: reduce → 0ms`（transition 與 animation 都歸零）、
-      `scrim`、`focus`、accent 降到白字 `≥ 4.5:1`、`ink-muted` 對兩個 surface 都 `≥ 4.5:1`（D6 的待答在這裡量、數字寫進 PR）；字級五級＋行高
-- [ ] 2.3 `controls.ts`：`PRIMARY`／`SECONDARY`／`TERTIARY`／`FIELD` 帶 `data-tier` 的唯一來源（D7）、高度 `≥ 40px`、hover 態、`focus-visible` 環、過渡用 `--motion`；
-      文字層級常數帶 `data-text`（`display`／`title`／`heading`／`caption`）
-- [ ] 2.4 `colorScan` 擴成 `domTokenScan`：範圍 `src/world/**` → `src/**`（token 定義檔豁免）；抓 `rgb(`／`hsl(`／`oklch(`／`color-mix(`、`font-family`、
+      jsdom 的 `S01`（掃描 `src/**`、六段假輸入各被抓、豁免要理由且有上限）。實作前 79 條紅、實作後 139 綠
+- [x] 2.2 `globals.css`：`--font-sans`（design D1）、圓角兩級、陰影兩級、`--motion` 與 `prefers-reduced-motion: reduce → 0ms`（transition 與 animation 都歸零）、
+      `scrim`、`focus`、accent 降到白字 `≥ 4.5:1`（L 0.58 → 0.52：4.35 → 5.58:1）、`ink-muted` 對兩個 surface 都 `≥ 4.5:1`（L 0.52 原本就 5.21／5.53:1，不動）；字級五級＋行高。
+      高度下限、過渡、焦點環放 `@layer base`（每一個 `<button>`／輸入框都吃到，卡片與對話列不走常數也在內）
+- [x] 2.3 `controls.ts`：`PRIMARY`／`SECONDARY`／`TERTIARY`／`FIELD` 改成物件常數（`{ className, 'data-tier' }`，`{...PRIMARY}` 展開；`withClass()` 加版面 class）、hover 態；
+      60 個呼叫端改套法；`IdentityBadge` 的名字、訪客提示的「先四處看看」改 `TERTIARY`；標題列加 `data-testid="app-header"`（`S19` 也要）
+- [x] 2.4 新 `domTokenScan.ts`（`colorScan.ts` 留給 `src/world`）：範圍 `src/world/**` → `src/**`（token 定義檔豁免）；抓 `rgb(`／`hsl(`／`oklch(`／`color-mix(`、`font-family`、
       任意值 class（`bg-[`…`z-[`）、`data-tier=`／`data-text=` 字面值；`dom-token-allow: <理由>` 沒理由算違規；豁免上限寫在判準
-- [ ] 2.5 效能：對 1.3 的基線量 `/world` client JS 與 CSS（gzip）與請求清單（`S20` 的量法），數字寫進 PR（觀察）
+- [x] 2.5 效能：對 1.3 的基線量 `/world` client JS 與 CSS（gzip）：JS 221,412 → 221,596 B gz（+184）、CSS 5,768 → 6,103 B gz（+335）；零字型請求（`S02`）
+
+## 2b. `--text`：文字五級套到表面（Requirement〈文字有五級層次〉）
+
+- [ ] 2b.1 判準先紅：e2e `S03`（五級字級、必備層級）、`S04`（文字對比、空字串要紅）
+- [ ] 2b.2 `controls.ts` 加 `DISPLAY`／`TITLE`／`HEADING`／`CAPTION`（帶 `data-text`）；`/login` 的 h1、`PanelShell` 的 h2、訪客提示的 h2、卡片標題、收件匣對話的名字、
+      所有 `text-caption` 的地方改套常數（42 處）；alert 文字對比
 
 ## 3. `--shell`：`PanelShell` 的解剖（Requirement〈表面有三層〉〈每一個阻斷式面板的解剖一致〉）
 
