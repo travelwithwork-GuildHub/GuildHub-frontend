@@ -84,7 +84,7 @@ export function ListPanel<K extends ListKind>({
   const hasItems = items.length > 0
   const list = useRef<HTMLUListElement>(null)
 
-  // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——
+  // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——（容器是程式化取焦：`outline-none`，鍵盤開面板時不該整個列表亮一圈，`FE-X16-S10` 的焦點環只給控制項）
   // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
   // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，
   // 下一個 Tab 跑去標題列 —— 真瀏覽器的 e2e 抓到的。呼叫端可以再覆蓋（`BoardPanel` 把焦點放回那張卡）。
@@ -113,8 +113,8 @@ export function ListPanel<K extends ListKind>({
         aria-busy={state.phase === 'loading'}
         className={
           hasItems
-            ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto'
-            : 'h-0 flex-none overflow-hidden'
+            ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto outline-none'
+            : 'h-0 flex-none overflow-hidden outline-none'
         }
       >
         {items.map((item) => (

@@ -51,7 +51,7 @@ export function TalentDetail({ id, preview, onBack, actions }: TalentDetailProps
       data-profile-id={id}
       data-phase={detail.phase}
       aria-busy={detail.phase === 'loading'}
-      className="bg-surface-raised flex h-full flex-col gap-gutter overflow-y-auto"
+      className="bg-surface-raised flex h-full flex-col gap-gutter overflow-y-auto outline-none"
     >
       {detail.phase === 'error' && (
         <EmptyState kind="failure" error={toUiError(detail.error)} retry={detail.retry} />

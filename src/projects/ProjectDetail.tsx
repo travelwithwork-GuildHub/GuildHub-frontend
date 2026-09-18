@@ -65,7 +65,7 @@ export function ProjectDetail({ id, preview, onBack, actions, ownerActions }: Pr
       data-project-id={id}
       data-phase={detail.phase}
       aria-busy={detail.phase === 'loading'}
-      className="bg-surface-raised flex h-full flex-col gap-gutter overflow-y-auto"
+      className="bg-surface-raised flex h-full flex-col gap-gutter overflow-y-auto outline-none"
     >
       {project !== undefined && (
         <h3 data-testid="project-detail-title" {...withClass(HEADING, 'min-w-0 break-words')}>
