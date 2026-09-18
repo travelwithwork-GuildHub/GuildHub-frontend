@@ -66,7 +66,9 @@ describe('src/** 只從 token 取值', () => {
     const walk = (node: ts.Node) => {
       if (ts.isPropertyAssignment(node) && nameOf(node.name) === 'data-tier') {
         const decl = node.parent.parent
-        const exported = ts.isVariableDeclaration(decl) && ts.isIdentifier(decl.name) && decl.type?.getText() === 'Control' && decl.initializer === node.parent
+        const stmt = decl.parent?.parent
+        const hasExport = stmt !== undefined && ts.canHaveModifiers(stmt) && (ts.getModifiers(stmt) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+        const exported = hasExport && ts.isVariableDeclaration(decl) && ts.isIdentifier(decl.name) && decl.type?.getText() === 'Control' && decl.initializer === node.parent
         const owner = exported ? (decl as ts.VariableDeclaration).name.getText() : `<不是標成 Control 的 export：${node.getText()}>`
         ;(owners[owner] ??= []).push(ts.isStringLiteral(node.initializer) ? node.initializer.text : '<不是字串>')
       }
@@ -95,6 +97,9 @@ describe('src/** 只從 token 取值', () => {
     ["const p = { ['data-tier']: 'primary' }", '層級標記'],
     // 三輪審查：豁免寫在字串裡不算註解，色碼照抓
     ["const color = '#fff', note = 'dom-token-allow: 任意理由'", '色碼'],
+    // 四輪審查：字串裡假裝的 `//`；區塊註解的空理由（`*/` 不是理由）
+    ["const color = '#fff', note = '// dom-token-allow: 任意理由'", '色碼'],
+    ["const color = '#fff' /* dom-token-allow: */", '沒有理由的豁免'],
   ])('[FE-X16-S01] 假輸入被抓：%s', (input, kind) => {
     const scan = domTokenScan(`export const x = 1\n${input}\n`)
     expect(scan.violations.map((v) => v.kind), `沒抓到 ${kind}`).toContain(kind)
@@ -107,6 +112,9 @@ describe('src/** 只從 token 取值', () => {
     expect(scan.exemptions).toBe(1)
     // 沒有違規的行帶豁免註解 → 不算豁免（不然可以先囤一批）
     expect(domTokenScan('const y = 2 // dom-token-allow: 囤的\n').exemptions).toBe(0)
+    // css 的區塊註解、以及註解前面有含 `//` 的字串（網址）都要認得
+    expect(domTokenScan('  color: #fff; /* dom-token-allow: 印刷用的對照 */\n')).toEqual({ violations: [], exemptions: 1 })
+    expect(domTokenScan("const u = 'http://x/#fff' // dom-token-allow: 網址片段\n")).toEqual({ violations: [], exemptions: 1 })
   })
 
   it('[FE-X16-S01] 沒有字面值的來源是乾淨的（正向控制）', () => {
