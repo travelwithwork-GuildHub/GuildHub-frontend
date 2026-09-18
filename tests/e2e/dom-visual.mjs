@@ -123,16 +123,25 @@ const install = (page) =>
       /**
        * S03／S04：這個表面上每一個帶層級標記的元素、每一個 `p`、每一個 `role="alert"`。
        * 背景是**從元素自己往上真的合成**（chip 的底蓋在面板的底上），走到第一個不透明的層為止；走不到就回 null（判準要紅，不能算通過）。
-       * 邊界：只合成純色 `background-color`；祖先的 `opacity`、背景圖與漸層不在量尺裡（token 系統裡沒有這些，出現了要先改這裡）。
+       * 只合成純色 `background-color`：從元素到不透明層之間任何一層有 `opacity ≠ 1` 或背景圖／漸層，量尺不會算、直接回報量不到（紅）——
+       * 三輪審查：`opacity-0` 的文字顏色照樣高對比，不 fail-closed 的話 S03／S04 都能被透明的元素騙過。
        * 顏色字串空的或 CSS 解析不出來也回 null —— canvas 對壞字串會沿用上一次的 fillStyle，直接畫會拿到假的黑色。
        */
       text(root) {
         const rgba = (css) => (css !== '' && CSS.supports('color', css) ? toRgba(css) : null)
         const composite = (el) => {
           const stack = []
-          for (let n = el; n; n = n.parentElement) { const c = rgba(getComputedStyle(n).backgroundColor); if (c === null) return null; if (c[3] > 0) stack.push(c); if (c[3] >= 1) break }
+          for (let n = el; n; n = n.parentElement) {
+            const cs = getComputedStyle(n)
+            if (parseFloat(cs.opacity) !== 1) return `${n.tagName.toLowerCase()} 的 opacity=${cs.opacity}`
+            if (cs.backgroundImage !== 'none') return `${n.tagName.toLowerCase()} 有背景圖／漸層`
+            const c = rgba(cs.backgroundColor)
+            if (c === null) return `${n.tagName.toLowerCase()} 的 background-color=${JSON.stringify(cs.backgroundColor)}`
+            if (c[3] > 0) stack.push(c)
+            if (c[3] >= 1) break
+          }
           let bg = stack.pop()
-          if (bg === undefined || bg[3] < 1) return null
+          if (bg === undefined || bg[3] < 1) return '往上沒有不透明的層'
           while (stack.length > 0) { const f = stack.pop(); bg = [...[0, 1, 2].map((i) => f[i] * f[3] + bg[i] * (1 - f[3])), 1] }
           return bg
         }
@@ -232,7 +241,7 @@ async function inspect(page, surface, reduce) {
       if (t.level === 'caption') t.size >= 13 ? ok(`[S03] ${who}說明 ${t.size}px`) : bad(`[S03] ${who}說明只有 ${t.size}px`, '下限 13px')
       if (t.level !== 'body' && t.level !== 'caption' && !t.alert) continue
       if (t.alert) alertsMeasured += 1
-      if (t.text === null || t.bg === null) { bad(`[S04] ${who}的顏色或背景量不到`, `color=${JSON.stringify(t.raw)}、合成背景=${JSON.stringify(t.bg)}`); continue }
+      if (t.text === null || !Array.isArray(t.bg)) { bad(`[S04] ${who}的顏色或背景量不到`, `color=${JSON.stringify(t.raw)}、合成背景=${JSON.stringify(t.bg)}`); continue }
       const r = contrast(over(t.text, t.bg), t.bg)
       r >= 4.5 ? ok(`[S04] ${who}${t.alert ? 'alert ' : ''}${r.toFixed(2)}:1`) : bad(`[S04] ${who}只有 ${r.toFixed(2)}:1`, `字 ${JSON.stringify(t.text)} 底 ${JSON.stringify(t.bg)}（下限 4.5）`)
     }
