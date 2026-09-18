@@ -5,7 +5,9 @@
 「還剩幾天」「幾個座位」。卡片只放後端有的欄位：標題、需要的技能、狀態、到期、座位數；
 `body`、`updated_at`、`owner_id`、`room_template` 不上卡片。狀態以文字呈現、不靠顏色；剩幾天由 `expires_at` 與呈現時刻算出，
 已過期不印負數；沒有指定技能要看得出是「未指定」而不是沒載到。
-卡片在這一份是非互動的呈現，不是控制項；不做詳情、不決定卡片被點會發生什麼 —— 那是 `FE-B03`。
+卡片是可聚焦的控制項（`FE-B03`）：點擊、Enter、Space 開那一筆的詳情。詳情在同一個面板裡蓋在列表上，案子本體一律打 `GET /api/projects/{id}`，
+發案者名片另打 `GET /api/profiles/{owner_id}` 且獨立載入；動作列只放做得到的（私訊發案者、owner 的標示與給 `FE-J04` 的插槽）；
+返回列表時頁碼與捲動位置都還在。
 
 ## Requirements
 
@@ -21,7 +23,7 @@
 `expires_at` SHALL 以 `<time dateTime>` 帶出原始的絕對時間。
 `needed_skills` 為空陣列時 SHALL 呈現一個標示為「未指定」的節點（可見文字「未指定」，且 `data-missing="needed_skills"` 機器可辨識），SHALL NOT 留空白。
 案件卡 SHALL NOT 呈現 `body`、`updated_at`、`owner_id`、`room_template`。
-案件卡在這一份 SHALL 是非互動的 `<article>`：SHALL NOT 宣告或呈現任何卡片層級的啟動控制項（不是按鈕或連結、沒有 `role="button"`／`role="link"`、沒有可鍵盤聚焦的元素）—— 控制項由 `FE-B03` 以 MODIFIED 加上。
+案件卡 SHALL 是可聚焦的控制項（見〈卡片是控制項，滑鼠與鍵盤都開得了詳情〉）；卡片本身 SHALL NOT 含第二個控制項（整張卡就是那一顆按鈕）。
 
 ⚠️ **`updated_at` 是案件更新時間，不是活躍時間**；`body` 長度不定會把卡片高度弄亂；`owner_id` 是 UUID，人讀不懂 ——
 發案者是誰歸詳情（`FE-B03`）。
@@ -60,8 +62,11 @@
 
 #### Scenario: [FE-B02-S08] 卡片在這一份不是控制項
 
+> 標題是寫進 main 之後不改的鍵（`FE-B02` 時卡片還不是控制項）。自 `FE-B03` 起這一條的內容改為「整張卡就是唯一的控制項」——
+> 卡片**是**控制項（`FE-B03-S02`），但卡片**裡面**不能再有第二個。
+
 - **WHEN** 掛載一張案件卡
-- **THEN** 卡片的根節點 SHALL 是 `<article>`；卡片內（含根節點）SHALL NOT 有 `button`、`a`、`input`、`role="button"`、`role="link"`，SHALL NOT 有任何 `tabindex ≥ 0` 的元素 —— 也就是可聚焦元素的查詢在卡片內 SHALL 是空的
+- **THEN** 卡片的根節點 SHALL 是 `button`；根節點以內 SHALL NOT 有 `button`、`a`、`input`、`role="button"`、`role="link"`，SHALL NOT 有任何 `tabindex ≥ 0` 的子元素（巢狀控制項對螢幕閱讀器是壞掉的語意）
 
 ### Requirement: 專案看板的列項就是案件卡
 
@@ -76,3 +81,130 @@
 
 - **WHEN** 在本機自起的 `next start` 上，`/api/projects` 由 `page.route` 回一筆 `expires_at` 為當下 ＋7 天、`needed_skills: ['Three.js']`、`seat_count: 4`、`status: 'recruiting'` 的 fixture；使用者走到專案看板前按 E
 - **THEN** 面板第一個列項的卡片 SHALL 讀得到那個標題、技能節點「Three.js」、狀態節點「招募中」、到期節點「剩 7 天」、座位數節點「4 個座位」
+
+### Requirement: 卡片是控制項，滑鼠與鍵盤都開得了詳情
+
+案件卡 SHALL 是可聚焦的控制項（`<button type="button">`）；以滑鼠點擊或以鍵盤啟動（Enter／Space）SHALL 開啟**那一筆**的詳情。
+
+⚠️ `FE-B02` 那時詳情還不存在，做成按鈕會是一顆按下去沒反應的控制項；現在詳情有了。`FE-B02-S08` 的內容同步改成「卡片裡不能有第二個控制項」。
+
+#### Scenario: [FE-B03-S01] 點卡片開的是那一筆
+
+- **WHEN** 列表有多筆，使用者點擊其中第 N 筆的卡片
+- **THEN** 詳情 SHALL 是第 N 筆的案子，且送出的詳情請求 SHALL 是 `GET /api/projects/<第 N 筆的 id>`
+
+#### Scenario: [FE-B03-S02] 鍵盤也開得了：Enter 與 Space 各一次
+
+- **WHEN** 焦點以 Tab 移到某張卡片，使用者按 Enter；另一次改按 Space
+- **THEN** 兩次詳情都 SHALL 開啟；卡片的根節點 SHALL 是 `button`，卡片內 SHALL NOT 有第二個控制項
+
+### Requirement: 詳情在同一個面板裡，案子本體一律來自 `GET /api/projects/{id}`
+
+詳情 SHALL 在目前的面板內蓋在列表上（列表不卸載、標 `inert`），呈現 `title`、完整 `body`（保留換行）、每一項 `needed_skills`（空陣列 → 「未指定」）、
+`status` 的中文（`PROJECT_STATUS_LABEL`，唯一一份）、到期（`<time dateTime={expires_at}>`，呈現「剩 N 天」／「已到期」的同一條規則，並附本地化的絕對日期）、
+`seat_count`（「N 個座位」）。缺值 SHALL NOT 被捏造成有效值。
+
+每一次開啟詳情 SHALL 以該 `id` 請求 `GET /api/projects/{id}`，成功回應才是詳情的正式資料。列表手上的那一筆得作為**可辨識的載入中預覽**
+（`data-phase="loading"`、`aria-busy`）；請求成功前 SHALL NOT 宣告詳情載入完成，請求失敗後 SHALL NOT 讓預覽看起來像成功取得的詳情。
+失敗 SHALL 用 `FE-X04` 的空狀態：401 → 權限阻擋、404 → 找不到（`not-found`）、其他 → 載入失敗（可重試同一個 id）。
+快速連續開不同案子時，晚到的舊回應 SHALL NOT 覆蓋畫面。
+
+#### Scenario: [FE-B03-S03] 詳情呈現的是回應，不是列表那一筆
+
+- **WHEN** 列表那一筆的 `body` 與詳情端點回的 `body` 不同
+- **THEN** 詳情載入完成後（`data-phase="ready"`）呈現的 `body` SHALL 是詳情端點回的那一個，且保留其中的換行
+
+#### Scenario: [FE-B03-S04] 載入中是可辨識的載入中；失敗看得出失敗，不像成功
+
+- **WHEN** 詳情請求尚未回應
+- **THEN** 詳情 SHALL 是 `data-phase="loading"` 且 `aria-busy`，列表那一筆的標題 SHALL 已經看得到（預覽）
+- **AND WHEN** 詳情請求回 500
+- **THEN** 詳情 SHALL 呈現 `FE-X04` 的載入失敗狀態（可重試），SHALL NOT 是 `data-phase="ready"`；按重試 SHALL 恰好再請求一次同一個 id
+
+#### Scenario: [FE-B03-S05] 401 是權限阻擋、404 是找不到
+
+- **WHEN** 詳情請求回 `401 {"detail":"未登入"}`
+- **THEN** 詳情 SHALL 呈現 `FE-X04` 的權限阻擋狀態，不是載入失敗
+- **AND WHEN** 詳情請求回 `404 {"detail":"專案不存在"}`（例如深連結直達一個被移除的案子）
+- **THEN** 詳情 SHALL 呈現 `FE-X04` 的找不到狀態
+- **AND** 上述 401、404 與 `S04` 的 500 三種情況下，SHALL NOT 請求任何 `/api/profiles/*`（案子本體沒成功就沒有 `owner_id` 可以問）
+
+#### Scenario: [FE-B03-S06] 快速連點不同案子，晚到的舊回應不覆蓋
+
+- **WHEN** 使用者先開 A 再開 B，而 A 的詳情回應較晚到達
+- **THEN** 詳情呈現的 SHALL 是 B，且 SHALL NOT 在任何一格呈現「B 的 id 配 A 的內容」
+
+#### Scenario: [FE-B03-S07] 欄位齊全：狀態、到期、座位、技能、換行的內容
+
+- **WHEN** 詳情端點回 `status: 'active'`、`needed_skills: []`、`seat_count: 2`、`expires_at` 為呈現時刻 ＋2 天、`body` 含一個換行的案子
+- **THEN** 詳情 SHALL 呈現「已成軍」、「剩 2 天」與一個 `dateTime` 等於 `expires_at` 的時間元素、「2 個座位」、一個 `data-missing="needed_skills"` 的「未指定」節點
+- **AND** `body` 的節點 SHALL 保留換行（兩行分開呈現）；詳情 SHALL NOT 呈現 `owner_id` 的 UUID 文字、SHALL NOT 呈現 `room_template`
+
+### Requirement: 發案者名片是獨立的載入單元
+
+詳情 SHALL 以 `owner_id` 請求 `GET /api/profiles/{owner_id}`，呈現發案者的名字與角色外觀（跟世界裡同一個 `avatar_id` 一致）與技能；
+SHALL NOT 呈現發案者的 `bio`、時數、名片更新時間。
+發案者那一塊 SHALL 有自己的載入中／失敗狀態：它的失敗（404／500）SHALL NOT 改變案子本體的 `data-phase`，且 SHALL 可獨立重試。
+案子本體尚未成功前 SHALL NOT 請求發案者（沒有 `owner_id`）。
+
+#### Scenario: [FE-B03-S08] 發案者名片來自 `GET /api/profiles/{owner_id}`，外觀跟世界一致
+
+- **WHEN** 案子本體回 `owner_id = X`，`GET /api/profiles/X` 回一張 `avatar_id: 1` 的名片
+- **THEN** 詳情 SHALL 呈現那張名片的 `display_name` 與每一項技能，外觀色 SHALL 等於世界裡 `avatar_id: 1` 用的顏色
+- **AND** 詳情 SHALL NOT 含那張名片的 `bio` 字串、SHALL NOT 含其 `updated_at` 的年份
+
+#### Scenario: [FE-B03-S15] 案子已 ready、發案者還在載：兩塊各自的狀態
+
+- **WHEN** 案子本體回 200，`GET /api/profiles/{owner_id}` 尚未回應
+- **THEN** 案子本體 SHALL 是 `data-phase="ready"` 且標題、內容都在；發案者那一塊 SHALL 是自己的載入中狀態（`data-phase="loading"`），SHALL NOT 呈現任何名字
+
+#### Scenario: [FE-B03-S16] 切換案件後，舊發案者的回應不得覆蓋新案子的發案者
+
+- **WHEN** 使用者先開 A（owner X）再開 B（owner Y）；A 的案子本體、B 的案子本體與 `GET /api/profiles/Y` 都已回應，而 `GET /api/profiles/X` 最後才回來
+- **THEN** 詳情呈現的 SHALL 是 B 與 Y 的名字、技能、外觀；X 的回應到達後 SHALL NOT 在任何一格出現 X 的名字、技能或外觀
+
+#### Scenario: [FE-B03-S09] 發案者名片載不到，案子本體仍是 ready；可獨立重試
+
+- **WHEN** 案子本體回 200，`GET /api/profiles/{owner_id}` 回 500
+- **THEN** 案子本體 SHALL 是 `data-phase="ready"` 且標題、內容都在；發案者那一塊 SHALL 是 `FE-X04` 的載入失敗狀態
+- **AND WHEN** 按發案者那一塊的重試
+- **THEN** SHALL 恰好再請求一次 `GET /api/profiles/{owner_id}`，SHALL NOT 再請求 `GET /api/projects/{id}`
+
+### Requirement: 動作列只放做得到的：私訊發案者、owner 的標示與插槽
+
+已登入且不是 owner 的人 SHALL 看到「私訊發案者」：啟動它 SHALL 關閉看板面板並開啟收件匣直接進入與 `owner_id` 的對話（`FE-K01-S02` 的同一條路）。
+owner（`owner_id` 等於自己的 `id`）SHALL 看到「這是你發的案子」的標示，SHALL NOT 看到「私訊發案者」；詳情 SHALL 提供一個只在 owner 時渲染的動作插槽（給 `FE-J04`）。
+訪客 SHALL NOT 看到任何動作。
+詳情 SHALL NOT 含成軍、結案、應徵、收藏、檢舉的控制項（這一份沒有 handler；`FE-J04` 接成軍／結案，其餘沒有後端）。
+
+#### Scenario: [FE-B03-S10] 非 owner 看到「私訊發案者」，按下去關看板、進對話
+
+- **WHEN** 已登入的人（`id ≠ owner_id`）開一筆案子的詳情，並啟動「私訊發案者」
+- **THEN** 看板面板 SHALL 關閉，收件匣 SHALL 開著且在與 `owner_id` 的對話裡
+
+#### Scenario: [FE-B03-S11] owner 看到標示與插槽，沒有「私訊發案者」；訪客什麼都沒有
+
+- **WHEN** owner 開自己案子的詳情
+- **THEN** SHALL 有「這是你發的案子」的標示節點與插槽節點，SHALL NOT 有「私訊發案者」
+- **AND WHEN** 訪客（身分 `guest`）以深連結開同一筆詳情（真實系統下請求回 `401`）
+- **THEN** 詳情 SHALL 是權限阻擋狀態，SHALL NOT 有「私訊發案者」、SHALL NOT 有 owner 標示、SHALL NOT 有插槽節點
+
+#### Scenario: [FE-B03-S12] 沒有做不到的動作
+
+- **WHEN** 以 owner 與非 owner 各開一次詳情
+- **THEN** 兩次詳情內 SHALL NOT 有名字含「成軍」「結案」「應徵」「收藏」「檢舉」的按鈕或連結（含 disabled 的）
+
+### Requirement: 返回列表時，頁碼與捲動位置都還在
+
+從案件詳情返回列表 SHALL NOT 重新請求列表，SHALL 回到進入前的頁碼與捲動位置；詳情顯示時列表區 SHALL 是 `inert`、SHALL NOT 卸載或 `display: none`。
+
+#### Scenario: [FE-B03-S13] 第 1 頁（0-based）進去、第 1 頁回來，頁碼與捲動位置都在、沒有重打列表；列表區 inert
+
+- **WHEN** 案件清單在 0-based 的第 1 頁、列表已捲到非零的 `scrollTop`，使用者開某一筆詳情再返回
+- **THEN** 列表 SHALL 仍在第 1 頁、`scrollTop` SHALL 等於進入前的值；期間對 `/api/projects` 的列表請求總次數 SHALL 不增加（含不帶 `page` 的第 0 頁）
+- **AND** 詳情開著時列表區 SHALL 是 `inert` 且不是 `display: none`
+
+#### Scenario: [FE-B03-S14] 真瀏覽器：點卡開詳情、發案者名片、返回
+
+- **WHEN** 在本機自起的 `next start` 上（`/api/projects*`、`/api/profiles/*` 以 `page.route` 回 fixture），使用者走到專案看板前按 E，Tab 到第一張卡按 Enter
+- **THEN** 詳情 SHALL 開著且呈現詳情端點回的 `body`（跟列表那一筆不同的那一個）、發案者的名字；按「返回」後列表 SHALL 還在、焦點 SHALL 回到那張卡
