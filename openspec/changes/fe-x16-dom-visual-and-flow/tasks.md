@@ -28,9 +28,12 @@
 
 ## 2b. `--text`：文字五級套到表面（Requirement〈文字有五級層次〉）
 
-- [ ] 2b.1 判準先紅：e2e `S03`（五級字級、必備層級）、`S04`（文字對比、空字串要紅）
-- [ ] 2b.2 `controls.ts` 加 `DISPLAY`／`TITLE`／`HEADING`／`CAPTION`（帶 `data-text`）；`/login` 的 h1、`PanelShell` 的 h2、訪客提示的 h2、卡片標題、收件匣對話的名字、
-      所有 `text-caption` 的地方改套常數（42 處）；alert 文字對比
+- [x] 2b.1 判準先紅：e2e `S03`（六個表面各自必備的層級逐一斷言、層級間比「高一級的最小 vs 低一級的最大」、內文 16px／1.5、說明 13px、面板標題 ≥ 1.25×、頁面標題 ≥ 1.5×）、
+      `S04`（背景從元素自己往上**真的合成**到第一個不透明層；顏色空字串或 `CSS.supports` 不認就紅；整趟至少量到一個 `role="alert"` —— 多一個表面「/login（送出失敗）」空名字送出）；
+      jsdom 的定義檔 AST 測試擴到 `data-text`（四個 export 各一值、標 `TextStyle`、無 computed 鍵）。實作前 e2e 16 紅、jsdom 1 紅
+- [x] 2b.2 `controls.ts` 加 `DISPLAY`／`TITLE`／`HEADING`／`CAPTION`（`TextStyle`，帶 `data-text`）；h1 三處 → `DISPLAY`、`text-title` 十四處 → `TITLE`、卡片標題與收件匣對話的名字 → `HEADING`、
+      `text-caption` 42 處 → `CAPTION`（`OnlineCount` 不動：別人的檔）；`body` 的字級與行高從 `--text-body` 繼承。
+      兩個表面原本沒有內文的 `p`：`/login` 加一句說這裡是什麼、名片的自我介紹從 `dd` 直放改成 `dd > p`（`data-testid` 跟著 `p`）；alert 文字（danger 對 surface）4.84:1
 
 ## 3. `--shell`：`PanelShell` 的解剖（Requirement〈表面有三層〉〈每一個阻斷式面板的解剖一致〉）
 
@@ -67,7 +70,7 @@
 
 ## 6. 突變（驗收條件：拔掉防禦要紅）
 
-- [ ] 6.1 拿掉 `--font-sans` 的繁中家族 → `S02` 紅；把某個表面的內文改成 `14px` → `S03` 紅；`ink-muted` 調淡 → `S04` 紅；假輸入六段任一掃不到 → `S01` 紅
+- [ ] 6.1 拿掉 `--font-sans` 的繁中家族 → `S02` 紅；把某個表面的內文改成 `14px` → `S03` 紅（`--text`：`--text-body` 改 0.875rem → 17 條紅）；`ink-muted` 調淡 → `S04` 紅（`--text`：L 0.52 → 0.7 → 29 條 2.51～2.67:1）；假輸入六段任一掃不到 → `S01` 紅
 - [ ] 6.2 面板底改成半透明 → `S05` 紅；給面板加一層世界遮罩 → `S05` 紅；確認視窗遮罩拿掉 → `S06` 紅；關閉搬到標題列最前 → `S07` 紅；`<header>` 放進捲動容器 → `S08` 紅
 - [ ] 6.3 場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
 - [ ] 6.4 協調者不 `onYield()` 就取代 → `S13` 紅；讓位時還焦點給開啟者 → `S13` 紅；provider 自己持有 open（不從 `active` 推導）→ `S22` 紅；鎖留在 provider 的開啟呼叫裡同步取 → `S21` 紅；殼的 cleanup 清 `active` → `S22` Strict Mode 段紅；`useBlockingPanelOpen` 用 `active !== null` → `S22` 幽靈段紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
