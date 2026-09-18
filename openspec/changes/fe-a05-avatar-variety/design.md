@@ -27,7 +27,7 @@
 
 ## D4｜選擇器換行
 
-`AvatarPicker` 的選項容器從 `flex gap-2` 改 `flex flex-wrap gap-2`、選擇器 `max-w-full`；不改結構。`S23` 在 1024 寬量矩形。
+`AvatarPicker` 的選項容器從 `flex gap-2` 改 `flex flex-wrap gap-2`、選擇器 `max-w-full`；不改結構。`S23` 在 1280 與 1024 寬各量一次矩形（審查提醒 `left-0` 可能往右超出：紅了就改對齊）。
 
 ## 驗證方式（不進 Requirement）
 
