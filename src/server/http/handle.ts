@@ -45,6 +45,15 @@ export function json(body: unknown, init: ResponseInit = {}): Response {
   })
 }
 
+/**
+ * `204 No Content`：**不能有 body**（`DELETE /api/projects/{id}/resources/{id}`，`FE-J14-S28`）。
+ * 回 `json(null, {status: 204})` 會送出四個字元 `null`，而 `fetch` 對 204 的 body 行為是未定義的 ——
+ * 契約測試量的是 `body.length === 0`。
+ */
+export function noContent(): Response {
+  return new Response(null, { status: 204 })
+}
+
 function detail(status: number, text: string): Response {
   return json({ detail: text }, { status })
 }

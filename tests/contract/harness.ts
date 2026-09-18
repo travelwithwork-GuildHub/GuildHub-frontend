@@ -189,11 +189,13 @@ export default async function setup(project: TestProject): Promise<() => Promise
 
   // 即時層替身：另一個程序、另一個 port；`GET /api/rooms` 透過 INTERNAL_REALTIME_PORT 找到它。
   const stubPort = await freePort()
-  const stub = spawn('npx', ['tsx', 'scripts/realtime-stub.ts'], {
+  const stub = spawn(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'scripts/realtime-stub.ts'], {
     cwd: ROOT,
     env: { ...process.env, INTERNAL_DATABASE_URL: db.url, INTERNAL_SESSION_SECRET: CONTRACT_SESSION_SECRET, INTERNAL_REALTIME_PORT: String(stubPort) },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
+    // Windows：不要為子程序開主控台視窗（本機跑一次契約測試會閃兩個黑窗）。其他平台忽略這個選項。
+    windowsHide: true,
   })
   let stubLog = ''
   const collectStub = (d: Buffer) => {
@@ -215,7 +217,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
 
   const port = await freePort()
   const base = `http://127.0.0.1:${port}`
-  const child = spawn('npx', ['next', 'start', '-p', String(port), '-H', '127.0.0.1'], {
+  const child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', String(port), '-H', '127.0.0.1'], {
     cwd: ROOT,
     env: {
       ...process.env,
@@ -226,6 +228,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
+    windowsHide: true,
   })
   // 只在啟動期間收 log（給失敗訊息用）；ready 之後就不再累積，不然整個套件期間的輸出都堆在記憶體裡。
   let log = ''
