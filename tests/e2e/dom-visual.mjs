@@ -130,8 +130,13 @@ const install = (page) =>
       text(root) {
         const rgba = (css) => (css !== '' && CSS.supports('color', css) ? toRgba(css) : null)
         const composite = (el) => {
-          // opacity 要看完整條祖先鏈（不透明的面板外面再包一層 opacity: .1，面板的底也跟著透）；背景只收到第一個不透明層
-          for (let n = el; n; n = n.parentElement) { const o = getComputedStyle(n).opacity; if (parseFloat(o) !== 1) return `${n.tagName.toLowerCase()} 的 opacity=${o}` }
+          // 會改變最終像素、量尺不模擬的效果要看完整條祖先鏈（不透明的面板外面再包一層 opacity: .1，面板的底也跟著透；
+          // 五輪審查：`filter: opacity(0)`、mask、mix-blend-mode 一樣能讓字色照舊、畫面上卻沒有字）；背景只收到第一個不透明層
+          for (let n = el; n; n = n.parentElement) {
+            const cs = getComputedStyle(n)
+            const effect = [['opacity', cs.opacity, '1'], ['filter', cs.filter, 'none'], ['mask-image', cs.maskImage, 'none'], ['mix-blend-mode', cs.mixBlendMode, 'normal']].find(([, v, rest]) => v !== rest)
+            if (effect !== undefined) return `${n.tagName.toLowerCase()} 的 ${effect[0]}=${effect[1]}`
+          }
           const stack = []
           for (let n = el; n; n = n.parentElement) {
             const cs = getComputedStyle(n)
