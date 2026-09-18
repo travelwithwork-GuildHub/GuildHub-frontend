@@ -182,7 +182,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
         <label className={FIELD_LABEL}>
           在世界裡顯示的名字
           <input
-            className={FIELD}
+            {...FIELD}
             {...nick.form.register('nickname')}
             aria-describedby="nickname-remaining"
             aria-invalid={nicknameViolation === 'too-long' ? true : undefined}
@@ -206,7 +206,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
         {/* 只在**超過上限**時禁用；太短（含空）照 `FE-A01-S02` 按下去讓 alert 說出長度問題（兩位審查者一致）。
             `canSubmit` 已含 schema 的 too_big，但 RHF 的驗證晚一個 microtask；`violates` 是同一份 `LIMITS` 的同步判斷，
             讓「第 21 個字打下去」的那一幀鈕就已經是 disabled（`FE-O06-S06`／`S08` 同步斷言）。 */}
-        <button type="submit" className={PRIMARY} disabled={anyBusy || !nick.canSubmit || nicknameViolation === 'too-long'}>
+        <button type="submit" {...PRIMARY} disabled={anyBusy || !nick.canSubmit || nicknameViolation === 'too-long'}>
           進入世界
         </button>
       </form>
@@ -218,10 +218,10 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
         {/* `S17`：手上有金鑰的人，在一台全新的裝置上回得去 */}
         <label className={FIELD_LABEL}>
           貼上你的恢復金鑰
-          <input className={FIELD} {...recovery.form.register('key')} />
+          <input {...FIELD} {...recovery.form.register('key')} />
         </label>
         <SubmitError message={recovery.submitError} />
-        <button type="submit" className={SECONDARY} disabled={anyBusy || !recovery.canSubmit}>
+        <button type="submit" {...SECONDARY} disabled={anyBusy || !recovery.canSubmit}>
           用金鑰回來
         </button>
       </form>
@@ -232,10 +232,10 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
           {ACCOUNT_LABELS.heading}
         </h2>
         <div role="group" aria-label={ACCOUNT_LABELS.heading} className="flex gap-gutter">
-          <button type="button" className={SECONDARY} aria-pressed={accountTab === 'login'} disabled={anyBusy} onClick={() => switchAccountTab('login')}>
+          <button type="button" {...SECONDARY} aria-pressed={accountTab === 'login'} disabled={anyBusy} onClick={() => switchAccountTab('login')}>
             {ACCOUNT_LABELS.tabLogin}
           </button>
-          <button type="button" className={SECONDARY} aria-pressed={accountTab === 'register'} disabled={anyBusy} onClick={() => switchAccountTab('register')}>
+          <button type="button" {...SECONDARY} aria-pressed={accountTab === 'register'} disabled={anyBusy} onClick={() => switchAccountTab('register')}>
             {ACCOUNT_LABELS.tabRegister}
           </button>
         </div>
@@ -255,7 +255,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
               testId="account-login-form"
             />
             <SubmitError message={account.submitError} />
-            <button type="submit" className={PRIMARY} disabled={anyBusy || !account.canSubmit}>
+            <button type="submit" {...PRIMARY} disabled={anyBusy || !account.canSubmit}>
               {ACCOUNT_LABELS.submitLogin}
             </button>
           </form>
@@ -273,7 +273,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
             />
             <AccountField api={signup} name="nickname" label={ACCOUNT_LABELS.nickname} type="text" autoComplete="nickname" testId="account-register-form" />
             <SubmitError message={signup.submitError} />
-            <button type="submit" className={PRIMARY} disabled={anyBusy || !signup.canSubmit}>
+            <button type="submit" {...PRIMARY} disabled={anyBusy || !signup.canSubmit}>
               {ACCOUNT_LABELS.submitRegister}
             </button>
           </form>
@@ -308,7 +308,7 @@ function AccountField<TInput extends FieldValues, TOutput extends FieldValues>({
     <>
       <label className={FIELD_LABEL}>
         {label}
-        <input className={FIELD} type={type} autoComplete={autoComplete} {...api.form.register(name)} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} />
+        <input {...FIELD} type={type} autoComplete={autoComplete} {...api.form.register(name)} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} />
       </label>
       {error && (
         <p id={errorId} data-testid={errorId} className="text-caption text-danger">

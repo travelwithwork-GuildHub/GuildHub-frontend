@@ -88,7 +88,7 @@ function ThreadList({ inbox, returnFocusRef }: { inbox: InboxValue; returnFocusR
           {moreError !== null && <EmptyState kind="failure" error={toUiError(moreError)} retry={loadMore} />}
           {moreError === null && exhausted && <EmptyState kind="exhausted" />}
           {moreError === null && !exhausted && (
-            <button type="button" className={SECONDARY} disabled={loading || fetching} onClick={loadMore}>
+            <button type="button" {...SECONDARY} disabled={loading || fetching} onClick={loadMore}>
               {INBOX_LABELS.loadMore}
             </button>
           )}
@@ -107,7 +107,7 @@ function ThreadRow({ thread, name, me, onOpen }: { thread: Thread; name: string 
       data-testid="inbox-thread-item"
       data-with={thread.with}
       onClick={onOpen}
-      className="border-line flex w-full flex-col items-start gap-1 rounded border p-2 text-left"
+      className="border-line hover:bg-surface-sunken flex w-full flex-col items-start gap-1 rounded border p-2 text-left"
     >
       <span className="flex w-full items-baseline justify-between gap-2">
         <span data-testid="inbox-thread-name" className="font-medium">
@@ -148,7 +148,7 @@ function ThreadView({ inbox, withId, openedFrom, returnFocusRef }: { inbox: Inbo
   return (
     <article ref={root} tabIndex={-1} data-testid="inbox-thread" data-with={withId} aria-busy={loading} className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto outline-none">
       <header className="flex items-center gap-3">
-        <button type="button" className={SECONDARY} onClick={back}>
+        <button type="button" {...SECONDARY} onClick={back}>
           {INBOX_LABELS.back}
         </button>
         <h3 className="text-title" data-testid="inbox-thread-name">

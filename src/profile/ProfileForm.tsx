@@ -97,7 +97,7 @@ export function ProfileForm({ profile, onDone, closeIntentRef, askDiscard }: Pro
       <label className={FIELD_LABEL}>
         {PROFILE_FORM_LABELS.displayName}
         <input
-          className={FIELD}
+          {...FIELD}
           {...displayNameField}
           ref={(el) => {
             displayNameField.ref(el)
@@ -110,26 +110,26 @@ export function ProfileForm({ profile, onDone, closeIntentRef, askDiscard }: Pro
       {fieldError('display_name')}
       <label className={FIELD_LABEL}>
         {PROFILE_FORM_LABELS.skills}
-        <input className={FIELD} {...skillsField} onBlur={onSkillsBlur} aria-invalid={!!visibleErrors.skills} aria-describedby={errorId('skills')} />
+        <input {...FIELD} {...skillsField} onBlur={onSkillsBlur} aria-invalid={!!visibleErrors.skills} aria-describedby={errorId('skills')} />
       </label>
       {fieldError('skills')}
       <label className={FIELD_LABEL}>
         {PROFILE_FORM_LABELS.hours}
-        <input className={FIELD} type="number" inputMode="numeric" {...form.register('hours_per_week')} aria-invalid={!!visibleErrors.hours_per_week} aria-describedby={errorId('hours_per_week')} />
+        <input {...FIELD} type="number" inputMode="numeric" {...form.register('hours_per_week')} aria-invalid={!!visibleErrors.hours_per_week} aria-describedby={errorId('hours_per_week')} />
       </label>
       {fieldError('hours_per_week')}
       <label className={FIELD_LABEL}>
         {PROFILE_FORM_LABELS.bio}
-        <textarea className={FIELD} rows={4} {...form.register('bio')} aria-invalid={!!visibleErrors.bio} aria-describedby={errorId('bio')} />
+        <textarea {...FIELD} rows={4} {...form.register('bio')} aria-invalid={!!visibleErrors.bio} aria-describedby={errorId('bio')} />
       </label>
       {fieldError('bio')}
 
       <SubmitError message={submitError} />
       <div className="flex gap-gutter">
-        <button type="submit" className={PRIMARY} disabled={!canSubmit}>
+        <button type="submit" {...PRIMARY} disabled={!canSubmit}>
           {PROFILE_FORM_LABELS.save}
         </button>
-        <button type="button" className={SECONDARY} onClick={requestClose} disabled={busy}>
+        <button type="button" {...SECONDARY} onClick={requestClose} disabled={busy}>
           {PROFILE_FORM_LABELS.cancel}
         </button>
       </div>

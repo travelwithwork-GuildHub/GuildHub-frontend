@@ -1,38 +1,88 @@
 @import 'tailwindcss';
 
-/* DOM design token 的單一事實來源（規格 FE-X01：色票、字級與間距刻度）。
-   實際數值是暫定的 —— FE-W09（WorldDesignSystem，W3）會定統一風格，
-   到時由它收斂。規格只約束「有唯一來源」，不約束值是什麼。
-
-   **堆疊層級刻意不在這裡**（規格 FE-X01-S14）。它在 src/design/layers.ts，
-   理由見 design.md 的 D5：CSS 自訂屬性取不到只會回空字串，靜默退化。 */
+/* DOM design token 的單一事實來源（FE-X01 開的頭；FE-X16 補齊成七類：色票、字級、間距、圓角、陰影、動態時長、字體堆疊）。
+   `src/**` 裡只有這一份可以出現色碼、`font-family` 與任意值（`tests/dom-token-scan.test.ts` 掃）。
+   規格只約束門檻（4.5:1、3:1、≥ 16px⋯⋯），不約束值 —— 值在這裡量出來、寫在旁邊。
+   **堆疊層級刻意不在這裡**（FE-X01-S14）：在 src/design/layers.ts，理由見它的 design D5（CSS 自訂屬性取不到只會回空字串）。 */
 @theme {
+  /* 字體堆疊：系統字體，不載 webfont（FE-X16 design D1）。三個繁中家族各對一個平台 —— 少了它們 CJK 會落到瀏覽器預設的襯線字（S02）。 */
+  --font-sans: ui-sans-serif, system-ui, 'SF Pro Text', 'Segoe UI', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+
+  /* 色票。對比全部畫到 canvas 讀 pixel 算（getComputedStyle 對 oklch() 原樣回字串）。surface 量到 rgb(247 248 251)。 */
   --color-surface: oklch(0.98 0.004 260);
   --color-surface-raised: oklch(1 0 0);
+  /* hover 的底、卡片上的 chip。對 surface-raised 只有 1.14:1 —— 它**不是**用來達標的，是「有東西在這裡」的低語。 */
+  --color-surface-sunken: oklch(0.955 0.006 260);
   --color-ink: oklch(0.24 0.02 260);
+  /* 說明文字。對 surface 5.21:1、對 surface-raised 5.53:1（S04 要 4.5）。 */
   --color-ink-muted: oklch(0.52 0.02 260);
-  --color-accent: oklch(0.58 0.16 258);
+  /* 主要按鈕的填色、文字級的字色。**白字對它 5.58:1**（S04／S10；原本的 L 0.58 只有 4.35:1）；對 surface 5.25:1。 */
+  --color-accent: oklch(0.52 0.16 258);
+  --color-accent-hover: oklch(0.46 0.16 258);
+  /* 危險色文字對 surface 4.84:1、對 surface-raised 5.14:1。 */
   --color-danger: oklch(0.56 0.19 26);
   --color-line: oklch(0.9 0.008 260);
 
-  /* 控制項的邊界。**跟 --color-line 是兩個東西，不要合併**（規格 FE-X13）：
-     line 給分隔線與卡片邊界，那些不需要達到可辨識控制項的對比門檻；
-     這一個給按鈕與輸入框，SHALL 對 --color-surface 達 3:1。
-
-     實測 3.70:1（把顏色畫到 canvas 上讀 pixel 算的 —— getComputedStyle
-     對 oklch() 原樣回傳字串，直接 parse 會算出 1.00:1 而且看起來很合理）。
-     對照組：line 是 1.27:1、surface-raised 是 1.06:1，兩個都不夠。 */
+  /* 控制項的邊界。**跟 --color-line 是兩個東西，不要合併**（FE-X13）：line 給分隔線與卡片邊界；
+     這一個給按鈕與輸入框，SHALL 對 --color-surface 達 3:1 —— 實測 3.70:1（對照：line 1.27:1、surface-raised 1.06:1，都不夠）。 */
   --color-control-edge: oklch(0.6 0.02 260);
+  /* 確認視窗與世界上的視窗的遮罩：alpha 要在 [0.3, 0.6]（S06）。 */
+  --color-scrim: oklch(0 0 0 / 0.45);
+  /* 焦點環：對 surface 5.25:1、對 surface-raised 5.58:1（S10 要 3）。獨立一個 token，之後要跟 accent 分開時不用改呼叫端。 */
+  --color-focus: oklch(0.52 0.16 258);
 
+  /* 字級五級（S03）：內文 16px／1.5、說明 13px；面板標題 22px = 1.375 × 內文（要 ≥ 1.25）；頁面標題 32px = 2 ×（要 ≥ 1.5）。 */
   --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
   --text-body: 1rem;
-  --text-title: 1.5rem;
+  --text-body--line-height: 1.5;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.4;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.3;
+  --text-display: 2rem;
+  --text-display--line-height: 1.2;
 
   --spacing-gutter: 1rem;
   --spacing-section: 2.5rem;
+
+  /* 圓角兩級：控制項、面板。 */
+  --radius-control: 0.375rem;
+  --radius-panel: 0.75rem;
+
+  /* 陰影兩級：面板（蓋在 3D 世界上）、視窗（蓋在面板上）。S05 只驗存在、好不好看留給截圖。 */
+  --shadow-panel: 0 8px 24px oklch(0 0 0 / 0.14), 0 1px 3px oklch(0 0 0 / 0.1);
+  --shadow-dialog: 0 16px 40px oklch(0 0 0 / 0.22);
+
+  /* 動態時長：唯一的一個（S12 要在 [120ms, 300ms]、全部相等）。Tailwind 的 transition-* 也跟著它。 */
+  --motion: 180ms;
+  --default-transition-duration: var(--motion);
 }
 
-body {
-  background: var(--color-surface);
-  color: var(--color-ink);
+@layer base {
+  body {
+    background: var(--color-surface);
+    color: var(--color-ink);
+  }
+
+  /* 所有控制項共有的：高度下限（S11）、過渡（S12，只動顏色類，不動寬高）。
+     勾選框不吃高度下限 —— 它的框是瀏覽器畫的，拉高只會把框拉歪。 */
+  button, textarea, select, input:not([type='checkbox']):not([type='radio']) {
+    min-height: 2.5rem;
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: var(--motion);
+    transition-timing-function: ease-out;
+  }
+
+  /* 鍵盤焦點環（S10）：≥ 2px、對表面 ≥ 3:1。offset 讓它畫在按鈕外側，主要按鈕的填色不會把它吃掉。
+     只給控制項 —— 面板容器是程式化取焦（tabIndex=-1），鍵盤開面板時不該整個面板亮一圈。 */
+  :is(button, input, textarea, select, a):focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* 減少動態：過渡與動畫**全部**歸零（S12）。`!important` 是刻意的 —— 它要贏過每一個 utility。 */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+  }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { SECONDARY } from '@/design/controls'
+import { SECONDARY, withClass } from '@/design/controls'
 import { useScene } from './SceneProvider'
 
 // 「回到 Guild Hall」。規格 `FE-V01-S13`。
@@ -14,7 +14,7 @@ export function ReturnToHallButton() {
   const { scene, returnToHall } = useScene()
   if (scene.id !== 'room') return null
   return (
-    <button type="button" onClick={() => returnToHall()} className={`${SECONDARY} min-h-11`}>
+    <button type="button" onClick={() => returnToHall()} {...withClass(SECONDARY, 'min-h-11')}>
       回到 Guild Hall
     </button>
   )

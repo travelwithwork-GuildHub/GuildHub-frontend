@@ -80,7 +80,7 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
       <label className={FIELD_LABEL}>
         {CREATE_PROJECT_LABELS.title}
         <input
-          className={FIELD}
+          {...FIELD}
           {...titleField}
           ref={(el) => {
             titleField.ref(el)
@@ -93,18 +93,18 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
       {fieldError('title')}
       <label className={FIELD_LABEL}>
         {CREATE_PROJECT_LABELS.body}
-        <textarea className={FIELD} rows={5} {...form.register('body')} aria-invalid={!!visibleErrors.body} aria-describedby={describedBy('body')} />
+        <textarea {...FIELD} rows={5} {...form.register('body')} aria-invalid={!!visibleErrors.body} aria-describedby={describedBy('body')} />
       </label>
       {fieldError('body')}
       <label className={FIELD_LABEL}>
         {CREATE_PROJECT_LABELS.skills}
-        <input className={FIELD} {...form.register('skills')} aria-invalid={!!visibleErrors.skills} aria-describedby={describedBy('skills', 'project-hint-skills')} />
+        <input {...FIELD} {...form.register('skills')} aria-invalid={!!visibleErrors.skills} aria-describedby={describedBy('skills', 'project-hint-skills')} />
       </label>
       {fieldError('skills') ?? <p id="project-hint-skills" className="text-caption">{CREATE_PROJECT_LABELS.skillsHint}</p>}
       <label className={FIELD_LABEL}>
         {CREATE_PROJECT_LABELS.seats}
         <input
-          className={FIELD}
+          {...FIELD}
           type="number"
           inputMode="numeric"
           min={FORM_LIMITS.seatCount.min}
@@ -119,10 +119,10 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
 
       <SubmitError message={submitError} />
       <div className="flex gap-gutter">
-        <button type="submit" className={PRIMARY} disabled={!canSubmit}>
+        <button type="submit" {...PRIMARY} disabled={!canSubmit}>
           {CREATE_PROJECT_LABELS.submit}
         </button>
-        <button type="button" className={SECONDARY} onClick={requestClose} disabled={busy}>
+        <button type="button" {...SECONDARY} onClick={requestClose} disabled={busy}>
           {CREATE_PROJECT_LABELS.cancel}
         </button>
       </div>

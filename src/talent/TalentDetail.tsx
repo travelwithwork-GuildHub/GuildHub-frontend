@@ -46,7 +46,7 @@ export function TalentDetail({ id, preview, onBack, labels, actions }: TalentDet
   }, [])
   const profile = detail.profile
   const back = (
-    <button type="button" className={SECONDARY} onClick={onBack}>
+    <button type="button" {...SECONDARY} onClick={onBack}>
       {labels.back}
     </button>
   )

@@ -14,7 +14,7 @@ export function InboxButton() {
   const { openList } = useInbox()
   if (identity.state !== 'signed-in') return null
   return (
-    <button type="button" className={SECONDARY} data-testid="inbox-button" onClick={(e) => openList(e.currentTarget)}>
+    <button type="button" {...SECONDARY} data-testid="inbox-button" onClick={(e) => openList(e.currentTarget)}>
       {INBOX_BUTTON_LABEL}
     </button>
   )

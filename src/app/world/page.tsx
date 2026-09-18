@@ -44,7 +44,7 @@ export default function WorldPage() {
                 身分的查詢在瀏覽器端發生，因為它要帶 cookie。 */}
             {/* ⚠️ **`relative` 是換角色面板 `absolute` 的定位基準。**
                 少了它，面板會相對於整個視窗定位。 */}
-            <div className="p-gutter relative flex shrink-0 items-center gap-gutter">
+            <div data-testid="app-header" className="p-gutter relative flex shrink-0 items-center gap-gutter">
               <h1 className="text-title">GuildHub</h1>
               <IdentityBadge />
               {/* 收件匣入口（`FE-K01`）：只在已登入時出現。 */}

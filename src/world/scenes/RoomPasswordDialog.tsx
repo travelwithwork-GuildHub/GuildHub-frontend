@@ -185,16 +185,16 @@ function OpenDialog({ request, title, onClose }: { request: RoomEntryRequest; ti
             }}
             type="password"
             autoComplete="current-password"
-            className={FIELD}
+            {...FIELD}
             {...passwordField}
           />
         </label>
         <SubmitError message={submitError} />
         <div className="flex gap-gutter">
-          <button type="submit" className={PRIMARY} disabled={!canSubmit}>
+          <button type="submit" {...PRIMARY} disabled={!canSubmit}>
             {ROOM_ENTRY_LABELS.submit}
           </button>
-          <button type="button" className={SECONDARY} onClick={closeDialog}>
+          <button type="button" {...SECONDARY} onClick={closeDialog}>
             {ROOM_ENTRY_LABELS.cancel}
           </button>
         </div>

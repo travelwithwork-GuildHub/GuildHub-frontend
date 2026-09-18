@@ -37,7 +37,7 @@ export function ComposeForm({ onSend, sending }: { onSend: (body: string) => Pro
     <form className={FORM} data-testid="compose-form" onSubmit={onSubmit} noValidate>
       <label className={FIELD_LABEL}>
         {COMPOSE_LABELS.body}
-        <textarea className={FIELD} rows={3} {...form.register('body')} aria-invalid={error ? true : undefined} aria-describedby={error ? 'compose-error' : undefined} />
+        <textarea {...FIELD} rows={3} {...form.register('body')} aria-invalid={error ? true : undefined} aria-describedby={error ? 'compose-error' : undefined} />
       </label>
       {error && (
         <p id="compose-error" data-testid="compose-error" className="text-caption text-danger">
@@ -45,7 +45,7 @@ export function ComposeForm({ onSend, sending }: { onSend: (body: string) => Pro
         </p>
       )}
       <SubmitError message={submitError} />
-      <button type="submit" className={PRIMARY} disabled={sending || !canSubmit}>
+      <button type="submit" {...PRIMARY} disabled={sending || !canSubmit}>
         {COMPOSE_LABELS.send}
       </button>
     </form>

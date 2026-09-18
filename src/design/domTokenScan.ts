@@ -1,0 +1,56 @@
+// 「DOM 元件只從 token 取值」的判定。規格 `FE-X16-S01`。
+// `colorScan.ts`（`FE-W09`）只管 `src/world` 與 hex；這一份管整個 `src/**`：色碼、顏色函式、字體堆疊、Tailwind 任意值 class、層級標記（tier／text）的字面值。
+// ⚠️ **純函式，沒有檔案系統。** 讀檔與豁免上限在 `tests/dom-token-scan.test.ts`（理由同 `colorScan.ts`：負向驗證要餵假輸入）。
+// ⚠️ 樣板（連這裡的註解）全部避開字面值，**不然這個檔案會抓到自己** —— 第一版的註解就被自己抓到六條。
+
+const COLOR_FUNCTIONS = ['rgb', 'rgba', 'hsl', 'hsla', 'oklch', 'oklab', 'color-mix']
+/** 規格點名的任意值前綴。`w-[`、`max-h-[` 這種尺寸不在名單裡 —— 規格管的是「視覺 token 的七類」。 */
+const ARBITRARY = ['bg', 'text', 'border', 'ring', 'shadow', 'rounded', 'duration', 'font', 'z']
+const FONT_FAMILY = ['font', 'family'].join('-')
+const TIER_ATTR = ['data', 'tier'].join('-')
+const TEXT_ATTR = ['data', 'text'].join('-')
+
+const PATTERNS: ReadonlyArray<readonly [kind: string, re: RegExp]> = [
+  ['色碼', /#[0-9a-fA-F]{3,8}\b/g],
+  ['色碼', /\b0x[0-9a-fA-F]{3,8}\b/g],
+  ['顏色函式', new RegExp(`\\b(?:${COLOR_FUNCTIONS.join('|')})\\(`, 'g')],
+  ['字體堆疊', new RegExp(FONT_FAMILY, 'g')],
+  // 前面要是行首、空白、引號或 variant 的冒號（帶 `hover:` 前綴的也要抓）；`!`（important）與 `-`（負值）也算（審查抓到）
+  ['任意值', new RegExp(`(?:^|[\\s"'\`:])!?-?(?:${ARBITRARY.join('|')})-\\[`, 'g')],
+  // `=` 前後可以有空白（JSX 合法）；物件字面鍵（引號、`[引號]` 的 computed、展開、createElement）也算 —— 定義檔是 `controls.ts`，測試那邊只放行它的三個值
+  ['層級標記', new RegExp(`(?:\\b(?:${TIER_ATTR}|${TEXT_ATTR})\\s*=|\\[?['"](?:${TIER_ATTR}|${TEXT_ATTR})['"]\\]?\\s*:)`, 'g')],
+]
+
+/** 這一行要求豁免。**只認落在註解區間裡的**（`commentSpans`）、**冒號後面要有理由**（到那個區間結尾為止）；沒有理由算違規。 */
+export const ALLOW = ['dom', 'token', 'allow'].join('-') + ':'
+
+export interface TokenViolation { line: number; kind: string; text: string }
+export interface TokenScan { violations: TokenViolation[]; /** 帶理由、而且那一行真的有東西要豁免的行數 */ exemptions: number }
+
+/** 這一行的註解區間：`//` 到行尾、`/*` 到區塊註解結尾（沒收掉就到行尾）。逐字掃、記引號與跳脫 —— 字串裡的 `//`／`/*`、已收掉的區塊註解後面的字串都不算（審查抓到三次）。 */
+function commentSpans(line: string): Array<readonly [start: number, end: number]> {
+  const spans: Array<readonly [number, number]> = []
+  for (let i = 0, quote = ''; i < line.length; i++) {
+    const c = line[i]
+    if (quote !== '') { if (c === '\\') i += 1; else if (c === quote) quote = ''; continue }
+    if (c === '"' || c === "'" || c === '`') quote = c
+    else if (line.startsWith('//', i)) { spans.push([i, line.length]); break }
+    else if (line.startsWith('/*', i)) { const end = line.indexOf('*/', i + 2); spans.push([i, end === -1 ? line.length : end]); i = end === -1 ? line.length : end + 1 }
+  }
+  return spans
+}
+export function domTokenScan(source: string): TokenScan {
+  const violations: TokenViolation[] = []; let exemptions = 0
+  source.split('\n').forEach((line, index) => {
+    const found: TokenViolation[] = []
+    for (const [kind, re] of PATTERNS) {
+      re.lastIndex = 0
+      for (const match of line.matchAll(re)) found.push({ line: index + 1, kind, text: match[0].trim() })
+    }
+    const span = commentSpans(line).map(([s, e]) => [line.indexOf(ALLOW, s), e] as const).find(([at, e]) => at !== -1 && at < e)
+    if (span === undefined) { violations.push(...found); return }
+    if (line.slice(span[0] + ALLOW.length, span[1]).trim() === '') { violations.push({ line: index + 1, kind: '沒有理由的豁免', text: line.trim() }); return }
+    if (found.length > 0) exemptions += 1
+  })
+  return { violations, exemptions }
+}
