@@ -15,7 +15,7 @@
 //   node tests/e2e/avatar-pixels.mjs
 
 import { chromium } from 'playwright-core'
-import { burst, stableDiff } from './lib/pixels.mjs'
+import { burst, stableDiff, stableDiffWhere } from './lib/pixels.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3100'
 const ARGS = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader']
@@ -240,6 +240,40 @@ try {
         `低於下限 ${REMOTE_FLOOR}。鄰居有被畫出來（上一條 ${appeared} 個像素），` +
           `所以問題在**遠端那條路沒有把 av 傳下去** —— 看 RemotePlayers.tsx`,
       )
+  }
+
+  // ── `FE-A05-S16`（change `fe-a05-avatar-variety`）：八款兩兩之間在真的畫面上看得出差別 ──
+  //
+  // 八個 `av` 各抓一組穩定幀（即時層攔掉、沒有別人），二十八對 `stableDiff ≥ SIGNAL_FLOOR`；
+  // 「差異落在主要部位」用差異像素的包圍盒高度 ≥ 角色高度的 1/3 —— 角色高度拿「沒有鄰居 vs 有鄰居」的差異包圍盒（同一個正交相機，本地與遠端同尺）。
+  {
+    const box = (as, bs) => {
+      let top = Infinity
+      let bottom = -Infinity
+      const r = stableDiffWhere(as, bs, (_, row) => { top = Math.min(top, row); bottom = Math.max(bottom, row); return true })
+      return { total: r.total, height: r.total === 0 ? 0 : bottom - top + 1 }
+    }
+    const none = await framesWith(browser, 0, null)
+    const peer = await framesWith(browser, 0, 0)
+    const charHeight = box(none.frames, peer.frames).height
+    if (charHeight >= 30) ok(`[S16] 角色高度的尺：一個鄰居的差異包圍盒高 ${charHeight} px`)
+    else bad('[S16] 量不到角色高度', `包圍盒高 ${charHeight}`)
+    const looks = []
+    for (let av = 0; av < 8; av += 1) looks.push(await framesWith(browser, av, null))
+    let minSignal = Infinity
+    let minPair = ''
+    let failed = 0
+    for (let a = 0; a < 8; a += 1)
+      for (let b = a + 1; b < 8; b += 1) {
+        const { total, height } = box(looks[a].frames, looks[b].frames)
+        if (total < minSignal) { minSignal = total; minPair = `${a}/${b}` }
+        if (total < SIGNAL_FLOOR || height < charHeight / 3) {
+          failed += 1
+          bad(`[S16] av=${a} 與 av=${b} 分不開`, `差異 ${total} 像素（下限 ${SIGNAL_FLOOR}）、包圍盒高 ${height}（下限 ${Math.round(charHeight / 3)}）`)
+        }
+      }
+    if (failed === 0) ok(`[S16] 二十八對都分得開；最小差異 ${minSignal} 像素（av ${minPair}，下限 ${SIGNAL_FLOOR}）`)
+    console.log(`S16 最小 stableDiff：${minSignal}（${minPair}）`)
   }
 } catch (e) {
   bad('腳本中途爆掉', e.message)

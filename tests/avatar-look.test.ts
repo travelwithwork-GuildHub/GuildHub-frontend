@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { AVATAR_COUNT, avatarLook } from '@/design/avatar'
 import { colorLiterals } from '@/design/colorScan'
+import { worldColor } from '@/design/world'
 
 // 規格 `avatar-appearance`（`FE-W19`）的**映射那一半**。
 //
@@ -57,6 +58,27 @@ describe('av 換成外觀', () => {
     // `AVATAR_COUNT` 是**數量**不是最大值。`LOOKS[2]` 不存在。
     expect(avatarLook(AVATAR_COUNT)).toEqual(avatarLook(0))
     expect(avatarLook(AVATAR_COUNT)).not.toEqual(avatarLook(AVATAR_COUNT - 1))
+  })
+
+  // ── 八款（change `fe-a05-avatar-variety`）────────────────────────
+  it('[FE-A05-S14] 八款各是一款：兩兩在主要部位不同、av=7 有效、av=8 回預設', () => {
+    expect(AVATAR_COUNT).toBe(8)
+    const looks = Array.from({ length: 8 }, (_, i) => avatarLook(i))
+    for (let a = 0; a < 8; a += 1)
+      for (let b = a + 1; b < 8; b += 1) {
+        const x = looks[a]!
+        const y = looks[b]!
+        const major = x.skin !== y.skin || x.body !== y.body || x.limb !== y.limb
+        expect(major, `av=${a} 與 av=${b} 在皮膚／軀幹／四肢上完全相同（只有眼睛不算）`).toBe(true)
+      }
+    expect(avatarLook(7), 'av=7 是合法選擇，不該等於預設').not.toEqual(avatarLook(0))
+    expect(avatarLook(8), 'av=8 在上界外，回預設').toEqual(avatarLook(0))
+    for (let i = 1; i < 8; i += 1) expect(avatarLook(8), `av=8 繞回了 av=${i}`).not.toEqual(avatarLook(i))
+  })
+
+  it('[FE-A05-S15] 擴充前的兩款顏色不變（讀的是原本那幾個 token）', () => {
+    expect(avatarLook(0)).toEqual({ skin: worldColor('skin'), body: worldColor('avatarBody'), limb: worldColor('avatarLimb'), ink: worldColor('ink') })
+    expect(avatarLook(1)).toEqual({ skin: worldColor('skin'), body: worldColor('avatarBodyAlt'), limb: worldColor('avatarLimbAlt'), ink: worldColor('ink') })
   })
 
   it('[FE-W19-S08] 非整數回到預設', () => {

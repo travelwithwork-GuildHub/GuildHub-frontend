@@ -1,4 +1,4 @@
-import { worldColor } from './world'
+import { worldColor, type WorldColorName } from './world'
 
 // `av` → 角色外觀。規格 `avatar-appearance`（`FE-W19`）。
 //
@@ -12,9 +12,6 @@ import { worldColor } from './world'
 // （這一行刻意不寫真的色碼：`tests/avatar-look.test.ts` 會掃這個檔案，
 //   而在註解裡舉反例然後加一行豁免，等於在守門的地方開一個門）
 // 而且讓本地與遠端各自形成不同的映射。
-
-/** 支援幾款外觀。規格定案 `N = 2`。 */
-export const AVATAR_COUNT = 2
 
 export type AvatarLook = {
   skin: string
@@ -31,15 +28,31 @@ const DEFAULT_LOOK: AvatarLook = {
   ink: worldColor('ink'),
 }
 
+/** 第 n 款（n ≥ 3）：皮膚與眼睛共用，軀幹／四肢各一組 token。 */
+const look = (body: WorldColorName, limb: WorldColorName): AvatarLook => ({
+  skin: worldColor('skin'),
+  body: worldColor(body),
+  limb: worldColor(limb),
+  ink: worldColor('ink'),
+})
+
+// ⚠️ 前兩款的顏色不能動（`FE-A05-S15`：已經存在的人外觀不變）；新的往後加。
 const LOOKS: readonly AvatarLook[] = [
   DEFAULT_LOOK,
-  {
-    skin: worldColor('skin'),
-    body: worldColor('avatarBodyAlt'),
-    limb: worldColor('avatarLimbAlt'),
-    ink: worldColor('ink'),
-  },
+  look('avatarBodyAlt', 'avatarLimbAlt'),
+  look('avatarBody3', 'avatarLimb3'),
+  look('avatarBody4', 'avatarLimb4'),
+  look('avatarBody5', 'avatarLimb5'),
+  look('avatarBody6', 'avatarLimb6'),
+  look('avatarBody7', 'avatarLimb7'),
+  look('avatarBody8', 'avatarLimb8'),
 ]
+
+/**
+ * 支援幾款外觀。規格 `avatar-appearance`（`FE-A05-S14`）定案 `N = 8`。
+ * **就是 `LOOKS.length`** —— 選擇器、隨機指派、值域檢查都讀這一個，不各寫一份數字（`fe-a05-avatar-variety` D2）。
+ */
+export const AVATAR_COUNT = LOOKS.length
 
 /**
  * 把協定送來的 `av` 換成一組顏色。
