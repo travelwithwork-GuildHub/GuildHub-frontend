@@ -20,7 +20,7 @@ export type Tier = 'primary' | 'secondary' | 'tertiary'
 /** 一個常數：class ＋ 它帶的層級標記。用 `{...PRIMARY}` 展開到元素上。 */
 export interface Control {
   readonly className: string
-  readonly 'data-tier': Tier | 'field'
+  readonly 'data-tier': Tier
 }
 
 /** 常數加上呼叫端自己的版面 class（`shrink-0`、`flex`⋯⋯）。標記跟著常數走，不用呼叫端記得帶。 */
@@ -58,7 +58,7 @@ export const TERTIARY: Control = {
  * ⚠️⚠️ 空白的輸入框沒有任何內容，「有沒有東西在那裡」只能靠填色或邊界本身；
  * **SHALL NOT 靠 placeholder、游標或 focus ring 達標**（`FE-X13-S04`）。
  */
-export const FIELD: Control = { 'data-tier': 'field', className: 'border-control-edge bg-surface-raised rounded-control border px-3 py-2' }
+export const FIELD = { className: 'border-control-edge bg-surface-raised rounded-control border px-3 py-2' } as const
 
 /** 勾選框那一列：讓框跟字之間有距離，而且整列都點得到。 */
 export const CHECK_ROW = 'flex items-center gap-2'

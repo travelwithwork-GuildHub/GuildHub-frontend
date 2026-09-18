@@ -74,8 +74,9 @@
     transition-timing-function: ease-out;
   }
 
-  /* 鍵盤焦點環（S10）：≥ 2px、對表面 ≥ 3:1。offset 讓它畫在按鈕外側，主要按鈕的填色不會把它吃掉。 */
-  :focus-visible {
+  /* 鍵盤焦點環（S10）：≥ 2px、對表面 ≥ 3:1。offset 讓它畫在按鈕外側，主要按鈕的填色不會把它吃掉。
+     只給控制項 —— 面板容器是程式化取焦（tabIndex=-1），鍵盤開面板時不該整個面板亮一圈。 */
+  :is(button, input, textarea, select, a):focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }

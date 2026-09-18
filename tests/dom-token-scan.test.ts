@@ -55,6 +55,9 @@ describe('src/** 只從 token 取值', () => {
     ['font-family: Inter', '字體堆疊'],
     ['<button data-tier="primary" />', '層級標記'],
     ['color: #fff // dom-token-allow:', '沒有理由的豁免'],
+    // 審查抓到的繞法：JSX 允許 `=` 前後有空白；Tailwind 的 important 與負值前綴
+    ['<button data-tier = "primary" />', '層級標記'],
+    ['<div className="!bg-[red] -z-[1] hover:text-[blue]" />', '任意值'],
   ])('[FE-X16-S01] 假輸入被抓：%s', (input, kind) => {
     const scan = domTokenScan(`export const x = 1\n${input}\n`)
     expect(scan.violations.map((v) => v.kind), `沒抓到 ${kind}`).toContain(kind)

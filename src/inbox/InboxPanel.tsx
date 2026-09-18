@@ -107,7 +107,7 @@ function ThreadRow({ thread, name, me, onOpen }: { thread: Thread; name: string 
       data-testid="inbox-thread-item"
       data-with={thread.with}
       onClick={onOpen}
-      className="border-line flex w-full flex-col items-start gap-1 rounded border p-2 text-left"
+      className="border-line hover:bg-surface-sunken flex w-full flex-col items-start gap-1 rounded border p-2 text-left"
     >
       <span className="flex w-full items-baseline justify-between gap-2">
         <span data-testid="inbox-thread-name" className="font-medium">
