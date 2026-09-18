@@ -36,10 +36,10 @@
 
 ## 3b. `--reveal`：密碼只在這一次詳情裡呈現（`project-lifecycle`〈密碼只在這一次詳情裡呈現…〉；design D3／D4）
 
-- [ ] 3b.1 `tests/project-password-reveal.test.tsx`：`S05`／`S06`（`vi.mock('@/identity/clipboard')` 控制成功／失敗）、`S08`（掛載前攔 `setItem`／cookie setter／`pushState`／`replaceState`，原文與 encoded 都掃）；先 commit 紅
-- [ ] 3b.2 `OwnerActions`：`revealed` state、密碼區塊（`room-password-reveal`、一次性提示）、「複製密碼」（`ClipboardPort`）、「寄給隊員」（草稿進剪貼簿成功才 `onSendToTeam`）；`BoardPanel`：`onSendToTeam` = `closePanel()` ＋ `inbox?.openList(null)`
-- [ ] 3b.3 **突變**：密碼寫進 sessionStorage 之後刪掉 → `S08` 紅；剪貼簿失敗也開收件匣 → `S06` 紅；複製失敗也說已複製 → `S05` 紅；返回重開還呈現密碼 → `S05` 紅
-- [ ] 3b.4 `tests/e2e/form-team.mjs`：`S09`（發案 → 成軍 → 複製 → 門長出來且 rooms 請求數增加 → 深連結回詳情 → 結案 → 門消失）；對 `next start`＋internal 跑綠（本機已先跑過一次 13 ✅）
+- [x] 3b.1 `tests/project-password-reveal.test.tsx`：`S05`／`S06`（`vi.mock('@/identity/clipboard')` 控制成功／失敗；`S05` 第二次複製用「壓著不回」抓「先說已複製再改回」、`S06` 進對話驗輸入框是空的）、`S08`（掛載前攔 `setItem`／cookie setter／`pushState`／`replaceState`，原文與 encoded 都掃；密碼含空白與 `#` 讓 encoded 長得不一樣；流程含「寄給隊員」→ 關收件匣 → 重開看板與詳情）；先 commit 紅（3 條全紅）
+- [x] 3b.2 `OwnerActions`：`revealed` state、密碼區塊（`room-password-reveal`、一次性提示）、「複製密碼」（`ClipboardPort`）、「寄給隊員」（草稿進剪貼簿成功才 `onSendToTeam`）；`BoardPanel`：`onSendToTeam` = `closePanel()` ＋ `inbox?.openList(null)`
+- [x] 3b.3 **突變**：密碼寫進 sessionStorage 之後刪掉 → `S08` 紅；剪貼簿失敗也開收件匣 → `S06` 紅；複製失敗也說已複製 → `S05` 紅；返回重開還呈現密碼 → `S05`／`S08` 紅；另加：密碼 encoded 進網址 → `S08` 紅（encoded 那條抓的）、「寄給隊員」開的是對話 → `S06` 紅（6／6）
+- [x] 3b.4 `tests/e2e/form-team.mjs`：`S09`（發案 → 成軍 → 複製 → 門長出來且 rooms 請求數增加 → 深連結回詳情 → 結案 → 門消失）；對 `next start`＋internal 跑綠（13 ✅）
 
 ## 4. 收尾
 
