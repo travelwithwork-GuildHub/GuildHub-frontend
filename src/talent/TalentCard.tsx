@@ -3,7 +3,7 @@
 import type { ProfileOut } from '@/api/contract/rest'
 import { avatarLook } from '@/design/avatar'
 import { Missing } from './Missing'
-import { CAPTION, withClass } from '@/design/controls'
+import { CAPTION, HEADING, withClass } from '@/design/controls'
 
 // 人才卡。規格 `FE-B04`〈人才卡讓人一眼判斷「會不會我要的」與「有沒有時間」〉、〈卡片是控制項〉。
 //
@@ -34,7 +34,7 @@ export function TalentCard({ profile, onOpen }: { profile: ProfileOut; onOpen: (
         className="border-control-edge mt-1 inline-block size-5 shrink-0 rounded-full border"
       />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-ink font-medium">{profile.display_name}</span>
+        <span {...withClass(HEADING, 'text-ink')}>{profile.display_name}</span>
         <span data-testid="talent-hours" {...withClass(CAPTION, 'text-ink-muted')}>
           {profile.hours_per_week === null ? <Missing field="hours_per_week" /> : `每週 ${profile.hours_per_week} 小時`}
         </span>
