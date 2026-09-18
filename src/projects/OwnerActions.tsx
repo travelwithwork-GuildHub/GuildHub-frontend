@@ -11,14 +11,12 @@ import { useForm } from '@/forms/useForm'
 import { useEscapeLayer } from '@/world/interaction/escapeLayers'
 import { FormTeamSchema } from './projectRules'
 
-// owner 在案件詳情裡的動作：成軍（recruiting）、結案（active）。規格 `FE-J04`〈動作跟著狀態走，只給 owner〉、〈成軍…〉、〈密碼只在這一次詳情裡呈現…〉、〈結案要確認…〉。
+// owner 在案件詳情裡的動作：成軍（recruiting）、結案（active）。規格 `FE-J04`〈動作跟著狀態走，只給 owner〉、〈成軍…〉、〈結案要確認…〉。
+// 密碼的一次性呈現（〈密碼只在這一次詳情裡呈現…〉）在下一片 `--reveal`。
 //
 // ⚠️ **狀態機就是 `project.status`**（design D1）：這裡沒有「成軍中／已成軍」的旗標，成功後呼叫端拿回應 `replace` 詳情，畫面從新的 `status` 推導。
-// 這個元件只多兩件自己的事：表單開不開、剛設定的密碩（`revealed`）—— 密碼只活在這裡的 state（design D3）：不進 provider、不進網址、不進 storage。
 //
 // ⚠️ **三個副作用互相獨立**（design D6）：成功後呼叫端先同步 `replace(response)`，再各自啟動列表 `reload()` 與門 `refreshRooms()`；這裡不等它們、不看它們的結果。
-//
-// ⚠️ **「寄給隊員」= 草稿進剪貼簿 ＋ 開收件匣清單**（design D4）：寫入成功才交接（關看板、開清單）；失敗就不開、說出來、草稿留著可選取。隊員沒有模型，貼給誰是 owner 的動作。
 //
 // ⚠️ 送出中（成軍或結案）不可關：`onBusyChange` 讓呼叫端把返回／關閉／Escape 擋住（`S04`／`S07`）。
 
@@ -28,14 +26,6 @@ export const OWNER_ACTION_LABELS = {
   passwordHint: `${FORM_LIMITS.roomPassword.min}～${FORM_LIMITS.roomPassword.max} 個字（本站的上限）。隊員要拿它進房；後端不會再給你看一次。`,
   submit: '確定成軍',
   cancel: '取消',
-  revealTitle: '房間密碼（只會顯示這一次）',
-  revealHint: '離開這個詳情就看不到了；忘了的話沒有地方找回來。',
-  copy: '複製密碼',
-  copied: '已複製密碼。',
-  copyFailed: '這個瀏覽器不允許自動複製，請把上面那一串自己選起來複製。',
-  sendToTeam: '寄給隊員',
-  sendHint: '會把一段含密碼的訊息放進剪貼簿，然後開收件匣 —— 選一個對話貼上就寄出去了。',
-  sendFailed: '這個瀏覽器不允許自動複製，收件匣沒有打開；請把下面那一段自己選起來複製。',
   close: '結案',
   closeTitle: '要結案嗎？',
   closeBody: '結案之後門會消失、座位整批清空，而且不能再成軍。',
