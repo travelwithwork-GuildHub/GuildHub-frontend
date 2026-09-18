@@ -8,7 +8,6 @@ import { toUiError } from '@/errors/uiError'
 import { FORM_LIMITS } from '@/forms/limits'
 import { SubmitError } from '@/forms/SubmitError'
 import { useForm } from '@/forms/useForm'
-import { browserClipboard, type ClipboardPort } from '@/identity/clipboard'
 import { useEscapeLayer } from '@/world/interaction/escapeLayers'
 import { FormTeamSchema } from './projectRules'
 
@@ -43,25 +42,17 @@ export const OWNER_ACTION_LABELS = {
   closeConfirm: '確定結案',
 } as const
 
-export const passwordDraft = (project: ProjectOut, password: string) => `「${project.title}」的房間密碼：${password}`
-
 export interface OwnerActionsProps {
   project: ProjectOut
   /** 成軍／結案的回應：呼叫端用它更新詳情，並各自啟動列表與門的重取。 */
   onReplaced: (project: ProjectOut) => void
-  /** 「寄給隊員」草稿已進剪貼簿：呼叫端關看板、開收件匣清單。 */
-  onSendToTeam: () => void
   /** 送出中（成軍或結案）：呼叫端要擋住返回／關閉／Escape。 */
   onBusyChange?: (busy: boolean) => void
-  clipboard?: ClipboardPort
 }
 
-export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, clipboard = browserClipboard() }: OwnerActionsProps) {
+export function OwnerActions({ project, onReplaced, onBusyChange }: OwnerActionsProps) {
   const [composing, setComposing] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [revealed, setRevealed] = useState<string | null>(null)
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const [sendFailed, setSendFailed] = useState(false)
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
@@ -71,8 +62,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
     defaultValues: { password: '' },
     onSubmit: async ({ password }) => {
       const next = await formTeam(project.id, { password })
-      // 先記密碼（只在這裡）、關表單，再交回應給呼叫端 —— 它會同步 replace，畫面從 active 推導出「結案」與密碼區塊
-      setRevealed(password)
+      // 關表單，再交回應給呼叫端 —— 它會同步 replace，畫面從 active 推導出「結案」。密碼的一次性呈現在 `--reveal` 片
       setComposing(false)
       onReplaced(next)
     },
@@ -86,26 +76,6 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
   useEffect(() => {
     if (composing) passwordField.current?.focus()
   }, [composing])
-
-  const copy = useCallback(async () => {
-    if (revealed === null) return
-    try {
-      await clipboard.write(revealed)
-      setCopyState('copied')
-    } catch {
-      setCopyState('failed')
-    }
-  }, [clipboard, revealed])
-  const sendToTeam = useCallback(async () => {
-    if (revealed === null) return
-    try {
-      await clipboard.write(passwordDraft(project, revealed))
-      setSendFailed(false)
-      onSendToTeam()
-    } catch {
-      setSendFailed(true)
-    }
-  }, [clipboard, project, revealed, onSendToTeam])
 
   const confirmClose = useCallback(async () => {
     if (closing) return
@@ -173,44 +143,6 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
             </button>
           </div>
         </form>
-      )}
-
-      {/* 剛成軍：密碼只在這一次呈現（後端不回、前端不留）—— `status` 已是 active 才有意義 */}
-      {project.status === 'active' && revealed !== null && (
-        <section data-testid="room-password-reveal-section" aria-labelledby="room-password-reveal-heading" className="flex flex-col gap-2">
-          <h4 id="room-password-reveal-heading" className="text-caption text-ink-muted">
-            {OWNER_ACTION_LABELS.revealTitle}
-          </h4>
-          <p>
-            <code data-testid="room-password-reveal" className="select-all">
-              {revealed}
-            </code>
-          </p>
-          <p className="text-caption text-ink-muted">{OWNER_ACTION_LABELS.revealHint}</p>
-          <div className="flex flex-wrap gap-gutter">
-            <button type="button" className={SECONDARY} onClick={() => void copy()}>
-              {OWNER_ACTION_LABELS.copy}
-            </button>
-            <button type="button" className={SECONDARY} onClick={() => void sendToTeam()}>
-              {OWNER_ACTION_LABELS.sendToTeam}
-            </button>
-          </div>
-          <p className="text-caption">{OWNER_ACTION_LABELS.sendHint}</p>
-          {copyState === 'copied' && <p role="status">{OWNER_ACTION_LABELS.copied}</p>}
-          {copyState === 'failed' && (
-            <p role="alert" className="text-danger">
-              {OWNER_ACTION_LABELS.copyFailed}
-            </p>
-          )}
-          {sendFailed && (
-            <div role="alert" className="text-danger flex flex-col gap-1">
-              <p>{OWNER_ACTION_LABELS.sendFailed}</p>
-              <code data-testid="room-password-draft" className="select-all">
-                {passwordDraft(project, revealed)}
-              </code>
-            </div>
-          )}
-        </section>
       )}
 
       {project.status === 'active' && !confirming && (

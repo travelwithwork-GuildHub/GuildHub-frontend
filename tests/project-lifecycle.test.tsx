@@ -13,17 +13,11 @@ import { InteractionProvider } from '@/world/interaction/InteractionProvider'
 import { RoomsRefreshProvider } from '@/world/rooms/RoomsRefreshContext'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
-// 規格：openspec/changes/fe-j04-form-team/specs/project-lifecycle/spec.md —— S01～S08
+// 規格：openspec/changes/fe-j04-form-team/specs/project-lifecycle/spec.md —— S01～S04、S07（S05／S06／S08 密碼的一次性呈現在 project-password-reveal.test.tsx）
 //
 // 整棵真的樹：IdentityProvider（contract-server 給 /api/me）> InboxPanelProvider > InteractionProvider > ListPanelProvider > [BoardPanel, InboxPanel]，
-// 外面包 `RoomsRefreshProvider`（`refresh` 是 vi.fn：成功恰好一次、失敗零次）。剪貼簿用 `vi.mock('@/identity/clipboard')` 控制成功／失敗。
+// 外面包 `RoomsRefreshProvider`（`refresh` 是 vi.fn：成功恰好一次、失敗零次）。
 // 面板從網址開著、詳情從 `project=<id>` 開著（`FE-B09-S14`）。**不連任何團隊共用的位址。**
-
-const clipboardWrite = vi.hoisted(() => vi.fn<(text: string) => Promise<void>>())
-vi.mock('@/identity/clipboard', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('@/identity/clipboard')>()
-  return { ...mod, browserClipboard: () => ({ write: clipboardWrite }) }
-})
 
 const UUID = (n: number) => `88888888-8888-4888-8888-${String(n).padStart(12, '0')}`
 const ME = { id: UUID(900), display_name: '我', avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-10T00:00:00Z' }
@@ -58,7 +52,6 @@ beforeEach(async () => {
   process.env.NEXT_PUBLIC_GUILDHUB_REST = server.base
   process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
   refreshRooms.mockReset()
-  clipboardWrite.mockReset().mockResolvedValue(undefined)
 })
 afterEach(async () => {
   cleanup()
@@ -226,7 +219,6 @@ describe('成軍：密碼由前端守上限，成功後詳情呈現回應', () =
     await openFormAndFill('demo-1234')
     await submitForm()
     await waitFor(() => expect(status()).toBe('已成軍'))
-    expect(screen.getByTestId('room-password-reveal').textContent).toBe('demo-1234')
     expect(screen.queryByTestId('form-team-form')).toBeNull()
     await waitFor(() => expect(within(screen.getByTestId('list-panel')).getByTestId('empty-state').dataset.emptyState).toBe('load-failed'))
     expect(refreshRooms).toHaveBeenCalledTimes(1)
@@ -264,96 +256,6 @@ describe('成軍：密碼由前端守上限，成功後詳情呈現回應', () =
     expect(screen.queryByTestId('list-panel')).not.toBeNull()
     held.release()
     await waitFor(() => expect(status()).toBe('已成軍'))
-  })
-})
-
-describe('密碼只在這一次詳情裡呈現，可複製、可寄給隊員，不落地', () => {
-  async function formed(password = 'demo-1234') {
-    server.replyFor(`/api/projects/${P.id}/form-team`, 200, { ...P, status: 'active', room_template: 0 })
-    server.replyFor('/api/projects', 200, [])
-    await openFormAndFill(password)
-    await submitForm()
-    await waitFor(() => expect(status()).toBe('已成軍'))
-  }
-
-  it('[FE-J04-S05] 呈現密碼與一次性提示；複製成功說已複製；失敗不說已複製、alert、文字可選取；返回再重開沒有密碼', async () => {
-    await mountDetail(P)
-    await formed()
-    expect(screen.getByTestId('room-password-reveal').textContent).toBe('demo-1234')
-    expect(detail().textContent).toContain('只會顯示這一次')
-    click(btn('複製密碼'))
-    await waitFor(() => expect(within(detail()).getByRole('status').textContent).toContain('已複製'))
-    expect(clipboardWrite).toHaveBeenLastCalledWith('demo-1234')
-
-    clipboardWrite.mockRejectedValueOnce(new Error('不准'))
-    click(btn('複製密碼'))
-    await waitFor(() => expect(within(detail()).getByRole('alert')).toBeInTheDocument())
-    expect(within(detail()).queryByRole('status')).toBeNull()
-    expect(screen.getByTestId('room-password-reveal').textContent).toBe('demo-1234')
-
-    // 返回列表再重開：沒有密碼（後端不回、前端不留）
-    server.replyFor(`/api/projects/${P.id}`, 200, { ...P, status: 'active' })
-    server.replyFor(`/api/profiles/${ME.id}`, 200, ME)
-    fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
-    expect(screen.queryByTestId('project-detail')).toBeNull()
-    act(() => grabbed.list!.selectProject(P.id))
-    await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
-    expect(screen.queryByTestId('room-password-reveal')).toBeNull()
-    expect(queryBtn('複製密碼')).toBeNull()
-    expect(detail().textContent).not.toContain('demo-1234')
-  })
-
-  it('[FE-J04-S06] 寄給隊員：草稿進剪貼簿、看板關、收件匣清單開著、輸入框是空的；剪貼簿失敗就不開', async () => {
-    await mountDetail(P)
-    await formed()
-    // 先驗失敗的那一條（看板還開著）
-    clipboardWrite.mockRejectedValueOnce(new Error('不准'))
-    click(btn('寄給隊員'))
-    await waitFor(() => expect(within(detail()).getByTestId('room-password-draft')).toBeInTheDocument())
-    expect(screen.queryByTestId('inbox-panel'), '剪貼簿失敗還開了收件匣').toBeNull()
-    expect(screen.queryByTestId('list-panel')).not.toBeNull()
-    expect(within(detail()).getAllByRole('alert').length).toBeGreaterThanOrEqual(1)
-
-    server.replyFor('/api/messages', 200, [])
-    click(btn('寄給隊員'))
-    await waitFor(() => expect(screen.queryByTestId('list-panel')).toBeNull())
-    expect(clipboardWrite).toHaveBeenLastCalledWith(`「${P.title}」的房間密碼：demo-1234`)
-    const inbox = screen.getByTestId('inbox-panel')
-    expect(screen.queryByTestId('inbox-thread'), '開的是對話不是清單').toBeNull()
-    expect(inbox.contains(document.activeElement), '焦點不在收件匣').toBe(true)
-  })
-
-  it('[FE-J04-S08] 密碼不落地：攔截整段流程的每一次寫入（原文與 encoded）', async () => {
-    const PW = 'sekret-9x7'
-    const writes: string[] = []
-    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
-      writes.push(`${k}=${v}`)
-    })
-    const push = vi.spyOn(window.history, 'pushState').mockImplementation((_s, _t, url) => writes.push(`push:${String(url)}`))
-    const replace = vi.spyOn(window.history, 'replaceState')
-    const cookieDesc = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie')
-    Object.defineProperty(document, 'cookie', { configurable: true, get: () => '', set: (v: string) => writes.push(`cookie:${v}`) })
-    try {
-      await mountDetail(P)
-      await formed(PW)
-      click(btn('複製密碼'))
-      server.replyFor('/api/messages', 200, [])
-      click(btn('寄給隊員'))
-      await waitFor(() => expect(screen.queryByTestId('list-panel')).toBeNull())
-      const all = [...writes, ...replace.mock.calls.map((c) => `replace:${String(c[2])}`)]
-      for (const w of all) {
-        expect(w, '密碼落地了').not.toContain(PW)
-        expect(w).not.toContain(encodeURIComponent(PW))
-      }
-      expect(window.location.href).not.toContain(PW)
-      expect(document.cookie).not.toContain(PW)
-    } finally {
-      setItem.mockRestore()
-      push.mockRestore()
-      replace.mockRestore()
-      if (cookieDesc) Object.defineProperty(Document.prototype, 'cookie', cookieDesc)
-      Reflect.deleteProperty(document, 'cookie')
-    }
   })
 })
 

@@ -11,7 +11,6 @@ import { CreateProjectForm } from '@/projects/CreateProjectForm'
 import { ProjectCard } from '@/projects/ProjectCard'
 import { OwnerActions } from '@/projects/OwnerActions'
 import { ProjectDetail } from '@/projects/ProjectDetail'
-import { useInboxIfProvided } from '@/inbox/InboxPanelProvider'
 import { useRoomsRefresh } from '@/world/rooms/RoomsRefreshContext'
 import { TalentCard } from '@/talent/TalentCard'
 import { SendMessageButton } from '@/inbox/SendMessageButton'
@@ -116,7 +115,6 @@ function ProjectBoard() {
   const signedIn = identity.state === 'signed-in'
   // 成軍／結案（`FE-J04`）的交接：門的立即重取（沒有 provider 是 no-op）、「寄給隊員」開收件匣清單（沒有收件匣就只關看板）。
   const refreshRooms = useRoomsRefresh()
-  const inbox = useInboxIfProvided()
   // 成軍／結案送出中：返回、Escape、面板關閉都擋住（`FE-J04-S04`／`S07`）—— 跟表單送出中同一條規則
   const [actionBusy, setActionBusy] = useState(false)
   const [composing, setComposing] = useState(false)
@@ -227,10 +225,6 @@ function ProjectBoard() {
                       } catch {
                         // 門重取失敗只影響走廊（既有 stale 規則）；不回滾詳情、不擋列表
                       }
-                    }}
-                    onSendToTeam={() => {
-                      closePanel()
-                      inbox?.openList(null)
                     }}
                   />
                 )}
