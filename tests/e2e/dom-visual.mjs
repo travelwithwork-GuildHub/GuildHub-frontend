@@ -132,7 +132,7 @@ const install = (page) =>
         const composite = (el) => {
           // 會改變最終像素、量尺不模擬的效果要看完整條祖先鏈（不透明的面板外面再包一層 opacity: .1，面板的底也跟著透；
           // 五、六輪審查：`filter: opacity(0)`、mask、mix-blend-mode、clip-path、`-webkit-text-fill-color` 一樣能讓 `color` 照舊、畫面上卻沒有字）；
-          // 背景只收到第一個不透明層。這張表守的是「字色跟量到的不一樣」那一類；把字移出盒子（transform、text-indent）的是 visible() 的範圍，不在這裡
+          // 背景只收到第一個不透明層。這張表守的是「字色跟量到的不一樣」那一類；把字移出盒子（transform、text-indent）的由 shown() 量字的幾何
           for (let n = el; n; n = n.parentElement) {
             const cs = getComputedStyle(n)
             const effect = [
@@ -159,13 +159,28 @@ const install = (page) =>
         // 後代的層級跟著最近的 p／[data-text] 祖先；文字空白的 alert 不算「量到 alert」。
         const hasText = (el) => [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim() !== '')
         const levelOf = (el) => { const o = el.closest('[data-text], p'); return o === null ? null : (o.getAttribute('data-text') ?? (o.tagName === 'P' ? 'body' : null)) }
+        // 七輪審查：字真的畫在畫面上嗎 —— 量**文字節點**的矩形（Range.getClientRects），不是盒子；`text-indent: -9999px`、`translateX(-9999px)` 盒子都還在。
+        // 先 scrollIntoView（面板裡捲到下面的內文不算藏起來），量完把每一層的捲動位置還回去。沒有自己的字的容器回 null（不驗）。
+        const shown = (el) => {
+          const nodes = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim() !== '')
+          if (nodes.length === 0) return null
+          const saved = []
+          for (let n = el.parentElement; n; n = n.parentElement) saved.push([n, n.scrollTop, n.scrollLeft])
+          const [sx, sy] = [scrollX, scrollY]
+          el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+          const range = document.createRange()
+          const onScreen = nodes.some((t) => { range.selectNodeContents(t); return [...range.getClientRects()].some((b) => b.width > 0 && b.height > 0 && b.right > 0 && b.bottom > 0 && b.left < innerWidth && b.top < innerHeight) })
+          for (const [n, top, left] of saved) { n.scrollTop = top; n.scrollLeft = left }
+          scrollTo(sx, sy)
+          return onScreen
+        }
         const owners = [...document.querySelector(root).querySelectorAll('[data-text], p, [role="alert"]')].filter(visible)
         const els = new Set(owners)
         for (const o of owners) for (const d of o.querySelectorAll('*')) if (visible(d) && hasText(d)) els.add(d)
         return [...els].map((el) => {
           const cs = getComputedStyle(el)
           return {
-            level: levelOf(el), alert: el.closest('[role="alert"]') !== null && hasText(el), label: label(el),
+            level: levelOf(el), alert: el.closest('[role="alert"]') !== null && hasText(el), label: label(el), shown: shown(el),
             size: parseFloat(cs.fontSize), leading: parseFloat(cs.lineHeight) / parseFloat(cs.fontSize), raw: cs.color, text: rgba(cs.color), bg: composite(el),
           }
         })
@@ -250,6 +265,7 @@ async function inspect(page, surface, reduce) {
       if (t.level === 'body') t.size >= 16 && t.leading >= 1.5 ? ok(`[S03] ${who}內文 ${t.size}px／${t.leading.toFixed(2)}`) : bad(`[S03] ${who}內文 ${t.size}px／行高 ${t.leading}`, '下限 16px、1.5')
       if (t.level === 'caption') t.size >= 13 ? ok(`[S03] ${who}說明 ${t.size}px`) : bad(`[S03] ${who}說明只有 ${t.size}px`, '下限 13px')
       // 量不到就紅 —— 對每一個被算進 S03 的元素都是（審查：透明的 title 不在 S04 的對比清單裡，也不能綠著過 S03）
+      if (t.shown === false) { bad(`[S03] ${who}的字不在畫面上`, '文字節點的矩形沒有跟視窗相交（移出盒子或視窗）'); continue }
       if (t.text === null || !Array.isArray(t.bg)) { bad(`[S04] ${who}的顏色或背景量不到`, `color=${JSON.stringify(t.raw)}、合成背景=${JSON.stringify(t.bg)}`); continue }
       if (t.level !== 'body' && t.level !== 'caption' && !t.alert) continue
       if (t.alert) alertsMeasured += 1
