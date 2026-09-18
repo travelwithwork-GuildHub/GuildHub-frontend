@@ -36,32 +36,31 @@
 不透明底＋`3:1` 的邊界＋一層陰影，對比可以量一次、跟世界無關。**代價**：面板蓋住的那一塊世界完全看不到 ——
 但那本來就是「阻斷式」的意思（世界鎖著）。
 
-### D3｜一次一個阻斷式面板：協調者持有「掛載中的面板」，讓位是兩個同步函式，拒絕有回饋
+### D3｜一次一個阻斷式面板：協調者**持有** `active`，各 provider 的「開著」從它推導；讓位是兩個同步函式，拒絕有回饋
 
-三個 provider 互不知道對方，所以「開第二個關第一個」要有一個共同的持有者。第一版寫的是「呼叫既有的 `onCloseRequest()`、看它接不接受」——
-兩個審查者同時指出那條路走不通：`onCloseRequest` 是 `() => void`，接受／拒絕沒有回傳；「有未儲存的修改要先問」是非同步的人類決策；
-React 的 state 更新也不同步 —— `claim()` 不可能同步知道結果。所以改成：
+三個 provider 互不知道對方，所以「開第二個關第一個」要有一個共同的持有者。走過三版：
+1. 「呼叫既有的 `onCloseRequest()` 看它接不接受」—— `() => void` 同步拿不到答案（兩個審查者第一輪同時抓到）。
+2. 「殼登記 `canYield`／`yield`、provider 開面板前 `requestOpen()`、成功就保留」—— 殼在 effect 才登記，同一次事件兩個請求都看到空表（codex 第二輪）；
+   加了保留又要處理保留懸空（codex 第三輪）；加了 task 結束自動失效又出現「舊請求延遲 commit 跨過失效、掛出第二個面板」（codex 第四輪）。
+   每補一個洞都是在替「provider 各自持有 open」這個根本問題打補丁。
+3. **協調者持有 `active: id | null`（選這個；Gemini 第一輪與 codex 第三輪都建議過）**：那是唯一的來源，`ListPanelProvider`／`InboxPanelProvider`／
+   `ProfilePanelProvider` 的「開著」＝`useActivePanel() === 自己的 id`，不再各自 `useState(open)`。「≤ 1」變成結構上的事 —— 一個值只能指向一個 id，
+   延遲 commit 的舊請求掛不出東西（掛不掛由 `active` 決定），沒有保留、沒有計時器。
 
-- **持有者由殼登記**：`PanelShell` 掛載時向協調者登記 `{ id, canYield, yield }`，卸載時釋放（effect cleanup；同 id 重複登記冪等，Strict Mode 兩次掛載安全）。
-  「掛載中的阻斷式面板 ≤ 1」因此是協調者**看得到**的事實（登記表的大小），不是各 provider 的 `open` 旗標各自宣稱。
-- **`canYield(): boolean` 同步**：每個面板今天就同步知道自己能不能立刻關 —— 送出中（`busy` ref）、名片有未儲存的修改（dirty）→ `false`。
-  讓位**不替使用者回答**「要放棄修改嗎」：那是非同步的問題，讓位直接算拒絕（`S14` 第三段）。
-- **`yield(): void` 同步**：確定關閉，走 provider 既有的關閉路徑（看板的網址退照舊），但**不把焦點還給開啟者**（`S13` 的 `focusin` 序列裡不得有開啟者）——
-  今天 `ProfilePanelProvider` 在卸載後的 effect 裡還焦點，讓位時要跳過那一步（用一個「這次關閉是讓位」的旗標）。
-- **請求同步＋保留**：provider 的 `openX()` 先 `coordinator.requestOpen(id)`。codex 第二輪抓到：只靠登記表（殼在 effect 裡登記）判斷「沒有持有者」，
-  同一次事件裡 A、B 兩個請求都會看到空表、都拿到 `true`、commit 後兩個都掛。所以協調者多一個 **`reserved: id | null`**（ref，同步）：請求成功就保留給那個 id，
-  殼登記時解除、`release(id)` 解除、**最晚在目前 task 結束時自動失效**（`setTimeout(…, 0)` 清掉；React 對離散事件的更新在事件結束時同步 commit，所以殼來得及登記）；
-  保留期間別的 id 一律拒絕（`S21`）。codex 第三輪抓到「provider 一定會 setOpen(true) 所以不會懸空」不是 React 保證的事（commit 前卸載、條件變了都掛不成）——
-  自動失效讓最壞情況只是「同一個 task 裡別人被拒」，不會永久鎖死（`S22`）。
-  沒有持有者 → 保留、`true`；`canYield()` → `yield()`、保留、`true`；否則 `false` 並發一則 `role="status"` 的回饋（`toast` 層；文案不是契約）。
-  呼叫端拿到 `false` 就不動自己的 state —— 不會先開再關、不閃。
-- **網址**：看板讓位走既有關閉路徑 → `PanelUrlSync` 照 `FE-B09` 退網址。下一頁的 `restore`（讓位是 `go(-1)`，帶 `panel` 的那一筆在**前進**紀錄 —— codex 第二輪抓到第一版寫成上一頁）也經過 `requestOpen()`；
-  被拒 → `replaceState` 把目前這一筆改回實際狀態（`FE-B09-S05` canonical 的同一招）、不 `pushState`、不動畫面（`S17`）。收件匣與名片不進網址（那是 `FE-B09` 的規格變更，不做）。
+- **同步決定**：`requestOpen(id)` 用一個同步鏡像（ref）判斷，再 `setActive`：`active` 空或指向還沒登記的 id → 取代；已登記且 `canYield()` → `onYield()` 後取代；
+  否則拒絕（`active` 不變、`role="status"` 回饋在 `toast` 層；文案不是契約）。同一次事件裡後者取代前者（前者還沒掛成），commit 後只掛最後一個（`S21`／`S22`）。
+- **殼登記** `{ id, canYield, onYield }`（掛載時；卸載釋放；冪等）。`canYield` 是每個面板今天就同步知道的事：送出中（`busy` ref）、名片 dirty → `false`。
+  讓位**不替使用者回答**「要放棄修改嗎」：直接算拒絕（`S14` 第三段）。
+- **`onYield` 的收尾**：被讓位的面板不還焦點給開啟者（`ProfilePanelProvider` 卸載後的還焦點 effect 要看一個「這次是讓位」的旗標 —— Gemini 第二輪提醒）；
+  看板的網址退照 `FE-B09`（`PanelUrlSync` 看的是狀態，狀態從 `active` 推導，所以不用改它的寫法）。
+- **provider 保留自己的子狀態**（看板的 kind／page／selected、收件匣的 view／thread、名片的草稿）—— 只有「開不開」搬到協調者。關閉＝`requestClose(id)`（`active = null`）。
+- **網址**：下一頁的 `restore`（讓位是 `go(-1)`，帶 `panel` 的那一筆在**前進**紀錄 —— codex 第二輪抓到第一版寫成上一頁）也經過 `requestOpen()`；
+  被拒 → `replaceState` 把目前這一筆改回實際狀態（`FE-B09-S05` canonical 的同一招）、不 `pushState`、不動畫面（`S17`）。
+- 換角色彈出層：成功開面板時關；被拒時照 `FE-X06-S16` 焦點離開就關（第一版寫「被拒不動」跟那條矛盾，codex 抓到）。
 
-換角色彈出層：成功開面板時關；被拒時照 `FE-X06-S16` 焦點離開就關（第一版寫「被拒不動」跟那條矛盾，codex 抓到）。
-非阻斷的表面（訪客提示、聊天框、彈出層）**只讀**協調者（`useBlockingPanelOpen(): boolean`，從登記表推導），不登記。
-為什麼不做成「路由決定開哪個」：見 ADR 0011 選項 B。**代價**：多一個 context、殼多兩個 prop（`canYield`、`onYield`）、provider 開面板多一次同步請求。
-**Supersedes**: 無。ADR：`docs/adr/0011-one-blocking-panel-at-a-time.md`。
+非阻斷的表面（訪客提示、聊天框、彈出層）**只讀** `useBlockingPanelOpen()`（`active !== null`），不登記。
+為什麼不做成「路由決定開哪個」：見 ADR 0011 選項 B。**代價**：三個 provider 的 `open` 各改成從協調者推導（每個約 10 行）、殼多兩個 prop、
+provider 的開／關 API 名稱不變但實作換成呼叫協調者。**Supersedes**: 無。ADR：`docs/adr/0011-one-blocking-panel-at-a-time.md`。
 
 ### D4｜三級控制項仍然是字串常數；「至多一個主要動作」以操作區為單位、由判準守
 
@@ -99,7 +98,7 @@ React 的 state 更新也不同步 —— `claim()` 不可能同步知道結果�
   新 `tests/e2e/dom-visual.mjs`，沿用 `control-contrast.mjs` 的量法（畫到 canvas 讀 pixel）。跑法同 `FE-J04`：`next start`＋`internal`。
 - 結構（標題列順序、返回／關閉位置、一次一個面板、提示讓位、聊天收起、主要動作計數）：jsdom 判準，`tests/dom-visual-*.test.tsx`。
   `S09` 的「至多一個」用 `data-tier="primary"` 這種**由常數帶出來**的屬性數（常數是唯一來源，屬性跟著它走；判準不比 class 字串）。
-- 突變（tasks 第 6 節）：拿掉 token → `S01`／`S03`／`S05` 紅；協調者不 `yield()` 就開 → `S13` 紅；`canYield` 恆真 → `S14` 紅；讓位時還焦點給開啟者 → `S13` 的 `focusin` 序列紅；上一頁被拒不 `replaceState` → `S17` 紅；
+- 突變（tasks 第 6 節）：拿掉 token → `S01`／`S03`／`S05` 紅；協調者不 `onYield()` 就取代 → `S13` 紅；`canYield` 恆真 → `S14` 紅；讓位時還焦點給開啟者 → `S13` 的 `focusin` 序列紅；下一頁被拒不 `replaceState` → `S17` 紅；
   聊天框不讀協調者 → `S16` 紅；把 `reduce` 的 media query 拿掉 → `S12` 紅；`PanelShell` 的 `<header>` 留在捲動容器裡 → `S08` 紅（Gemini 抓到 tasks 第一版把 overflow 加在含標題列的容器上）。
 
 ### D8｜效能預算：零新靜態請求、JS `≤ +4 KB`、CSS `≤ +6 KB`（gzip）、基線固定

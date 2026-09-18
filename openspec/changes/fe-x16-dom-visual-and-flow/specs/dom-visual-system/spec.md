@@ -176,18 +176,21 @@ DOM 那一半的介面（登入頁、首次進入、標題列、看板與詳情�
 
 ### Requirement: 同一時間只有一個阻斷式面板；讓位有協定；非阻斷的提示讓位
 
-**持有者**：掛載中的阻斷式面板，由殼向協調者登記；登記帶兩個**同步**函式 `canYield(): boolean`（送出中或有未儲存的修改 → `false`）
-與 `yield(): void`（確定關閉，**不**把焦點還給開啟者）。卸載即釋放；同 id 重複登記冪等。
-**請求**：要開一個阻斷式面板之前 SHALL 先向協調者請求 `requestOpen(id)`，協調者**同步、原子地**處理：已有別的 id 的**保留**（下面）→ 拒絕；
-沒有持有者 → 保留給 `id` 並回 `true`；持有者 `canYield()` 為 `true` → 先 `yield()`、保留給 `id`、回 `true`；為 `false` → **拒絕**：不開、持有者留著、
-觸發它的控制保持焦點、畫面 SHALL 有可見的回饋（`role="status"`，內容不是契約）。**保留**只為了同一次事件：它在 `id` 的殼登記時解除、在請求者呼叫 `release(id)` 時解除、而且**最晚在目前這個 task 結束時自動失效**
-（下一個 macrotask 起不再擋任何人）—— 殼沒掛成（請求者在 commit 前卸載、條件變了）也不會把所有面板永久鎖死。同一次事件裡的第二個請求因為保留而被拒（不看 React 何時 commit）。任一時刻掛載中的阻斷式面板 SHALL `≤ 1`。
+**協調者持有「哪一個阻斷式面板是開的」**（`active: id | null`）—— 那是唯一的來源，各 provider 的「開著」SHALL 從它推導，不各自持有。
+所以「任一時刻掛載中的阻斷式面板 `≤ 1`」是結構上的事：一個值只能指向一個 id。
+**持有者**：`active` 指向的面板；它掛載中的殼向協調者登記兩個**同步**函式 `canYield(): boolean`（送出中或有未儲存的修改 → `false`）
+與 `onYield(): void`（被讓位時的收尾：走既有關閉路徑的副作用，**不**把焦點還給開啟者）。卸載即釋放；同 id 重複登記冪等。
+**請求**：要開一個阻斷式面板 SHALL 呼叫 `requestOpen(id)`，協調者**同步**決定（用同步的鏡像判斷，不等 React commit）：
+`active` 是 `null`、或指向一個還沒登記的 id（殼還沒掛成）→ `active = id`、回 `true`；`active` 已登記且 `canYield()` → 先 `onYield()`、`active = id`、回 `true`；
+`canYield()` 為 `false` → **拒絕**：`active` 不變、觸發它的控制保持焦點、畫面 SHALL 有可見的回饋（`role="status"`，內容不是契約）。
+同一次事件裡的多個請求依呼叫順序處理，後者對前者做同一套判斷（前者還沒掛成 → 被取代），commit 後掛載的只有最後一個成功的。
+沒有保留、沒有計時器：一個延遲到很晚才 commit 的舊請求不可能掛出第二個面板，因為掛不掛載由 `active` 決定，不由請求者自己的 state 決定。
 **讓位後的焦點**：從觸發到穩定，記錄每一次 `focusin` 的目標，被讓位面板的開啟者（世界焦點錨、或開它的按鈕）SHALL NOT 出現在序列裡，
 `body` SHALL NOT 出現在序列裡；最後 `document.activeElement` 在新面板內（新面板自己的取焦規則）。
 **網址**：看板在網址裡（`deep-link`）。看板讓位 SHALL 走它既有的關閉路徑（網址跟著退：`history.go(-1)`，帶 `panel` 的那一筆留在**前進**紀錄裡）；
 上一頁／下一頁要求重開看板 SHALL 也經過協調者，被拒絕時網址 SHALL 以 `replaceState` 把**目前這一筆**改成實際狀態（跟 `deep-link` 的 canonical 同一種處理），
 SHALL NOT `pushState`，畫面 SHALL NOT 換。
-**非阻斷的表面**：面板開著時訪客提示 SHALL 不顯示，面板關了、提示還沒被關掉或走完就回來，讓位 SHALL NOT 重設它的「關掉了」與「走完了」；
+**非阻斷的表面**（讀 `active` 推導的 `useBlockingPanelOpen()`）：面板開著時訪客提示 SHALL 不顯示，面板關了、提示還沒被關掉或走完就回來，讓位 SHALL NOT 重設它的「關掉了」與「走完了」；
 場景聊天框 SHALL 收成一行（區域仍在、只剩區域名稱與「面板開著期間新到的訊息數」，沒有列表與輸入框），面板關了展開回來，
 記憶體與捲動位置照舊：收起前在底部 → 展開後在底部；收起前往上讀 → 展開後位置不動、有新的就顯示「回到最新」（`scene-chat-ui` 的兩條照舊）；
 成功開啟任一阻斷式面板時換角色彈出層 SHALL 關（`keyboard-focus` 的「按 E 開面板」擴到所有入口）；請求被拒時照 `keyboard-focus` 既有的「焦點離開就關」——
@@ -250,19 +253,19 @@ SHALL NOT `pushState`，畫面 SHALL NOT 換。
 - **AND WHEN** 看板詳情送出中，換角色彈出層開著（有未套用的草稿），按標題列的收件匣
 - **THEN** 收件匣 SHALL NOT 開、彈出層 SHALL 關（焦點離開了它）、草稿 SHALL 丟（`keyboard-focus` 既有語意）、焦點在收件匣按鈕上
 
-#### Scenario: [FE-X16-S21] 同一次事件裡兩個請求：第一個贏、第二個被拒
+#### Scenario: [FE-X16-S21] 同一次事件裡兩個請求：只掛最後一個成功的
 
-- **WHEN** 沒有面板開著，在同一次事件裡依序請求開看板、再請求開收件匣（兩個 provider 都還沒 commit）
-- **THEN** 第一個 SHALL 得到 `true`、第二個 SHALL 得到 `false` 並有 `role="status"` 回饋；commit 後掛載中的阻斷式面板 SHALL 恰好一個且是看板
-- **AND WHEN** 看板登記之後再請求開收件匣
-- **THEN** 看板讓位、收件匣開（保留已在登記時解除）
+- **WHEN** 沒有面板開著，在同一個 handler 裡依序請求開看板、再請求開收件匣（commit 前斷言兩個同步回傳值）
+- **THEN** 兩個都 SHALL 得到 `true`（看板還沒掛成，被取代）；commit 後掛載中的阻斷式面板 SHALL 恰好一個且是收件匣，看板 SHALL 從未掛載
+- **AND WHEN** 收件匣登記之後、對話送出中，再請求開看板
+- **THEN** SHALL 得到 `false`、收件匣留著
 
-#### Scenario: [FE-X16-S22] 請求成功但殼沒掛成：保留不得永久鎖死
+#### Scenario: [FE-X16-S22] 延遲的舊請求掛不出第二個面板；殼沒掛成不鎖死
 
-- **WHEN** 沒有面板開著，請求開看板成功，但看板的 provider 在 commit 前卸載（殼從未登記，也沒人呼叫 `release`）
-- **THEN** 在下一個 task 裡請求開收件匣 SHALL 成功、收件匣 SHALL 掛載
-- **AND WHEN** 同樣的情況但請求者在同一次事件裡呼叫了 `release(看板)`
-- **THEN** 同一次事件裡緊接著請求開收件匣 SHALL 成功
+- **WHEN** 請求開看板成功，看板的殼還沒登記（例如它的內容在 Suspense 裡延後 commit），此時請求開收件匣
+- **THEN** SHALL 得到 `true`；之後看板那次延後的 commit 完成時，看板 SHALL NOT 掛載（它的 provider 從 `active` 推導出「不是我」）、掛載中的阻斷式面板恰好是收件匣
+- **AND WHEN** 請求開看板成功但看板的 provider 在 commit 前整個卸載（`active` 指向沒人掛的 id）
+- **THEN** 下一次請求開收件匣 SHALL 成功、收件匣 SHALL 掛載
 
 ### Requirement: 標題列是固定的導覽
 
