@@ -13,6 +13,7 @@ import { OwnerActions } from '@/projects/OwnerActions'
 import { ProjectDetail } from '@/projects/ProjectDetail'
 import { useRoomsRefresh } from '@/world/rooms/RoomsRefreshContext'
 import { TalentCard } from '@/talent/TalentCard'
+import { useInboxIfProvided } from '@/inbox/InboxPanelProvider'
 import { SendMessageButton } from '@/inbox/SendMessageButton'
 import { TalentDetail } from '@/talent/TalentDetail'
 import { ListPanel } from './ListPanel'
@@ -115,6 +116,7 @@ function ProjectBoard() {
   const signedIn = identity.state === 'signed-in'
   // 成軍／結案（`FE-J04`）的交接：門的立即重取（沒有 provider 是 no-op）、「寄給隊員」開收件匣清單（沒有收件匣就只關看板）。
   const refreshRooms = useRoomsRefresh()
+  const inbox = useInboxIfProvided()
   // 成軍／結案送出中：返回、Escape、面板關閉都擋住（`FE-J04-S04`／`S07`）—— 跟表單送出中同一條規則。
   // 用 ref：`OwnerActions` 在送出的同一個 tick 同步通知，擋的那一刻要讀得到最新值（state 會晚一格、closure 會是舊的）。
   const actionBusy = useRef(false)
@@ -228,6 +230,11 @@ function ProjectBoard() {
                       } catch {
                         // 門重取失敗只影響走廊（既有 stale 規則）；不回滾詳情、不擋列表
                       }
+                    }}
+                    // 草稿已在剪貼簿：關看板、開收件匣**清單**（不進對話、不帶草稿 —— design D4）。跟 `SendMessageButton` 同一種交接，只是停在清單
+                    onSendToTeam={() => {
+                      closePanel()
+                      inbox?.openList(null)
                     }}
                   />
                 )}
