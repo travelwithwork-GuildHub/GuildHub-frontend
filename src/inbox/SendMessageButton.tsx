@@ -11,7 +11,7 @@ import { useInboxIfProvided } from './InboxPanelProvider'
 
 export const SEND_MESSAGE_LABEL = '寄信給他'
 
-export function SendMessageButton({ to, onBeforeOpen }: { to: string; onBeforeOpen: () => void }) {
+export function SendMessageButton({ to, onBeforeOpen, label = SEND_MESSAGE_LABEL }: { to: string; onBeforeOpen: () => void; /** 案件詳情上叫「私訊發案者」（`FE-B03`）；同一顆按鈕、同一條路。 */ label?: string }) {
   const identity = useIdentity()
   const inbox = useInboxIfProvided()
   if (inbox === null || identity.state !== 'signed-in' || identity.profile.id === to) return null
@@ -26,7 +26,7 @@ export function SendMessageButton({ to, onBeforeOpen }: { to: string; onBeforeOp
         inbox.openThreadFromTalent(to)
       }}
     >
-      {SEND_MESSAGE_LABEL}
+      {label}
     </button>
   )
 }

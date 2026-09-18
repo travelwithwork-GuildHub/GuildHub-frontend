@@ -61,9 +61,13 @@ afterEach(async () => {
   window.history.replaceState(null, '', '/world')
 })
 
-/** 登入成 `ME`、案件面板從網址開著（第 `page` 頁）。 */
+/**
+ * 登入成 `ME`、案件面板從網址開著（第 `page` 頁）。
+ * ⚠️ `InboxPanelProvider` 以 `me` 為 key：`/api/me` 回來那一刻整棵看板會重掛、列表重取一次 —— 所以排兩份列表回應，並等到「已登入」之後才算掛好。
+ */
 async function mount(items: ProjectOut[], page = 0) {
   server.replyFor('/api/me', 200, ME)
+  server.replyFor(LIST, 200, items)
   server.replyFor(LIST, 200, items)
   window.history.replaceState(null, '', `/world?panel=projects${page > 0 ? `&page=${page}` : ''}`)
   render(
@@ -81,6 +85,8 @@ async function mount(items: ProjectOut[], page = 0) {
       </InboxPanelProvider>
     </IdentityProvider>,
   )
+  await waitFor(() => expect(server.calls.filter((c) => c.pathname === '/api/me')).toHaveLength(1))
+  await waitFor(() => expect(listCalls()).toHaveLength(2))
   await waitFor(() => expect(cards()).toHaveLength(items.length))
 }
 const cards = () => screen.queryAllByTestId('project-card') as HTMLButtonElement[]
@@ -106,7 +112,7 @@ describe('返回列表時，頁碼與捲動位置都還在', () => {
   it('[FE-B03-S13] 0-based 第 1 頁、非零 scrollTop 進去再返回：頁碼、scrollTop 都在、列表沒重打；詳情開著時列表 inert 且不是 display:none；焦點回那張卡', async () => {
     // 網址說第 1 頁：第一個請求就是 page=1，回 3 筆（0-based 第 1 頁 = 畫面上的第二頁）
     await mount(many(3, PAGE_SIZE), 1)
-    expect(listCalls()).toEqual([`${LIST}?page=1`])
+    expect(listCalls()).toEqual([`${LIST}?page=1`, `${LIST}?page=1`])
     await waitFor(() => expect(grabbed.list?.page).toBe(1))
     const listEl = screen.getByTestId('list-panel-list')
     listEl.scrollTop = 137
