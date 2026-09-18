@@ -11,7 +11,7 @@
 併發：適用 —— 成軍與結案送出中都是連按只送一次、不可關；成功後詳情更新、列表重取、門重取三件事各自獨立（先同步更新詳情，再各自啟動兩個重取，任一失敗不回滾、不擋另一個）
 持久資料相容性：適用 —— 密碼 SHALL NOT 寫進任何本機儲存或網址
 失敗路徑：適用 —— 密碼太短／太長／空白、403、500、斷線；結案取消
-測試連到什麼：單元判準只連**本機自起**的 `contract-server` 替身；契約判準對**本機自起**的 `internal` 與 `guildhub`（`scripts/contract-guildhub.mjs`）各跑一次（既有 `projects.contract.ts` 已涵蓋 form-team／close 的形狀，這裡不加）；
+測試連到什麼：單元判準只連**本機自起**的 `contract-server` 替身；契約判準對**本機自起**的 `internal` 與 `guildhub`（`scripts/contract-guildhub.mjs`）各跑一次（新 `lifecycle.contract.ts`，見 `internal-backend` 的 delta）；
 端到端連**本機自起**的 `next start`＋`internal` 資料層（真的 Route Handler、真的 Postgres），`/api/rooms` 走真的替身。不連任何團隊共用的位址。
 
 ## ADDED Requirements
