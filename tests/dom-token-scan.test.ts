@@ -13,8 +13,9 @@ const ROOT = join(import.meta.dirname, '..')
 const SRC = join(ROOT, 'src')
 /** token 定義檔：DOM 的在 `globals.css`（七類）、3D 的在 `design/world.ts`（`FE-W09`）。只有這兩個可以出現字面值。 */
 const TOKEN_FILES = new Set(['src/app/globals.css', 'src/design/world.ts'])
-/** 層級標記的定義檔：只有它可以寫 `data-tier`／`data-text` 的物件鍵；其他類別照抓。 */
+/** 層級標記的定義檔：只有它可以寫 `data-tier` 的物件鍵 —— 而且只能是型別那一行加三個值各一次（下面另一條測試數）；其他類別照抓。 */
 const TIER_DEFINITION = 'src/design/controls.ts'
+const TIER_KEY = "'data-tier':"
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = []
@@ -44,12 +45,20 @@ describe('src/** 只從 token 取值', () => {
       const scan = domTokenScan(readFileSync(join(ROOT, file), 'utf8'))
       exemptions += scan.exemptions
       for (const v of scan.violations) {
-        if (file === TIER_DEFINITION && v.kind === '層級標記') continue
+        if (file === TIER_DEFINITION && v.kind === '層級標記' && v.text === TIER_KEY) continue
         problems.push(`${file}:${v.line} ${v.kind}：${v.text}`)
       }
     }
     expect(problems, '字面值或任意值。改用 globals.css 的 token／design/controls 的常數；真的要字面值就在該行加 `dom-token-allow: <理由>` 並調高上限').toEqual([])
     expect(exemptions, `豁免 ${exemptions} 個，超過上限 ${MAX_EXEMPTIONS}`).toBeLessThanOrEqual(MAX_EXEMPTIONS)
+  })
+
+  it('[FE-X16-S01] 定義檔只有介面一行加三個值各一次（多一個常數、多一套定義、JSX 字面屬性都紅）', () => {
+    const source = readFileSync(join(ROOT, TIER_DEFINITION), 'utf8')
+    const marks = domTokenScan(source).violations.filter((v) => v.kind === '層級標記').map((v) => v.text)
+    expect(marks).toEqual([TIER_KEY, TIER_KEY, TIER_KEY, TIER_KEY])
+    const values = [...source.matchAll(/'data-tier': '(\w+)'/g)].map((m) => m[1]).sort()
+    expect(values).toEqual(['primary', 'secondary', 'tertiary'])
   })
 
   // 六段假輸入各要被抓 —— 判準不是恆真。每一段單獨餵，抓到的那一條要說得出是哪一類。
@@ -65,6 +74,7 @@ describe('src/** 只從 token 取值', () => {
     ['<div className="!bg-[red] -z-[1] hover:text-[blue]" />', '任意值'],
     ['<button {...{ "data-tier": "primary" }} />', '層級標記'],
     ["createElement('button', { 'data-text': 'caption' })", '層級標記'],
+    ["const p = { ['data-tier']: 'primary' }", '層級標記'],
   ])('[FE-X16-S01] 假輸入被抓：%s', (input, kind) => {
     const scan = domTokenScan(`export const x = 1\n${input}\n`)
     expect(scan.violations.map((v) => v.kind), `沒抓到 ${kind}`).toContain(kind)

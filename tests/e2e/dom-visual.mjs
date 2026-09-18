@@ -1,6 +1,6 @@
 // `FE-X16` 的真瀏覽器判準（design D7）：`S02` 字體、`S10` 三級與焦點環／hover、`S11` 高度、`S12` 動態。
 // 規格點名的表面各走一次：`/login`、金鑰交接、訪客提示、標題列、看板清單／詳情（案件與人才；owner 的案件另量）、收件匣清單／對話、
-// 我的名片（看／改）、場景聊天框、結案確認、放棄修改確認。房間密碼視窗要走到門前，`--shell` 的 `S06` 一起量。
+// 我的名片（看／改）、場景聊天框、結案確認、放棄修改確認、房間密碼（真的走到門前按 E，走位借 `lib/world.mjs` 的里程計）。
 // REST 全部 `page.route` 偽造、只打本機自己起的 `next start`（`lib/world.mjs` 的 loopback 守衛）。
 //
 //   FRONTEND=http://127.0.0.1:3101 node tests/e2e/dom-visual.mjs
@@ -11,7 +11,7 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
-import { assertLoopback, bad, failureCount, guardLoopback, ok, profile, uuid, waitForWorld } from './lib/world.mjs'
+import { assertLoopback, bad, failureCount, guardLoopback, ok, profile, uuid, waitForWorld, walker } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3101'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-x16'
@@ -24,6 +24,9 @@ const PROJECTS = [['案件甲', OTHER, 'recruiting'], ['案件乙', OTHER, 'recr
   room_template: status === 'active' ? 0 : null, seat_count: 4, expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(), updated_at: '2026-09-09T00:00:00Z',
 }))
 const [, , MINE_RECRUITING, MINE_ACTIVE] = PROJECTS
+/** 走廊前兩扇門：第一扇是目標（按 E 開密碼視窗）、第二扇是里程計的另一個刻度（`walker` 要兩個標籤才算得出比例尺）。 */
+const ROOMS = [{ project_id: uuid(41), title: '星際導航', online_count: 3 }, { project_id: uuid(42), title: '深海探勘', online_count: 1 }]
+const { approachDoor } = walker({ room: ROOMS[0].project_id, decoy: ROOMS[1].project_id, title: ROOMS[0].title, out: OUT })
 const MESSAGE = { id: uuid(31), sender_id: OTHER.id, recipient_id: ME.id, body: '嗨，看到你的名片', created_at: '2026-09-12T10:00:00.000000Z', read_at: null }
 
 const world = async (page, query = '') => { await page.goto(`${FRONTEND}/world${query}`); await waitForWorld(page) }
@@ -54,6 +57,7 @@ const SURFACES = [
     name: '放棄修改確認', root: '[data-testid="profile-discard-confirm"]',
     open: async (page) => { await openProfile(page); await page.click('[data-testid="profile-panel"] >> text=編輯'); await page.fill('[data-testid="profile-form"] textarea', '改了字'); await page.keyboard.press('Escape'); await page.waitForSelector('[data-testid="profile-discard-confirm"]') },
   },
+  { name: '房間密碼', root: '[data-testid="room-password-dialog"]', open: async (page) => { await world(page); await approachDoor(page); await page.keyboard.press('KeyE'); await page.waitForSelector('[data-testid="room-password-dialog"] input') } },
   { name: '場景聊天框', root: '[data-testid="scene-chat"]', open: async (page) => { await world(page); await page.waitForSelector('[data-testid="scene-chat"] textarea') } },
   // 標題列：三個入口（名片、收件匣、換角色）都在
   { name: '標題列', root: '[data-testid="app-header"]', open: async (page) => { await world(page); await page.waitForSelector('[data-testid="inbox-button"]') } },
@@ -63,7 +67,7 @@ async function fakeRest(page, guest) {
   const json = (body, status = 200) => (r) => r.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
   await page.route('**/api/me', guest ? (r) => r.fulfill({ status: 401, body: '' }) : json(ME))
   await page.route('**/api/login', json(ME))
-  await page.route('**/api/rooms', json([]))
+  await page.route('**/api/rooms', json(ROOMS))
   await page.route('**/api/profiles?*', json([OTHER]))
   await page.route('**/api/projects?*', json(PROJECTS))
   for (const p of PROJECTS) await page.route(`**/api/projects/${p.id}`, json(p))
@@ -102,6 +106,16 @@ const install = (page) =>
         els.forEach((el, i) => el.setAttribute('data-dv', String(i)))
         return els.map((el, i) => ({ i, tag: el.tagName.toLowerCase(), label: label(el), tier: el.getAttribute('data-tier'), disabled: el.disabled === true, ...style(el) }))
       },
+      /** reduce 用：整份文件裡**每一個元素與 ::before／::after** 還有非零時長的（規格：所有 transition／animation 歸零，不只按鈕與面板）。 */
+      leaks() {
+        const out = []
+        const nonzero = (s) => s.split(',').some((x) => parseFloat(x) !== 0)
+        for (const el of document.querySelectorAll('*')) for (const pseudo of [null, '::before', '::after']) {
+          const cs = getComputedStyle(el, pseudo)
+          if (nonzero(cs.transitionDuration) || nonzero(cs.animationDuration)) out.push(`${el.tagName.toLowerCase()}${pseudo ?? ''}#${el.id || el.getAttribute('data-testid') || ''} transition ${cs.transitionDuration} animation ${cs.animationDuration}`)
+        }
+        return out
+      },
       focused() { const el = document.activeElement; return el && el.hasAttribute('data-dv') ? { i: Number(el.getAttribute('data-dv')), ...style(el) } : null },
     }
   })
@@ -131,7 +145,10 @@ async function inspect(page, surface, reduce) {
       if (ms(c.duration).every((d) => d === 0) && ms(c.animation).every((d) => d === 0)) continue
       bad(`[S12] reduce 下${who(c)}的動態沒歸零`, `transition ${c.duration}、animation ${c.animation}`)
     }
-    return ok(`[S12] reduce 下 ${surface.name} 的 ${controls.length} 個控制項${panel === null ? '' : '與面板'}動態都是 0s`)
+    // 二輪審查：不只控制項與面板 —— 整份文件每個元素與偽元素都要 0s
+    const leaks = await page.evaluate(() => window.__dv.leaks())
+    if (leaks.length > 0) return bad(`[S12] reduce 下 ${surface.name} 仍有 ${leaks.length} 個元素／偽元素的動態沒歸零`, leaks.slice(0, 8).join('\n   '))
+    return ok(`[S12] reduce 下 ${surface.name} 的 ${controls.length} 個控制項${panel === null ? '' : '與面板'}、整份文件的元素與偽元素動態都是 0s`)
   }
 
   // S02：這個表面上找得到的樣本都要跟 body 相同、含繁中家族；五種樣本（body、面板標題、卡片標題、按鈕、輸入框）齊全的那一頁（看板清單：聊天框有輸入框）
