@@ -56,8 +56,10 @@
 - **開啟的副作用搬到殼的掛載生命週期**（codex 第五輪抓到）：今天 `ListPanelProvider.openPanel` 同步 `holdInputLock()`、名片記 opener、收件匣記 opener 與世代 ——
   一個成功但被同事件後者取代、從未掛載的請求會留下這些。改成：世界命令鎖由 `PanelShell` 在 mount effect 取得、unmount 釋放（`FE-X06` 的鎖是可合成的，持有者換成殼不改語意）；
   opener 與焦點旗標由 provider 在殼掛載後才記（或跟著 `active` 的 commit 記）；重取世代在殼掛載時推進。`S21` 斷言關掉後鎖放開、`active` 為 `null`。
-- **compare-and-clear**：登記的 cleanup 與 `active` 的清空都只在「仍然是自己」時做；Strict Mode 的舊 cleanup 不得清掉新的（`S22` 第三段）。provider 整個卸載也 compare-and-clear，
-  畫面上沒有面板時 `active` 一定是 `null`（不然提示與聊天框會被幽靈壓著 —— codex 第五輪）。
+- **殼的卸載不動 `active`**（codex 第六輪：Strict Mode 的模擬卸載跟真卸載是同一條 cleanup，在 cleanup 裡清 `active` 會讓 Strict Mode 的第二次 setup 拿不回來）。
+  登記是有身分的一筆（物件識別），cleanup 只刪自己那筆。`active` 只由 `requestClose(id)`（compare-and-clear）與被取代改變。
+  幽靈 `active`（provider 在 commit 前整個卸載）用推導消掉：`useBlockingPanelOpen()` ＝「`active` 指向的殼已登記」，不是 `active !== null` ——
+  幽靈對畫面沒有作用，下一次請求直接取代它（`S22`）。
 - **provider 保留自己的子狀態**（看板的 kind／page／selected、收件匣的 view／thread、名片的草稿）—— 只有「開不開」搬到協調者。關閉＝`requestClose(id)`（`active = null`）。
 - **網址**：下一頁的 `restore`（讓位是 `go(-1)`，帶 `panel` 的那一筆在**前進**紀錄 —— codex 第二輪抓到第一版寫成上一頁）也經過 `requestOpen()`；
   被拒 → `replaceState` 把目前這一筆改回實際狀態（`FE-B09-S05` canonical 的同一招）、不 `pushState`、不動畫面（`S17`）。

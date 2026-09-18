@@ -38,10 +38,10 @@
 
 - [ ] 4.1 判準先紅（jsdom）：`S13`（看板→收件匣→名片→收件匣、寄信那條路、焦點不經開啟者與 `body`、網址退）、`S14`（成軍送出中拒絕＋`role="status"`＋焦點留在按鈕；回來後接受；名片 dirty 拒絕且不出確認）、
       `S15`（提示讓位／回來／關掉不回來／走完不回來）、`S16`（收起顯示 3、不持鎖；展開有 3 則在底部；往上讀時收起再展開位置不動＋回到最新）、
-      `S17`（下一頁：接受重開；送出中拒絕 → `replaceState` 一次、`pushState` 零次、再上一頁回原本那一筆）、`S18`（彈出層：成功就關、被拒也因焦點離開而關）、`S21`（同一個 handler 連續兩次 `requestOpen`：兩個 `true`、只掛最後一個；已登記且送出中 → `false`）、`S22`（殼延後 commit 時別人取代 → 舊的不掛；provider 卸載後 `active === null`、提示不被壓；Strict Mode 舊 cleanup 不清新的）；`S21` 加：關掉後鎖放開、被取代的請求沒留鎖／opener
+      `S17`（下一頁：接受重開；送出中拒絕 → `replaceState` 一次、`pushState` 零次、再上一頁回原本那一筆）、`S18`（彈出層：成功就關、被拒也因焦點離開而關）、`S21`（同一個 handler 連續兩次 `requestOpen`：兩個 `true`、只掛最後一個；已登記且送出中 → `false`）、`S22`（殼延後 commit 時別人取代 → 舊的不掛；provider 卸載後 `useBlockingPanelOpen() === false`、提示不被壓；Strict Mode 殼掛→卸→掛後登記恰好一筆且 `active` 仍指向它）；`S21` 加：關掉後鎖放開、被取代的請求沒留鎖／opener
 - [ ] 4.2 `src/panel/BlockingPanelCoordinator.tsx`（D3）：持有 `active: id | null`（state＋同步鏡像 ref）；`requestOpen(id)` 同步決定（空／未登記 → 取代；已登記且 `canYield()` → `onYield()` 後取代；否則 `false`＋`role="status"` 在 `toast` 層）；`requestClose(id)`；
-      `register({ id, canYield, onYield })` 冪等、cleanup 與清 `active` 都 compare-and-clear；`useActivePanel()`、`useBlockingPanelOpen()`。`PanelShell` 掛載時登記（新 prop `canYield`、`onYield`）**並在 mount effect 取世界命令鎖、unmount 釋放**（鎖從 provider 的開啟呼叫搬過來）
-- [ ] 4.3 三個 provider：`open` 改成 `useActivePanel() === 自己的 id`（不再 `useState(open)`）；`openX()` → `requestOpen()`、`closePanel()` → `requestClose()`；`onYield` 走既有關閉的副作用但**不還焦點**（三個 provider 都有還焦點的路：名片的 effect、看板的 `release()`、收件匣的 `closePanel()`，全部要有讓位旗標）；opener 與重取世代改在殼掛載後才記；provider 卸載時對 `active` compare-and-clear；`FE-K01-S02` 的「看板關」改走協調者；
+      `register({ id, canYield, onYield })` 回一筆有身分的登記、cleanup 只刪自己那筆、**不動 `active`**；`requestClose(id)` compare-and-clear；`useActivePanel()`、`useBlockingPanelOpen()`（＝ `active` 指向的殼已登記）。`PanelShell` 掛載時登記（新 prop `canYield`、`onYield`）**並在 mount effect 取世界命令鎖、unmount 釋放**（鎖從 provider 的開啟呼叫搬過來）
+- [ ] 4.3 三個 provider：`open` 改成 `useActivePanel() === 自己的 id`（不再 `useState(open)`）；`openX()` → `requestOpen()`、`closePanel()` → `requestClose()`；`onYield` 走既有關閉的副作用但**不還焦點**（三個 provider 都有還焦點的路：名片的 effect、看板的 `release()`、收件匣的 `closePanel()`，全部要有讓位旗標）；opener 與重取世代改在殼掛載後才記；`FE-K01-S02` 的「看板關」改走協調者；
       `PanelUrlSync.restore` 經過 `requestOpen()`，被拒 → `replaceState` 目前這一筆回實際狀態（不 push）
 - [ ] 4.4 `FirstEntryNotice` 讀 `useBlockingPanelOpen()`（不卸載它的 `dismissed`／`alreadyDone`：用 `hidden`，不是 return null）；`SceneChatHud` 收成一行＋捲動位置還原（D5）；`AvatarPicker` 成功開面板時關、被拒時照既有焦點離開規則關
 - [ ] 4.5 e2e：`S13`（記 `focusin` 序列）／`S15`／`S16`／`S17` 在真瀏覽器各走一次（`tests/e2e/dom-visual.mjs`）
@@ -62,7 +62,7 @@
 - [ ] 6.1 拿掉 `--font-sans` 的繁中家族 → `S02` 紅；把某個表面的內文改成 `14px` → `S03` 紅；`ink-muted` 調淡 → `S04` 紅；假輸入六段任一掃不到 → `S01` 紅
 - [ ] 6.2 面板底改成半透明 → `S05` 紅；給面板加一層世界遮罩 → `S05` 紅；確認視窗遮罩拿掉 → `S06` 紅；關閉搬到標題列最前 → `S07` 紅；`<header>` 放進捲動容器 → `S08` 紅
 - [ ] 6.3 場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
-- [ ] 6.4 協調者不 `onYield()` 就取代 → `S13` 紅；讓位時還焦點給開啟者 → `S13` 紅；provider 自己持有 open（不從 `active` 推導）→ `S22` 紅；鎖留在 provider 的開啟呼叫裡同步取 → `S21` 紅；cleanup 不 compare 就清 `active` → `S22` 紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
+- [ ] 6.4 協調者不 `onYield()` 就取代 → `S13` 紅；讓位時還焦點給開啟者 → `S13` 紅；provider 自己持有 open（不從 `active` 推導）→ `S22` 紅；鎖留在 provider 的開啟呼叫裡同步取 → `S21` 紅；殼的 cleanup 清 `active` → `S22` Strict Mode 段紅；`useBlockingPanelOpen` 用 `active !== null` → `S22` 幽靈段紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
       聊天框展開不還原 `scrollTop` → `S16` 紅；下一頁被拒不 `replaceState`（或用了 `pushState`）→ `S17` 紅；被拒時彈出層留著 → `S18` 紅；同一事件的第二個請求不取代第一個（兩個都掛）→ `S21` 紅
 - [ ] 6.5 每次突變前 commit；突變後還原並重 build `.next`
 

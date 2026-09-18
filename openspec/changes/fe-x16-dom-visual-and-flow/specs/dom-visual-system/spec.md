@@ -179,11 +179,12 @@ DOM 那一半的介面（登入頁、首次進入、標題列、看板與詳情�
 **協調者持有「哪一個阻斷式面板是開的」**（`active: id | null`）—— 那是唯一的來源，各 provider 的「開著」SHALL 從它推導，不各自持有。
 所以「任一時刻掛載中的阻斷式面板 `≤ 1`」是結構上的事：一個值只能指向一個 id。
 **持有者**：`active` 指向的面板；它掛載中的殼向協調者登記兩個**同步**函式 `canYield(): boolean`（送出中或有未儲存的修改 → `false`）
-與 `onYield(): void`（被讓位時的收尾：走既有關閉路徑的副作用，**不**把焦點還給開啟者）。同 id 重複登記冪等；登記的解除與 `active` 的清空都是
-**compare-and-clear**（只有仍然是自己那一筆才清；Strict Mode 的舊 cleanup 不得清掉新的登記或新的 `active`）。
+與 `onYield(): void`（被讓位時的收尾：走既有關閉路徑的副作用，**不**把焦點還給開啟者）。每次登記是一筆有身分的紀錄，解除只刪自己那一筆（compare-and-delete；Strict Mode 的舊 cleanup 不得刪掉新的登記）。
+**殼的卸載 SHALL NOT 動 `active`**（Strict Mode 的模擬卸載跟真卸載走同一條 cleanup，分不出來）；`active` 只由 `requestClose(id)`（compare-and-clear）與被取代改變。
 **開啟的副作用歸掛載生命週期**：世界命令鎖、焦點還原的旗標、開啟者、重取的世代這些「開了就要收的東西」SHALL 在殼**掛載**時取得、卸載時釋放，
 SHALL NOT 在 `requestOpen()` 或 provider 的開啟呼叫裡同步取得 —— 一個成功但從未掛載的請求（被同一事件的後者取代）才不會留下任何要收的東西。
-殼卸載、或 provider 整個卸載時，SHALL 對 `active` compare-and-clear（仍指向自己才清成 `null`）—— 畫面上沒有阻斷式面板時 `active` SHALL 是 `null`。
+「有阻斷式面板開著」SHALL 從 **`active` 指向的殼已登記** 推導（`useBlockingPanelOpen()`），不是從 `active !== null` 推導 ——
+一個指向沒人掛的 id 的 `active`（provider 在 commit 前整個卸載）對畫面沒有作用：提示不被壓、聊天框不收起，而且下一次請求會直接取代它。
 **請求**：要開一個阻斷式面板 SHALL 呼叫 `requestOpen(id)`，協調者**同步**決定（用同步的鏡像判斷，不等 React commit）：
 `active` 是 `null`、或指向一個還沒登記的 id（殼還沒掛成）→ `active = id`、回 `true`；`active` 已登記且 `canYield()` → 先 `onYield()`、`active = id`、回 `true`；
 `canYield()` 為 `false` → **拒絕**：`active` 不變、觸發它的控制保持焦點、畫面 SHALL 有可見的回饋（`role="status"`，內容不是契約）。
@@ -263,7 +264,7 @@ SHALL NOT `pushState`，畫面 SHALL NOT 換。
 - **THEN** 兩個都 SHALL 得到 `true`（看板還沒掛成，被取代）；commit 後掛載中的阻斷式面板 SHALL 恰好一個且是收件匣，看板 SHALL 從未掛載
 - **AND** 世界命令鎖的持有者 SHALL 恰好一個（收件匣的殼），看板那次請求 SHALL NOT 留下鎖、開啟者或焦點旗標
 - **AND WHEN** 關掉收件匣
-- **THEN** 世界命令鎖 SHALL 放開、`active` SHALL 是 `null`、人 SHALL 走得動
+- **THEN** 世界命令鎖 SHALL 放開、`active` SHALL 是 `null`（`requestClose`）、`useBlockingPanelOpen()` 是 `false`、人 SHALL 走得動
 - **AND WHEN** 收件匣重新開著、對話送出中，再請求開看板
 - **THEN** SHALL 得到 `false`、收件匣留著
 
@@ -272,9 +273,9 @@ SHALL NOT `pushState`，畫面 SHALL NOT 換。
 - **WHEN** 請求開看板成功，看板的殼還沒登記（例如它的內容在 Suspense 裡延後 commit），此時請求開收件匣
 - **THEN** SHALL 得到 `true`；之後看板那次延後的 commit 完成時，看板 SHALL NOT 掛載（它的 provider 從 `active` 推導出「不是我」）、掛載中的阻斷式面板恰好是收件匣
 - **AND WHEN** 請求開看板成功但看板的 provider 在 commit 前整個卸載
-- **THEN** 卸載穩定後 `active` SHALL 是 `null`、`useBlockingPanelOpen()` SHALL 是 `false`（訪客提示與聊天框不會被一個不存在的面板壓著）；之後請求開收件匣 SHALL 成功、收件匣 SHALL 掛載
+- **THEN** 卸載穩定後 `useBlockingPanelOpen()` SHALL 是 `false`（訪客提示顯示、聊天框展開 —— 不被一個不存在的面板壓著）；之後請求開收件匣 SHALL 成功、收件匣 SHALL 掛載
 - **AND WHEN** Strict Mode 下殼掛載→卸載→再掛載
-- **THEN** 登記 SHALL 仍在、`active` SHALL 仍指向它（舊 cleanup 沒有清掉新的）
+- **THEN** 登記 SHALL 恰好一筆且是新的那筆、`useBlockingPanelOpen()` SHALL 是 `true`、`active` SHALL 仍指向它（殼的 cleanup 沒動 `active`、舊登記沒刪掉新登記）
 
 ### Requirement: 標題列是固定的導覽
 
