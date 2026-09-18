@@ -26,7 +26,6 @@ const profile = (n: number, extra: Partial<ProfileOut> = {}): ProfileOut => ({
   ...extra,
 })
 const detailPath = (id: string) => `/api/profiles/${id}`
-const LABELS = { back: '返回' }
 
 let server: ContractServer
 beforeEach(async () => {
@@ -42,7 +41,7 @@ afterEach(async () => {
 
 const detail = () => screen.getByTestId('talent-detail')
 const mount = (id: string, preview: ProfileOut | undefined) =>
-  render(<TalentDetail id={id} preview={preview} onBack={() => {}} labels={LABELS} />)
+  render(<TalentDetail id={id} preview={preview} onBack={() => {}} />)
 
 describe('詳情的內容一律來自 GET /api/profiles/{id}', () => {
   it('[FE-B04-S06] 詳情呈現的是回應，不是預覽那一筆', async () => {

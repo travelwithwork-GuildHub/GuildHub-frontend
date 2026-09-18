@@ -334,7 +334,8 @@ async function inspect(page, surface, reduce) {
   const focusable = controls.filter((c) => !c.disabled)
   const reached = new Map()
   await page.mouse.click(2, 2)
-  for (let i = 0; i < focusable.length * 2 + 4 && reached.size < focusable.length; i += 1) {
+  // 上限只是迴圈的保險，不是判準：從文件頭 Tab 過標題列、聊天框、殼的標題列才到視窗裡（--shell 之後多一顆關閉）
+  for (let i = 0; i < focusable.length * 2 + 16 && reached.size < focusable.length; i += 1) {
     await page.keyboard.press('Tab')
     const f = await page.evaluate(() => window.__dv.focused())
     if (f !== null && !reached.has(f.i)) reached.set(f.i, f)

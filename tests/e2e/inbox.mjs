@@ -31,7 +31,8 @@ async function approach(page, label, steps) {
     if (prompt !== null && prompt.includes(label)) return prompt
     await hold(page, 'ArrowUp', 120)
   }
-  throw new Error(`走不到「${label}」前面`)
+  await page.screenshot({ path: path.join(OUT, 'lost.png') }).catch(() => {})
+  throw new Error(`走不到「${label}」前面（提示：${await page.$eval('[data-testid="interaction-prompt"]', (n) => n.textContent ?? '').catch(() => '（沒有提示）')}）`)
 }
 async function login(context, nickname) {
   const page = await context.newPage()
@@ -100,7 +101,9 @@ try {
   // 3. B 開收件匣：看到 A 的對話（名字解析）、進去、回信。
   await B.page.getByTestId('inbox-button').click()
   await B.page.waitForSelector('[data-testid="inbox-list"][aria-busy="false"]')
+  // 名字是列表載完之後另外解析的（resolveNames）：等那一列帶著名字出現，不是 aria-busy 一放開就數（三次裡兩次撞到還是短 id 的那一格）
   const row = B.page.locator('[data-testid="inbox-thread-item"]', { hasText: NICK_A }).first()
+  await row.waitFor({ timeout: 5_000 }).catch(() => {})
   if (await row.count()) ok(`B 的收件匣有 A（${NICK_A}）的對話，名字解析出來了`)
   else bad('B 看不到 A 的對話', await B.page.$eval('[data-testid="inbox-list"]', (n) => n.textContent ?? ''))
   const previewText = await row.locator('[data-testid="inbox-thread-preview"]').textContent()

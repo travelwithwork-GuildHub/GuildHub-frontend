@@ -38,13 +38,17 @@
 
 ## 3. `--shell`：`PanelShell` 的解剖（Requirement〈表面有三層〉〈每一個阻斷式面板的解剖一致〉）
 
-- [ ] 3.1 判準先紅：e2e `S05`（底 alpha `= 1`、邊界對 `surface` `3:1`、陰影存在且 alpha `> 0`、世界區沒有遮罩）、`S06`（確認視窗與密碼視窗有遮罩 `[0.3, 0.6]`、子畫面沒有、關了不在）、
-      `S07`（1280×720 與 1024×640：標題列三個位置、關閉同 rect、同寬）、`S08`（溢出時內容區捲、文件不捲、標題列在捲動容器外）；
-      jsdom 的 `S07` 結構半邊（標題列是第一個區塊、返回第一個可聚焦、關閉最後一個）
-- [ ] 3.2 `PanelShell`：`back?: { label, onBack }` 插槽（返回在標題列最前）；**`{children}` 自己包一層捲動容器（`min-h-0 flex-1 overflow-y-auto`），`<header>` 留在容器外**（Gemini 抓到第一版把 overflow 加在含 header 的容器上）；
-      覆蓋層的兩種形狀：子畫面（換標題列與內容、沒有遮罩）與確認視窗（`scrim`）；寬度改 token；出現的過渡只動 `opacity`／`transform`
-- [ ] 3.3 看板詳情（`ProjectDetail`／`TalentDetail`）與收件匣對話的返回改走殼的插槽（既有 `FE-X06-S12`／`FE-K01-S07` 的焦點行為不變）
-- [ ] 3.4 房間密碼視窗（世界上的視窗）：同一套底／邊界／陰影 token、對世界區的 `scrim`；結案確認與放棄修改確認套 `scrim`
+- [x] 3.1 判準先紅：e2e `tests/e2e/dom-shell.mjs`（獨立一支；`S05` 底 alpha `= 1`、邊界對 `surface` `3:1`、陰影存在且 alpha `> 0`、世界區上面板以外沒有 bg alpha > 0 且蓋住 ≥ 90% 的元素；
+      `S06` 三個視窗的遮罩 `[0.3, 0.6]`、蓋滿被擋那一層、中心點命中、面板的 body 與 overlay `inert`（世界區沒有 inert 屬性：用中心點命中代替）、關了不在、子畫面沒有；
+      `S07` 1280×720 與 1024×640 各開五個面板：第一個區塊是 `header` 且有 heading、關閉是最後一個可聚焦、返回第一個（清單／名片沒有）、五個關閉 rect ±1px、同寬；
+      `S08` 一頁 20 筆溢出（分頁是換頁不是累加，「30 筆」在這個模型裡就是一頁滿的）：面板高 ≤ 視窗、內容區有在捲的容器、文件不捲、標題列往上沒有任何會捲的容器、捲到底標題列與關閉 rect 不變）；
+      jsdom `tests/panel-shell-anatomy.test.tsx`（`S07` 結構半邊＋`PanelDialog` 的遮罩層／inert／沒有殼時原地渲染）。實作前 e2e 33 紅
+- [x] 3.2 `PanelShell`：`back?: { label, onBack }`（返回在標題列最前，關閉最後，標題 `flex-1 truncate`）；標題列在內容區**外**、永不 inert；內容區容器 `${testId}-content`（relative）裡：body 自己 `overflow-y-auto`、
+      子畫面 overlay 只蓋內容區並自帶不透明底；確認視窗走新的 `src/panel/PanelDialog.tsx`（context ＋ portal 到內容區容器：`scrim` 層 ＋ 殼把 body／overlay 標 `inert`；沒有殼就原地渲染）；
+      面板 `shadow-panel rounded-panel w-panel`（新 token `--container-panel`／`--container-dialog`）
+- [x] 3.3 `ProjectDetail`／`TalentDetail` 拿掉自己的返回鈕與 header（`labels` prop 一起拿掉），`BoardPanel` 給 `ListPanel` 新的 `subScreen={{ title, back }}`（標題換成「案件」／「人才」，案名／人名留在內容區當 `HEADING`）；
+      收件匣的返回 handler 提到 `OpenInboxPanel`（殼的返回鈕與對話的 Escape 同一條），標題換「對話」；`TalentFacts` 的 `leading` 槽拿掉、名字 `HEADING`。既有測試改成在面板層找「返回」（焦點回卡片／回那一列的斷言不動、全綠）
+- [x] 3.4 房間密碼視窗：外面包一層 `world-scrim`（對世界區、`layer('modal')`、flex 置中取代 translate），視窗 `shadow-dialog rounded-panel w-dialog`；結案確認與放棄修改確認包 `<PanelDialog>`（名片的確認從 overlay 槽改成內容區的孩子）
 
 ## 4. `--flow`：協調者、提示讓位、聊天收起、網址（Requirement〈同一時間只有一個阻斷式面板〉）
 
@@ -72,7 +76,8 @@
 ## 6. 突變（驗收條件：拔掉防禦要紅）
 
 - [ ] 6.1 拿掉 `--font-sans` 的繁中家族 → `S02` 紅；把某個表面的內文改成 `14px` → `S03` 紅（`--text`：`--text-body` 改 0.875rem → 17 條紅）；`ink-muted` 調淡 → `S04` 紅（`--text`：L 0.52 → 0.7 → 29 條 2.51～2.67:1）；假輸入六段任一掃不到 → `S01` 紅
-- [ ] 6.2 面板底改成半透明 → `S05` 紅；給面板加一層世界遮罩 → `S05` 紅；確認視窗遮罩拿掉 → `S06` 紅；關閉搬到標題列最前 → `S07` 紅；`<header>` 放進捲動容器 → `S08` 紅
+- [x] 6.2 面板底改成半透明 → `S05` 紅（`/80`：三個面板「底 alpha 0.8」）；給面板加一層世界遮罩 → `S05` 紅（「有 1 個蓋住世界的元素」）；確認視窗遮罩拿掉 → `S06` 紅（三個視窗「遮罩 alpha 0」）；
+      關閉搬到標題列最前 → `S07` 紅（十個面板×viewport 各兩條）；`<header>` 放進捲動容器 → `S08` 紅（「標題列在捲動容器裡面」）＋ `S07` 紅（第一個區塊是 div）；陰影拿掉 → `S05` 紅；視窗開著內容區不 inert → `S06` 紅（兩個確認視窗）
 - [ ] 6.3 場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
 - [ ] 6.4 協調者不 `onYield()` 就取代 → `S13` 紅；讓位時還焦點給開啟者 → `S13` 紅；provider 自己持有 open（不從 `active` 推導）→ `S22` 紅；鎖留在 provider 的開啟呼叫裡同步取 → `S21` 紅；殼的 cleanup 清 `active` → `S22` Strict Mode 段紅；`useBlockingPanelOpen` 用 `active !== null` → `S22` 幽靈段紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
       聊天框展開不還原 `scrollTop` → `S16` 紅；下一頁被拒不 `replaceState`（或用了 `pushState`）→ `S17` 紅；被拒時彈出層留著 → `S18` 紅；同一事件的第二個請求不取代第一個（兩個都掛）→ `S21` 紅

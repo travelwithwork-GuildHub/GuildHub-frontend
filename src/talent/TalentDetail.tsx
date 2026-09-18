@@ -1,7 +1,6 @@
 'use client'
 
 import type { ProfileOut } from '@/api/contract/rest'
-import { SECONDARY } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { useEscapeLayer } from '@/world/interaction/escapeLayers'
@@ -27,12 +26,11 @@ export interface TalentDetailProps {
   /** 列表手上的那一筆，當載入中的預覽。深連結（`FE-B09`）沒有它。 */
   preview: ProfileOut | undefined
   onBack: () => void
-  labels: { back: string }
   /** 名片上的動作（例如「寄信給他」，`FE-K01`）：由呼叫端決定，這裡只給位置 —— 詳情本身不知道「我能對這個人做什麼」。 */
   actions?: ReactNode
 }
 
-export function TalentDetail({ id, preview, onBack, labels, actions }: TalentDetailProps) {
+export function TalentDetail({ id, preview, onBack, actions }: TalentDetailProps) {
   const detail = useProfileDetail(id, preview)
   // 焦點進詳情（`FE-X06-S11`）：開它的那張卡在 `inert` 的列表區裡 —— 焦點留在那裡的話，
   // Tab 的 keydown 不會派送（inert 的元素收不到事件），面板的 focus trap 接不到，焦點就跑出去了。
@@ -45,12 +43,6 @@ export function TalentDetail({ id, preview, onBack, labels, actions }: TalentDet
     root.current?.focus()
   }, [])
   const profile = detail.profile
-  const back = (
-    <button type="button" {...SECONDARY} onClick={onBack}>
-      {labels.back}
-    </button>
-  )
-
   return (
     <article
       ref={root}
@@ -59,16 +51,13 @@ export function TalentDetail({ id, preview, onBack, labels, actions }: TalentDet
       data-profile-id={id}
       data-phase={detail.phase}
       aria-busy={detail.phase === 'loading'}
-      className="bg-surface-raised flex h-full flex-col gap-gutter overflow-y-auto"
+      className="bg-surface-raised flex h-full flex-col gap-gutter overflow-y-auto outline-none"
     >
-      {/* 還沒有任何資料（深連結、還在載入或失敗）：只有返回鈕那一列。 */}
-      {profile === undefined && <header className="flex items-center gap-3">{back}</header>}
-
       {detail.phase === 'error' && (
         <EmptyState kind="failure" error={toUiError(detail.error)} retry={detail.retry} />
       )}
 
-      {profile !== undefined && <TalentFacts profile={profile} leading={back} />}
+      {profile !== undefined && <TalentFacts profile={profile} />}
       {profile !== undefined && actions}
     </article>
   )
