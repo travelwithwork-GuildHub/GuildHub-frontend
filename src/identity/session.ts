@@ -1,6 +1,9 @@
 import { LIMITS, codePointLength, violates } from '@/api/contract/limits'
 import { getMyProfile, login, register } from '@/api/operations'
+import type { ProfileOut } from '@/api/contract/rest'
+import { AVATAR_COUNT } from '@/design/avatar'
 import { toUiError } from '@/errors/uiError'
+import { saveAvatar } from './saveAvatar'
 import { browserRecoveryKeyStore, type RecoveryKeyStore } from './recoveryKey'
 import { CredentialsRejectedError, LoginIdTakenError, NicknameLengthError, RecoveryKeyRejectedError, type Identity } from './types'
 
@@ -61,6 +64,25 @@ export interface SignInOptions {
    */
   remember?: boolean
   store?: RecoveryKeyStore
+  /**
+   * 首次建立身分時挑外觀用的亂數來源，回 `[0, 1)`。**預設 `Math.random`**；測試注入固定序列。
+   * 規格 `avatar-selection`〈首次建立身分時隨機指派一款外觀〉（`FE-A05-S21`）。
+   */
+  random?: () => number
+}
+
+/**
+ * 剛建立的身分隨機發一款外觀（`FE-A05-S17`～`S21`）：均勻來源 ＋ 無偏映射 `Math.floor(r × 款數)`，
+ * 款數讀映射的常數（不寫死 8）。走既有的 `saveAvatar`（值域檢查、無條件帶 `avatar_id`、不送 null）。
+ *
+ * ⚠️ **失敗就用後端回的那張名片、不重試、不拋**（`S20`）：進得了世界比外觀重要，換角色的入口一直在。
+ * ⚠️ **只給剛建立的**：金鑰／密碼登入既有名片的路徑不呼叫這個（`S19`）。
+ * ⚠️ 亂數來源每次恰好取一次值 —— 「均勻」由來源與映射保證，不用抽樣統計驗。
+ */
+async function assignRandomAvatar(profile: ProfileOut, random: () => number): Promise<ProfileOut> {
+  const av = Math.floor(random() * AVATAR_COUNT)
+  const saved = await saveAvatar(av)
+  return saved.ok ? saved.profile : profile
 }
 
 /**
@@ -84,13 +106,15 @@ function persist(store: RecoveryKeyStore, key: string, remember: boolean): void 
  */
 export async function signInWithNickname(
   nickname: string,
-  { remember = false, store = browserRecoveryKeyStore() }: SignInOptions = {},
+  { remember = false, store = browserRecoveryKeyStore(), random = Math.random }: SignInOptions = {},
 ): Promise<Identity> {
   const problem = nicknameProblem(nickname)
   if (problem !== null) throw problem
 
-  const profile = await login({ nickname })
-  persist(store, profile.id, remember)
+  const created = await login({ nickname })
+  persist(store, created.id, remember)
+  // 暱稱登入**一定是新建立的**身分（後端每次建一張新名片）→ 隨機發一款外觀，存完才回（呼叫端 await 完才導向：`S17` 的順序）。
+  const profile = await assignRandomAvatar(created, random)
   return { state: 'signed-in', profile }
 }
 
@@ -148,16 +172,18 @@ export async function signInWithPassword(
  */
 export async function registerAccount(
   input: { loginId: string; password: string; nickname: string },
-  { remember = false, store = browserRecoveryKeyStore() }: SignInOptions = {},
+  { remember = false, store = browserRecoveryKeyStore(), random = Math.random }: SignInOptions = {},
 ): Promise<Identity> {
-  let profile
+  let created
   try {
-    profile = await register({ login_id: input.loginId, password: input.password, nickname: input.nickname })
+    created = await register({ login_id: input.loginId, password: input.password, nickname: input.nickname })
   } catch (error) {
     if (isConflict(error)) throw new LoginIdTakenError()
     throw error
   }
-  persist(store, profile.id, remember)
+  persist(store, created.id, remember)
+  // 註冊也是新建立的身分（`S18`）。
+  const profile = await assignRandomAvatar(created, random)
   return { state: 'signed-in', profile }
 }
 

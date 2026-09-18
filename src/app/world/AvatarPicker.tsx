@@ -115,13 +115,14 @@ export function AvatarPicker() {
           // 面板是浮的，所以它要自己宣告層級。**堆疊層級走 `design/layers`**
           // —— 散在各處的 z-index 會互相打架，而症狀是「有時候被蓋住」。
           style={{ zIndex: layer('panel') }}
-          className="bg-surface-raised border-control-edge absolute top-full left-0 mt-2 flex flex-col gap-gutter rounded border p-gutter"
+          // `max-w-full`＋選項 `flex-wrap`：八款在 1024 寬也放得下（`FE-A05-S23`）
+          className="bg-surface-raised border-control-edge absolute top-full left-0 mt-2 flex max-w-full flex-col gap-gutter rounded border p-gutter"
         >
           {/* 開著才在 Escape 的堆疊裡；面板開著時它在下面（但會先因失焦而關）。 */}
           <EscapeLayer onEscape={dismiss} element={popover} />
           <div className={FIELD_LABEL}>
             <span>選一個角色</span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {Array.from({ length: AVATAR_COUNT }, (_, index) => {
                 const look = avatarLook(index)
                 const picked = showing === index

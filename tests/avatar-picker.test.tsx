@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { AvatarPicker } from '@/app/world/AvatarPicker'
+import { AVATAR_COUNT, avatarLook } from '@/design/avatar'
 import { AvatarDraftProvider, useAvatarDraft } from '@/identity/AvatarDraftProvider'
 import { saveAvatar } from '@/identity/saveAvatar'
 import type { SaveAvatarResult } from '@/identity/saveAvatar'
@@ -124,6 +125,24 @@ describe('換角色', () => {
       draftNow(),
       '取消之後草稿還在 —— 畫面會停在使用者沒有選的那一個角色',
     ).toBe('none')
+  })
+
+  it('[FE-A05-S22] 八款都在、色票是映射的軀幹色、選第八款送 7', async () => {
+    mockedSave.mockResolvedValue({ ...okResult, profile: { ...okResult.profile, avatar_id: 7 } })
+    render(wrap(<AvatarPicker />))
+    click(screen.getByRole('button', { name: '更換角色' }))
+    const options = screen.getAllByRole('button', { name: /^角色 \d+/ })
+    expect(options, '選項數要等於映射的款數').toHaveLength(AVATAR_COUNT)
+    expect(AVATAR_COUNT, '這條測試是照八款寫的').toBe(8)
+    // jsdom 把 `#rrggbb` 正規化成 `rgb(r, g, b)`：兩邊都經過同一個正規化再比
+    const rgb = (hex: string) => { const n = parseInt(hex.slice(1), 16); return `rgb(${n >> 16}, ${(n >> 8) & 255}, ${n & 255})` }
+    options.forEach((option, index) => {
+      const swatch = option.querySelector('span[aria-hidden]') as HTMLElement | null
+      expect(swatch?.style.background, `第 ${index + 1} 款的色票不是映射的軀幹色`).toBe(rgb(avatarLook(index).body))
+    })
+    click(screen.getByRole('button', { name: /角色 8/ }))
+    click(screen.getByRole('button', { name: '就用這個' }))
+    await waitFor(() => expect(mockedSave).toHaveBeenCalledWith(7))
   })
 
   it('[FE-A05-S04] 儲存成功之後才重連', async () => {
