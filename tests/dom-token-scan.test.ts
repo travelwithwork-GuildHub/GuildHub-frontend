@@ -100,6 +100,8 @@ describe('src/** 只從 token 取值', () => {
     // 四輪審查：字串裡假裝的 `//`；區塊註解的空理由（`*/` 不是理由）
     ["const color = '#fff', note = '// dom-token-allow: 任意理由'", '色碼'],
     ["const color = '#fff' /* dom-token-allow: */", '沒有理由的豁免'],
+    // 五輪審查：前面放一個已收掉的區塊註解，標記在後面的字串裡
+    ["const color = '#fff' /* 普通註解 */; const note = 'dom-token-allow: 任意理由'", '色碼'],
   ])('[FE-X16-S01] 假輸入被抓：%s', (input, kind) => {
     const scan = domTokenScan(`export const x = 1\n${input}\n`)
     expect(scan.violations.map((v) => v.kind), `沒抓到 ${kind}`).toContain(kind)
@@ -115,6 +117,8 @@ describe('src/** 只從 token 取值', () => {
     // css 的區塊註解、以及註解前面有含 `//` 的字串（網址）都要認得
     expect(domTokenScan('  color: #fff; /* dom-token-allow: 印刷用的對照 */\n')).toEqual({ violations: [], exemptions: 1 })
     expect(domTokenScan("const u = 'http://x/#fff' // dom-token-allow: 網址片段\n")).toEqual({ violations: [], exemptions: 1 })
+    // 跳脫的反斜線結束字串、收掉的區塊註解之後才是真的行尾註解
+    expect(domTokenScan("const s = 'x\\\\'; const c = '#fff' /* 先收掉 */ // dom-token-allow: 真的在註解裡\n")).toEqual({ violations: [], exemptions: 1 })
   })
 
   it('[FE-X16-S01] 沒有字面值的來源是乾淨的（正向控制）', () => {
