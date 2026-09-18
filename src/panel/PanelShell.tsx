@@ -78,8 +78,9 @@ export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestI
       // 過渡只動 opacity（`FE-X16-S12`：不動寬高、不用 all）。底不透明、邊界 3:1、陰影 —— 三個都是 token（`S05`）；寬度一個 token（`S07`）
       className="bg-surface-raised border-control-edge text-ink shadow-panel rounded-panel w-panel absolute top-gutter right-gutter bottom-gutter flex flex-col gap-gutter border p-gutter transition-opacity"
     >
-      {/* 標題列：面板的第一個區塊，在內容區外面，任何覆蓋層都不蓋它。返回（子畫面才有）第一個、關閉最後一個（`S07`）。 */}
-      <header className="flex shrink-0 items-center gap-gutter">
+      {/* 標題列：面板的第一個區塊，在內容區外面，子畫面不蓋它。返回（子畫面才有）第一個、關閉最後一個（`S07`）。
+          確認視窗開著時它也 `inert`（審查：不然 Tab 會從視窗溜到返回／關閉、滑鼠也點得到 —— 視窗外的操作一個都不能達；遮罩照規格只蓋內容區）。 */}
+      <header inert={dialogOpen} className="flex shrink-0 items-center gap-gutter">
         {back !== undefined && (
           <button type="button" {...withClass(SECONDARY, 'shrink-0 whitespace-nowrap')} onClick={back.onBack}>
             {back.label}

@@ -76,17 +76,24 @@ const install = (page) =>
         return { bg: toRgba(cs.backgroundColor), border: toRgba(cs.borderTopColor), borderWidth: parseFloat(cs.borderTopWidth), borderStyle: cs.borderTopStyle, shadow: cs.boxShadow, shadowAlphas: shadowAlphas(cs.boxShadow), page: toRgba(getComputedStyle(document.body).backgroundColor) }
       },
       /**
-       * S05：面板開著時世界有沒有被蓋住 —— 掃**整份文件**（不只世界容器的後代：portal、兄弟節點也算）裡有底色、跟世界區相交的可見元素
-       *（排除面板本身與它的後代、世界容器與它的祖先、canvas），把它們的矩形聯集用 40×40 的格點取樣算出蓋住世界區的比例。
-       * 一個 90% 的、兩個 50% 的、四個 25% 的都一樣算（審查：單一元素 ≥ 90% 會被分片繞過）。合法的 HUD（聊天框、門標籤、在線人數）加起來遠低於門檻。
+       * S05：面板開著時世界有沒有被蓋住 —— 掃**整份文件**（不只世界容器的後代：portal、兄弟節點也算）裡「會畫東西」的可見元素：
+       * 底色 alpha > 0、背景圖、backdrop-filter、或 ::before／::after 有底色；跟世界區相交；排除面板本身與它的後代、世界容器與它的祖先、canvas，
+       * 以及**點名的合法 HUD**（聊天框、在線人數、走廊提示、門標籤、互動提示）。其餘的矩形聯集用 40×40 的格點取樣 —— 要是**零**
+       *（審查：單一元素 ≥ 90% 會被分片繞過；「≤ 20%」會把 HUD 的 7.5% 變成新的容許量）。
        */
       worldCovers(panelSel) {
         const worldEl = document.querySelector('[data-testid="world-canvas-container"]')
         const w = rect(worldEl)
         const panel = document.querySelector(panelSel)
+        const HUD = '[data-testid="scene-chat"], [data-testid="online-count"], [data-testid="rooms-notice"], [data-testid="door-labels"], [data-testid="interaction-prompt"]'
         const ancestors = new Set(); for (let n = worldEl; n; n = n.parentElement) ancestors.add(n)
-        const boxes = [...document.querySelectorAll('body *')].filter((el) => el !== panel && !panel.contains(el) && !ancestors.has(el) && el.tagName !== 'CANVAS' && visible(el))
-          .filter((el) => toRgba(getComputedStyle(el).backgroundColor)[3] > 0)
+        const paints = (el) => {
+          const cs = getComputedStyle(el)
+          if (toRgba(cs.backgroundColor)[3] > 0 || cs.backgroundImage !== 'none' || (cs.backdropFilter ?? 'none') !== 'none') return true
+          return ['::before', '::after'].some((p) => { const ps = getComputedStyle(el, p); return ps.content !== 'none' && toRgba(ps.backgroundColor)[3] > 0 })
+        }
+        const boxes = [...document.querySelectorAll('body *')].filter((el) => el !== panel && !panel.contains(el) && !ancestors.has(el) && el.tagName !== 'CANVAS' && el.closest(HUD) === null && visible(el))
+          .filter(paints)
           .map((el) => ({ el, r: rect(el) })).filter(({ r }) => r.right > w.left && r.left < w.right && r.bottom > w.top && r.top < w.bottom)
         let hit = 0
         const N = 40
@@ -183,7 +190,7 @@ try {
     await openList(page)
     await surfaceChecks(page, '看板', '[data-testid="list-panel"]')
     const covers = await page.evaluate(() => window.__ds.worldCovers('[data-testid="list-panel"]'))
-    covers.fraction <= 0.2 ? ok(`[S05] 看板開著時世界區被有底色的元素蓋住 ${(covers.fraction * 100).toFixed(1)}%（HUD：${covers.who.join('、')}）`) : bad(`[S05] 看板開著時世界區被蓋住 ${(covers.fraction * 100).toFixed(1)}%`, covers.who.join('、'))
+    covers.fraction === 0 ? ok('[S05] 看板開著時，點名的 HUD 以外沒有任何東西蓋住世界區（0%）') : bad(`[S05] 看板開著時世界區被蓋住 ${(covers.fraction * 100).toFixed(1)}%`, covers.who.join('、'))
   })
   await run(context, 'S05 收件匣', async (page) => { await openInboxList(page); await surfaceChecks(page, '收件匣', '[data-testid="inbox-panel"]') })
   await run(context, 'S05 名片', async (page) => { await openProfile(page); await surfaceChecks(page, '我的名片', '[data-testid="profile-panel"]') })
@@ -202,7 +209,8 @@ try {
     await world(page, `?panel=projects&project=${MINE_ACTIVE.id}`)
     await page.click('[data-testid="owner-actions-body"] >> text=結案')
     await page.waitForSelector('[data-testid="close-project-confirm"]')
-    await scrimChecks(page, '結案確認', '[data-testid="list-panel"] [data-testid="panel-scrim"]', '[data-testid="list-panel-content"]', ['[data-testid="list-panel-list"]', '[data-testid="list-panel-overlay"]'])
+    // 被遮的內容區（body 與子畫面）加標題列都要 inert：視窗外的操作一個都不能達（審查：不然 Tab 從視窗溜到返回／關閉）
+    await scrimChecks(page, '結案確認', '[data-testid="list-panel"] [data-testid="panel-scrim"]', '[data-testid="list-panel-content"]', ['[data-testid="list-panel-list"]', '[data-testid="list-panel-overlay"]', '[data-testid="list-panel"] > header'])
     await page.screenshot({ path: path.join(OUT, 'shell-close-confirm.png') })
     await page.click('[data-testid="close-project-confirm"] >> text=取消')
     await page.waitForSelector('[data-testid="close-project-confirm"]', { state: 'detached' })
@@ -211,7 +219,7 @@ try {
   await run(context, 'S06 放棄修改確認', async (page) => {
     await openProfile(page); await page.click('[data-testid="profile-panel"] >> text=編輯'); await page.fill('[data-testid="profile-form"] textarea', '改了字'); await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="profile-discard-confirm"]')
-    await scrimChecks(page, '放棄修改確認', '[data-testid="profile-panel"] [data-testid="panel-scrim"]', '[data-testid="profile-panel-content"]', ['[data-testid="profile-panel-body"]'])
+    await scrimChecks(page, '放棄修改確認', '[data-testid="profile-panel"] [data-testid="panel-scrim"]', '[data-testid="profile-panel-content"]', ['[data-testid="profile-panel-body"]', '[data-testid="profile-panel"] > header'])
     await page.click('[data-testid="profile-discard-confirm"] >> text=繼續編輯')
     await page.waitForSelector('[data-testid="profile-discard-confirm"]', { state: 'detached' })
     ;(await page.$('[data-testid="profile-panel"] [data-testid="panel-scrim"]')) === null ? ok('[S06] 放棄修改確認關了、遮罩不在') : bad('[S06] 放棄修改確認關了遮罩還在')

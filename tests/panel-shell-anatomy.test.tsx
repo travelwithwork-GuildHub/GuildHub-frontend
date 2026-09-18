@@ -45,7 +45,7 @@ describe('阻斷式面板的解剖', () => {
     expect(backs).toBe(1)
   })
 
-  it('[FE-X16-S06] PanelDialog：遮罩層掛在內容區上、內容區 inert、標題列不 inert；卸掉之後 inert 拿掉', () => {
+  it('[FE-X16-S06] PanelDialog：遮罩層掛在內容區上（不蓋標題列）、內容區與標題列都 inert；卸掉之後 inert 拿掉', () => {
     const view = render(
       <InteractionProvider>
         <PanelShell title="殼" closeLabel="關閉" testId="p" onCloseRequest={() => {}}>
@@ -63,7 +63,8 @@ describe('阻斷式面板的解剖', () => {
     expect(within(scrim).getByTestId('dlg')).toBeDefined()
     expect(screen.getByTestId('p-body').hasAttribute('inert'), '內容區要 inert').toBe(true)
     expect(screen.getByTestId('p-content').contains(scrim), '遮罩要在內容區的容器裡、不蓋標題列').toBe(true)
-    expect((section.firstElementChild as HTMLElement).hasAttribute('inert')).toBe(false)
+    // 標題列不被遮罩蓋（遮罩在內容區容器裡），但視窗開著時它也 inert：視窗外的操作一個都不能達
+    expect((section.firstElementChild as HTMLElement).hasAttribute('inert')).toBe(true)
     view.rerender(
       <InteractionProvider>
         <PanelShell title="殼" closeLabel="關閉" testId="p" onCloseRequest={() => {}}>
@@ -72,6 +73,7 @@ describe('阻斷式面板的解剖', () => {
       </InteractionProvider>,
     )
     expect(screen.getByTestId('p-body').hasAttribute('inert')).toBe(false)
+    expect((section.firstElementChild as HTMLElement).hasAttribute('inert')).toBe(false)
     expect(screen.queryByTestId('panel-scrim')).toBeNull()
   })
 
