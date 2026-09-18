@@ -30,9 +30,9 @@
 
 ## 3a. `--close`：結案（`project-lifecycle`〈結案要確認…〉、〈動作跟著狀態走〉的 active 半邊；design D6）
 
-- [ ] 3a.1 `tests/project-close.test.tsx`：`S01`（active → 結案、沒有成軍）、`S07`（取消／Escape 不送、焦點回結案且開著時焦點在「取消」、送出中連按一次且同一 tick 按返回被擋、成功後沒有按鈕、`refresh` 一次、不重取列表、500／403 語彙留著）；先 commit 紅
-- [ ] 3a.2 `OwnerActions`：結案按鈕、`CloseConfirm`（`alertdialog`、不宣告 modal、`aria-disabled`、焦點在取消、Escape ＝ 取消、`flushSync` 還焦點）、`confirmClose`（ref guard 連按、`enterBusy`／`leaveBusy`）
-- [ ] 3a.3 **突變**：取消也送 close → `S07` 紅；結案也 reload 列表 → `S07` 紅；成功不 `refresh` → `S07` 紅；送出中不擋關閉 → `S07` 紅
+- [x] 3a.1 `tests/project-close.test.tsx`：`S07`（取消／Escape 不送、焦點回結案且開著時焦點在「取消」、送出中連按一次且同一 tick 按返回被擋、成功後沒有按鈕、`refresh` 一次、不重取列表、500／403 語彙留著）；`S01` 的 active 半邊（有結案沒成軍）補進 `project-lifecycle.test.tsx`；J04 三個測試檔共用的樹與手勢抽到 `tests/support/project-lifecycle.tsx`；先 commit 紅（3 條紅、S02～S04 仍綠）
+- [x] 3a.2 `OwnerActions`：結案按鈕、`CloseConfirm`（`alertdialog`、不宣告 modal、`aria-disabled`、焦點在取消、Escape ＝ 取消、`flushSync` 還焦點）、`confirmClose`（ref guard 連按、`enterBusy`／`leaveBusy`）
+- [x] 3a.3 **突變**：取消也送 close → `S07` 紅；結案也 reload 列表 → `S07` 紅；成功不 `refresh` → `S07` 紅；送出中不擋關閉 → `S07` 紅；另加：取消不還焦點、連按沒 guard、送出中 Escape 仍取消 → 都 `S07` 紅（7／7）
 
 ## 3b. `--reveal`：密碼只在這一次詳情裡呈現（`project-lifecycle`〈密碼只在這一次詳情裡呈現…〉；design D3／D4）
 
