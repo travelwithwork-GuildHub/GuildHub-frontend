@@ -36,36 +36,45 @@
 不透明底＋`3:1` 的邊界＋一層陰影，對比可以量一次、跟世界無關。**代價**：面板蓋住的那一塊世界完全看不到 ——
 但那本來就是「阻斷式」的意思（世界鎖著）。
 
-### D3｜一次一個阻斷式面板：一個協調者，provider 向它登記
+### D3｜一次一個阻斷式面板：協調者持有「掛載中的面板」，讓位是兩個同步函式，拒絕有回饋
 
-三個 provider 互不知道對方，所以「開第二個關第一個」要有一個**共同的持有者**。做法：`src/panel/BlockingPanelCoordinator.tsx`
-提供 `useBlockingPanel(id, { open, onCloseRequest })`：provider 開面板時 `claim(id)`，協調者對目前持有者呼叫它的 `onCloseRequest()` ——
-**這是既有的「關閉是意圖」語意**（`PanelShell` 的註解）：持有者可以拒絕（送出中、未儲存要先問）。拒絕時 `claim` 回 `false`，呼叫端不開。
-`FE-K01-S02`「從名片寄信：看板關、收件匣開」改走協調者，不再是特例。
+三個 provider 互不知道對方，所以「開第二個關第一個」要有一個共同的持有者。第一版寫的是「呼叫既有的 `onCloseRequest()`、看它接不接受」——
+兩個審查者同時指出那條路走不通：`onCloseRequest` 是 `() => void`，接受／拒絕沒有回傳；「有未儲存的修改要先問」是非同步的人類決策；
+React 的 state 更新也不同步 —— `claim()` 不可能同步知道結果。所以改成：
 
-非阻斷的表面**讀**協調者（`useBlockingPanelOpen(): boolean`）決定要不要讓位；它們不登記（登記了就會被當成阻斷式、被關掉）。
+- **持有者由殼登記**：`PanelShell` 掛載時向協調者登記 `{ id, canYield, yield }`，卸載時釋放（effect cleanup；同 id 重複登記冪等，Strict Mode 兩次掛載安全）。
+  「掛載中的阻斷式面板 ≤ 1」因此是協調者**看得到**的事實（登記表的大小），不是各 provider 的 `open` 旗標各自宣稱。
+- **`canYield(): boolean` 同步**：每個面板今天就同步知道自己能不能立刻關 —— 送出中（`busy` ref）、名片有未儲存的修改（dirty）→ `false`。
+  讓位**不替使用者回答**「要放棄修改嗎」：那是非同步的問題，讓位直接算拒絕（`S14` 第三段）。
+- **`yield(): void` 同步**：確定關閉，走 provider 既有的關閉路徑（看板的網址退照舊），但**不把焦點還給開啟者**（`S13` 焦點只動一次）——
+  今天 `ProfilePanelProvider` 在卸載後的 effect 裡還焦點，讓位時要跳過那一步（用一個「這次關閉是讓位」的旗標）。
+- **請求同步**：provider 的 `openX()` 先 `coordinator.requestOpen()`：沒有持有者 → `true`；`canYield()` → `yield()` 後 `true`；否則 `false`
+  並發一則 `role="status"` 的回饋（`toast` 層；文案不是契約）。呼叫端拿到 `false` 就不動自己的 state —— 不會先開再關、不閃。
+  同一次事件裡的多個請求依呼叫順序處理（協調者的登記表是 ref，不是 state，所以同批次看得到前一個請求的結果）。
+- **網址**：看板讓位走既有關閉路徑 → `PanelUrlSync` 照 `FE-B09` 退網址。上一頁／下一頁的 `restore` 也經過 `requestOpen()`；被拒 → `replaceState` 改回實際狀態
+  （`FE-B09-S05` canonical 的同一招）、不動畫面（`S17`）。收件匣與名片不進網址（那是 `FE-B09` 的規格變更，不做）。
 
-為什麼不做成「路由決定開哪個」：`PanelUrlSync` 只同步看板（`FE-B09`），收件匣與名片不在網址裡，而把它們塞進網址是 `FE-B09` 的規格變更。
-**代價**：多一個 context；provider 的開面板路徑多一次同步的 `claim`。**Supersedes**: 無（`fe-k01-inbox` 的「看板關」是實作細節，不是決策）。
-ADR：`docs/adr/0011-one-blocking-panel-at-a-time.md`。
+非阻斷的表面（訪客提示、聊天框、彈出層）**只讀**協調者（`useBlockingPanelOpen(): boolean`，從登記表推導），不登記。
+為什麼不做成「路由決定開哪個」：見 ADR 0011 選項 B。**代價**：多一個 context、殼多兩個 prop（`canYield`、`onYield`）、provider 開面板多一次同步請求。
+**Supersedes**: 無。ADR：`docs/adr/0011-one-blocking-panel-at-a-time.md`。
 
-### D4｜三級控制項仍然是字串常數；「唯一主要動作」由判準守，不由執行期擋
+### D4｜三級控制項仍然是字串常數；「至多一個主要動作」以操作區為單位、由判準守
 
-`FE-X13` 兩個審查者共同的警告：不要長出帶 API 的元件庫。所以：`PRIMARY`／`SECONDARY`／`TERTIARY`（新增）／`FIELD` 仍然是字串，
-呼叫端自己選。「每個表面恰好一個啟用中的主要動作」是**判準**（`S09` 逐表面數），不是執行期的 registry ——
-執行期擋的話，第二個主要動作會靜默降級，畫面看起來對、程式碼是錯的。
+`FE-X13` 兩個審查者共同的警告：不要長出帶 API 的元件庫。所以 `PRIMARY`／`SECONDARY`／`TERTIARY`（新增）／`FIELD` 仍然是字串常數，
+呼叫端自己選；常數帶 `data-tier`，判準數屬性不比 class。
 
-「下一步」的動態切換（複製前主要動作是複製、複製後是進入世界）由呼叫端依狀態換常數，不是常數自己有狀態。
-確認視窗（結案）維持既有的「取消是主要、確認是次要」（安全預設；`FE-J04` 已談定），不改成紅色主要動作 —— 那是視覺變更以外的行為變更。
-
-`/login` 今天有三個 `PRIMARY`（進入世界、帳號登入、註冊）—— 改成只有暱稱那條是主要，帳號那一塊是次要。
-**代價**：帳號登入的人多看一眼；demo 的路是暱稱。
+第一版寫「每個表面恰好一個啟用中的主要動作，而且是下一步」—— 兩個審查者都指出這是最可能做錯的決定：`/login` 三個表單是三個意圖、
+送出中／載入中／權限阻擋的畫面合理地沒有前進動作、結案確認的「取消是主要」證明主要其實是「推薦」不是「下一步」。改成：
+**以操作區（一個表單、一個面板畫面的動作列、一個確認視窗）為單位，同一狀態下至多一個；有明確的前進動作時它是主要；
+關閉／返回／取消不為了湊數升級；零個合法**（`S09` 逐操作區列出期望）。`/login` 三個表單各自可以有主要動作，暱稱那條靠版面順序與標題層次領先，
+不靠降級別人的按鈕。「主要＝推薦的前進動作」在確認視窗上就是安全的那一個（取消），跟 `FE-J04` 一致。
+「唯一」由判準守、不由執行期擋 —— 執行期擋的話第二個主要動作會靜默降級，畫面看起來對、程式碼是錯的。
 
 ### D5｜聊天框「收成一行」只讀協調者，不碰 transport 與記憶體
 
 `SceneChatHud` 讀 `useBlockingPanelOpen()`：`true` 時只畫一行（區域名稱＋期間新到的數）；`log` 照舊由 `SceneChatProvider` 持有，
 所以展開時訊息都在（`S16`）。「期間新到的數」＝收起時記下 `log.length`，之後 `log.length − 那個數`（換場景清空時歸零）。
-收起狀態沒有輸入框，所以世界鎖不可能由它持有。**代價**：面板開著時看不到訊息內容 —— 但面板開著時世界本來就鎖著，
+收起狀態沒有輸入框，所以世界鎖不可能由它持有。捲動位置：收起時列表卸載會丟 `scrollTop`，所以收起前記下「在不在底部」與 `scrollTop`，展開後在 layout effect 裡還原（在底部 → 捲到底；不在 → 還原 `scrollTop`，有新的就亮「回到最新」）—— `scene-chat-ui` S11／S12 的狀態跨過收起／展開（`S16` 第三段）。**代價**：面板開著時看不到訊息內容 —— 但面板開著時世界本來就鎖著，
 而且那正是使用者說的「混亂」。
 
 ### D6｜token 的值：Minimalism & Swiss 的中性灰階＋一個強調色，值在實作量出來
@@ -84,17 +93,18 @@ ADR：`docs/adr/0011-one-blocking-panel-at-a-time.md`。
 - 對比、字級、尺寸、時長、alpha、rect：只有真瀏覽器算得出來（jsdom 不載 CSS，`getComputedStyle` 回空字串 → `S04` 明寫空字串要紅）。
   新 `tests/e2e/dom-visual.mjs`，沿用 `control-contrast.mjs` 的量法（畫到 canvas 讀 pixel）。跑法同 `FE-J04`：`next start`＋`internal`。
 - 結構（標題列順序、返回／關閉位置、一次一個面板、提示讓位、聊天收起、主要動作計數）：jsdom 判準，`tests/dom-visual-*.test.tsx`。
-  `S09` 的「恰好一個」用 `data-tier="primary"` 這種**由常數帶出來**的屬性數（常數是唯一來源，屬性跟著它走；判準不比 class 字串）。
-- 突變（tasks 第 6 節）：拿掉 token → `S01`／`S03`／`S05` 紅；協調者不呼叫 `onCloseRequest` → `S13` 紅；拒絕不回 `false` → `S14` 紅；
-  聊天框不讀協調者 → `S16` 紅；把 `reduce` 的 media query 拿掉 → `S12` 紅。
+  `S09` 的「至多一個」用 `data-tier="primary"` 這種**由常數帶出來**的屬性數（常數是唯一來源，屬性跟著它走；判準不比 class 字串）。
+- 突變（tasks 第 6 節）：拿掉 token → `S01`／`S03`／`S05` 紅；協調者不 `yield()` 就開 → `S13` 紅；`canYield` 恆真 → `S14` 紅；讓位時還焦點給開啟者 → `S13` 焦點只動一次紅；上一頁被拒不 `replaceState` → `S17` 紅；
+  聊天框不讀協調者 → `S16` 紅；把 `reduce` 的 media query 拿掉 → `S12` 紅；`PanelShell` 的 `<header>` 留在捲動容器裡 → `S08` 紅（Gemini 抓到 tasks 第一版把 overflow 加在含標題列的容器上）。
 
-### D8｜效能預算：零新請求、JS `≤ +4 KB`、CSS `≤ +6 KB`（gzip）
+### D8｜效能預算：零新靜態請求、JS `≤ +4 KB`、CSS `≤ +6 KB`（gzip）、基線固定
 
 估：協調者 context ≈ 1 KB、聊天收起 ≈ 0.5 KB、`PanelShell` 解剖 ≈ 0.5 KB、各表面換常數 ≈ 0.5 KB；Tailwind 只產用到的 class，
-新 token 與三級控制項 ≈ 2–4 KB CSS。基線在第一片實作 PR 量（`FE-J04` 的量法：`--reveal` 163,149 → 163,853 B gz）。
+新 token 與三級控制項 ≈ 2–4 KB CSS。基線＝這份規格合併時 `main` 的 SHA（寫進 tasks 1.3），量法寫在 Requirement 裡（build manifest 的 `/world` 入口 chunk 各自 gzip 加總；同一 lockfile 與 Node）；裁決只在最後一片合併前對基線做一次，每片的數字是觀察（`FE-J04` 的量法：`--reveal` 163,149 → 163,853 B gz）。請求清單在真瀏覽器記（不含 `/api/*` 與 WS），前後相同。
 
 ## 待答問題
 
+- `S19` 標題列與面板的幾何：面板掛在 `WorldCanvas` 的 `relative h-full w-full` 容器裡，那個容器在標題列**下方**的世界區（`src/app/world/page.tsx`：標題列 `div` → `OtherTabNotice` → `SceneNotices` → 世界區 `div.relative`），所以面板的 `absolute top-gutter` 是相對世界區，不會蓋到標題列。判準仍量 rect 不相交，因為這是版面沒有測試守著的假設。
 - `S07` 五個面板寬度相同：今天名片面板是不是也用 `PanelShell` 的寬 —— 是（`ProfilePanel` 用殼）。`AvatarPicker` 是彈出層不算。
-- `S17` 房間裡的標題列多「回到 Guild Hall」：品牌＋身分＋收件匣＋換角色＋回大廳＝5，剛好在上限；`FE-K05` 的狀態入口進來就要合併某個 —— 記在 `FE-K05` 的規格。
+- `S19` 房間裡的標題列多「回到 Guild Hall」：品牌＋身分＋收件匣＋換角色＋回大廳＝5，剛好在上限；`FE-K05` 的狀態入口進來就要合併某個 —— 記在 `FE-K05` 的規格。
 - 陰影與 3D 底的可辨識度沒有數字門檻（`box-shadow ≠ none` 只是存在性）—— 用截圖對，不進 CI。
