@@ -30,7 +30,8 @@ const HEADED = process.env.HEADED === '1'
 
 const uuid = (n) => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`
 // `expires_at` 釘在「當下 ＋7 天」：卡片的「剩幾天」是 `ceil`（`FE-B02-S07`），從這裡到瀏覽器畫出來差的那幾百毫秒吸得掉、一定是 7。
-const PROJECTS = ['案件甲', '案件乙', '案件丙'].map((title, i) => ({
+// 12 筆：列表要溢出面板才捲得動（FE-B03-S13 要驗返回之後的 scrollTop）。第一筆仍是「案件甲」（S01 看它）。
+const PROJECTS = ['案件甲', '案件乙', '案件丙', ...Array.from({ length: 9 }, (_, i) => `案件 ${i + 4}`)].map((title, i) => ({
   id: uuid(i + 1),
   owner_id: uuid(99),
   title,
@@ -102,9 +103,11 @@ try {
   // 案件詳情（FE-B03-S14）：詳情端點回的 body 刻意跟列表那一筆不同；發案者名片另一個端點。
   const PROJECT_DETAIL = { ...PROJECTS[0], body: '詳情端點回的內容：做一個小房間。' }
   const OWNER = { id: uuid(99), display_name: '發案的人', avatar_id: 1, skills: ['React'], hours_per_week: null, bio: null, updated_at: '2026-09-09T00:00:00Z' }
-  await page.route(`**/api/projects/${PROJECTS[0].id}`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROJECT_DETAIL) }),
-  )
+  for (const p of PROJECTS) {
+    await page.route(`**/api/projects/${p.id}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(p.id === PROJECTS[0].id ? PROJECT_DETAIL : p) }),
+    )
+  }
   await page.route(`**/api/profiles/${OWNER.id}`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(OWNER) }),
   )
@@ -194,6 +197,46 @@ try {
         else bad('[FE-B03-S13] 返回之後列表不對', `${stillThree} 張卡`)
         if (hits.projects === 1) ok('[FE-B03-S13] 返回沒有重打列表（仍是 1 次 /api/projects）')
         else bad('[FE-B03-S13] 返回時重打了列表', `${hits.projects} 次`)
+
+        // ── FE-B03-S13：真的捲動 —— 把列表捲到第 2、3 張卡在視窗裡，用滑鼠點第 2 張（在畫面上、不會被 scrollIntoView 動到），返回後 scrollTop 要一樣 ──
+        // jsdom 沒有排版引擎，手動塞的 scrollTop 永遠留著、驗不到；這裡是唯一能驗它的地方（審查抓到的）。
+        const LIST = '[data-testid="list-panel"] ul'
+        const scrolled = await page.$eval(LIST, (ul) => { ul.scrollTop = 150; return ul.scrollTop })
+        if (scrolled > 0) ok(`[FE-B03-S13] 列表捲得動（scrollTop ${scrolled}）`)
+        else bad('[FE-B03-S13] 列表捲不動 —— 12 筆沒有溢出面板？量測壞了', '')
+        await page.waitForTimeout(100)
+        // 點一張**完全在視窗裡**的卡：半露的卡 Playwright 會先 scrollIntoView 再點、返回時 focus() 也會捲 —— 那是量測動到了尺，不是產品
+        const visibleId = await page.$eval(LIST, (ul) => {
+          const r = ul.getBoundingClientRect()
+          for (const c of ul.querySelectorAll('[data-testid="project-card"]')) {
+            const b = c.getBoundingClientRect()
+            if (b.top >= r.top && b.bottom <= r.bottom) return c.getAttribute('data-project-id')
+          }
+          return null
+        })
+        if (visibleId === null) bad('[FE-B03-S13] 捲動後沒有一張卡完全在視窗裡 —— 量測壞了', '')
+        const before = await page.$eval(LIST, (ul) => ul.scrollTop)
+        await page.locator(`[data-testid="project-card"][data-project-id="${visibleId}"]`).click()
+        await page.waitForSelector('[data-testid="project-detail"][data-phase="ready"]', { timeout: 5_000 })
+        await page.getByTestId('project-detail').getByRole('button', { name: '返回' }).click()
+        await page.waitForSelector('[data-testid="project-detail"]', { state: 'detached', timeout: 5_000 })
+        const after = await page.$eval(LIST, (ul) => ul.scrollTop)
+        if (after === before && before > 0) ok(`[FE-B03-S13] 返回之後捲動位置還在（${after}）`)
+        else bad('[FE-B03-S13] 返回之後捲動位置變了', `進去前 ${before}，回來 ${after}`)
+        const backTo2 = await page.evaluate(() => document.activeElement?.getAttribute('data-project-id') ?? null)
+        if (backTo2 === visibleId) ok('[FE-B03-S14] 返回之後焦點回到那張（捲動後點的）卡')
+        else bad('[FE-B03-S14] 返回之後焦點沒回到那張卡', `${backTo2}`)
+
+        // ── FE-B03-S02：Space 也開得了（焦點還在那張卡上）──
+        await page.keyboard.press('Space')
+        const bySpace = await page.waitForSelector('[data-testid="project-detail"]', { timeout: 5_000 }).catch(() => null)
+        if (bySpace !== null && (await bySpace.getAttribute('data-project-id')) === visibleId) ok('[FE-B03-S02] 按 Space 開出了那一筆的詳情')
+        else bad('[FE-B03-S02] 按 Space 沒有開出那一張的詳情', '')
+        await page.waitForSelector('[data-testid="project-detail"][data-phase="ready"]', { timeout: 5_000 }).catch(() => null)
+        await page.getByTestId('project-detail').getByRole('button', { name: '返回' }).click()
+        await page.waitForSelector('[data-testid="project-detail"]', { state: 'detached', timeout: 5_000 })
+        if (hits.projects === 1) ok('[FE-B03-S13] 三進三出，列表仍只取了 1 次')
+        else bad('[FE-B03-S13] 列表被重取了', `${hits.projects} 次`)
       }
     }
   }

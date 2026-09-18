@@ -130,7 +130,19 @@ function ProjectBoard() {
   const closeIntentRef = useRef<(() => void) | null>(null)
   const focusBeforeConfirm = useRef<HTMLElement | null>(null)
   // 表單開著時身分不再是 signed-in（登出、問不到）：入口沒了，表單跟著收（推導，不另設狀態）。
-  const formOpen = composing && signedIn
+  // 詳情開著時也沒有表單（overlay 一次只放一個）—— 而且**表單狀態要真的收掉**，不是只藏起來：
+  // 表單開著時上一頁／下一頁／深連結帶 `project` 進來，導航贏（跟離開頁面一樣，草稿不留）；返回列表時不能再冒出一張空白表單、
+  // 也不能讓「私訊發案者」的 `closePanel` 繞過表單的 dirty 確認（審查抓到的）。
+  const formOpen = composing && signedIn && selected === null
+  // 「記住上一次繪製的 selected」：換成非 null 的那一格就把表單狀態收掉（繪製期間 setState，不等 effect —— `useProfileDetail` 同一個模式）
+  const [seenSelected, setSeenSelected] = useState(selected)
+  if (selected !== seenSelected) {
+    setSeenSelected(selected)
+    if (selected !== null) {
+      setComposing(false)
+      setConfirming(false)
+    }
+  }
 
   const onClose = () => {
     const requestClose = closeIntentRef.current

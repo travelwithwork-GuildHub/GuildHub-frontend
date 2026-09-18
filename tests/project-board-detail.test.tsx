@@ -137,6 +137,30 @@ describe('返回列表時，頁碼與捲動位置都還在', () => {
   })
 })
 
+describe('表單與詳情共用 overlay：導航贏', () => {
+  it('[FE-B03-S13] 表單開著（有輸入）時網址帶 project 進來：詳情蓋上、返回之後沒有表單、焦點回那張卡', async () => {
+    await mount(many(2))
+    fireEvent.click(within(screen.getByTestId('list-panel')).getByRole('button', { name: '發案' }))
+    const title = await within(screen.getByTestId('create-project-form')).findByLabelText('標題')
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(title, '打了一半的草稿')
+      title.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    server.replyFor(detailPath(UUID(1)), 200, project(1))
+    server.replyFor(`/api/profiles/${OWNER.id}`, 200, OWNER)
+    // 上一頁／下一頁／深連結：provider 的 `restore` 直接帶 project 進來（`WorldUrlSync` 的 popstate 就是走這條）
+    act(() => grabbed.list!.restore({ panel: 'projects', profile: null, project: UUID(1), page: 0 }))
+    await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
+    expect(screen.queryByTestId('create-project-form'), '詳情開著表單還在').toBeNull()
+    fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
+    expect(screen.queryByTestId('project-detail')).toBeNull()
+    expect(screen.queryByTestId('create-project-form'), '返回之後冒出一張空白表單').toBeNull()
+    expect(screen.getByTestId('list-panel-list')).not.toHaveAttribute('inert')
+    expect(cards()).toHaveLength(2)
+    expect(document.activeElement, '焦點沒回到那張卡（列表 inert 的話 focus 會失敗、掉到 body）').toBe(cards()[1])
+  })
+})
+
 describe('動作列只放做得到的', () => {
   it('[FE-B03-S10] 非 owner 按「私訊發案者」：看板關、收件匣開著在與 owner 的對話', async () => {
     await mount(many(1))
