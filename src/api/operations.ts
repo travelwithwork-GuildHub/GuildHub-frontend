@@ -219,6 +219,73 @@ export async function sendMessage(input: contract.MessageCreate) {
   }, contract.MessageOut)
 }
 
+// ---------------------------------------------------------------- 專案資源
+
+/**
+ * 一個專案的資源清單（`BE-G12`）。固定以 `(created_at, id)` 排序，**沒有分頁** ——
+ * 上限是 `LIMITS.resourcesPerProject`，一次就回得完。
+ */
+export async function listResources(projectId: string) {
+  return send(
+    'listResources',
+    {
+      method: 'GET',
+      path: '/api/projects/{project_id}/resources',
+      params: { project_id: projectId },
+    },
+    z.array(contract.ProjectResourceOut),
+  )
+}
+
+/** ⚠️ **滿了是 409，不是例外** —— 上限由後端的 `MAX_RESOURCES` 擋（`LIMITS.resourcesPerProject`）。 */
+export async function createResource(projectId: string, input: contract.ProjectResourceCreate) {
+  return send(
+    'createResource',
+    {
+      method: 'POST',
+      path: '/api/projects/{project_id}/resources',
+      params: { project_id: projectId },
+      body: contract.ProjectResourceCreate.parse(input),
+    },
+    contract.ProjectResourceOut,
+  )
+}
+
+/**
+ * ⚠️ **只送有改的鍵。** `ProjectResourceUpdate` 三個欄位都是 `.optional()`，
+ * 解析後的結果只含有給的鍵 —— 所以把整份表單丟進來會連沒改的一起送，
+ * 而那會蓋掉別人在這期間改的欄位（判準在 `--form` 那一片的 `S17`／`S18`）。
+ */
+export async function updateResource(
+  projectId: string,
+  resourceId: string,
+  input: contract.ProjectResourceUpdate,
+) {
+  return send(
+    'updateResource',
+    {
+      method: 'PATCH',
+      path: '/api/projects/{project_id}/resources/{resource_id}',
+      params: { project_id: projectId, resource_id: resourceId },
+      body: contract.ProjectResourceUpdate.parse(input),
+    },
+    contract.ProjectResourceOut,
+  )
+}
+
+/** ⚠️ **回 204、沒有 body** —— 所以輸出是 `z.void()`，不是某個實體。 */
+export async function deleteResource(projectId: string, resourceId: string) {
+  return send(
+    'deleteResource',
+    {
+      method: 'DELETE',
+      path: '/api/projects/{project_id}/resources/{resource_id}',
+      params: { project_id: projectId, resource_id: resourceId },
+    },
+    z.void(),
+  )
+}
+
 // ---------------------------------------------------------------- 走廊門位
 
 /** ⚠️ `online_count` **不會自己更新** —— 要自行輪詢。 */

@@ -383,6 +383,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Resources
+         * @description 清單。固定排序，不分頁（上限 50 筆，分頁只會多一個沒人用的參數）。
+         *
+         *     還在招募的專案回空陣列給發起人：房間還沒開，沒有東西可看，但那不是錯誤。
+         *     結案的專案只有發起人讀得到 —— **不能靠 room token 擋**，因為 `/close`
+         *     不清 `password_hash`，結案之後照樣換得到票（前端 FE-N08 的規格也記了
+         *     這件事）。所以這裡自己查 status。
+         */
+        get: operations["list_resources_api_projects__project_id__resources_get"];
+        put?: never;
+        /**
+         * Create Resource
+         * @description 新增一筆。上限 50 筆，滿了回 409。
+         *
+         *     計數寫在 insert 的 where 裡，跟鎖是**分開的兩句**（見檔頭）。
+         */
+        post: operations["create_resource_api_projects__project_id__resources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}/resources/{resource_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Resource
+         * @description 硬刪除。第二次刪同一筆是 404 —— 「我剛刪掉」與「有人先刪了」對使用者
+         *     是兩件事，前端要分得出來。
+         */
+        delete: operations["delete_resource_api_projects__project_id__resources__resource_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Resource
+         * @description 真正的 partial update：沒給的欄位不動，送 `{}` 回 200 原樣。
+         *
+         *     `{}` 回 422 看起來比較嚴格，但那會讓「沒有改動就不要送」變成前端的義務，
+         *     而 `PATCH /api/profiles/me` 早就是回 200 原樣 —— 同一個動詞在同一個 API
+         *     裡有兩種語意，才是真正的坑。
+         */
+        patch: operations["update_resource_api_projects__project_id__resources__resource_id__patch"];
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -598,6 +658,58 @@ export interface components {
             updated_at: string;
         };
         /**
+         * ProjectResourceCreate
+         * @description POST。長度與 URL scheme 刻意不在這裡驗（[P15]），由資料庫的 check 擋。
+         */
+        ProjectResourceCreate: {
+            /** Label */
+            label: string;
+            type: components["schemas"]["ResourceType"];
+            /** Url */
+            url: string;
+        };
+        /** ProjectResourceOut */
+        ProjectResourceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Label */
+            label: string;
+            type: components["schemas"]["ResourceType"];
+            /** Url */
+            url: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * ProjectResourceUpdate
+         * @description PATCH。未給的欄位不動，給了 null 是 422。
+         *
+         *     型別寫 `str` 而不是 `str | None`，是因為這三欄在資料庫都是 NOT NULL ——
+         *     「把它清空」沒有對應的合法狀態。預設值 None 只代表「這次沒給」，
+         *     由 `model_fields_set` 分辨，不會被當成要寫進去的值。
+         *
+         *     id / project_id / created_at 不在這裡：它們不是可以改的東西，
+         *     而未知欄位會被 Pydantic 靜默忽略（全 repo 都沒有設 extra）。
+         */
+        ProjectResourceUpdate: {
+            /** Label */
+            label?: string;
+            type?: components["schemas"]["ResourceType"];
+            /** Url */
+            url?: string;
+        };
+        /**
          * ProjectStatus
          * @description 對應 sql 的 project_status enum。
          * @enum {string}
@@ -622,6 +734,16 @@ export interface components {
             /** Nickname */
             nickname: string;
         };
+        /**
+         * ResourceType
+         * @description 對應 `project_resources.type` 的 check。
+         *
+         *     鏡像資料庫的合法值，理由跟 ProjectStatus 一樣：這是有限集合，不是長度
+         *     規則 —— 把它留給資料庫會讓「打錯一個字」變成 500 而不是 422。
+         *     V1 沒有 other：未分類的連結會讓前端的 icon 推導失去意義。
+         * @enum {string}
+         */
+        ResourceType: "github" | "figma" | "notion" | "drive" | "meeting";
         /**
          * RoomDoorOut
          * @description 全案唯一合併兩層的回應（附錄 B ★）。
@@ -1214,6 +1336,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoomDoorOut"][];
+                };
+            };
+        };
+    };
+    list_resources_api_projects__project_id__resources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResourceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_resource_api_projects__project_id__resources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectResourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resource_api_projects__project_id__resources__resource_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_resource_api_projects__project_id__resources__resource_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectResourceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

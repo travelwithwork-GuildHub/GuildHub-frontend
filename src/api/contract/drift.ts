@@ -46,8 +46,14 @@ const ENTITIES = {
   ProfileUpdate: rest.ProfileUpdate,
   ProjectCreate: rest.ProjectCreate,
   ProjectOut: rest.ProjectOut,
+  ProjectResourceCreate: rest.ProjectResourceCreate,
+  ProjectResourceOut: rest.ProjectResourceOut,
+  ProjectResourceUpdate: rest.ProjectResourceUpdate,
   ProjectStatus: rest.ProjectStatus,
   RegisterIn: rest.RegisterIn,
+  // ⚠️ `ResourceType` 是後端的一個 component schema（跟 `ProjectStatus` 一樣），
+  // 所以涵蓋率那條斷言會要求登錄它 —— tasks 2.2 寫「三個實體」少算了它。
+  ResourceType: rest.ResourceType,
   RoomDoorOut: rest.RoomDoorOut,
   SeatClaim: rest.SeatClaim,
   SeatOut: rest.SeatOut,
@@ -91,7 +97,14 @@ type _ProfileOut = Expect<Equal<Inferred<'ProfileOut'>, Schema<'ProfileOut'>>>
 type _ProfileUpdate = Expect<Equal<Inferred<'ProfileUpdate'>, Schema<'ProfileUpdate'>>>
 type _ProjectCreate = Expect<Equal<Inferred<'ProjectCreate'>, Schema<'ProjectCreate'>>>
 type _ProjectOut = Expect<Equal<Inferred<'ProjectOut'>, Schema<'ProjectOut'>>>
+type _ProjectResourceCreate = Expect<Equal<Inferred<'ProjectResourceCreate'>, Schema<'ProjectResourceCreate'>>>
+type _ProjectResourceOut = Expect<Equal<Inferred<'ProjectResourceOut'>, Schema<'ProjectResourceOut'>>>
+// ⚠️ 這一條就是「更新用 `.optional()` 不用 `.nullable()`」的守門人：
+// 改成 `.nullable()` 的話推出來是 `string | null | undefined`，產出的型別是
+// `string | undefined`，雙向相等立刻紅。
+type _ProjectResourceUpdate = Expect<Equal<Inferred<'ProjectResourceUpdate'>, Schema<'ProjectResourceUpdate'>>>
 type _ProjectStatus = Expect<Equal<Inferred<'ProjectStatus'>, Schema<'ProjectStatus'>>>
+type _ResourceType = Expect<Equal<Inferred<'ResourceType'>, Schema<'ResourceType'>>>
 type _RegisterIn = Expect<Equal<Inferred<'RegisterIn'>, Schema<'RegisterIn'>>>
 type _RoomDoorOut = Expect<Equal<Inferred<'RoomDoorOut'>, Schema<'RoomDoorOut'>>>
 type _SeatClaim = Expect<Equal<Inferred<'SeatClaim'>, Schema<'SeatClaim'>>>

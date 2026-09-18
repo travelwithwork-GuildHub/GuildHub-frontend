@@ -89,6 +89,7 @@ type METHODS = {
   GET: 'get'
   POST: 'post'
   PATCH: 'patch'
+  DELETE: 'delete'
 }
 
 /**
@@ -332,7 +333,13 @@ export async function send<T>(
     throw new HttpError(operation, response.status, detail)
   }
 
-  const parsed = output.safeParse(await response.json())
+  // ⚠️ **204 沒有 body**（`DELETE /api/projects/{id}/resources/{id}`，`BE-G12`）。
+  // 無條件 `response.json()` 的話空 body 會丟 `SyntaxError`，而那個錯會從
+  // `send` 裡**同步以外的路徑**冒出來，看起來像「後端回了壞掉的 JSON」。
+  // 判斷用 status 而不是「body 是不是空字串」—— 後者會把一個真的回空 body 的
+  // 200 也當成成功，而那是契約漂移，該紅。
+  const payload = response.status === 204 ? undefined : await response.json()
+  const parsed = output.safeParse(payload)
   if (!parsed.success) {
     throw new ContractDriftError(operation, parsed.error.issues)
   }

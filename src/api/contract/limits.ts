@@ -31,12 +31,17 @@ export const UNBOUNDED = null
  *   28  body           text not null                     ← 沒有 check
  *   53  constraint seat_in_range check (seat_index >= 0 and seat_index < 8)
  *   61  body           text not null check (char_length(body) between 1 and 2000)
+ *   97  label          text not null check (char_length(label) between 1 and 100 and btrim(label) <> '')
+ *  100  url            text not null check (char_length(url) between 1 and 2048 and url ~* '^https?://[^[:space:]]+$')
  *
  * `app/realtime/presence.py`
  *   10  STATUS_MAX_CHARS = 12
  *
  * `app/models.py`
  *  122  password: str = Field(min_length=8)
+ *
+ * `app/api/project_resources.py`
+ *   56  MAX_RESOURCES = 50
  */
 export const LIMITS = {
   /** `profiles.display_name`。 */
@@ -87,6 +92,32 @@ export const LIMITS = {
    * 「單則只保留 2000 code point」是 `sceneChat.ts` 的客戶端預算，兩者都**不是**後端限制，不寫在這裡。`BE-G16` 未解。
    */
   chatBody: { min: 0, max: UNBOUNDED },
+
+  /**
+   * `project_resources.label`（`BE-G12`）。
+   *
+   * ⚠️ 同一條 check 還有 `btrim(label) <> ''`（不得只含空白）——
+   * **那不是長度，不放進這張表**：它表達不成一個 `{min, max}`，
+   * 硬塞進來的話「上限」這張表就開始混進不是數字的規則。
+   * 前端送出前怎麼擋它由 `project-resources` 規定（`S13`）。
+   */
+  resourceLabel: { min: 1, max: 100 },
+  /**
+   * `project_resources.url`（`BE-G12`）。
+   *
+   * ⚠️ 同一條 check 還有 `url ~* '^https?://[^[:space:]]+$'`，**`~*` 是不分大小寫的** ——
+   * `HTTPS://…` 在後端合法。同樣不是長度，不放進這張表。
+   */
+  resourceUrl: { min: 1, max: 2048 },
+  /**
+   * 一個專案最多幾筆資源。**出處不是資料庫，是應用層** ——
+   * `project_resources.py` 的 `MAX_RESOURCES`，滿了回 409（跟 `password` 一樣是
+   * 「只寫在後端應用層」的規則，所以上面的出處表多了一段）。
+   *
+   * 是**數量**不是長度：`codePointLength` 那組 helper 不適用它，
+   * 但它同樣是「不能在別處再寫一次的數字」，所以住在這裡。
+   */
+  resourcesPerProject: { min: 0, max: 50 },
 } as const
 
 /** 後端 `list_*` 的 offset 翻頁大小。沒有 total、沒有 `has_more`（`BE-G05`）。 */
@@ -114,6 +145,9 @@ export const LIMIT_SOURCES: Record<keyof typeof LIMITS, { source: string; checke
   skillCount: { source: 'sql/001_schema.sql skills text[]（沒有 check）', checkedOn: '2026-09-11' },
   skillLength: { source: 'sql/001_schema.sql skills text[]（沒有 check）', checkedOn: '2026-09-11' },
   chatBody: { source: 'app/realtime/protocol.py::ChatIn.body（str，沒有長度驗證）', checkedOn: '2026-09-15' },
+  resourceLabel: { source: 'sql/001_schema.sql:97', checkedOn: '2026-09-18' },
+  resourceUrl: { source: 'sql/001_schema.sql:100', checkedOn: '2026-09-18' },
+  resourcesPerProject: { source: 'app/api/project_resources.py:56 MAX_RESOURCES', checkedOn: '2026-09-18' },
 }
 
 // ─── 長度單位是 Unicode code point：這三個 helper 是唯一算法。規格 `FE-O06`〈長度單位是 Unicode code point〉 ───
