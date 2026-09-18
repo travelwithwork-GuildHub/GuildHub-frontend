@@ -20,6 +20,11 @@ export const FORM_LIMITS = {
    * 下限 1：0 座位的案子成軍後沒有人坐得下。
    */
   seatCount: { min: 1, max: LIMITS.seatIndex.max + 1 },
+  /**
+   * 成軍時設的房間密碼（`FE-J04`）：後端不驗（`FE-O08` 量到 3 個字也 200）。太短的密碼讓「走到門前猜」變得可行；太長的隊員貼不進去。
+   * 不是帳號密碼，不做強度規則。單位是 code point。
+   */
+  roomPassword: { min: 4, max: 64 },
 } as const satisfies Record<string, { min: number; max: number }>
 
 export type FormLimitKey = keyof typeof FORM_LIMITS
