@@ -1,0 +1,75 @@
+import { readFileSync, readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { domTokenScan } from '@/design/domTokenScan'
+
+// 規格 `FE-X16-S01`：`src/**` 只從 token 取值。判定本身在 `src/design/domTokenScan.ts`（純函式），這裡是讀檔那一半（同 `world-color-scan.test.ts`）。
+//
+// ⚠️ **豁免的上限寫在這裡**，不在掃描器裡：新增一個 `dom-token-allow:` 就得改這個數字，改了 review 會看到。
+// 今天是 0 —— 掃描器自己的樣板用字串拼接避開自己，不吃豁免。
+const MAX_EXEMPTIONS = 0
+
+const ROOT = join(import.meta.dirname, '..')
+const SRC = join(ROOT, 'src')
+/** token 定義檔：DOM 的在 `globals.css`（七類）、3D 的在 `design/world.ts`（`FE-W09`）。只有這兩個可以出現字面值。 */
+const TOKEN_FILES = new Set(['src/app/globals.css', 'src/design/world.ts'])
+
+function sourceFiles(dir: string): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...sourceFiles(full))
+    else if (/\.(tsx?|css)$/.test(entry.name)) out.push(full)
+  }
+  return out
+}
+
+/** 掃描範圍縮水（例如改回只掃 `src/world`）會在這裡紅，而不是靜默放行。 */
+const MUST_INCLUDE = ['src/app/globals.css', 'src/design/controls.ts', 'src/panel/PanelShell.tsx', 'src/app/login/LoginForm.tsx', 'src/chat/SceneChatHud.tsx', 'src/world/WorldCanvas.tsx']
+
+describe('src/** 只從 token 取值', () => {
+  const files = sourceFiles(SRC).map((f) => relative(ROOT, f))
+
+  it('[FE-X16-S01] 掃描範圍涵蓋整個 src（含 css）', () => {
+    for (const name of MUST_INCLUDE) expect(files, `掃描範圍少了 ${name}`).toContain(name)
+  })
+
+  it('[FE-X16-S01] token 定義檔以外零違規；豁免帶理由且不超過上限', () => {
+    const problems: string[] = []
+    let exemptions = 0
+    for (const file of files) {
+      if (TOKEN_FILES.has(file)) continue
+      const scan = domTokenScan(readFileSync(join(ROOT, file), 'utf8'))
+      exemptions += scan.exemptions
+      for (const v of scan.violations) problems.push(`${file}:${v.line} ${v.kind}：${v.text}`)
+    }
+    expect(problems, '字面值或任意值。改用 globals.css 的 token／design/controls 的常數；真的要字面值就在該行加 `dom-token-allow: <理由>` 並調高上限').toEqual([])
+    expect(exemptions, `豁免 ${exemptions} 個，超過上限 ${MAX_EXEMPTIONS}`).toBeLessThanOrEqual(MAX_EXEMPTIONS)
+  })
+
+  // 六段假輸入各要被抓 —— 判準不是恆真。每一段單獨餵，抓到的那一條要說得出是哪一類。
+  it.each([
+    ['background: #fff', '色碼'],
+    ['const c = "rgb(0 0 0)"', '顏色函式'],
+    ['<div className="rounded-[8px]" />', '任意值'],
+    ['font-family: Inter', '字體堆疊'],
+    ['<button data-tier="primary" />', '層級標記'],
+    ['color: #fff // dom-token-allow:', '沒有理由的豁免'],
+  ])('[FE-X16-S01] 假輸入被抓：%s', (input, kind) => {
+    const scan = domTokenScan(`export const x = 1\n${input}\n`)
+    expect(scan.violations.map((v) => v.kind), `沒抓到 ${kind}`).toContain(kind)
+    expect(scan.violations[0]?.line).toBe(2)
+  })
+
+  it('[FE-X16-S01] 帶理由的豁免不算違規、算一個豁免；理由要在同一行', () => {
+    const scan = domTokenScan('const glow = "#ffe9b0" // dom-token-allow: canvas 取樣的對照色，不是畫面上的顏色\n')
+    expect(scan.violations).toEqual([])
+    expect(scan.exemptions).toBe(1)
+    // 沒有違規的行帶豁免註解 → 不算豁免（不然可以先囤一批）
+    expect(domTokenScan('const y = 2 // dom-token-allow: 囤的\n').exemptions).toBe(0)
+  })
+
+  it('[FE-X16-S01] 沒有字面值的來源是乾淨的（正向控制）', () => {
+    expect(domTokenScan('const cls = "bg-accent text-white rounded-control"\nconst z = 0.5\n')).toEqual({ violations: [], exemptions: 0 })
+  })
+})
