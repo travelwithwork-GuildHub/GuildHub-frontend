@@ -289,6 +289,28 @@ try {
     await pg.screenshot({ path: `${SHOTS}/picker-${width}.png` })
     await ctx.close()
   }
+  // 「選項 SHALL 能換行」要在**放不下**的寬度才驗得到（1024 寬八個選項只佔 ~770 px，拿掉 flex-wrap 也綠 —— 一輪審查抓到）：
+  // 600 寬時後面的選項要在下一列（top 比第一個大），而且每一個仍在視窗內
+  {
+    const ctx = await browser.newContext({ viewport: { width: 600, height: 720 } })
+    await ctx.route('**/api/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROFILE) }))
+    const pg = await ctx.newPage()
+    await pg.goto(`${FRONTEND}/world`)
+    await pg.waitForSelector('canvas', { timeout: 30_000 })
+    await pg.click('button:has-text("更換角色")')
+    await pg.waitForSelector('section[aria-label="更換角色"]', { timeout: 5_000 })
+    const wrap = await pg.evaluate(() => {
+      const section = document.querySelector('section[aria-label="更換角色"]')
+      const options = [...section.querySelectorAll('button')].filter((b) => /^角色 \d+/.test(b.textContent ?? ''))
+      const tops = options.map((o) => Math.round(o.getBoundingClientRect().top))
+      const inside = options.every((o) => { const r = o.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth })
+      return { rows: new Set(tops).size, tops, inside }
+    })
+    if (wrap.rows >= 2 && wrap.inside) ok(`[S23] 600 寬：八個選項真的換行（${wrap.rows} 列）、每一個都在視窗內`)
+    else bad('[S23] 600 寬：選項沒有換行或超出視窗', JSON.stringify(wrap))
+    await pg.screenshot({ path: `${SHOTS}/picker-600.png` })
+    await ctx.close()
+  }
 } catch (e) {
   bad('腳本中途爆掉', e.message)
 } finally {

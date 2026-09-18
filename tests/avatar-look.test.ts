@@ -76,9 +76,18 @@ describe('av 換成外觀', () => {
     for (let i = 1; i < 8; i += 1) expect(avatarLook(8), `av=8 繞回了 av=${i}`).not.toEqual(avatarLook(i))
   })
 
-  it('[FE-A05-S15] 擴充前的兩款顏色不變（讀的是原本那幾個 token）', () => {
-    expect(avatarLook(0)).toEqual({ skin: worldColor('skin'), body: worldColor('avatarBody'), limb: worldColor('avatarLimb'), ink: worldColor('ink') })
-    expect(avatarLook(1)).toEqual({ skin: worldColor('skin'), body: worldColor('avatarBodyAlt'), limb: worldColor('avatarLimbAlt'), ink: worldColor('ink') })
+  it('[FE-A05-S15] 擴充前的兩款顏色不變（跟擴充前的色碼快照逐一相同）', () => {
+    // ⚠️ 期望值是**擴充前（2026-09-19，`893aa8c` 之前）的色碼快照**，刻意不從 `worldColor()` 讀 ——
+    // 讀同一個來源的話，改掉 token 的值兩邊一起變、這條永遠綠（一輪審查抓到）。這裡是測試檔，色碼掃描只掃 src/。
+    const before = {
+      0: { skin: '#f2c9a0', body: '#4d5bb0', limb: '#3b4794', ink: '#20232e' },
+      1: { skin: '#f2c9a0', body: '#4d9b5b', limb: '#2f7a45', ink: '#20232e' },
+    }
+    expect(avatarLook(0)).toEqual(before[0])
+    expect(avatarLook(1)).toEqual(before[1])
+    // 而且它們仍然是從 token 來的（不是有人在映射裡寫死了同樣的字面值）
+    expect(worldColor('avatarBody')).toBe(before[0].body)
+    expect(worldColor('avatarBodyAlt')).toBe(before[1].body)
   })
 
   it('[FE-W19-S08] 非整數回到預設', () => {
