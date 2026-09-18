@@ -108,8 +108,12 @@ const install = (page) =>
         const el = [body, ...body.querySelectorAll('*')].find((n) => n.scrollHeight > n.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(n).overflowY))
         if (el === undefined) return null
         el.setAttribute('data-ds-scroller', '')
-        const header = el.closest('section')?.firstElementChild
-        return { scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, containsHeader: header !== undefined && el.contains(header), doc: { scrollHeight: document.scrollingElement.scrollHeight, clientHeight: document.scrollingElement.clientHeight } }
+        // 標題列（面板裡第一個 header）往上到 section 之間不准有任何會捲的容器 —— 不只「不在量到的那個捲動容器裡」（突變：標題列放進 body、ul 在捲，會漏）
+        const section = body.closest('section')
+        const header = section.querySelector('header')
+        let inScroller = false
+        for (let n = header?.parentElement ?? null; n !== null && n !== section; n = n.parentElement) if (/auto|scroll/.test(getComputedStyle(n).overflowY)) inScroller = true
+        return { scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, containsHeader: inScroller, doc: { scrollHeight: document.scrollingElement.scrollHeight, clientHeight: document.scrollingElement.clientHeight } }
       },
     }
   })
