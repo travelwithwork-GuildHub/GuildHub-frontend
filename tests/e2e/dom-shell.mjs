@@ -88,7 +88,9 @@ const install = (page) =>
         const panel = document.querySelector(panelSel)
         const HUD = '[data-testid="scene-chat"], [data-testid="online-count"], [data-testid="rooms-notice"], [data-testid="door-labels"], [data-testid="interaction-prompt"]'
         const ancestors = new Set(); for (let n = worldEl; n; n = n.parentElement) ancestors.add(n)
-        const paintsPseudo = (el) => ['::before', '::after'].some((p) => { const ps = getComputedStyle(el, p); return ps.content !== 'none' && (toRgba(ps.backgroundColor)[3] > 0 || ps.backgroundImage !== 'none' || (ps.backdropFilter ?? 'none') !== 'none') })
+        // 偽元素：底色、背景圖、backdrop-filter、box-shadow 都算（審查：1×1 的 ::after 加 100vmax 的陰影也能把世界變暗）。
+        // 偽元素畫在哪裡 DOM 量不到（可能 fixed、可能超出宿主）—— 所以有會畫東西的偽元素就一律算，不看宿主的矩形
+        const paintsPseudo = (el) => ['::before', '::after'].some((p) => { const ps = getComputedStyle(el, p); return ps.content !== 'none' && (toRgba(ps.backgroundColor)[3] > 0 || ps.backgroundImage !== 'none' || (ps.backdropFilter ?? 'none') !== 'none' || ps.boxShadow !== 'none') })
         const effects = (cs) => cs.filter !== 'none' || (cs.backdropFilter ?? 'none') !== 'none'
         const why = (el) => {
           const cs = getComputedStyle(el)
@@ -99,7 +101,7 @@ const install = (page) =>
         const who = [...document.querySelectorAll('body *')]
           .filter((el) => el !== panel && !panel.contains(el) && el.closest(HUD) === null && (ancestors.has(el) || visible(el)))
           .map((el) => ({ el, r: rect(el), why: el.tagName === 'CANVAS' ? [effects(getComputedStyle(el)) && 'filter'].filter(Boolean) : why(el) }))
-          .filter(({ r, why }) => why.length > 0 && overlaps(r))
+          .filter(({ r, why }) => why.length > 0 && (overlaps(r) || why.includes('偽元素')))
           .map(({ el, r, why }) => `${el.tagName.toLowerCase()}#${el.getAttribute('data-testid') ?? el.className.slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}（${why.join('、')}）`)
         return { fraction: who.length === 0 ? 0 : 1, who }
       },

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 // 確認視窗的層（規格 `FE-X16-S06`）：蓋在面板**內容區**上的遮罩（`scrim` token，alpha 在 [0.3, 0.6]）＋視窗本身；
@@ -21,7 +21,8 @@ export const DialogHostContext = createContext<DialogHost | null>(null)
 export function PanelDialog({ children }: { children: ReactNode }) {
   const ctx = useContext(DialogHostContext)
   const setOpen = ctx?.setOpen
-  useEffect(() => {
+  // layout effect：在第一次 paint 之前就把殼標成「有視窗」，不然視窗畫出來的第一幀底下還不是 inert（審查抓到）
+  useLayoutEffect(() => {
     setOpen?.(true)
     return () => setOpen?.(false)
   }, [setOpen])
