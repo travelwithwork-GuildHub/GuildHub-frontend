@@ -45,13 +45,13 @@ const openThread = async (page) => { await openInboxList(page); await page.click
 const openList = async (page) => { await world(page, '?panel=projects'); await page.waitForSelector('[data-testid="project-card"]') }
 const openDetail = async (page) => { await world(page, `?panel=projects&project=${FIRST.id}`); await page.waitForSelector('[data-testid="project-detail"][data-phase="ready"]') }
 
-/** 五個阻斷式面板（`S07`）：根節點、要不要有返回。 */
+/** 五個阻斷式面板（`S07`）：根節點、標題列該寫什麼、要不要有返回。標題逐一核對（審查：任意非空 heading 會被空殼繞過）。 */
 const PANELS = [
-  { name: '看板清單', root: '[data-testid="list-panel"]', back: false, open: openList },
-  { name: '看板詳情', root: '[data-testid="list-panel"]', back: true, open: openDetail },
-  { name: '收件匣清單', root: '[data-testid="inbox-panel"]', back: false, open: openInboxList },
-  { name: '收件匣對話', root: '[data-testid="inbox-panel"]', back: true, open: openThread },
-  { name: '我的名片', root: '[data-testid="profile-panel"]', back: false, open: openProfile },
+  { name: '看板清單', root: '[data-testid="list-panel"]', title: '專案看板', back: false, open: openList },
+  { name: '看板詳情', root: '[data-testid="list-panel"]', title: '案件', back: true, open: openDetail },
+  { name: '收件匣清單', root: '[data-testid="inbox-panel"]', title: '收件匣', back: false, open: openInboxList },
+  { name: '收件匣對話', root: '[data-testid="inbox-panel"]', title: '對話', back: true, open: openThread },
+  { name: '我的名片', root: '[data-testid="profile-panel"]', title: '我的名片', back: false, open: openProfile },
 ]
 
 /** 頁面裡的量尺。 */
@@ -75,25 +75,45 @@ const install = (page) =>
         const cs = getComputedStyle(el)
         return { bg: toRgba(cs.backgroundColor), border: toRgba(cs.borderTopColor), borderWidth: parseFloat(cs.borderTopWidth), borderStyle: cs.borderTopStyle, shadow: cs.boxShadow, shadowAlphas: shadowAlphas(cs.boxShadow), page: toRgba(getComputedStyle(document.body).backgroundColor) }
       },
-      /** S05：世界區上、面板以外、有底色且蓋住世界區（≥ 90% 面積）的元素 */
+      /**
+       * S05：面板開著時世界有沒有被蓋住 —— 掃**整份文件**（不只世界容器的後代：portal、兄弟節點也算）裡有底色、跟世界區相交的可見元素
+       *（排除面板本身與它的後代、世界容器與它的祖先、canvas），把它們的矩形聯集用 40×40 的格點取樣算出蓋住世界區的比例。
+       * 一個 90% 的、兩個 50% 的、四個 25% 的都一樣算（審查：單一元素 ≥ 90% 會被分片繞過）。合法的 HUD（聊天框、門標籤、在線人數）加起來遠低於門檻。
+       */
       worldCovers(panelSel) {
         const worldEl = document.querySelector('[data-testid="world-canvas-container"]')
         const w = rect(worldEl)
         const panel = document.querySelector(panelSel)
-        return [...worldEl.querySelectorAll('*')].filter((el) => el !== panel && !panel.contains(el) && el.tagName !== 'CANVAS').filter((el) => {
-          const r = rect(el)
-          const overlap = Math.max(0, Math.min(r.right, w.right) - Math.max(r.left, w.left)) * Math.max(0, Math.min(r.bottom, w.bottom) - Math.max(r.top, w.top))
-          return overlap >= 0.9 * w.width * w.height && toRgba(getComputedStyle(el).backgroundColor)[3] > 0
-        }).map((el) => `${el.tagName.toLowerCase()}#${el.getAttribute('data-testid') ?? el.className.slice(0, 40)}`)
+        const ancestors = new Set(); for (let n = worldEl; n; n = n.parentElement) ancestors.add(n)
+        const boxes = [...document.querySelectorAll('body *')].filter((el) => el !== panel && !panel.contains(el) && !ancestors.has(el) && el.tagName !== 'CANVAS' && visible(el))
+          .filter((el) => toRgba(getComputedStyle(el).backgroundColor)[3] > 0)
+          .map((el) => ({ el, r: rect(el) })).filter(({ r }) => r.right > w.left && r.left < w.right && r.bottom > w.top && r.top < w.bottom)
+        let hit = 0
+        const N = 40
+        for (let i = 0; i < N; i += 1) for (let j = 0; j < N; j += 1) {
+          const x = w.left + ((i + 0.5) / N) * w.width, y = w.top + ((j + 0.5) / N) * w.height
+          if (boxes.some(({ r }) => x >= r.left && x < r.right && y >= r.top && y < r.bottom)) hit += 1
+        }
+        return { fraction: hit / (N * N), who: boxes.map(({ el, r }) => `${el.tagName.toLowerCase()}#${el.getAttribute('data-testid') ?? el.className.slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}`) }
       },
-      /** S06：遮罩與它蓋住的那一層 */
+      /** S06：遮罩與它蓋住的那一層。inert 驗**行為**不只屬性：被遮那一層裡第一個可聚焦的元素 `focus()` 之後不能成為 activeElement。 */
       scrim(scrimSel, coveredSel, inertSels) {
         const scrim = document.querySelector(scrimSel)
         if (scrim === null) return null
         const covered = document.querySelector(coveredSel)
         const center = rect(covered)
         const hit = document.elementFromPoint((center.left + center.right) / 2, (center.top + center.bottom) / 2)
-        return { alpha: toRgba(getComputedStyle(scrim).backgroundColor)[3], covers: covers(rect(scrim), rect(covered)), onTop: hit !== null && (scrim === hit || scrim.contains(hit)), inert: inertSels.map((s) => document.querySelector(s)?.hasAttribute('inert') ?? null) }
+        const inert = inertSels.map((s) => {
+          const layerEl = document.querySelector(s)
+          if (layerEl === null) return { attr: null }
+          const target = [...layerEl.querySelectorAll('button, a[href], input, textarea, select, [tabindex]')].find((el) => el.tabIndex >= 0 && !el.disabled) ?? null
+          const before = document.activeElement
+          target?.focus()
+          const stole = target !== null && document.activeElement === target
+          if (stole) before?.focus()
+          return { attr: layerEl.hasAttribute('inert'), tried: target?.tagName.toLowerCase() ?? null, focusable: stole }
+        })
+        return { alpha: toRgba(getComputedStyle(scrim).backgroundColor)[3], covers: covers(rect(scrim), rect(covered)), onTop: hit !== null && (scrim === hit || scrim.contains(hit)), inert }
       },
       /** S07：面板的第一個區塊是標題列；標題列裡的標題與可聚焦元素 */
       anatomy(sel) {
@@ -142,8 +162,8 @@ async function scrimChecks(page, name, scrimSel, coveredSel, inertSels) {
   s.alpha >= 0.3 && s.alpha <= 0.6 ? ok(`[S06] ${name}：遮罩 alpha ${s.alpha.toFixed(2)}`) : bad(`[S06] ${name}：遮罩 alpha ${s.alpha}`, '要在 [0.3, 0.6]')
   s.covers ? ok(`[S06] ${name}：遮罩蓋住被擋的那一層`) : bad(`[S06] ${name}：遮罩沒蓋滿被擋的那一層`)
   s.onTop ? ok(`[S06] ${name}：被擋那一層的中心點上是遮罩（或視窗）`) : bad(`[S06] ${name}：中心點上不是遮罩`)
-  // 面板的內容區用 `inert` 屬性；世界區（canvas）沒有可聚焦的內容，「被擋」由上一條的中心點命中證明、鍵盤由世界命令鎖擋（`room-entry.mjs` 既有）
-  if (inertSels.length > 0) s.inert.every((v) => v === true) ? ok(`[S06] ${name}：被遮的那一層 inert`) : bad(`[S06] ${name}：被遮的那一層不是 inert`, JSON.stringify(s.inert))
+  // 屬性在、而且裡面的東西真的聚焦不了（有可聚焦的才驗得到後半）
+  s.inert.every((v) => v.attr === true && v.focusable === false) ? ok(`[S06] ${name}：被遮的那一層 inert（${s.inert.map((v) => v.tried ?? '沒有可聚焦的').join('、')} 聚焦不了）`) : bad(`[S06] ${name}：被遮的那一層不是 inert`, JSON.stringify(s.inert))
 }
 
 await mkdir(OUT, { recursive: true })
@@ -163,7 +183,7 @@ try {
     await openList(page)
     await surfaceChecks(page, '看板', '[data-testid="list-panel"]')
     const covers = await page.evaluate(() => window.__ds.worldCovers('[data-testid="list-panel"]'))
-    covers.length === 0 ? ok('[S05] 看板開著時世界區上沒有遮罩元素') : bad(`[S05] 看板開著時世界區上有 ${covers.length} 個蓋住世界的元素`, covers.join('、'))
+    covers.fraction <= 0.2 ? ok(`[S05] 看板開著時世界區被有底色的元素蓋住 ${(covers.fraction * 100).toFixed(1)}%（HUD：${covers.who.join('、')}）`) : bad(`[S05] 看板開著時世界區被蓋住 ${(covers.fraction * 100).toFixed(1)}%`, covers.who.join('、'))
   })
   await run(context, 'S05 收件匣', async (page) => { await openInboxList(page); await surfaceChecks(page, '收件匣', '[data-testid="inbox-panel"]') })
   await run(context, 'S05 名片', async (page) => { await openProfile(page); await surfaceChecks(page, '我的名片', '[data-testid="profile-panel"]') })
@@ -171,7 +191,7 @@ try {
     await world(page); await approachDoor(page); await page.keyboard.press('KeyE'); await page.waitForSelector('[data-testid="room-password-dialog"] input')
     await surfaceChecks(page, '房間密碼視窗', '[data-testid="room-password-dialog"]')
     // ── S06 世界上的視窗：遮罩蓋世界區、關了就不在 ──
-    await scrimChecks(page, '房間密碼', '[data-testid="world-scrim"]', '[data-testid="world-canvas-container"]', [])
+    await scrimChecks(page, '房間密碼', '[data-testid="world-scrim"]', '[data-testid="world-canvas-container"]', ['[data-testid="world-stage"]'])
     await page.keyboard.press('Escape')
     await page.waitForSelector('[data-testid="room-password-dialog"]', { state: 'detached' })
     ;(await page.$('[data-testid="world-scrim"]')) === null ? ok('[S06] 房間密碼關了、遮罩不在') : bad('[S06] 房間密碼關了遮罩還在')
@@ -214,7 +234,7 @@ try {
         await install(page)
         const a = await page.evaluate((sel) => window.__ds.anatomy(sel), p.root)
         const tag = `${vp.width}×${vp.height} ${p.name}`
-        a.firstTag === 'header' && a.title !== '' ? ok(`[S07] ${tag}：第一個區塊是標題列、標題「${a.title}」`) : bad(`[S07] ${tag}：第一個區塊是 ${a.firstTag}、標題「${a.title}」`)
+        a.firstTag === 'header' && a.title === p.title ? ok(`[S07] ${tag}：第一個區塊是標題列、標題「${a.title}」`) : bad(`[S07] ${tag}：第一個區塊是 ${a.firstTag}、標題「${a.title}」（要「${p.title}」）`)
         const last = a.focusables.at(-1)
         last !== undefined && last.text === '關閉' ? ok(`[S07] ${tag}：關閉是標題列最後一個可聚焦的`) : bad(`[S07] ${tag}：標題列最後一個可聚焦的是「${last?.text}」`, a.focusables.map((f) => f.text).join('、'))
         const first = a.focusables[0]
@@ -247,8 +267,9 @@ try {
     ok(`[S08] 內容區捲動容器 scrollHeight ${s.scrollHeight} > clientHeight ${s.clientHeight}`)
     s.doc.scrollHeight <= s.doc.clientHeight ? ok('[S08] 文件本身不可捲') : bad(`[S08] 文件可捲`, `${s.doc.scrollHeight} > ${s.doc.clientHeight}`)
     !s.containsHeader ? ok('[S08] 標題列在捲動容器之外') : bad('[S08] 標題列在捲動容器裡面')
-    await page.evaluate(() => { const el = document.querySelector('[data-ds-scroller]'); el.scrollTop = el.scrollHeight })
+    const scrolled = await page.evaluate(() => { const el = document.querySelector('[data-ds-scroller]'); el.scrollTop = el.scrollHeight; return el.scrollTop })
     await page.waitForTimeout(100)
+    scrolled > 0 ? ok(`[S08] 真的捲了：scrollTop ${scrolled}`) : bad('[S08] scrollTop 還是 0', '找到的容器沒有在捲')
     const after = await page.evaluate(() => window.__ds.anatomy('[data-testid="list-panel"]'))
     const close = after.focusables.at(-1)
     sameRect(before.header, after.header) && inViewport(after.header, 1280, 720) ? ok('[S08] 捲到底標題列 rect 不變、完整在視窗裡') : bad('[S08] 捲到底標題列動了或出了視窗', `${JSON.stringify(before.header)} → ${JSON.stringify(after.header)}`)

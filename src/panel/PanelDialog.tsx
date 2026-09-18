@@ -25,7 +25,9 @@ export function PanelDialog({ children }: { children: ReactNode }) {
     setOpen?.(true)
     return () => setOpen?.(false)
   }, [setOpen])
-  if (ctx === null || ctx.host === null) return children
+  if (ctx === null) return children
+  // 殼在、host 還沒掛好（第一個 commit 之前）：先不畫，不要先原地畫一幀再搬進 portal（視窗會被重掛一次）
+  if (ctx.host === null) return null
   return createPortal(
     <div data-testid="panel-scrim" className="bg-scrim absolute inset-0 z-20 flex items-start justify-center overflow-y-auto p-gutter">
       {children}

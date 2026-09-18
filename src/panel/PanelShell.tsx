@@ -61,8 +61,10 @@ export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestI
 
   // 確認視窗的層：`PanelDialog` 把視窗 portal 到內容區的容器上，開著時內容區（連子畫面）都 inert。host 用 state 不用 ref：portal 要在它掛好之後才畫。
   const [host, setHost] = useState<HTMLDivElement | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const dialogHost = useMemo(() => ({ host, setOpen: setDialogOpen }), [host])
+  // 計數不是布林（審查：兩個視窗同時開、一個關掉不能把另一個的 inert 也拿掉）
+  const [dialogs, setDialogs] = useState(0)
+  const dialogHost = useMemo(() => ({ host, setOpen: (open: boolean) => setDialogs((n) => n + (open ? 1 : -1)) }), [host])
+  const dialogOpen = dialogs > 0
 
   return (
     <section
