@@ -13,7 +13,7 @@ import { InteractionProvider } from '@/world/interaction/InteractionProvider'
 import { RoomsRefreshProvider } from '@/world/rooms/RoomsRefreshContext'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
-// 規格：openspec/changes/fe-j04-form-team/specs/project-lifecycle/spec.md —— S01～S04、S07（S05／S06／S08 密碼的一次性呈現在 project-password-reveal.test.tsx）
+// 規格：openspec/changes/fe-j04-form-team/specs/project-lifecycle/spec.md —— S01（成軍那一半）～S04（S07 結案在 project-close.test.tsx；S05／S06／S08 密碼的一次性呈現在 project-password-reveal.test.tsx）
 //
 // 整棵真的樹：IdentityProvider（contract-server 給 /api/me）> InboxPanelProvider > InteractionProvider > ListPanelProvider > [BoardPanel, InboxPanel]，
 // 外面包 `RoomsRefreshProvider`（`refresh` 是 vi.fn：成功恰好一次、失敗零次）。
@@ -114,7 +114,6 @@ const submitForm = () =>
   })
 const passwordField = () => within(detail()).getByLabelText('房間密碼') as HTMLInputElement
 const formTeamCalls = (id = P.id) => server.calls.filter((c) => c.method === 'POST' && c.pathname === `/api/projects/${id}/form-team`)
-const closeCalls = (id = P.id) => server.calls.filter((c) => c.method === 'POST' && c.pathname === `/api/projects/${id}/close`)
 const listGets = () => server.calls.filter((c) => c.method === 'GET' && c.pathname === '/api/projects').map((c) => c.search)
 const escape = () =>
   act(() => {
@@ -132,7 +131,7 @@ async function openFormAndFill(password: string) {
 }
 
 describe('動作跟著狀態走，只給 owner', () => {
-  it('[FE-J04-S01] recruiting 有「成軍」沒「結案」；active 反過來；closed 沒有；非 owner 什麼都沒有', async () => {
+  it('[FE-J04-S01] recruiting 有「成軍」沒「結案」；active 沒有「成軍」；closed 沒有；非 owner 什麼都沒有', async () => {
     await mountDetail(project(1, { status: 'recruiting' }))
     expect(queryBtn(/成軍/)).not.toBeNull()
     expect(queryBtn(/結案/)).toBeNull()
@@ -140,8 +139,8 @@ describe('動作跟著狀態走，只給 owner', () => {
     await server.close()
     server = await startContractServer()
     process.env.NEXT_PUBLIC_GUILDHUB_REST = server.base
+    // active → 「結案」那一半在 `--close` 片（project-close.test.tsx）；這裡只驗它沒有「成軍」
     await mountDetail(project(2, { status: 'active' }))
-    expect(queryBtn(/結案/)).not.toBeNull()
     expect(queryBtn(/成軍/)).toBeNull()
     cleanup()
     await server.close()
@@ -206,7 +205,6 @@ describe('成軍：密碼由前端守上限，成功後詳情呈現回應', () =
     expect(detail().dataset.projectId).toBe(P.id)
     expect(server.calls.filter((c) => c.pathname === `/api/projects/${P.id}`).length, '成功後重打了詳情').toBe(detailGetsBefore)
     expect(screen.queryByTestId('form-team-form')).toBeNull()
-    expect(queryBtn(/結案/)).not.toBeNull()
     expect(queryBtn(/成軍/)).toBeNull()
     await waitFor(() => expect(listGets().length).toBe(listBefore + 1))
     expect(listGets().at(-1), '列表沒有回第 0 頁').toBe('?page=0')
@@ -262,63 +260,5 @@ describe('成軍：密碼由前端守上限，成功後詳情呈現回應', () =
     expect(screen.queryByTestId('list-panel')).not.toBeNull()
     held.release()
     await waitFor(() => expect(status()).toBe('已成軍'))
-  })
-})
-
-describe('結案要確認；成功後沒有動作', () => {
-  const A = project(5, { status: 'active' })
-  it('[FE-J04-S07] 取消／Escape 不送、焦點回結案；送出中連按一次且關不掉；成功後沒有按鈕、refresh 一次、不重取列表；500／403 留著', async () => {
-    await mountDetail(A)
-    const listBefore = listGets().length
-    click(btn('結案'))
-    const dialog = screen.getByRole('alertdialog')
-    expect(document.activeElement, '焦點要在安全的「取消」上，不是「確定結案」').toBe(within(dialog).getByRole('button', { name: '取消' }))
-    click(within(dialog).getByRole('button', { name: '取消' }))
-    expect(closeCalls(A.id)).toHaveLength(0)
-    await waitFor(() => expect(document.activeElement).toBe(btn('結案')))
-    click(btn('結案'))
-    escape()
-    expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(closeCalls(A.id)).toHaveLength(0)
-    expect(queryBtn('結案')).not.toBeNull()
-
-    // 壓著不回：連按確定兩次、Escape、返回 —— 只送一個，確認層與詳情都還在
-    const held = gate()
-    server.replyFor(`/api/projects/${A.id}/close`, 200, { ...A, status: 'closed' }, { after: held.promise })
-    click(btn('結案'))
-    // 同一個 tick：確定 → 立刻按返回（不等更新）
-    within(screen.getByRole('alertdialog')).getByRole('button', { name: '確定結案' }).dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    within(detail()).getByRole('button', { name: '返回' }).dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    expect(screen.queryByTestId('project-detail'), '結案送出的同一個 tick 內按返回把詳情關掉了').not.toBeNull()
-    click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '確定結案' }))
-    escape()
-    fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
-    await waitFor(() => expect(closeCalls(A.id)).toHaveLength(1))
-    expect(screen.queryByRole('alertdialog')).not.toBeNull()
-    expect(screen.queryByTestId('project-detail')).not.toBeNull()
-    held.release()
-    await waitFor(() => expect(status()).toBe('已結案'))
-    expect(within(actions()!).queryAllByRole('button')).toEqual([])
-    expect(refreshRooms).toHaveBeenCalledTimes(1)
-    // 重取是 effect 裡的非同步請求：等一拍再數，才抓得到「結案也 reload」的實作
-    await new Promise((r) => setTimeout(r, 50))
-    expect(listGets().length, '結案不該重取列表').toBe(listBefore)
-    expect(closeCalls(A.id)[0]?.body ?? null, 'close 沒有 body').toBeNull()
-  })
-
-  it('[FE-J04-S07] 500 與 403：alert 各自的語彙、狀態仍已成軍、結案可再按、不 refresh', async () => {
-    await mountDetail(A)
-    server.replyFor(`/api/projects/${A.id}/close`, 500, { detail: '壞了' })
-    click(btn('結案'))
-    click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '確定結案' }))
-    await waitFor(() => expect(within(screen.getByRole('alertdialog')).getByRole('alert').textContent).toContain(VOCABULARY['server-error']))
-    expect(status()).toBe('已成軍')
-    server.replyFor(`/api/projects/${A.id}/close`, 403, { detail: '只有發起人可以做這件事' })
-    click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '確定結案' }))
-    await waitFor(() => expect(within(screen.getByRole('alertdialog')).getByRole('alert').textContent).toContain(VOCABULARY['permission-denied']))
-    expect(status()).toBe('已成軍')
-    expect(refreshRooms).not.toHaveBeenCalled()
-    click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '取消' }))
-    expect(queryBtn('結案')).not.toBeNull()
   })
 })
