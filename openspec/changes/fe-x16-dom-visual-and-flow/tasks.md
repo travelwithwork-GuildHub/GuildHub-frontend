@@ -29,7 +29,8 @@
 ## 2b. `--text`：文字五級套到表面（Requirement〈文字有五級層次〉）
 
 - [x] 2b.1 判準先紅：e2e `S03`（六個表面各自必備的層級逐一斷言、層級間比「高一級的最小 vs 低一級的最大」、內文 16px／1.5、說明 13px、面板標題 ≥ 1.25×、頁面標題 ≥ 1.5×）、
-      `S04`（背景從元素自己往上**真的合成**到第一個不透明層；顏色空字串或 `CSS.supports` 不認就紅；整趟至少量到一個 `role="alert"` —— 多一個表面「/login（送出失敗）」空名字送出）；
+      `S04`（背景從元素自己往上**真的合成**到第一個不透明層；顏色空字串或 `CSS.supports` 不認就紅；整趟至少量到一個**有字的** `role="alert"` —— 多一個表面「/login（送出失敗）」空名字送出）；
+      量的集合含 `p`／`[data-text]`／alert 底下自己帶文字的後代（審查：alert 裡換了顏色的 `span` 不能靠外層過關）；必備層級由每個表面自己宣告（人才清單／詳情跟案件同一組 —— 抓到 `TalentCard` 的名字沒有 heading）；
       jsdom 的定義檔 AST 測試擴到 `data-text`（四個 export 各一值、標 `TextStyle`、無 computed 鍵）。實作前 e2e 16 紅、jsdom 1 紅
 - [x] 2b.2 `controls.ts` 加 `DISPLAY`／`TITLE`／`HEADING`／`CAPTION`（`TextStyle`，帶 `data-text`）；h1 三處 → `DISPLAY`、`text-title` 十四處 → `TITLE`、卡片標題與收件匣對話的名字 → `HEADING`、
       `text-caption` 42 處 → `CAPTION`（`OnlineCount` 不動：別人的檔）；`body` 的字級與行高從 `--text-body` 繼承。
