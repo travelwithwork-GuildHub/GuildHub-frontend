@@ -1,10 +1,10 @@
-# 0012. 名字牌：第三個「render loop → DOM」的消費者；角色自己寫牌子的位置，投影矩形的函式帶尺寸、不抽通用元件
+# 0012. 名字牌：第三個「render loop → DOM」的消費者；角色自己寫牌子的位置，投影只用既有的 `screenPixelFor`、不抽通用元件
 
 - **Status**: Proposed（`spec/fe-w08-name-tag`；實作合併後改 Accepted）
 - **Date**: 2026-09-19
 - **Deciders**: 寫 `FE-W08` 名字牌規格的那個 session；兩位外部審查（規格 PR）
 - **邊界狀態**: 僅約定
-- **證據**: openspec/changes/fe-w08-name-tag/design.md:12、src/world/rooms/labelProjection.ts:82
+- **證據**: openspec/changes/fe-w08-name-tag/design.md:12、src/world/rooms/labelProjection.ts:49
 
 > `邊界狀態` 與 `證據` 兩欄由 `bash .github/scripts/arch-view.sh` 讀。實作合併時改成 `已強制`，證據換成 `tests/name-tags.test.tsx` 與 `tests/e2e/name-tags.mjs`。
 
@@ -26,7 +26,7 @@ ADR 0010 記了「render loop 直接寫 Canvas 外面的 DOM」這條路（門�
 ### B. 角色自己寫牌子的位置；只抽最小的共用函式
 - `RemotePlayer` 在自己的 `useFrame` 裡、寫完 `root.position` 之後，用同一次求值的結果把頭頂錨點投影寫進牌子的 `style`
   （相機與畫布尺寸從 `useFrame` 的 `state` 拿）。
-- 共用的只有投影矩形：`labelRectFor(point, target, viewport, size)` 多一個尺寸參數（門標籤照舊用預設）。
+- 共用的只有投影函式：`screenPixelFor(point, target, viewport)`（工位錨點已經在用的那一份；門標籤的 `labelRectFor` 也是從它算的）。`labelProjection.ts` 一行不改。
 - 好：一次求值、同一幀、空窗處理只有一份；投影公式仍然只有一份（`toScreen`）。
 - 壞：`RemotePlayer` 從「只碰 3D」變成也碰 DOM（透過 `nodesRef` 查自己的節點寫兩個 style 屬性）；「誰寫、什麼時候寫」在三個消費者裡有兩種形狀。
 

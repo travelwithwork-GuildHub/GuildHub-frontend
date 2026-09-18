@@ -68,7 +68,7 @@
 
 - **GIVEN** 兩個遠端玩家站在不同的世界座標
 - **THEN** 兩塊牌子的螢幕位置不同
-- **AND** 兩者底邊中點的差 SHALL 等於用 `toScreen` 從各自頭頂錨點算出來的差（±1 px）
+- **AND** 兩者底邊中點的差 SHALL 等於用 `screenPixelFor`（已含 y 軸翻轉的 CSS 像素）從各自頭頂錨點算出來的差（±1 px）
 
 #### Scenario: [FE-W08-S05] 角色移動時牌子每幀跟著走，React 一次都不重繪
 
@@ -84,6 +84,7 @@
 - **WHEN** 他的樣本被清掉、元件還沒卸載（`FE-R08-S20` 那一幀）
 - **THEN** 牌子的位置與上一幀相同，而且仍然呈現
 - **AND** 沒有任何錯誤被拋出
+- **AND** 另一個剛進名單、還沒有任何樣本的人，他的牌子在有位置之前 SHALL NOT 呈現（不在左上角閃一幀）
 
 ### Requirement: 牌子的寬度固定、名字過長截字
 
@@ -95,12 +96,16 @@ MUST NOT 換行、MUST NOT 撐大牌子。`name` 的上限是 20 個 code point�
 
 - **GIVEN** 一個人的 `name` 是二十個全形字、另一個人的是兩個字
 - **THEN** 兩塊牌子的 `getBoundingClientRect().width` 相同、`height` 相同
-- **AND** 長名字的牌子只有一行、文字被截、`textContent` 仍是完整的名字
+- **AND** 長名字的牌子只有一行（高度等於短名字的）、`textContent` 仍是完整的名字
+- **AND** 真的截了：長名字牌子的 `scrollWidth` 大於 `clientWidth`（內容確實超出盒子），而且它的 `overflow-x` 計算值不是 `visible`
+  （超出的部分被裁掉）—— 只量牌子的寬會漏掉「漏寫 `overflow: hidden`、字溢出去蓋到別人」
 
 ### Requirement: 畫面外不呈現、不擋操作、看得清楚
 
-牌子整個矩形不在畫面內時 SHALL NOT 呈現，也 SHALL NOT 在無障礙樹裡（跟 `FE-W12-S13` 同一個判準；
-不要求從 DOM 移除 —— 那是每幀的高頻判斷）。牌子 SHALL NOT 接收指標事件（點牌子等於點它底下的世界）。
+頭頂錨點的投影**點**不在畫面內時，牌子 SHALL NOT 呈現，也 SHALL NOT 在無障礙樹裡（不要求從 DOM 移除 —— 那是每幀的高頻判斷）。
+錨點在畫面內、但牌子的矩形有一部分越出畫面時，牌子 SHALL 照常呈現，由容器裁掉越界的部分。
+**這跟門標籤 `FE-W12-S13`（整個矩形要在畫面內）刻意不同**：門在畫面外時被切一半的標籤會被讀成「那個方向有東西」；
+名字牌跟著一個**看得見的人**，人站在畫面邊緣 80 px 處名字卻憑空消失才是缺陷。判斷用的是同一份 `screenPixelFor` 的 `inside`。牌子 SHALL NOT 接收指標事件（點牌子等於點它底下的世界）。
 牌子的文字對它的底 SHALL 至少 4.5:1 對比、底的 alpha SHALL 為 1（`dom-visual-system` 的表面規則）；
 文字與底、邊界、字級 SHALL 只從 token 取值。
 牌子 SHALL 在 `hud` 層，面板開著時 SHALL 被面板蓋住（面板在 `panel` 層）。
@@ -108,16 +113,19 @@ MUST NOT 換行、MUST NOT 撐大牌子。`name` 的上限是 20 個 code point�
 #### Scenario: [FE-W08-S08] 走遠之後那個人離開畫面，牌子就不呈現也不被唸出來
 
 - **GIVEN** 相機跟著自己（世界固定、畫面跟著自己走）
-- **WHEN** 自己走到讓某個遠端玩家的頭頂投影落在畫面外
+- **WHEN** 自己走到讓某個遠端玩家站在畫面邊緣、頭頂錨點仍在畫面內但牌子的矩形已越出一部分
+- **THEN** 那塊牌子仍然 `visible`（被容器裁掉一部分，不消失）
+- **WHEN** 再走到讓那個人的頭頂錨點落在畫面外
 - **THEN** 那塊牌子 `visibility` 不是 `visible`、無障礙樹裡沒有它
-- **AND** 走回來之後它又呈現
+- **AND** 走回來、錨點回到畫面內之後它又呈現
 
-#### Scenario: [FE-W08-S09] 牌子不擋操作、看得清楚
+#### Scenario: [FE-W08-S09] 牌子不擋操作、看得清楚、被面板蓋住
 
-- **GIVEN** 一塊名字牌在畫面上
+- **GIVEN** 一塊名字牌在畫面上，而且那個人站在看板面板打開後會蓋到的位置（畫面右側）
 - **THEN** `document.elementFromPoint(牌子中心)` 不是那塊牌子（它不接收指標事件）
 - **AND** 文字對底的對比 ≥ 4.5:1、底的 alpha = 1（顏色畫到 canvas 讀）
-- **AND** 牌子的 `z-index` 等於 `layer('hud')`、低於面板
+- **WHEN** 打開看板面板
+- **THEN** `document.elementFromPoint(牌子中心)` 在面板的子樹裡（牌子被面板蓋住，不是只比 `z-index` 的數字）
 
 ### Requirement: 房間裡也有名字牌
 
