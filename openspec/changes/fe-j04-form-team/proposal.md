@@ -15,20 +15,23 @@
 ## What Changes
 
 - 新 capability **`project-lifecycle`**：owner 在案件詳情的動作插槽（`FE-B03` 留的）看到**成軍**（只在 `recruiting`）或**結案**（只在 `active`）；`closed` 沒有動作。
-  - 成軍：填房間密碼（前端上限 `FORM_LIMITS.roomPassword` 4–64 字，後端不驗）→ `POST form-team` → 詳情呈現回應的狀態「已成軍」，並**只在這一次詳情裡**呈現剛設定的密碼：「複製密碼」、「用私訊寄出」（開收件匣、帶著草稿 —— 隊員是誰後端沒有模型，由 owner 選對話）。
+  - 成軍：填房間密碼（前端上限 `FORM_LIMITS.roomPassword` 4–64 個 code point，後端不驗）→ `POST form-team` → 詳情呈現回應的狀態「已成軍」，並**只在這一次詳情裡**呈現剛設定的密碼：「複製密碼」、「寄給隊員」（把一段含密碼的草稿寫進剪貼簿、關看板、開收件匣**清單**讓 owner 選對話貼上 —— 隊員是誰後端沒有模型；**不改收件匣**、密碼不進任何 provider）。
     列表回第 0 頁重取（案子已不在 `recruiting` 清單裡）；大廳的門**立即重取**（不等輪詢）。
   - 結案：確認層 → `POST close` → 「已結案」、沒有任何動作；門立即重取（消失）。
   - 失敗留值（`FE-X05` 的全站規則）：500 留密碼、狀態不變、不重取；403 用 `FE-X03` 的語彙；送出中不可關、連按只送一次。
   - 密碼不落地：不進網址、不進 storage（跟 `FE-N08-S05` 同一條線）。
 - **`world-interactive-objects`**（ADDED 一條）：走廊的門在「成軍／結案」之後 SHALL 立即重取一次 `GET /api/rooms`；有請求在飛時在它結束後再取一次（不疊加，`FE-W12-S21` 不變）。
-- **`inbox`**（MODIFIED〈收件匣是阻斷式面板，兩個入口〉→ 三個入口）：從案件詳情「用私訊寄出」開收件匣**清單**並帶著草稿；進任一對話時輸入框已填草稿；寄出或關閉後草稿清掉。
 - 真瀏覽器 e2e：owner 發案 → 詳情 → 成軍 → 密碼可複製 → 大廳長出那扇門 → 結案 → 門消失。
+- 三個副作用（詳情更新、列表重取、門重取）**互相獨立**：先同步用回應更新詳情，再各自啟動兩個重取；任一重取失敗不得回滾詳情、不得收回密碼、不得擋住另一個。
 
 ## Non-goals
 
-- **不做隊員模型**（誰是隊員、應徵、邀請 —— `BE-G10`）：「用私訊寄出」只帶草稿開收件匣，不替 owner 決定寄給誰。
+- **不做隊員模型**（誰是隊員、應徵、邀請 —— `BE-G10`）：「寄給隊員」只把草稿放進剪貼簿、開收件匣清單，不替 owner 決定寄給誰。
+- **不改收件匣**（不帶草稿進對話、不在 provider 放密碼）：審查指出「感染下一次點擊」的隱式狀態會把密碼貼給點錯的人、也拉長密碼在記憶體裡的生命週期。
 - **不做暫停／取消／已補滿**（WBS 第二列：`BE-G22` 待銜接，demo 之前不做）；後端只有 `recruiting → active → closed`。
 - **不做「重新成軍」／改密碼**：`active` 的案子不再顯示成軍（後端重複 form-team 會換密碼、舊密碼立即失效，那是危險的隱藏行為）；`closed` 不給成軍（後端會復活，anomaly 不開放）。
+  ⚠️ 這是 **UI 的圍堵，不是狀態轉移的安全保證**：兩個分頁一個看到 recruiting、另一個已 close，前者仍打得出 form-team 且後端回 200。真正的保證要由後端拒絕非 `recruiting` 的 form-team（anomaly 清單裡的 `form-team-after-close`，`FE-O08`）；這一份不自造鎖。
+- **不驗座位被清掉**：那是後端 `close` 的行為（`BE-G07`），契約套件與演練帳（`FE-O08`）守；e2e 只驗門消失。
 - **不動進房**（`room-entry-gate`）、不動座位（`FE-J13`）、不做「我的案件」（`FE-J03`，它會重用這裡的動作元件）。
 - **不動 `useRooms` 的輪詢語意**（30 秒、背景停、單飛）—— 只多一個「立即重取」的觸發。
 - 不做密碼強度、不做顯示／隱藏切換（4–64 字的房間密碼，不是帳號密碼）。
@@ -38,6 +41,5 @@
 - 新 `src/projects/OwnerActions.tsx`（成軍表單、結案確認、密碼一次性呈現）、`src/projects/projectRules.ts`（`FormTeamSchema`）、`src/forms/limits.ts`（`FORM_LIMITS.roomPassword`）
 - `src/projects/ProjectDetail.tsx`／`useProjectDetail.ts`（拿回應更新詳情）、`src/list-panel/BoardPanel.tsx`（把 `OwnerActions` 接進插槽、列表 `reload`）
 - `src/world/rooms/useRooms.ts`（`refresh`）＋ 新 `src/world/rooms/RoomsRefreshContext.tsx`（`WorldCanvas` 提供、詳情呼叫）
-- `src/inbox/InboxPanelProvider.tsx`（`openListWithDraft`、`draft`）、`src/inbox/InboxPanel.tsx`／`ComposeForm.tsx`（草稿）
-- 判準：新 `tests/project-lifecycle.test.tsx`、`tests/rooms-refresh.test.tsx`；`tests/inbox-panel.test.tsx`（草稿入口）；e2e `tests/e2e/form-team.mjs`
+- 判準：新 `tests/project-lifecycle.test.tsx`、`tests/rooms-refresh.test.tsx`；e2e `tests/e2e/form-team.mjs`
 - 效能：表單＋確認層進 board chunk；預期 +2 KB gz 以內；量前後差貼 PR
