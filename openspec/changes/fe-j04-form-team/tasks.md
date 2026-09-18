@@ -16,7 +16,7 @@
 
 ## 2b. `--backend`：替身的 form-team／close（`internal-backend` ADDED）
 
-- [ ] 2b.1 `tests/contract/rest/lifecycle.contract.ts`：`S12`（200 十鍵 active、rooms 含、enter 對／錯、非 owner 403、401、404）、`S13`（closed、座位 SQL 為 0、rooms 不含、重複 200、非 owner 403）；先 commit 紅（對 internal 是 404）
+- [ ] 2b.1 `tests/contract/rest/lifecycle.contract.ts`：`S12`（200 十鍵 active、rooms 含、enter 對／錯、再成軍換密碼、非 owner 403、401、404、422）、`S13`（closed、座位 SQL 為 0、rooms 不含、重複 200、非 owner 403、401、404）；先 commit 紅（對 internal 是 404）
 - [ ] 2b.2 `src/server/projects.ts`：`formTeam(id, hash)`、`closeProject(id)`（交易：update ＋ delete seats）；兩個 route 檔 `handle({ auth: 'required' })`，owner 檢查 → 403 原句
 - [ ] 2b.3 對 `internal` 契約套件綠；對 `guildhub`（本機自起）跑一次綠；**突變**：拿掉 owner 檢查 → `S12`／`S13` 紅；close 不刪座位 → `S13` 紅；form-team 不設 room_template → `S12` 紅（`room_ready` check 會 500）
 
