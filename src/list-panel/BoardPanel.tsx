@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { ProfileOut } from '@/api/contract/rest'
+import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
 import { PRIMARY } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
@@ -9,6 +9,7 @@ import { useIdentity } from '@/identity/IdentityProvider'
 import { DiscardConfirm } from '@/profile/DiscardConfirm'
 import { CreateProjectForm } from '@/projects/CreateProjectForm'
 import { ProjectCard } from '@/projects/ProjectCard'
+import { ProjectDetail } from '@/projects/ProjectDetail'
 import { TalentCard } from '@/talent/TalentCard'
 import { SendMessageButton } from '@/inbox/SendMessageButton'
 import { TalentDetail } from '@/talent/TalentDetail'
@@ -31,8 +32,9 @@ import type { ListKind } from './paging'
 // 這個檔案是第一個呼叫端，不該自己先示範繞過。
 //
 // 人才那一支是真的卡片與詳情（`FE-B04`）：卡片開詳情，詳情蓋在列表上（`overlay`），
-// 列表不卸載 —— 返回時頁碼與捲動位置都還在。案件那一支的列項是案件卡（`FE-B02`，純呈現、還不是控制項 —— 詳情是 `FE-B03`），
+// 列表不卸載 —— 返回時頁碼與捲動位置都還在。案件那一支同一種形狀（`FE-B02` 卡片、`FE-B03` 詳情）：卡片開詳情、詳情蓋在列表上；
 // 加「發案」（`FE-J01`）：只給已登入的人、表單住在同一個 overlay 插槽、成功後回第 0 頁重取。
+// **overlay 一次只放一個**：選中的詳情優先於表單（詳情開著時列表連工具列都 `inert`，按不到「發案」）。
 //
 // 「開著哪一筆詳情」「第幾頁」住在 `ListPanelProvider`，不在這裡（`FE-B09`：網址要能還原它們）。
 // 這裡只留「列表手上那一筆」當詳情的載入中預覽 —— 深連結直達時沒有預覽，詳情自己去載。
@@ -41,6 +43,7 @@ const TITLES: Record<ListKind, string> = { projects: '專案看板', profiles: '
 const LABELS = { next: '下一頁', close: '關閉' }
 const DETAIL_LABELS = { back: '返回' }
 const CREATE_LABEL = '發案'
+const MESSAGE_OWNER_LABEL = '私訊發案者'
 
 /** 人才那一支：選中的 id 在 provider，列表手上的那一筆（詳情的載入中預覽）在這裡。 */
 function TalentBoard({ onClose }: { onClose: () => void }) {
@@ -105,15 +108,41 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
  * `requestClose()` 回 `void`，`??` 右邊照樣執行，dirty 確認與送出中不可關全部被繞過（codex 審查抓到的；`S07` 對殼的關閉鈕有判準）。
  */
 function ProjectBoard() {
-  const { closePanel, page, reportPage } = useListPanel()
+  const { closePanel, page, reportPage, selected, selectProject } = useListPanel()
   const identity = useIdentity()
   const signedIn = identity.state === 'signed-in'
   const [composing, setComposing] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  // 詳情的載入中預覽：列表手上的那一筆（深連結沒有）。跟 `TalentBoard` 同一招。
+  const [preview, setPreview] = useState<ProjectOut | null>(null)
+  // 詳情關閉時焦點回到開它的那張卡（`FE-X06-S12`）；父層的 effect 跑得比 `ListPanel` 的晚，所以卡片贏。
+  const lastOpenedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (selected !== null) {
+      lastOpenedRef.current = selected
+      return
+    }
+    const id = lastOpenedRef.current
+    if (id === null) return
+    lastOpenedRef.current = null
+    document.querySelector<HTMLElement>(`[data-testid="project-card"][data-project-id="${id}"]`)?.focus()
+  }, [selected])
   const closeIntentRef = useRef<(() => void) | null>(null)
   const focusBeforeConfirm = useRef<HTMLElement | null>(null)
   // 表單開著時身分不再是 signed-in（登出、問不到）：入口沒了，表單跟著收（推導，不另設狀態）。
-  const formOpen = composing && signedIn
+  // 詳情開著時也沒有表單（overlay 一次只放一個）—— 而且**表單狀態要真的收掉**，不是只藏起來：
+  // 表單開著時上一頁／下一頁／深連結帶 `project` 進來，導航贏（跟離開頁面一樣，草稿不留）；返回列表時不能再冒出一張空白表單、
+  // 也不能讓「私訊發案者」的 `closePanel` 繞過表單的 dirty 確認（審查抓到的）。
+  const formOpen = composing && signedIn && selected === null
+  // 「記住上一次繪製的 selected」：換成非 null 的那一格就把表單狀態收掉（繪製期間 setState，不等 effect —— `useProfileDetail` 同一個模式）
+  const [seenSelected, setSeenSelected] = useState(selected)
+  if (selected !== seenSelected) {
+    setSeenSelected(selected)
+    if (selected !== null) {
+      setComposing(false)
+      setConfirming(false)
+    }
+  }
 
   const onClose = () => {
     const requestClose = closeIntentRef.current
@@ -141,7 +170,16 @@ function ProjectBoard() {
       kind="projects"
       title={TITLES.projects}
       labels={LABELS}
-      renderItem={(item, { fetchedAt }) => <ProjectCard project={item} now={fetchedAt} />}
+      renderItem={(item, { fetchedAt }) => (
+        <ProjectCard
+          project={item}
+          now={fetchedAt}
+          onOpen={() => {
+            setPreview(item)
+            selectProject(item.id)
+          }}
+        />
+      )}
       onClose={onClose}
       page={page}
       onShownPage={reportPage}
@@ -156,7 +194,16 @@ function ProjectBoard() {
       exhausted={<EmptyState kind="exhausted" />}
       error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
       overlay={
-        formOpen
+        selected !== null ? (
+          <ProjectDetail
+            id={selected}
+            preview={preview?.id === selected ? preview : undefined}
+            labels={DETAIL_LABELS}
+            onBack={() => selectProject(null)}
+            // 「私訊發案者」（`FE-K01` 的同一條路）：關看板、開收件匣直接進對話。`ProjectDetail` 只在已登入的非 owner 時渲染它。
+            actions={(project) => <SendMessageButton to={project.owner_id} label={MESSAGE_OWNER_LABEL} onBeforeOpen={closePanel} />}
+          />
+        ) : formOpen
           ? ({ reload }) => (
               <div className="flex min-h-0 flex-col gap-gutter overflow-y-auto">
                 <div inert={confirming}>

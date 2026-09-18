@@ -387,6 +387,50 @@ describe('互動寫回網址；上一頁與 Escape 等效', () => {
   })
 })
 
+describe('[FE-B09-S14] 案件詳情的網址：project=<id>', () => {
+  const OWNER = UUID(0)
+  const projectDetail = () => screen.queryByTestId('project-detail')
+  const projectCards = () => screen.queryAllByTestId('project-card')
+
+  it('[FE-B09-S14] 直達 ?panel=projects&project=<id>：詳情蓋在面板上、送 GET /api/projects/<id>、不多一層紀錄；Escape 用 replace 回 ?panel=projects', async () => {
+    server.replyFor('/api/projects', 200, [project(0), project(1)])
+    server.replyFor(`/api/projects/${UUID(101)}`, 200, { ...project(1), body: '詳情端點回的' })
+    server.replyFor(`/api/profiles/${OWNER}`, 200, profile(0))
+    const { spies } = arriveAt(`/world?panel=projects&project=${UUID(101)}`)
+    expect(panel()?.dataset.kind).toBe('projects')
+    expect(projectDetail(), '詳情沒有跟著網址開').not.toBeNull()
+    await waitFor(() => expect(projectDetail()?.dataset.phase).toBe('ready'))
+    expect(screen.getByText('詳情端點回的')).toBeTruthy()
+    expect(server.calls.some((c) => c.pathname === `/api/projects/${UUID(101)}`), '沒有預覽可用，要去載那一筆').toBe(true)
+    expect(spies.push(), '直達不是「使用者在清單裡開詳情」，不該 push').toBe(0)
+    const replacedBefore = spies.replace()
+    escape()
+    expect(projectDetail()).toBeNull()
+    expect(panel(), '一下 Escape 把面板連詳情一起關了').not.toBeNull()
+    await waitFor(() => expect(url()).toBe('/world?panel=projects'))
+    expect(spies.go(), '直達之後 Escape 用了 back —— 本站沒有上一層，會退出本站').toBe(0)
+    expect(spies.push()).toBe(0)
+    expect(spies.replace(), '退一層的網址不是用 replace 寫的').toBeGreaterThanOrEqual(replacedBefore + 1)
+  })
+
+  it('[FE-B09-S14] 清單裡開案件詳情：push 一層、網址帶 project；上一頁回清單（詳情關、清單仍開）', async () => {
+    server.replyFor('/api/projects', 200, [project(0), project(1)])
+    server.replyFor(`/api/projects/${UUID(100)}`, 200, project(0))
+    server.replyFor(`/api/profiles/${OWNER}`, 200, profile(0))
+    const { spies } = arriveAt('/world?panel=projects')
+    await waitFor(() => expect(projectCards()).toHaveLength(2))
+    const pushedBefore = spies.push()
+    fireEvent.click(projectCards()[0] as HTMLElement)
+    await waitFor(() => expect(projectDetail()?.dataset.phase).toBe('ready'))
+    await waitFor(() => expect(url()).toBe(`/world?panel=projects&project=${UUID(100)}`))
+    expect(spies.push() - pushedBefore, '開詳情沒有多一層紀錄').toBe(1)
+    await go(-1)
+    await waitFor(() => expect(projectDetail()).toBeNull())
+    expect(panel()?.dataset.kind, '上一頁把清單也關了').toBe('projects')
+    expect(url()).toBe('/world?panel=projects')
+  })
+})
+
 describe('網址改變時世界不重掛', () => {
   it('[FE-B09-S12] 一連串網址變化，provider 那一層只掛一次（jsdom 探針，輔）', async () => {
     server.replyFor('/api/profiles', 200, [profile(0), profile(1)])

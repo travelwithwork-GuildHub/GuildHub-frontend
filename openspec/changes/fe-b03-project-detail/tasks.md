@@ -29,13 +29,13 @@
 
 ## 4. `--wire`：卡片變控制項、接上看板、e2e（MODIFIED 卡片；`S01`／`S02`／`S13`／`S14`；design D5）
 
-- [ ] 4.1 `tests/project-card.test.tsx`：`FE-B02-S08` 改成「根是 `button`、裡面沒有第二個控制項」、加 `S02`（Enter／Space）；`tests/board-panel-wiring.test.tsx`：`S01`、`S13`（第 1 頁、非零 `scrollTop`、列表請求總次數不增加）；`tests/create-project.test.tsx` 或新檔（`mountBoard`＋真的 `InboxPanelProvider`）：`S10` 私訊發案者 → 看板關、收件匣在與 owner 的對話；`tests/deep-link.test.tsx`：`FE-B09-S14` 直達 `?panel=projects&project=<id>` 送出 `GET /api/projects/<id>`、不多一層紀錄、Escape 用 replace 回 `?panel=projects`；清單裡開詳情 push 一層、上一頁回清單；先 commit 紅
-- [ ] 4.2 `ProjectCard` → `<button>`＋`onOpen`；`BoardPanel` 案件那一支：`selected` → overlay 放 `ProjectDetail`（預覽是列表那一筆）、返回焦點回那張卡、`SendMessageButton label="私訊發案者"`；`create-project` 表單與詳情共用 overlay 插槽（一次只開一個）
-- [ ] 4.3 `tests/e2e/board-panel.mjs` 案件那一段：Tab 到第一張卡按 Enter、詳情 `body` 是詳情端點的、發案者名字、返回焦點回卡（`S14`）；對 `next start` 重跑綠；`create-project.mjs` 重跑綠
-- [ ] 4.4 **突變**：卡片改回 `<article>` → `S02` 紅；返回時卸載列表 → `S13` 紅
+- [x] 4.1 `tests/project-card.test.tsx`：`FE-B02-S08` 改成「根是 `button`、裡面沒有第二個控制項」、加 `S02`（Enter／Space）；`tests/board-panel-wiring.test.tsx`：`S01`、`S13`（第 1 頁、非零 `scrollTop`、列表請求總次數不增加）；`tests/create-project.test.tsx` 或新檔（`mountBoard`＋真的 `InboxPanelProvider`）：`S10` 私訊發案者 → 看板關、收件匣在與 owner 的對話；`tests/deep-link.test.tsx`：`FE-B09-S14` 直達 `?panel=projects&project=<id>` 送出 `GET /api/projects/<id>`、不多一層紀錄、Escape 用 replace 回 `?panel=projects`；清單裡開詳情 push 一層、上一頁回清單；先 commit 紅
+- [x] 4.2 `ProjectCard` → `<button>`＋`onOpen`；`BoardPanel` 案件那一支：`selected` → overlay 放 `ProjectDetail`（預覽是列表那一筆）、返回焦點回那張卡、`SendMessageButton label="私訊發案者"`；`create-project` 表單與詳情共用 overlay 插槽（一次只開一個）
+- [x] 4.3 `tests/e2e/board-panel.mjs` 案件那一段：Tab 到第一張卡按 Enter、詳情 `body` 是詳情端點的、發案者名字、返回焦點回卡（`S14`）；對 `next start` 重跑綠；`create-project.mjs` 重跑綠
+- [x] 4.4 **突變**：卡片改回 `<article>` → `S02`／`S08` 紅；塞第二個控制項 → `S08` 紅；開固定 id → `S01` 紅；返回時卸載列表／不還焦點 → `S13` 紅；私訊不關看板 → `S10` 紅；`depthOf` 不算 project／`selected` 不寫回 → `FE-B09-S14` 紅
 
 ## 5. 收尾
 
-- [ ] 5.1 `ui-ux-pro-max` pre-delivery（詳情版面、焦點、對比）；`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm exec tsc --noEmit`、`pnpm test`；`bash .github/scripts/pr-size.sh`
-- [ ] 5.2 量 client JS 前後差貼 PR；合併後 `vercel deploy --prod`
+- [x] 5.1 `ui-ux-pro-max` pre-delivery（詳情版面、焦點、對比）；`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm exec tsc --noEmit`、`pnpm test`；`bash .github/scripts/pr-size.sh`
+- [ ] 5.2 量 client JS 前後差貼 PR（全部 chunk gz 1291.5 → 1292.5 KB；BoardPanel 那個 chunk 157.4 → 158.3 KB，+0.9 KB）；合併後 `vercel deploy --prod`
 - [ ] 5.3 `archive/fe-b03-project-detail`：`openspec validate --archived --strict` 與 `--all --strict`；Sheet `FE-B03` Done
