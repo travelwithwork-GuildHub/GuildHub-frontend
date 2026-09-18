@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs'
+import ts from 'typescript'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { domTokenScan } from '@/design/domTokenScan'
@@ -53,12 +54,29 @@ describe('src/** 只從 token 取值', () => {
     expect(exemptions, `豁免 ${exemptions} 個，超過上限 ${MAX_EXEMPTIONS}`).toBeLessThanOrEqual(MAX_EXEMPTIONS)
   })
 
-  it('[FE-X16-S01] 定義檔只有介面一行加三個值各一次（多一個常數、多一套定義、JSX 字面屬性都紅）', () => {
+  // 三輪審查：純文字計數會被註解與沒用到的假物件騙 —— 改讀 AST：三個 export 各恰一個合法值、標成 `Control`、沒有別的物件帶這個鍵、沒有 computed 鍵。
+  it('[FE-X16-S01] 定義檔：只有 PRIMARY／SECONDARY／TERTIARY 三個 export 帶層級標記、各一個值、沒有 computed 鍵', () => {
     const source = readFileSync(join(ROOT, TIER_DEFINITION), 'utf8')
     const marks = domTokenScan(source).violations.filter((v) => v.kind === '層級標記').map((v) => v.text)
     expect(marks).toEqual([TIER_KEY, TIER_KEY, TIER_KEY, TIER_KEY])
-    const values = [...source.matchAll(/'data-tier': '(\w+)'/g)].map((m) => m[1]).sort()
-    expect(values).toEqual(['primary', 'secondary', 'tertiary'])
+    const sf = ts.createSourceFile(TIER_DEFINITION, source, ts.ScriptTarget.Latest, true)
+    const owners: Record<string, string[]> = {}
+    let computed = 0
+    const nameOf = (n: ts.PropertyName) => (ts.isStringLiteral(n) || ts.isIdentifier(n) ? n.text : (computed += 1, '<computed>'))
+    const walk = (node: ts.Node) => {
+      if (ts.isPropertyAssignment(node) && nameOf(node.name) === 'data-tier') {
+        const decl = node.parent.parent
+        const exported = ts.isVariableDeclaration(decl) && ts.isIdentifier(decl.name) && decl.type?.getText() === 'Control' && decl.initializer === node.parent
+        const owner = exported ? (decl as ts.VariableDeclaration).name.getText() : `<不是標成 Control 的 export：${node.getText()}>`
+        ;(owners[owner] ??= []).push(ts.isStringLiteral(node.initializer) ? node.initializer.text : '<不是字串>')
+      }
+      ts.forEachChild(node, walk)
+    }
+    walk(sf)
+    expect(owners).toEqual({ PRIMARY: ['primary'], SECONDARY: ['secondary'], TERTIARY: ['tertiary'] })
+    expect(computed, '定義檔不准有 computed 鍵').toBe(0)
+    const iface = sf.statements.find((s): s is ts.InterfaceDeclaration => ts.isInterfaceDeclaration(s) && s.name.text === 'Control')
+    expect(iface?.members.map((m) => `${m.name?.getText()}:${(m as ts.PropertySignature).type?.getText()}`)).toContain("'data-tier':Tier")
   })
 
   // 六段假輸入各要被抓 —— 判準不是恆真。每一段單獨餵，抓到的那一條要說得出是哪一類。
@@ -75,6 +93,8 @@ describe('src/** 只從 token 取值', () => {
     ['<button {...{ "data-tier": "primary" }} />', '層級標記'],
     ["createElement('button', { 'data-text': 'caption' })", '層級標記'],
     ["const p = { ['data-tier']: 'primary' }", '層級標記'],
+    // 三輪審查：豁免寫在字串裡不算註解，色碼照抓
+    ["const color = '#fff', note = 'dom-token-allow: 任意理由'", '色碼'],
   ])('[FE-X16-S01] 假輸入被抓：%s', (input, kind) => {
     const scan = domTokenScan(`export const x = 1\n${input}\n`)
     expect(scan.violations.map((v) => v.kind), `沒抓到 ${kind}`).toContain(kind)

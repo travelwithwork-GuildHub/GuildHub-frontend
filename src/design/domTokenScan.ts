@@ -23,7 +23,7 @@ const PATTERNS: ReadonlyArray<readonly [kind: string, re: RegExp]> = [
   ['層級標記', new RegExp(`(?:\\b(?:${TIER_ATTR}|${TEXT_ATTR})\\s*=|\\[?['"](?:${TIER_ATTR}|${TEXT_ATTR})['"]\\]?\\s*:)`, 'g')],
 ]
 
-/** 這一行要求豁免。**冒號後面要有理由**；沒有理由算違規。 */
+/** 這一行要求豁免。**只認註解裡的**（`//` 或 `/*` 之後；寫在字串裡不算，審查抓到）、**冒號後面要有理由**；沒有理由算違規。 */
 export const ALLOW = ['dom', 'token', 'allow'].join('-') + ':'
 
 export interface TokenViolation { line: number; kind: string; text: string }
@@ -39,7 +39,8 @@ export function domTokenScan(source: string): TokenScan {
       re.lastIndex = 0
       for (const match of line.matchAll(re)) found.push({ line: index + 1, kind, text: match[0].trim() })
     }
-    const allow = line.indexOf(ALLOW)
+    const comment = line.search(/\/\/|\/\*/)
+    const allow = comment === -1 ? -1 : line.indexOf(ALLOW, comment)
     if (allow === -1) {
       violations.push(...found)
       return
