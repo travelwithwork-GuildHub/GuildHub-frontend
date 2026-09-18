@@ -48,12 +48,15 @@ React 的 state 更新也不同步 —— `claim()` 不可能同步知道結果�
   讓位**不替使用者回答**「要放棄修改嗎」：那是非同步的問題，讓位直接算拒絕（`S14` 第三段）。
 - **`yield(): void` 同步**：確定關閉，走 provider 既有的關閉路徑（看板的網址退照舊），但**不把焦點還給開啟者**（`S13` 焦點只動一次）——
   今天 `ProfilePanelProvider` 在卸載後的 effect 裡還焦點，讓位時要跳過那一步（用一個「這次關閉是讓位」的旗標）。
-- **請求同步**：provider 的 `openX()` 先 `coordinator.requestOpen()`：沒有持有者 → `true`；`canYield()` → `yield()` 後 `true`；否則 `false`
-  並發一則 `role="status"` 的回饋（`toast` 層；文案不是契約）。呼叫端拿到 `false` 就不動自己的 state —— 不會先開再關、不閃。
-  同一次事件裡的多個請求依呼叫順序處理（協調者的登記表是 ref，不是 state，所以同批次看得到前一個請求的結果）。
-- **網址**：看板讓位走既有關閉路徑 → `PanelUrlSync` 照 `FE-B09` 退網址。上一頁／下一頁的 `restore` 也經過 `requestOpen()`；被拒 → `replaceState` 改回實際狀態
-  （`FE-B09-S05` canonical 的同一招）、不動畫面（`S17`）。收件匣與名片不進網址（那是 `FE-B09` 的規格變更，不做）。
+- **請求同步＋保留**：provider 的 `openX()` 先 `coordinator.requestOpen(id)`。codex 第二輪抓到：只靠登記表（殼在 effect 裡登記）判斷「沒有持有者」，
+  同一次事件裡 A、B 兩個請求都會看到空表、都拿到 `true`、commit 後兩個都掛。所以協調者多一個 **`reserved: id | null`**（ref，同步）：請求成功就保留給那個 id，
+  殼登記時解除；保留期間別的 id 一律拒絕（`S21`）。請求成功的 provider 在同一次事件裡 `setOpen(true)`，所以保留不會懸空（provider 只有這一種用法）。
+  沒有持有者 → 保留、`true`；`canYield()` → `yield()`、保留、`true`；否則 `false` 並發一則 `role="status"` 的回饋（`toast` 層；文案不是契約）。
+  呼叫端拿到 `false` 就不動自己的 state —— 不會先開再關、不閃。
+- **網址**：看板讓位走既有關閉路徑 → `PanelUrlSync` 照 `FE-B09` 退網址。下一頁的 `restore`（讓位是 `go(-1)`，帶 `panel` 的那一筆在**前進**紀錄 —— codex 第二輪抓到第一版寫成上一頁）也經過 `requestOpen()`；
+  被拒 → `replaceState` 把目前這一筆改回實際狀態（`FE-B09-S05` canonical 的同一招）、不 `pushState`、不動畫面（`S17`）。收件匣與名片不進網址（那是 `FE-B09` 的規格變更，不做）。
 
+換角色彈出層：成功開面板時關；被拒時照 `FE-X06-S16` 焦點離開就關（第一版寫「被拒不動」跟那條矛盾，codex 抓到）。
 非阻斷的表面（訪客提示、聊天框、彈出層）**只讀**協調者（`useBlockingPanelOpen(): boolean`，從登記表推導），不登記。
 為什麼不做成「路由決定開哪個」：見 ADR 0011 選項 B。**代價**：多一個 context、殼多兩個 prop（`canYield`、`onYield`）、provider 開面板多一次同步請求。
 **Supersedes**: 無。ADR：`docs/adr/0011-one-blocking-panel-at-a-time.md`。

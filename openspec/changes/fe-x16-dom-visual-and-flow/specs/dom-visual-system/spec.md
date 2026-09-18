@@ -129,7 +129,7 @@ DOM 那一半的介面（登入頁、首次進入、標題列、看板與詳情�
 
 控制項 SHALL 分**主要**（填色）、**次要**（邊框）、**文字**（無填色無邊框，文字色等於主要級的填色）三級，
 `data-tier` 分別是 `primary`／`secondary`／`tertiary`。主要級的填色對所在表面 `≥ 3:1`、次要級的邊界 `≥ 3:1`（`control-affordance` 既有），
-文字級的文字色 SHALL 與主要級的填色相同（讀得出它是可按的，而且跟內文不同色）。
+文字級的文字色 SHALL 與主要級**靜止、啟用**狀態的填色相同（讀得出它是可按的，而且跟內文不同色）；比較基準是同一份主要級常數在該表面上任一靜止、啟用的主要按鈕，該表面沒有時以 `/login` 暱稱表單的主要按鈕為基準；兩邊都畫到 canvas 讀 RGBA 再比。
 **每個操作區在同一狀態下，可見且啟用的主要動作 SHALL `≤ 1`**；有明確的前進動作時它 SHALL 是主要；關閉、返回、取消、送出中、載入中、
 權限阻擋、錯誤狀態 SHALL NOT 為了湊一個而升級 —— 零個是合法的。確認視窗的主要動作是安全的那一個（取消），`project-lifecycle` 已談定。
 場景聊天框是非阻斷的表面，它的送出 SHALL 是次要（不跟面板的主要動作搶）。
@@ -149,7 +149,7 @@ DOM 那一半的介面（登入頁、首次進入、標題列、看板與詳情�
 
 - **WHEN** 在點名的表面上找出每一個 `data-tier` 的按鈕
 - **THEN** 每一個主要級的填色對所在表面 `≥ 3:1`；每一個次要級的邊界 `≥ 3:1` 且沒有填色（背景 alpha `= 0` 或等於表面色）；
-  每一個文字級沒有邊界、沒有填色、文字色等於主要級的填色
+  每一個文字級沒有邊界、沒有填色、文字色（RGBA）等於基準主要按鈕靜止、啟用時的填色
 - **AND WHEN** 用鍵盤把焦點依序移到該表面上**每一個**按鈕與輸入框
 - **THEN** 每一個的焦點環寬度 SHALL `≥ 2px`、對所在表面 `≥ 3:1`
 - **AND WHEN** 指標依序移到**每一個**啟用中的按鈕上
@@ -178,22 +178,26 @@ DOM 那一半的介面（登入頁、首次進入、標題列、看板與詳情�
 
 **持有者**：掛載中的阻斷式面板，由殼向協調者登記；登記帶兩個**同步**函式 `canYield(): boolean`（送出中或有未儲存的修改 → `false`）
 與 `yield(): void`（確定關閉，**不**把焦點還給開啟者）。卸載即釋放；同 id 重複登記冪等。
-**請求**：要開一個阻斷式面板之前 SHALL 先向協調者請求；沒有持有者 → 開；持有者 `canYield()` 為 `true` → 先 `yield()` 再開；
-為 `false` → **拒絕**：不開、持有者留著、觸發它的控制保持焦點、畫面 SHALL 有可見的回饋（`role="status"`，內容不是契約）。
-同一次事件裡多個請求依呼叫順序處理。任一時刻掛載中的阻斷式面板 SHALL `≤ 1`。
-**讓位後的焦點**：SHALL 只移動一次，落在新面板內（新面板自己的取焦規則）；被讓位的面板 SHALL NOT 把焦點還給它的開啟者。
-**網址**：看板在網址裡（`deep-link`）。看板讓位 SHALL 走它既有的關閉路徑（網址跟著退）；上一頁／下一頁要求重開看板 SHALL 也經過協調者，
-被拒絕時網址 SHALL 以 `replaceState` 改回實際狀態（跟 `deep-link` 的 canonical 同一種處理），畫面 SHALL NOT 換。
+**請求**：要開一個阻斷式面板之前 SHALL 先向協調者請求 `requestOpen(id)`，協調者**同步、原子地**處理：已有別的 id 的**保留**（下面）→ 拒絕；
+沒有持有者 → 保留給 `id` 並回 `true`；持有者 `canYield()` 為 `true` → 先 `yield()`、保留給 `id`、回 `true`；為 `false` → **拒絕**：不開、持有者留著、
+觸發它的控制保持焦點、畫面 SHALL 有可見的回饋（`role="status"`，內容不是契約）。**保留**在 `id` 的殼登記時解除；請求成功的 provider SHALL 在同一次事件裡
+把自己設成開（保留不會懸空）。同一次事件裡的第二個請求因為保留而被拒（不看 React 何時 commit）。任一時刻掛載中的阻斷式面板 SHALL `≤ 1`。
+**讓位後的焦點**：從觸發到穩定，記錄每一次 `focusin` 的目標，被讓位面板的開啟者（世界焦點錨、或開它的按鈕）SHALL NOT 出現在序列裡，
+`body` SHALL NOT 出現在序列裡；最後 `document.activeElement` 在新面板內（新面板自己的取焦規則）。
+**網址**：看板在網址裡（`deep-link`）。看板讓位 SHALL 走它既有的關閉路徑（網址跟著退：`history.go(-1)`，帶 `panel` 的那一筆留在**前進**紀錄裡）；
+上一頁／下一頁要求重開看板 SHALL 也經過協調者，被拒絕時網址 SHALL 以 `replaceState` 把**目前這一筆**改成實際狀態（跟 `deep-link` 的 canonical 同一種處理），
+SHALL NOT `pushState`，畫面 SHALL NOT 換。
 **非阻斷的表面**：面板開著時訪客提示 SHALL 不顯示，面板關了、提示還沒被關掉或走完就回來，讓位 SHALL NOT 重設它的「關掉了」與「走完了」；
 場景聊天框 SHALL 收成一行（區域仍在、只剩區域名稱與「面板開著期間新到的訊息數」，沒有列表與輸入框），面板關了展開回來，
 記憶體與捲動位置照舊：收起前在底部 → 展開後在底部；收起前往上讀 → 展開後位置不動、有新的就顯示「回到最新」（`scene-chat-ui` 的兩條照舊）；
-成功開啟任一阻斷式面板時換角色彈出層 SHALL 關（`keyboard-focus` 的「按 E 開面板」擴到所有入口），請求被拒時彈出層不變。
+成功開啟任一阻斷式面板時換角色彈出層 SHALL 關（`keyboard-focus` 的「按 E 開面板」擴到所有入口）；請求被拒時照 `keyboard-focus` 既有的「焦點離開就關」——
+按了別的入口焦點就離開了它，所以它也關；這份不在那條上加例外。
 
 #### Scenario: [FE-X16-S13] 開第二個面板會關第一個、焦點只動一次、網址跟著退
 
 - **WHEN** 看板清單開著（網址有 `panel`），按標題列的收件匣
 - **THEN** 看板 SHALL 關、收件匣 SHALL 開、掛載中的阻斷式面板恰好一個、`document.activeElement` 在收件匣內、網址 SHALL NOT 再有 `panel`
-- **AND** 從按下到穩定，焦點變化 SHALL 恰好一次（開啟者 SHALL NOT 曾拿回焦點）
+- **AND** 從按下到穩定的 `focusin` 序列裡 SHALL NOT 出現世界焦點錨（看板的開啟者）也 SHALL NOT 出現 `body`
 - **AND WHEN** 收件匣開著，按標題列的我的名片
 - **THEN** 收件匣 SHALL 關、名片 SHALL 開
 - **AND WHEN** 名片開著，按標題列的收件匣
@@ -208,7 +212,7 @@ DOM 那一半的介面（登入頁、首次進入、標題列、看板與詳情�
 - **AND WHEN** 回應回來了，再按一次收件匣
 - **THEN** 看板 SHALL 關、收件匣 SHALL 開
 - **AND WHEN** 我的名片改了字沒存，按標題列的收件匣
-- **THEN** 收件匣 SHALL NOT 開、名片 SHALL 留著、SHALL NOT 出現放棄修改確認（讓位不替使用者按下那個問題）
+- **THEN** 收件匣 SHALL NOT 開、名片 SHALL 留著、改的字 SHALL 還在、SHALL NOT 出現放棄修改確認（讓位不替使用者按下那個問題）、焦點 SHALL 在收件匣按鈕上、SHALL 有一個 `role="status"` 的回饋
 
 #### Scenario: [FE-X16-S15] 訪客提示讓位、面板關了回來、不重設它的狀態
 
@@ -228,21 +232,30 @@ DOM 那一半的介面（登入頁、首次進入、標題列、看板與詳情�
 - **AND WHEN** 關掉看板
 - **THEN** 聊天框 SHALL 展開，列表裡有那 3 則、輸入框在、捲動在底部（最後一列完整可見）
 - **AND WHEN** 聊天框往上讀著（不在底部）時開看板、期間收到 2 則、關看板
-- **THEN** 展開後捲動位置 SHALL 跟收起前相同、SHALL 顯示「回到最新」的控制、列表裡有那 2 則
+- **THEN** 展開後 `scrollTop` 跟收起前的差 SHALL `≤ 1px`、SHALL 顯示「回到最新」的控制、列表裡有那 2 則
 
-#### Scenario: [FE-X16-S17] 上一頁要求重開看板：持有者接受就開、拒絕就把網址改回來
+#### Scenario: [FE-X16-S17] 下一頁要求重開看板：持有者接受就開、拒絕就把那一筆改回來
 
-- **WHEN** 看板開著 → 按標題列的收件匣（看板讓位、網址退）→ 按瀏覽器上一頁
-- **THEN** 收件匣 SHALL 關、看板 SHALL 重開（`deep-link` 的上一頁語意）
-- **AND WHEN** 收件匣對話正在送出中時按瀏覽器上一頁
-- **THEN** 收件匣 SHALL 留著、看板 SHALL NOT 開、網址 SHALL 以 `replaceState` 改回沒有 `panel` 的樣子、瀏覽紀錄長度 SHALL NOT 增加
+- **WHEN** 從 `/world` 按 E 開看板（`pushState`）→ 按標題列的收件匣（看板讓位、`go(-1)` 回 `/world`）→ 按瀏覽器**下一頁**
+- **THEN** 收件匣 SHALL 關、看板 SHALL 重開（`deep-link` 的下一頁語意）
+- **AND WHEN** 同樣走到收件匣開著、收件匣對話正在送出中時按瀏覽器下一頁
+- **THEN** 收件匣 SHALL 留著、看板 SHALL NOT 開、`history.replaceState` SHALL 被呼叫恰好一次且 `pushState` 零次（攔截兩者）、網址 SHALL 沒有 `panel`
+- **AND WHEN** 之後再按上一頁
+- **THEN** SHALL 回到原本的 `/world` 那一筆（沒有 `panel`），收件匣仍然開著（不在網址裡）
 
-#### Scenario: [FE-X16-S18] 換角色彈出層：成功開面板就關、被拒就不動
+#### Scenario: [FE-X16-S18] 換角色彈出層：成功開面板就關、被拒也因焦點離開而關、草稿丟
 
 - **WHEN** 換角色彈出層開著，按標題列的收件匣
 - **THEN** 彈出層 SHALL 關、收件匣 SHALL 開
-- **AND WHEN** 看板詳情送出中，換角色彈出層開著，按標題列的收件匣
-- **THEN** 收件匣 SHALL NOT 開、彈出層 SHALL 仍然開著
+- **AND WHEN** 看板詳情送出中，換角色彈出層開著（有未套用的草稿），按標題列的收件匣
+- **THEN** 收件匣 SHALL NOT 開、彈出層 SHALL 關（焦點離開了它）、草稿 SHALL 丟（`keyboard-focus` 既有語意）、焦點在收件匣按鈕上
+
+#### Scenario: [FE-X16-S21] 同一次事件裡兩個請求：第一個贏、第二個被拒
+
+- **WHEN** 沒有面板開著，在同一次事件裡依序請求開看板、再請求開收件匣（兩個 provider 都還沒 commit）
+- **THEN** 第一個 SHALL 得到 `true`、第二個 SHALL 得到 `false` 並有 `role="status"` 回饋；commit 後掛載中的阻斷式面板 SHALL 恰好一個且是看板
+- **AND WHEN** 看板登記之後再請求開收件匣
+- **THEN** 看板讓位、收件匣開（保留已在登記時解除）
 
 ### Requirement: 標題列是固定的導覽
 
@@ -254,18 +267,20 @@ DOM 那一半的介面（登入頁、首次進入、標題列、看板與詳情�
 - **WHEN** 分別以訪客、已登入在大廳、已登入在房間打開 `/world`
 - **THEN** 三次量到的標題列 rect SHALL 相同；第一個元素 SHALL 是品牌，其餘互動控制全部在品牌右側且 `≤ 5` 個
 - **AND WHEN** 開任一阻斷式面板
-- **THEN** 標題列裡每一個控制的 rect SHALL 不與面板的 rect 相交
+- **THEN** 面板的 rect 與**整個標題列**的 rect 交集面積 SHALL 是 0（不只是控制）
 
 ### Requirement: 這一份對載入預算的影響有上限，量法固定
 
 這一份 SHALL NOT 讓 `/world` 多出任何靜態資源請求（沒有 webfont、沒有圖檔、沒有新的 chunk 請求）。
 相對於**固定的基線 commit**（這份規格合併時 `main` 的 SHA，寫在 tasks 裡）：`/world` 的 client JS（gzip）增加 SHALL `≤ 4 KB`、
 CSS（gzip）增加 SHALL `≤ 6 KB`。量法：同一份 lockfile 與 Node 版本、`next build`、依 build manifest 的 `/world` 入口 chunk 各自 gzip 後加總；
-裁決在最後一片合併前對基線量一次，每片的數字只是觀察。
+裁決在最後一片合併前對基線量一次，每片的數字只是觀察。請求清單的量法：全新的 browser context、停用快取、冷載入 `/world` 到 canvas 出現；
+每個請求記 `(resourceType, 路徑類別)`，路徑類別＝路徑去掉 `/_next/static/<buildId>/` 與 chunk 的 hash 後的字串；排除 `/api/*` 與 WebSocket；redirect 算一次；
+兩次的 multiset SHALL 相同。
 
 #### Scenario: [FE-X16-S20] 預算與請求
 
 - **WHEN** 對基線與最後一片各做一次 `next build` 並量 `/world` 的 client JS 與 CSS（gzip）
 - **THEN** 差值 SHALL 在上限內
-- **AND WHEN** 真瀏覽器載入 `/world` 到 canvas 出現，記下所有請求（不含 `/api/*` 與 WebSocket）
-- **THEN** 請求數與種類 SHALL 跟基線相同，且 SHALL NOT 有字型或圖檔
+- **AND WHEN** 依上面的量法對基線與最後一片各記一次請求清單
+- **THEN** 兩個 multiset SHALL 相同，且 SHALL NOT 有 `font`／`image` 的 resourceType

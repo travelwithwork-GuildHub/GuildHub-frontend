@@ -38,24 +38,24 @@
 
 - [ ] 4.1 判準先紅（jsdom）：`S13`（看板→收件匣→名片→收件匣、寄信那條路、焦點只動一次、網址退）、`S14`（成軍送出中拒絕＋`role="status"`＋焦點留在按鈕；回來後接受；名片 dirty 拒絕且不出確認）、
       `S15`（提示讓位／回來／關掉不回來／走完不回來）、`S16`（收起顯示 3、不持鎖；展開有 3 則在底部；往上讀時收起再展開位置不動＋回到最新）、
-      `S17`（上一頁：接受重開；送出中拒絕 → `replaceState`、紀錄長度不變）、`S18`（彈出層：成功就關、被拒不動）
-- [ ] 4.2 `src/panel/BlockingPanelCoordinator.tsx`（D3）：登記表是 ref；`register({ id, canYield, yield })` 冪等、卸載釋放；`requestOpen()` 同步回 boolean、拒絕發 `role="status"`（`toast` 層）；
+      `S17`（下一頁：接受重開；送出中拒絕 → `replaceState` 一次、`pushState` 零次、再上一頁回原本那一筆）、`S18`（彈出層：成功就關、被拒也因焦點離開而關）、`S21`（同一次事件兩個請求：第一個贏、第二個拒）
+- [ ] 4.2 `src/panel/BlockingPanelCoordinator.tsx`（D3）：登記表是 ref；`register({ id, canYield, yield })` 冪等、卸載釋放並解除同 id 的保留；`requestOpen(id)` 同步回 boolean、成功就 `reserved = id`、保留期間別的 id 拒絕（D3）、拒絕發 `role="status"`（`toast` 層）；
       `useBlockingPanelOpen()` 從登記表推導。`PanelShell` 掛載時登記（新 prop `canYield`、`onYield`）
 - [ ] 4.3 三個 provider：`openX()` 先 `requestOpen()`；`yield` 走既有關閉路徑但**不還焦點**（`ProfilePanelProvider` 的還焦點 effect 加旗標）；`FE-K01-S02` 的「看板關」改走協調者；
-      `PanelUrlSync.restore` 經過 `requestOpen()`，被拒 → `replaceState` 回實際狀態
-- [ ] 4.4 `FirstEntryNotice` 讀 `useBlockingPanelOpen()`（不卸載它的 `dismissed`／`alreadyDone`：用 `hidden`，不是 return null）；`SceneChatHud` 收成一行＋捲動位置還原（D5）；`AvatarPicker` 成功開面板時關
-- [ ] 4.5 e2e：`S13`／`S15`／`S16`／`S17` 在真瀏覽器各走一次（`tests/e2e/dom-visual.mjs`）
+      `PanelUrlSync.restore` 經過 `requestOpen()`，被拒 → `replaceState` 目前這一筆回實際狀態（不 push）
+- [ ] 4.4 `FirstEntryNotice` 讀 `useBlockingPanelOpen()`（不卸載它的 `dismissed`／`alreadyDone`：用 `hidden`，不是 return null）；`SceneChatHud` 收成一行＋捲動位置還原（D5）；`AvatarPicker` 成功開面板時關、被拒時照既有焦點離開規則關
+- [ ] 4.5 e2e：`S13`（記 `focusin` 序列）／`S15`／`S16`／`S17` 在真瀏覽器各走一次（`tests/e2e/dom-visual.mjs`）
 - [ ] 4.6 ADR 0011 改 Accepted、邊界狀態「已強制」、證據補測試路徑
 
 ## 5. `--surfaces`：每個操作區套上三級與層次、標題列（Requirement〈控制項分三級〉〈標題列是固定的導覽〉）
 
-- [ ] 5.1 判準先紅（jsdom）：`S09` 逐操作區數 `data-tier="primary"`（`≤ 1`）且是列出的那一個、零個的狀態真的零個；`S19` 標題列順序與 `≤ 5`；e2e `S19` 三種身分的 rect 相同、跟面板不相交
+- [ ] 5.1 判準先紅（jsdom）：`S09` 逐操作區數 `data-tier="primary"`（`≤ 1`）且是列出的那一個、零個的狀態真的零個；`S19` 標題列順序與 `≤ 5`；e2e `S19` 三種身分的 rect 相同、面板 rect 與整個標題列 rect 交集為 0
 - [ ] 5.2 `/login`：三個表單各自一個主要（暱稱：進入世界；金鑰：用金鑰回來；帳號：登入／註冊）；版面順序與標題層次讓暱稱那條領先（D4）
 - [ ] 5.3 金鑰交接：複製前「複製鑰匙」主要、複製後「進入世界」主要、「複製鑰匙」退成次要；訪客提示「先四處看看」文字級
 - [ ] 5.4 案件詳情：owner 成軍／結案主要、送出中零個；密碼呈現「複製密碼」主要、「寄給隊員」次要；非 owner「私訊發案者」主要；結案確認「取消」主要
 - [ ] 5.5 收件匣對話「送出」主要；名片「儲存」主要（沒改 `disabled`）；**場景聊天框「送出」次要**（非阻斷的表面不搶）；標題列（品牌左、其餘右、`≤ 5`）
 - [ ] 5.6 前後截圖五張貼 PR；`ui-ux-pro-max` 的 pre-delivery checklist 逐條對
-- [ ] 5.7 `S20` 裁決：對 1.3 的基線量一次（JS `≤ +4 KB`、CSS `≤ +6 KB` gzip、請求清單相同）
+- [ ] 5.7 `S20` 裁決：對 1.3 的基線量一次（JS `≤ +4 KB`、CSS `≤ +6 KB` gzip；請求清單：全新 context、停用快取、`(resourceType, 去 hash 路徑)` multiset 相同）
 
 ## 6. 突變（驗收條件：拔掉防禦要紅）
 
@@ -63,7 +63,7 @@
 - [ ] 6.2 面板底改成半透明 → `S05` 紅；給面板加一層世界遮罩 → `S05` 紅；確認視窗遮罩拿掉 → `S06` 紅；關閉搬到標題列最前 → `S07` 紅；`<header>` 放進捲動容器 → `S08` 紅
 - [ ] 6.3 場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
 - [ ] 6.4 協調者不 `yield()` 就開 → `S13` 紅；讓位時還焦點給開啟者 → `S13` 紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
-      聊天框展開不還原 `scrollTop` → `S16` 紅；上一頁被拒不 `replaceState` → `S17` 紅；彈出層被拒時也關 → `S18` 紅
+      聊天框展開不還原 `scrollTop` → `S16` 紅；下一頁被拒不 `replaceState`（或用了 `pushState`）→ `S17` 紅；被拒時彈出層留著 → `S18` 紅；拿掉保留 → `S21` 紅
 - [ ] 6.5 每次突變前 commit；突變後還原並重 build `.next`
 
 ## 7. 收尾
