@@ -1,52 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { act, useEffect } from 'react'
-import type { ProjectOut } from '@/api/contract/rest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act } from 'react'
 import { VOCABULARY } from '@/errors/uiError'
 import { FORM_LIMITS } from '@/forms/limits'
-import { IdentityProvider } from '@/identity/IdentityProvider'
-import { InboxPanel } from '@/inbox/InboxPanel'
-import { InboxPanelProvider } from '@/inbox/InboxPanelProvider'
-import { BoardPanel } from '@/list-panel/BoardPanel'
-import { ListPanelProvider, useListPanel } from '@/list-panel/ListPanelProvider'
-import { InteractionProvider } from '@/world/interaction/InteractionProvider'
-import { RoomsRefreshProvider } from '@/world/rooms/RoomsRefreshContext'
 import { startContractServer, type ContractServer } from './support/contract-server'
+import { OTHER, actions, btn, click, detail, escape, gate, listGets as listGetsOn, mountDetail as mount, project, queryBtn, refreshRooms, status, type } from './support/project-lifecycle'
 
-// 規格：openspec/changes/fe-j04-form-team/specs/project-lifecycle/spec.md —— S01（成軍那一半）～S04（S07 結案在 project-close.test.tsx；S05／S06／S08 密碼的一次性呈現在 project-password-reveal.test.tsx）
-//
-// 整棵真的樹：IdentityProvider（contract-server 給 /api/me）> InboxPanelProvider > InteractionProvider > ListPanelProvider > [BoardPanel, InboxPanel]，
-// 外面包 `RoomsRefreshProvider`（`refresh` 是 vi.fn：成功恰好一次、失敗零次）。
-// 面板從網址開著、詳情從 `project=<id>` 開著（`FE-B09-S14`）。**不連任何團隊共用的位址。**
+// 規格：openspec/changes/fe-j04-form-team/specs/project-lifecycle/spec.md —— S01～S04（S07 結案在 project-close.test.tsx；S05／S06／S08 密碼的一次性呈現在 project-password-reveal.test.tsx）
+// 樹與手勢在 `tests/support/project-lifecycle.tsx`（真的 providers、真的 `BoardPanel`，資料走真的 `src/api/` 到本機自起的 contract-server）。
 
-const UUID = (n: number) => `88888888-8888-4888-8888-${String(n).padStart(12, '0')}`
-const ME = { id: UUID(900), display_name: '我', avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-10T00:00:00Z' }
-const OTHER = { ...ME, id: UUID(901), display_name: '別人' }
-const project = (n: number, extra: Partial<ProjectOut> = {}): ProjectOut => ({
-  id: UUID(n),
-  owner_id: ME.id,
-  title: `案件${n}`,
-  body: '內容',
-  needed_skills: [],
-  status: 'recruiting',
-  room_template: null,
-  seat_count: 4,
-  expires_at: new Date(Date.now() + 5 * 86_400_000).toISOString(),
-  updated_at: '2026-09-09T00:00:00Z',
-  ...extra,
-})
 const P = project(1)
 
 let server: ContractServer
-const refreshRooms = vi.fn()
-const grabbed: { list: ReturnType<typeof useListPanel> | null } = { list: null }
-function Grab() {
-  const list = useListPanel()
-  useEffect(() => {
-    grabbed.list = list
-  }, [list])
-  return null
-}
 beforeEach(async () => {
   server = await startContractServer()
   process.env.NEXT_PUBLIC_GUILDHUB_REST = server.base
@@ -60,78 +25,21 @@ afterEach(async () => {
   delete process.env.NEXT_PUBLIC_DATA_ADAPTER
   window.history.replaceState(null, '', '/world')
 })
-
-/** 登入成 `me`、案件面板＋那一筆的詳情從網址開著；等到詳情 ready。 */
-async function mountDetail(p: ProjectOut, { me = ME, page = 0 }: { me?: typeof ME; page?: number } = {}) {
-  server.replyFor('/api/me', 200, me)
-  // `InboxPanelProvider` 以 me 為 key：/api/me 回來會重掛一次 → 列表、詳情、發案者各兩份回應
-  for (let i = 0; i < 2; i += 1) {
-    server.replyFor('/api/projects', 200, [p])
-    server.replyFor(`/api/projects/${p.id}`, 200, p)
-    server.replyFor(`/api/profiles/${p.owner_id}`, 200, p.owner_id === ME.id ? ME : OTHER)
-  }
-  window.history.replaceState(null, '', `/world?panel=projects&project=${p.id}${page > 0 ? `&page=${page}` : ''}`)
-  render(
-    <RoomsRefreshProvider refresh={refreshRooms}>
-      <IdentityProvider>
-        <InboxPanelProvider>
-          <InteractionProvider>
-            <ListPanelProvider>
-              <Grab />
-              <div data-testid="world" data-focus-anchor="world" tabIndex={-1}>
-                <BoardPanel />
-                <InboxPanel />
-              </div>
-            </ListPanelProvider>
-          </InteractionProvider>
-        </InboxPanelProvider>
-      </IdentityProvider>
-    </RoomsRefreshProvider>,
-  )
-  await waitFor(() => expect(server.calls.filter((c) => c.pathname === '/api/me')).toHaveLength(1))
-  await waitFor(() => expect(server.calls.filter((c) => c.pathname === `/api/projects/${p.id}`)).toHaveLength(2))
-  await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
-  await waitFor(() => expect(screen.getByTestId('owner-card').dataset.phase).toBe('ready'))
-}
-const detail = () => screen.getByTestId('project-detail')
-const actions = () => screen.queryByTestId('owner-actions')
-const btn = (name: string | RegExp) => within(detail()).getByRole('button', { name, hidden: true })
-const queryBtn = (name: string | RegExp) => within(detail()).queryByRole('button', { name, hidden: true })
-const status = () => within(detail()).getByTestId('project-status').textContent
-const click = (el: HTMLElement) =>
-  act(() => {
-    el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-async function type(el: HTMLElement, value: string) {
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(el, value)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-}
+const mountDetail = (p: Parameters<typeof mount>[1], opts?: Parameters<typeof mount>[2]) => mount(server, p, opts)
+const listGets = () => listGetsOn(server)
 const submitForm = () =>
   act(async () => {
     ;(screen.getByTestId('form-team-form') as HTMLFormElement).requestSubmit()
   })
 const passwordField = () => within(detail()).getByLabelText('房間密碼') as HTMLInputElement
 const formTeamCalls = (id = P.id) => server.calls.filter((c) => c.method === 'POST' && c.pathname === `/api/projects/${id}/form-team`)
-const listGets = () => server.calls.filter((c) => c.method === 'GET' && c.pathname === '/api/projects').map((c) => c.search)
-const escape = () =>
-  act(() => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
-  })
-/** 一個可以從外面放行的 pending。 */
-function gate() {
-  let release: () => void = () => {}
-  const promise = new Promise<void>((resolve) => (release = resolve))
-  return { promise, release: () => release() }
-}
 async function openFormAndFill(password: string) {
   click(btn('成軍'))
   await type(passwordField(), password)
 }
 
 describe('動作跟著狀態走，只給 owner', () => {
-  it('[FE-J04-S01] recruiting 有「成軍」沒「結案」；active 沒有「成軍」；closed 沒有；非 owner 什麼都沒有', async () => {
+  it('[FE-J04-S01] recruiting 有「成軍」沒「結案」；active 反過來；closed 沒有；非 owner 什麼都沒有', async () => {
     await mountDetail(project(1, { status: 'recruiting' }))
     expect(queryBtn(/成軍/)).not.toBeNull()
     expect(queryBtn(/結案/)).toBeNull()
@@ -139,9 +47,9 @@ describe('動作跟著狀態走，只給 owner', () => {
     await server.close()
     server = await startContractServer()
     process.env.NEXT_PUBLIC_GUILDHUB_REST = server.base
-    // active → 「結案」那一半在 `--close` 片（project-close.test.tsx）；這裡只驗它沒有「成軍」
     await mountDetail(project(2, { status: 'active' }))
     expect(queryBtn(/成軍/)).toBeNull()
+    expect(queryBtn(/結案/)).not.toBeNull()
     cleanup()
     await server.close()
     server = await startContractServer()
