@@ -173,6 +173,8 @@ export default async function setup(project: TestProject): Promise<() => Promise
     // 真後端沒有 `/online`、也不給替身的探針：這兩個能力在這一輪不存在（房間的票由 `enter` 簽，那條兩邊都有）。
     project.provide('contractOnlineUrl', null)
     project.provide('contractStubProbe', null)
+    // 真後端的票放在它自己的 session cookie 裡（ADR 0008），沒有一間房一個的 cookie → 這個能力不存在。
+    project.provide('contractRoomGrantPrefix', null)
     return recorded
   }
 
@@ -262,6 +264,9 @@ export default async function setup(project: TestProject): Promise<() => Promise
   // 這是目標的**能力**，不是目標的名字 —— 測試檔仍然不知道自己在打誰。
   // `FE-K01` 把 messages 做出來了、`FE-J01` 把 `POST /api/projects` 做出來了，各自從這張表拿掉。
   project.provide('contractUnimplemented', ['GET /api/projects/{id}/seats'])
+  // 本地把「伺服器端記住的票」記成一間房一個 cookie（design D4）。字串在這裡寫死，**不 import `src/server/roomGrant.ts`**：
+  // 測試檔不能知道自己在打誰（`FE-O05-S02`），而 harness 是唯一允許認得目標的地方（`stubProbe` 的簽法同理）。
+  project.provide('contractRoomGrantPrefix', 'room_grant_')
   return async () => {
     await stop(child)
     await stop(stub)

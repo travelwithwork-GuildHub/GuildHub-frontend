@@ -14,8 +14,9 @@ import { ContractClient, baseUrl, databaseUrl } from '../client'
 // 「已經有 50 筆」這種前置用 SQL 直接寫進同一個可拋棄庫（兩個目標都有 `databaseUrl()`）—— 打 50 次 POST
 // 只是在重複測 POST 自己，而且慢。規格允許（〈由 harness 以可拋棄資料庫的 seed 或直接寫入準備〉）。
 //
-// ⚠️ **矩陣裡「持票」那兩列不在這一片**：本地還沒有伺服器端的房間票紀錄（`--room-grants` 那一片才做）。
-// 這裡驗的是矩陣裡不需要票的每一列。
+// 「持票」＝這個 session 對那個專案 `enter` 成功過（`room-entry-gate`〈伺服器端記住票〉）。票怎麼被記住是後端的事，
+// 這裡照常用同一個 cookie jar 打 `enter`，請求上**不帶票**（兩個目標的請求相同）。
+// 票本身的語意（別間房不算、換人不算、本地的 cookie 怎麼記）在 `enter.contract.ts` 的 `S34`／`S37`。
 
 const ZERO = '00000000-0000-4000-8000-000000000000'
 const GOOD = { label: '設計稿', type: 'figma', url: 'https://figma.com/file/abc' }
@@ -109,6 +110,16 @@ describe('專案資源：權限與狀態', () => {
       expect(detailOf(r)).toBe('只有發起人可以做這件事')
     }
 
+    // active、非 owner、**持票**：讀 200，但寫三種仍然是 403 —— 票只換到讀，不換到寫
+    expect((await other.raw('POST', `/api/projects/${active}/enter`, { body: { password: 'guild1234' } })).status, '拿不到票，下面的 200 就不算數').toBe(200)
+    const ticketed = await list(other, active)
+    expect(ticketed.status, ticketed.text.slice(0, 200)).toBe(200)
+    expect((ticketed.json as unknown[]).length, '持票讀到的不是這個專案的清單').toBe(1)
+    for (const r of [await add(other, active), await patch(other, active, one.id, { label: 'x' }), await remove(other, active, one.id)]) {
+      expect(r.status, r.text.slice(0, 200)).toBe(403)
+      expect(detailOf(r)).toBe('只有發起人可以做這件事')
+    }
+
     // closed：owner 讀得到、寫是 409；非 owner 一律 403
     const closed = await project(owner, '矩陣 closed', 'active')
     const inClosed = await seedOne(owner, closed)
@@ -128,6 +139,12 @@ describe('專案資源：權限與狀態', () => {
       expect(r.status, r.text.slice(0, 200)).toBe(403)
       expect(detailOf(r)).toBe('只有發起人可以做這件事')
     }
+
+    // closed、非 owner、**持票**：closed 仍然簽得到票（`FE-N08-S12`），但讀還是 403 —— 票不開已結案那扇門
+    expect((await other.raw('POST', `/api/projects/${closed}/enter`, { body: { password: 'guild1234' } })).status, 'closed 專案簽不出票，下面那條就不算數').toBe(200)
+    const closedTicketed = await list(other, closed)
+    expect(closedTicketed.status, closedTicketed.text.slice(0, 200)).toBe(403)
+    expect(detailOf(closedTicketed)).toBe('尚未通過房間密碼驗證')
 
     // recruiting：owner 讀到空陣列、寫是 409；非 owner 一律 403
     const recruiting = await project(owner, '矩陣 recruiting', 'recruiting')
