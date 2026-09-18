@@ -1,10 +1,9 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import type { ProfileOut } from '@/api/contract/rest'
 import { avatarLook } from '@/design/avatar'
 import { Missing } from './Missing'
-import { CAPTION, TITLE, withClass } from '@/design/controls'
+import { CAPTION, HEADING, withClass } from '@/design/controls'
 
 // 一張名片的**純呈現**：頭像色、名字、四欄的 `<dl>`。規格 `FE-A04`〈顯示我的名片，用同一個呈現元件〉。
 //
@@ -17,23 +16,21 @@ import { CAPTION, TITLE, withClass } from '@/design/controls'
 
 export interface TalentFactsProps {
   profile: ProfileOut
-  /** 名字那一列最前面的東西（`TalentDetail` 放返回鈕）。 */
-  leading?: ReactNode
 }
 
-export function TalentFacts({ profile, leading }: TalentFactsProps) {
+// 名字是內容區的條目標題（`FE-X16-S03` HEADING）：面板標題（我的名片／人才）在殼的標題列。
+export function TalentFacts({ profile }: TalentFactsProps) {
   const look = avatarLook(profile.avatar_id)
   return (
     <div data-testid="talent-facts" data-profile-id={profile.id} className="flex flex-col gap-gutter">
       <header className="flex items-center gap-3">
-        {leading}
         <span
           aria-hidden
           data-testid="talent-look"
           style={{ background: look.body }}
           className="border-control-edge inline-block size-6 rounded-full border"
         />
-        <h3 {...TITLE}>{profile.display_name}</h3>
+        <h3 {...HEADING}>{profile.display_name}</h3>
       </header>
       <dl className="flex flex-col gap-2">
         <dt {...withClass(CAPTION, 'text-ink-muted')}>技能</dt>

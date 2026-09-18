@@ -35,6 +35,7 @@ import { SceneObjects } from './scenes/SceneObjects'
 import { useRequestEntry } from './scenes/EntryGate'
 import { useSceneChatPortIfProvided } from '@/realtime/SceneChatProvider'
 import { SceneChatHud } from '@/chat/SceneChatHud'
+import { useRoomEntryGateIfProvided } from './scenes/RoomEntryGate'
 import { RoomPasswordDialog } from './scenes/RoomPasswordDialog'
 import { useScene } from './scenes/SceneProvider'
 import { SceneTransitionOverlay } from './scenes/SceneTransitionOverlay'
@@ -122,6 +123,8 @@ export default function WorldCanvas() {
   const { token, reportConnection } = useScene()
   // 對著門按 E（`FE-V01-S10`）：在 Canvas 外面拿動作、當 prop 交給 Canvas 裡的門。
   const requestEntry = useRequestEntry()
+  // 房間密碼視窗開著：世界區（canvas、HUD、門標籤）整層 `inert`（`FE-X16-S06` 被遮的那一層），視窗本身在這層外面
+  const worldDialogOpen = useRoomEntryGateIfProvided()?.request != null
   // 場景聊天的口（`FE-R11`）：context 不跨 R3F 的 renderer 邊界，當 prop 交給 `RemoteWorld`；沒 provider 就沒有聊天。
   const chat = useSceneChatPortIfProvided()
 
@@ -162,6 +165,8 @@ export default function WorldCanvas() {
           tabIndex={-1}
           className="relative h-full w-full outline-none"
         >
+          {/* 被遮罩蓋住的那一層：`display: contents`（不改版面、不改堆疊），只帶 `inert`。 */}
+          <div data-testid="world-stage" inert={worldDialogOpen} className="contents">
           <Canvas
             shadows
             // 規格 FE-W01-S02：DPR 上限 2。不設限的話 3x 螢幕會用九倍的像素
@@ -232,8 +237,6 @@ export default function WorldCanvas() {
           <ProfilePanel />
           {/* 收件匣面板（`FE-K01`）：同一個位置、同一把鎖的 provider 底下；開關與資料在 page.tsx 的 InboxPanelProvider。 */}
           <InboxPanel />
-          {/* 房間密碼視窗（`FE-N08`）：沒票的門按 E 開；同一把鎖、同一個焦點錨。開關在 page.tsx 的 RoomEntryGateProvider。 */}
-          <RoomPasswordDialog rooms={rooms.all} />
           {/* 規格 FE-W12-S02／S03／S04／S05：走廊的門「為什麼不在那裡」。
               **一切正常時它什麼都不顯示** —— 見下面那條禁令。 */}
           {/* 規格 `FE-W12-S09`：名稱與在線數**常態可見**。
@@ -244,6 +247,9 @@ export default function WorldCanvas() {
           {hall && <RoomsNotice view={rooms} />}
           {/* 工位的投影錨點（`FE-W16-S06`）**只在房間**：aria-hidden、沒有內容，是 `FE-J13` 座位標籤的位置與 e2e 的尺。 */}
           {!hall && <SeatAnchors anchors={SEAT_ANCHORS} nodesRef={seatNodesRef} />}
+          </div>
+          {/* 房間密碼視窗（`FE-N08`）：沒票的門按 E 開；同一把鎖、同一個焦點錨。開關在 page.tsx 的 RoomEntryGateProvider。在 `world-stage` 外面：遮罩蓋的是它以外的整層。 */}
+          <RoomPasswordDialog rooms={rooms.all} />
           {/* ⚠️ 規格 FE-O14-S11／S12：這裡刻意什麼都沒有。
               以前這裡有一段「目前是單人預覽，看不到其他人」——
               拿掉是產品決定（這個網址對外的用途是展示世界，而那段字是

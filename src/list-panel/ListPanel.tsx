@@ -49,6 +49,8 @@ export interface ListPanelProps<K extends ListKind> {
    * 只標成 `inert` —— 頁碼與捲動位置才留得住（`FE-B04-S11`／`S12`／`S16`）。
    */
   overlay?: ReactNode | ((slot: ListPanelSlot) => ReactNode)
+  /** 子畫面開著時標題列換成它的標題、前面加返回（`FE-X16-S07`）。沒給就是清單自己的標題、沒有返回。 */
+  subScreen?: { title: string; back: { label: string; onBack: () => void } }
   /** 列表上方的動作（例如「發案」，`FE-J01`）。跟列表一起在內容區，overlay 開著時一樣 `inert`。 */
   toolbar?: ReactNode
   onClose: () => void
@@ -66,6 +68,7 @@ export function ListPanel<K extends ListKind>({
   exhausted,
   error,
   overlay,
+  subScreen,
   toolbar,
   onClose,
   page,
@@ -81,7 +84,7 @@ export function ListPanel<K extends ListKind>({
   const hasItems = items.length > 0
   const list = useRef<HTMLUListElement>(null)
 
-  // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——
+  // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——（容器是程式化取焦：`outline-none`，鍵盤開面板時不該整個列表亮一圈，`FE-X16-S10` 的焦點環只給控制項）
   // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
   // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，
   // 下一個 Tab 跑去標題列 —— 真瀏覽器的 e2e 抓到的。呼叫端可以再覆蓋（`BoardPanel` 把焦點放回那張卡）。
@@ -93,7 +96,8 @@ export function ListPanel<K extends ListKind>({
 
   return (
     <PanelShell
-      title={title}
+      title={overlayOpen && subScreen !== undefined ? subScreen.title : title}
+      back={overlayOpen ? subScreen?.back : undefined}
       closeLabel={labels.close}
       testId="list-panel"
       bodyTestId="list-panel-list"
@@ -109,8 +113,8 @@ export function ListPanel<K extends ListKind>({
         aria-busy={state.phase === 'loading'}
         className={
           hasItems
-            ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto'
-            : 'h-0 flex-none overflow-hidden'
+            ? 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto outline-none'
+            : 'h-0 flex-none overflow-hidden outline-none'
         }
       >
         {items.map((item) => (

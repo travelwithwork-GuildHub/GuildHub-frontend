@@ -87,7 +87,7 @@ describe('密碼只在這一次詳情裡呈現，可複製、可寄給隊員，�
     // 返回列表再重開同一筆：後端不回密碼、前端不留
     server.replyFor(`/api/projects/${P.id}`, 200, { ...P, status: 'active', room_template: 0 })
     server.replyFor(`/api/profiles/${ME.id}`, 200, ME)
-    fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
+    fireEvent.click(screen.getByRole('button', { name: '返回' }))
     expect(screen.queryByTestId('project-detail')).toBeNull()
     act(() => grabbed.list!.selectProject(P.id))
     await waitFor(() => expect(detail().dataset.phase).toBe('ready'))

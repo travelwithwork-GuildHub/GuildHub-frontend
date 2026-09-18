@@ -19,6 +19,7 @@ import { preview, shortId, type Thread } from './threads'
 
 export const INBOX_LABELS = {
   title: '收件匣',
+  thread: '對話',
   close: '關閉',
   back: '返回',
   loadMore: '載入更多',
@@ -34,11 +35,22 @@ function OpenInboxPanel({ inbox }: { inbox: InboxValue }) {
   useEffect(() => holdInputLock('inbox-panel'), [holdInputLock])
   const returnFocusRef = useRef<string | null>(null)
   const view = inbox.view
+  // 返回：焦點回清單那一列（有的話；`S07`）—— 殼標題列的返回鈕（`FE-X16-S07`）與對話的 Escape 走同一條（審查抓到 Escape 漏了）。
+  const backToList = () => {
+    if (view.kind === 'thread') returnFocusRef.current = view.with
+    inbox.backToList()
+  }
   // 殼的關閉意圖：清單就關；對話就回清單。對話自己也是一個 Escape 層（在殼之上），所以 Escape 先回清單再關。
   return (
-    <PanelShell title={INBOX_LABELS.title} closeLabel={INBOX_LABELS.close} testId="inbox-panel" onCloseRequest={inbox.closePanel}>
+    <PanelShell
+      title={view.kind === 'thread' ? INBOX_LABELS.thread : INBOX_LABELS.title}
+      back={view.kind === 'thread' ? { label: INBOX_LABELS.back, onBack: backToList } : undefined}
+      closeLabel={INBOX_LABELS.close}
+      testId="inbox-panel"
+      onCloseRequest={inbox.closePanel}
+    >
       {view.kind === 'thread' ? (
-        <ThreadView inbox={inbox} withId={view.with} openedFrom={view.openedFrom} returnFocusRef={returnFocusRef} />
+        <ThreadView inbox={inbox} withId={view.with} onBack={backToList} />
       ) : (
         <ThreadList inbox={inbox} returnFocusRef={returnFocusRef} />
       )}
@@ -125,18 +137,12 @@ function ThreadRow({ thread, name, me, onOpen }: { thread: Thread; name: string 
   )
 }
 
-function ThreadView({ inbox, withId, openedFrom, returnFocusRef }: { inbox: InboxValue; withId: string; openedFrom: 'list' | 'talent'; returnFocusRef: ReturnFocus }) {
-  const { threads, names, resolveNames, loading, me, backToList, send, sendingTo } = inbox
+function ThreadView({ inbox, withId, onBack }: { inbox: InboxValue; withId: string; onBack: () => void }) {
+  const { threads, names, resolveNames, loading, me, send, sendingTo } = inbox
   const thread = threads.find((t) => t.with === withId)
   const root = useRef<HTMLElement>(null)
-  const back = () => {
-    // 返回時焦點回清單那一列（有的話；`S07`）—— Escape 與「返回」鈕走同一條（審查抓到 Escape 漏了）。
-    returnFocusRef.current = withId
-    void openedFrom
-    backToList()
-  }
   // 對話是殼之上的一層：Escape 先回清單（面板留著）。帶自己的元素：跟殼同一個 commit 掛載也在它上面。
-  useEscapeLayer(back, root)
+  useEscapeLayer(onBack, root)
   useEffect(() => {
     root.current?.focus()
   }, [])
@@ -147,14 +153,9 @@ function ThreadView({ inbox, withId, openedFrom, returnFocusRef }: { inbox: Inbo
   const messages: MessageOut[] = thread?.messages ?? []
   return (
     <article ref={root} tabIndex={-1} data-testid="inbox-thread" data-with={withId} aria-busy={loading} className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto outline-none">
-      <header className="flex items-center gap-3">
-        <button type="button" {...SECONDARY} onClick={back}>
-          {INBOX_LABELS.back}
-        </button>
-        <h3 {...HEADING} data-testid="inbox-thread-name">
-          {typeof name === 'string' ? name : shortId(withId)}
-        </h3>
-      </header>
+      <h3 {...HEADING} data-testid="inbox-thread-name">
+        {typeof name === 'string' ? name : shortId(withId)}
+      </h3>
       {!loading && messages.length === 0 && <EmptyState kind="first-empty" />}
       <ol className="flex flex-col gap-2">
         {messages.map((m) => {

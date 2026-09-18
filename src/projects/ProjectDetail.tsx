@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ProjectOut } from '@/api/contract/rest'
-import { CAPTION, SECONDARY, TITLE, withClass } from '@/design/controls'
+import { CAPTION, HEADING, withClass } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { useIdentity } from '@/identity/IdentityProvider'
@@ -31,8 +31,8 @@ export interface ProjectDetailProps {
   id: string
   /** 列表手上的那一筆，當載入中的預覽。深連結（`FE-B09`）沒有它。 */
   preview: ProjectOut | undefined
+  /** Escape 回列表（返回鈕在殼的標題列，`FE-X16-S07`；呼叫端把同一個 handler 也給殼）。 */
   onBack: () => void
-  labels: { back: string }
   /** 案子上的動作（例如「私訊發案者」）：由呼叫端決定，這裡只給位置；拿到載入完成的案子。 */
   actions?: (project: ProjectOut) => ReactNode
   /** 只在 owner 時渲染的插槽（`FE-J04` 的成軍／結案）：拿到載入完成的案子與 `replace`（用回應更新詳情）。 */
@@ -41,7 +41,7 @@ export interface ProjectDetailProps {
 
 export const OWNER_MARK = '這是你發的案子'
 
-export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActions }: ProjectDetailProps) {
+export function ProjectDetail({ id, preview, onBack, actions, ownerActions }: ProjectDetailProps) {
   const detail = useProjectDetail(id, preview)
   const identity = useIdentity()
   const root = useRef<HTMLElement>(null)
@@ -57,13 +57,6 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
   const signedIn = identity.state === 'signed-in' ? identity.profile.id : null
   const isOwner = ready && signedIn !== null && signedIn === project.owner_id
   const isVisitor = ready && signedIn !== null && signedIn !== project.owner_id
-  // 長標題會把返回鈕擠成兩行（真瀏覽器截圖抓到）：不縮、不換行
-  const back = (
-    <button type="button" {...withClass(SECONDARY, 'shrink-0 whitespace-nowrap')} onClick={onBack}>
-      {labels.back}
-    </button>
-  )
-
   return (
     <article
       ref={root}
@@ -72,16 +65,13 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
       data-project-id={id}
       data-phase={detail.phase}
       aria-busy={detail.phase === 'loading'}
-      className="bg-surface-raised flex h-full flex-col gap-gutter overflow-y-auto"
+      className="bg-surface-raised flex h-full flex-col gap-gutter overflow-y-auto outline-none"
     >
-      <header className="flex items-center gap-3">
-        {back}
-        {project !== undefined && (
-          <h3 data-testid="project-detail-title" {...withClass(TITLE, 'min-w-0 break-words')}>
-            {project.title}
-          </h3>
-        )}
-      </header>
+      {project !== undefined && (
+        <h3 data-testid="project-detail-title" {...withClass(HEADING, 'min-w-0 break-words')}>
+          {project.title}
+        </h3>
+      )}
 
       {detail.phase === 'error' && <EmptyState kind="failure" error={toUiError(detail.error)} retry={detail.retry} />}
 

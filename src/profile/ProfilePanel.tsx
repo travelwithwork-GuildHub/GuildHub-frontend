@@ -35,7 +35,7 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
   const [confirming, setConfirming] = useState(false)
   // 表單掛上來的「關閉意圖」處理（送出中無效、dirty 先問、否則回顯示）。顯示模式沒有表單：直接關面板。
   const closeIntentRef = useRef<(() => void) | null>(null)
-  // 確認層是殼的 overlay（表單變 inert）；「繼續編輯」之後焦點要回到剛剛在的地方（overlay 卸載時焦點會掉到 body）。
+  // 確認層走 `PanelDialog`（表單所在的內容區變 inert）；「繼續編輯」之後焦點要回到剛剛在的地方（視窗卸載時焦點會掉到 body）。
   const focusBeforeConfirm = useRef<HTMLElement | null>(null)
 
   // 世界輸入鎖：面板開著人不能走（`S01`）；關了要放（`S02`）。
@@ -69,7 +69,7 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
     setConfirming(false)
     const back = focusBeforeConfirm.current
     focusBeforeConfirm.current = null
-    // overlay 卸載之後再還焦點（同一個 commit 之後）。
+    // 視窗卸載、inert 拿掉之後再還焦點（同一個 commit 之後）。
     queueMicrotask(() => back?.focus())
   }
 
@@ -79,7 +79,6 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
       closeLabel={PROFILE_PANEL_LABELS.close}
       testId="profile-panel"
       onCloseRequest={onCloseRequest}
-      overlay={confirming ? <DiscardConfirm onDiscard={backToView} onKeep={keepEditing} /> : null}
     >
       {/* 只是捲動容器與初始焦點，不是第二個 landmark（殼的 section 已經叫「我的名片」）。 */}
       <div ref={root} tabIndex={-1} data-mode={mode} className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto outline-none">
@@ -95,6 +94,8 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
           <ProfileForm profile={profile} onDone={backToView} closeIntentRef={closeIntentRef} askDiscard={askDiscard} />
         )}
       </div>
+      {/* 放棄修改確認：`PanelDialog` 把它掛到內容區上（遮罩＋內容區 inert），不是子畫面的 overlay 槽（`FE-X16-S06`）。 */}
+      {confirming && <DiscardConfirm onDiscard={backToView} onKeep={keepEditing} />}
     </PanelShell>
   )
 }
