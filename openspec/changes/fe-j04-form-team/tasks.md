@@ -1,6 +1,7 @@
 # tasks：`fe-j04-form-team`
 
-兩個 `feat/fe-j04-form-team--<slice>` PR（每個產品碼 ≤250、手寫 ≤800）：`--rooms` → `--actions`（`--actions` 超過上限就按 Requirement 切出 `--reveal`）。
+三個 `feat/fe-j04-form-team--<slice>` PR（每個產品碼 ≤250、手寫 ≤800）：`--rooms` → `--backend` → `--actions`（`--actions` 超過上限就按 Requirement 切出 `--reveal`）。
+（`--backend` 是 e2e 第一次跑才加的：替身沒有 form-team／close。）
 每片：先寫判準（紅）→ commit → 實作（綠）→ 突變（拔掉防禦要紅、紀錄貼 PR）→ 檢查。
 
 ## 1. 規格
@@ -12,6 +13,12 @@
 - [x] 2.1 `tests/rooms-refresh.test.tsx`：`S10`（沒在飛就打、在飛等結束再打一次不是兩次、`enabled=false`／不可見 no-op、在飛時切背景／卸載／`enabled=false` 都不再打、500 → stale）；`listRooms` 替身；先 commit 紅
 - [x] 2.2 `useRooms` 回 `refresh`（`pendingRefresh` 只在**沒被中止**的 `finally` 消費；中止時清掉；不可見時 no-op）；新 `RoomsRefreshContext`（`WorldCanvas` 提供、預設 no-op）
 - [x] 2.3 **突變**：在飛時直接再打 → `S10` 紅；`pendingRefresh` 不消費 → `S10` 紅；中止的 `finally` 也消費 → `S10` 紅；`enabled=false`／不可見也打 → `S10` 紅；卸載不清把手 → `S10` 紅。「中止的 finally 也消費」單獨拿掉是等價突變（中止前待辦已被清）—— 跟「背景不清待辦」一起拿掉才紅（兩道防線）
+
+## 2b. `--backend`：替身的 form-team／close（`internal-backend` ADDED）
+
+- [ ] 2b.1 `tests/contract/rest/lifecycle.contract.ts`：`S12`（200 十鍵 active、rooms 含、enter 對／錯、再成軍換密碼、非 owner 403、401、404、422）、`S13`（closed、座位 SQL 為 0、rooms 不含、重複 200、非 owner 403、401、404）；先 commit 紅（對 internal 是 404）
+- [ ] 2b.2 `src/server/projects.ts`：`formTeam(id, hash)`、`closeProject(id)`（交易：update ＋ delete seats）；兩個 route 檔 `handle({ auth: 'required' })`，owner 檢查 → 403 原句
+- [ ] 2b.3 對 `internal` 契約套件綠；對 `guildhub`（本機自起）跑一次綠；**突變**：拿掉 owner 檢查 → `S12`／`S13` 紅；close 不刪座位 → `S13` 紅；form-team 不設 room_template → `S12` 紅（`room_ready` check 會 500）
 
 ## 3. `--actions`：成軍／結案（`project-lifecycle` 五條；design D1／D2／D3／D6）
 
