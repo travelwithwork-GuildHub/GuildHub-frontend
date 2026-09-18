@@ -23,7 +23,11 @@
 - **THEN** 期間 SHALL NOT 送出第二個請求；那一次回來之後 SHALL 恰好再送一次（不是兩次）
 - **AND WHEN** `enabled = false`（不在大廳）時呼叫 `refresh()`；另一次：分頁不可見時呼叫
 - **THEN** 兩次 SHALL 都不送出任何請求
-- **AND WHEN** 一次請求在飛時呼叫 `refresh()`，隨即分頁切到背景（在飛的被中止）；另一次改成隨即卸載；另一次改成 `enabled` 變 false
-- **THEN** 三次 SHALL 都不再送出請求（待辦被清掉，中止的 `finally` 不消費它）；回到前景那一次 SHALL 只送出既有的「立即更新」那一個
+- **AND WHEN** 一次請求在飛時呼叫 `refresh()`，隨即分頁切到背景（在飛的被中止）
+- **THEN** SHALL NOT 再送出請求（待辦被清掉，中止的 `finally` 不消費它）；回到前景時 SHALL 恰好送出一次（既有的「立即更新」，`FE-W12-S20`），不是兩次
+- **AND WHEN** 一次請求在飛時呼叫 `refresh()`，隨即卸載
+- **THEN** SHALL NOT 再送出請求、SHALL NOT 寫任何狀態；重新掛載 SHALL 恰好送出一次（首次載入）
+- **AND WHEN** 一次請求在飛時呼叫 `refresh()`，隨即 `enabled` 變 false
+- **THEN** SHALL NOT 再送出請求；`enabled` 變回 true 時 SHALL 恰好送出一次（既有規則），不是兩次
 - **AND WHEN** 立即重取回 500
 - **THEN** 門 SHALL 留在原地並標為 `stale`（既有規則），沒有別的副作用

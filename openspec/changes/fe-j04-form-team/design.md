@@ -58,5 +58,6 @@
 ## Risks
 
 - 成軍後案子從 `recruiting` 清單消失：列表回第 0 頁重取，詳情仍開著（`selected` 不變）—— 返回列表時那張卡不在了，焦點回不到卡（`ListPanel` 會把焦點放回列表本身，`FE-X06-S13` 的兜底）。判準 `S03` 驗這一點。
+  之後要再開那筆詳情（結案）只剩深連結 `?panel=projects&project=<id>`（`FE-B09-S14`），直到 `FE-J03` 我的案件給 owner 一個入口 —— `S09` 就走深連結。
 - `refresh()` 打的是 `GET /api/rooms`，跟輪詢同一個端點：`RoomsNotice` 的 `stale` 語意不變。
 - 「寄給隊員」的草稿含密碼，只進剪貼簿（使用者授權的例外）；`S08` 用攔截寫入的方式驗 storage、cookie、網址整段流程都沒碰到它（原文與 URL-encoded 都不行）；不得把密碼送進 logging／錯誤回報。

@@ -119,5 +119,5 @@ jsdom 看不到走廊；這一條只有 e2e 驗得到。
 
 - **WHEN** 在本機自起的 `next start`＋`internal` 上，一個全新身分發案 → 開詳情 → 成軍（密碼 `demo-1234`）
 - **THEN** 詳情 SHALL 呈現「已成軍」與那串密碼；「複製密碼」後剪貼簿 SHALL 是 `demo-1234`；關掉面板走到走廊，SHALL 在 5 秒內看得到那扇門的標籤（案子標題）而且期間 `GET /api/rooms` 的請求數 SHALL 比成軍前多（不是等 30 秒輪詢）
-- **AND WHEN** 回到詳情按「結案」→ 確定
+- **AND WHEN** 以深連結 `/world?panel=projects&project=<id>` 回到那筆詳情（案子已不在招募清單裡、卡片點不到；`FE-B09-S14` 是這條路，`FE-J03` 來之前唯一的路）按「結案」→ 確定
 - **THEN** 詳情 SHALL 是「已結案」，走廊上那扇門 SHALL 在 5 秒內消失
