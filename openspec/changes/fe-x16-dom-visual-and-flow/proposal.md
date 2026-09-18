@@ -1,0 +1,78 @@
+# `FE-X16` DOM 介面的視覺與動線
+
+## Why
+
+⚠️ **這一列跟 `FE-X13` 同一個來源：使用者看了截圖。** 2026-09-18 原話：
+
+> 我之前看非3D的網頁介面都醜醜的 / 沒有任何設計 / 這樣沒有美感大家看了會覺得不專業 /
+> 不想使用 / 所以記得要優化 UI/UX / 也要規劃動線要使用者容易操作 / 不要造成混亂
+
+這是**第二次**（第一次是 `FE-X13` 的「登入畫面也太醜了」）。到 `FE-J04` 為止，
+DOM 那一半的畫面只有兩樣東西：`FE-X01` 的暫定 token（檔案自己的註解寫著
+「實際數值是暫定的，等 `FE-W09` 收斂」—— 而 `FE-W09` 收斂的是 3D 那一半，
+DOM 的從來沒有人接手）與 `FE-X13` 的「看得出來能操作」下限。每片 PR 都跑過
+`ui-ux-pro-max`，但只查單點（對比、焦點、表單回饋），從沒有一份整體的視覺方向。
+
+截圖上實際的樣子（`/world`，訪客，走到專案看板前按了 E）：
+
+- 系統字體、預設藍按鈕、白色方框、細灰邊；標題與內文只差字級，沒有層次
+- **三個浮層同時疊在畫面上**：正中央的訪客提示、右邊的專案看板、左下角的聊天框
+- 看板裡的「關閉」是右上角的一顆邊框鈕；訪客提示的「先四處看看」是一行漂著的字；
+  兩者關的是不同的東西、長得也不一樣
+
+**不做會怎樣**：demo 順序上還有 9 項（J03、J13、K05、W08、R12、X15、O12、W20、O15），
+每一項都會長新的 DOM 畫面。沒有一套風格與動線規則，它們會各自長成第十種樣子，
+而 demo 當天觀眾第一眼看到的是這些面板，不是 3D。使用者的原話就是「不專業、不想用」——
+**功能對、判準綠，仍然不算完成**（`feedback_green_tests_must_mean_it_works`）。
+
+## What Changes
+
+- 一份新的 capability `dom-visual-system`：DOM 表面的**視覺層次**與**動線規則**，
+  每一條都給得出一個在瀏覽器裡量得到的門檻（對比、字級、尺寸、時長、數量）
+- token 從「色票、字級、間距」擴成「色票、字級、間距、圓角、陰影、動態時長」，
+  仍然是每一類單一來源（延伸 `FE-X01`），而且**所有** DOM 元件都只從 token 取值
+  （`FE-W09` 的色碼掃描從場景元件擴到整個 `src/`）
+- 控制項從兩級（`FE-X13` 的主要／次要）擴成三級（主要／次要／文字），
+  並且規定**每一個表面同時只有一個啟用中的主要動作** —— 使用者看一眼就知道下一步按哪裡
+- 阻斷式面板有一致的解剖：標題列（返回｜標題｜關閉）、內容區自己捲動、同一個寬度
+- **動線：同一時間只有一個阻斷式面板**；面板開著時訪客提示讓位、聊天框收成一行；
+  面板關了它們回來
+- 判準：真瀏覽器量 `getComputedStyle()`（沿用 `FE-X13` 的量法，顏色畫到 canvas 再讀）
+  ＋ jsdom 的結構判準；驗收條件仍然是「把防禦拿掉要變紅」
+- 每個實作 PR 附**前後截圖**（1280×720，固定的幾個表面），由 review 對，不進 CI
+  （`docs/DECISIONS.md` 拒絕過「視覺證據當閘門」）
+
+## ⚠️ 不做什麼
+
+- **SHALL NOT 碰 3D 那一半**：場景色票、材質、Outline、名字牌、看板摘要是
+  `FE-W09`／`FE-W14`／`FE-W08`／`FE-W20`
+- **SHALL NOT 做新手導覽**（`FE-B10`，W12）：這一份只讓「已經在畫面上的東西」
+  看得出層次與下一步，不加教學流程
+- **SHALL NOT 做行動版**（`FE-X14`）：判準只在 `≥ 1024` 寬的視窗量；
+  窄視窗的版面不在這一份
+- **SHALL NOT 建立帶 API、狀態與變體的 `<Button>`／`<Panel>` 元件庫**
+  （`FE-X13` 兩個審查者共同的警告仍然成立）：三級控制項仍然是**字串常數**，
+  面板解剖仍然是 `PanelShell` 一個殼
+- **SHALL NOT 載入 webfont**：字體堆疊是系統字體（design 的 `D1`），
+  這一份對 `/world` 的載入預算是零個新請求
+- **SHALL NOT 改任何既有 Scenario 的行為**：Escape 層級（`FE-X06`）、面板的資料行為
+  （`FE-B01`／`FE-K01`）、聊天的記憶體（`FE-K04`／`FE-R11`）、訪客提示不擋世界
+  （`FE-A06`）全部照舊；這一份只加規則，不改它們
+- **SHALL NOT 把色碼、class 名稱、padding 寫進判準**（`FE-X13` 同一條）：
+  判準量的是門檻，不是實作
+- **SHALL NOT 做深色模式**：只有一套色票；deferred，不是拒絕
+
+## Impact
+
+- 新增 `openspec/specs/dom-visual-system/`
+- `src/app/globals.css`：token 擴充（圓角、陰影、動態時長、字體堆疊）、`prefers-reduced-motion`
+- `src/design/controls.ts`：三級控制項、輸入框、焦點環
+- `src/panel/PanelShell.tsx`：標題列解剖（返回插槽）、內容區捲動、覆蓋層的遮罩
+- 新增 `src/panel/` 的阻斷式面板協調者（一次一個）；`ListPanelProvider`／`InboxPanelProvider`／
+  `ProfilePanelProvider` 向它登記
+- `src/app/world/FirstEntryNotice.tsx`、`src/chat/SceneChatHud.tsx`：面板開著時讓位
+- `/login`、首次進入、看板、詳情、收件匣、名片、標題列：套上三級控制項與字級層次
+- `src/design/colorScan.ts` 的掃描範圍：`src/world/**` → `src/**`
+- 新增判準：`tests/e2e/dom-visual.mjs`（真瀏覽器）、`tests/dom-visual-*.test.tsx`（jsdom）
+- `docs/adr/0011-one-blocking-panel-at-a-time.md`
+- 效能：`/world` 的 client JS 與 CSS 各有上限（design 的 `D8`），寫在 Requirement 裡
