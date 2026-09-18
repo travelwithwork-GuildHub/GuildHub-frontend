@@ -77,9 +77,10 @@ const install = (page) =>
       },
       /**
        * S05：面板開著時世界有沒有被蓋住 —— 掃**整份文件**（不只世界容器的後代：portal、兄弟節點也算）裡「會畫東西」的可見元素：
-       * 底色 alpha > 0、背景圖、backdrop-filter、或 ::before／::after 有底色；跟世界區相交；排除面板本身與它的後代、世界容器與它的祖先、canvas，
-       * 以及**點名的合法 HUD**（聊天框、在線人數、走廊提示、門標籤、互動提示）。其餘的矩形聯集用 40×40 的格點取樣 —— 要是**零**
-       *（審查：單一元素 ≥ 90% 會被分片繞過；「≤ 20%」會把 HUD 的 7.5% 變成新的容許量）。
+       * 底色 alpha > 0、背景圖、backdrop-filter、box-shadow、filter，或 ::before／::after 有底色／背景圖／backdrop-filter；跟世界區有正面積的交集；
+       * 排除面板本身與它的後代、canvas 自己的底（它就是世界），以及**點名的合法 HUD**（聊天框、在線人數、走廊提示、門標籤、互動提示）。
+       * 世界容器與它的祖先**不整體排除**（審查：`::after` 在容器上就是最自然的 scrim）：它們自己的底色不算（頁面底），但偽元素與 filter 照算。
+       * 候選清單要是**空的** —— 零容忍不用取樣（審查：格點會漏窄條）。
        */
       worldCovers(panelSel) {
         const worldEl = document.querySelector('[data-testid="world-canvas-container"]')
@@ -87,21 +88,20 @@ const install = (page) =>
         const panel = document.querySelector(panelSel)
         const HUD = '[data-testid="scene-chat"], [data-testid="online-count"], [data-testid="rooms-notice"], [data-testid="door-labels"], [data-testid="interaction-prompt"]'
         const ancestors = new Set(); for (let n = worldEl; n; n = n.parentElement) ancestors.add(n)
-        const paints = (el) => {
+        const paintsPseudo = (el) => ['::before', '::after'].some((p) => { const ps = getComputedStyle(el, p); return ps.content !== 'none' && (toRgba(ps.backgroundColor)[3] > 0 || ps.backgroundImage !== 'none' || (ps.backdropFilter ?? 'none') !== 'none') })
+        const effects = (cs) => cs.filter !== 'none' || (cs.backdropFilter ?? 'none') !== 'none'
+        const why = (el) => {
           const cs = getComputedStyle(el)
-          if (toRgba(cs.backgroundColor)[3] > 0 || cs.backgroundImage !== 'none' || (cs.backdropFilter ?? 'none') !== 'none') return true
-          return ['::before', '::after'].some((p) => { const ps = getComputedStyle(el, p); return ps.content !== 'none' && toRgba(ps.backgroundColor)[3] > 0 })
+          const own = ancestors.has(el) ? [] : [toRgba(cs.backgroundColor)[3] > 0 && '底色', cs.backgroundImage !== 'none' && '背景圖', cs.boxShadow !== 'none' && 'box-shadow']
+          return [...own, effects(cs) && 'filter', paintsPseudo(el) && '偽元素'].filter(Boolean)
         }
-        const boxes = [...document.querySelectorAll('body *')].filter((el) => el !== panel && !panel.contains(el) && !ancestors.has(el) && el.tagName !== 'CANVAS' && el.closest(HUD) === null && visible(el))
-          .filter(paints)
-          .map((el) => ({ el, r: rect(el) })).filter(({ r }) => r.right > w.left && r.left < w.right && r.bottom > w.top && r.top < w.bottom)
-        let hit = 0
-        const N = 40
-        for (let i = 0; i < N; i += 1) for (let j = 0; j < N; j += 1) {
-          const x = w.left + ((i + 0.5) / N) * w.width, y = w.top + ((j + 0.5) / N) * w.height
-          if (boxes.some(({ r }) => x >= r.left && x < r.right && y >= r.top && y < r.bottom)) hit += 1
-        }
-        return { fraction: hit / (N * N), who: boxes.map(({ el, r }) => `${el.tagName.toLowerCase()}#${el.getAttribute('data-testid') ?? el.className.slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}`) }
+        const overlaps = (r) => Math.min(r.right, w.right) - Math.max(r.left, w.left) > 0 && Math.min(r.bottom, w.bottom) - Math.max(r.top, w.top) > 0
+        const who = [...document.querySelectorAll('body *')]
+          .filter((el) => el !== panel && !panel.contains(el) && el.closest(HUD) === null && (ancestors.has(el) || visible(el)))
+          .map((el) => ({ el, r: rect(el), why: el.tagName === 'CANVAS' ? [effects(getComputedStyle(el)) && 'filter'].filter(Boolean) : why(el) }))
+          .filter(({ r, why }) => why.length > 0 && overlaps(r))
+          .map(({ el, r, why }) => `${el.tagName.toLowerCase()}#${el.getAttribute('data-testid') ?? el.className.slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}（${why.join('、')}）`)
+        return { fraction: who.length === 0 ? 0 : 1, who }
       },
       /** S06：遮罩與它蓋住的那一層。inert 驗**行為**不只屬性：被遮那一層裡第一個可聚焦的元素 `focus()` 之後不能成為 activeElement。 */
       scrim(scrimSel, coveredSel, inertSels) {
@@ -190,7 +190,7 @@ try {
     await openList(page)
     await surfaceChecks(page, '看板', '[data-testid="list-panel"]')
     const covers = await page.evaluate(() => window.__ds.worldCovers('[data-testid="list-panel"]'))
-    covers.fraction === 0 ? ok('[S05] 看板開著時，點名的 HUD 以外沒有任何東西蓋住世界區（0%）') : bad(`[S05] 看板開著時世界區被蓋住 ${(covers.fraction * 100).toFixed(1)}%`, covers.who.join('、'))
+    covers.who.length === 0 ? ok('[S05] 看板開著時，點名的 HUD 以外沒有任何會畫東西的元素跟世界區相交') : bad(`[S05] 看板開著時有 ${covers.who.length} 個東西蓋在世界區上`, covers.who.join('\n   '))
   })
   await run(context, 'S05 收件匣', async (page) => { await openInboxList(page); await surfaceChecks(page, '收件匣', '[data-testid="inbox-panel"]') })
   await run(context, 'S05 名片', async (page) => { await openProfile(page); await surfaceChecks(page, '我的名片', '[data-testid="profile-panel"]') })
