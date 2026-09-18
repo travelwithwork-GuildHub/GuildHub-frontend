@@ -9,7 +9,10 @@ import { useIdentity } from '@/identity/IdentityProvider'
 import { DiscardConfirm } from '@/profile/DiscardConfirm'
 import { CreateProjectForm } from '@/projects/CreateProjectForm'
 import { ProjectCard } from '@/projects/ProjectCard'
+import { OwnerActions } from '@/projects/OwnerActions'
 import { ProjectDetail } from '@/projects/ProjectDetail'
+import { useInboxIfProvided } from '@/inbox/InboxPanelProvider'
+import { useRoomsRefresh } from '@/world/rooms/RoomsRefreshContext'
 import { TalentCard } from '@/talent/TalentCard'
 import { SendMessageButton } from '@/inbox/SendMessageButton'
 import { TalentDetail } from '@/talent/TalentDetail'
@@ -111,6 +114,11 @@ function ProjectBoard() {
   const { closePanel, page, reportPage, selected, selectProject } = useListPanel()
   const identity = useIdentity()
   const signedIn = identity.state === 'signed-in'
+  // 成軍／結案（`FE-J04`）的交接：門的立即重取（沒有 provider 是 no-op）、「寄給隊員」開收件匣清單（沒有收件匣就只關看板）。
+  const refreshRooms = useRoomsRefresh()
+  const inbox = useInboxIfProvided()
+  // 成軍／結案送出中：返回、Escape、面板關閉都擋住（`FE-J04-S04`／`S07`）—— 跟表單送出中同一條規則
+  const [actionBusy, setActionBusy] = useState(false)
   const [composing, setComposing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   // 詳情的載入中預覽：列表手上的那一筆（深連結沒有）。跟 `TalentBoard` 同一招。
@@ -145,6 +153,7 @@ function ProjectBoard() {
   }
 
   const onClose = () => {
+    if (actionBusy) return
     const requestClose = closeIntentRef.current
     if (requestClose) requestClose()
     else closePanel()
@@ -194,16 +203,40 @@ function ProjectBoard() {
       exhausted={<EmptyState kind="exhausted" />}
       error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
       overlay={
-        selected !== null ? (
-          <ProjectDetail
-            id={selected}
-            preview={preview?.id === selected ? preview : undefined}
-            labels={DETAIL_LABELS}
-            onBack={() => selectProject(null)}
-            // 「私訊發案者」（`FE-K01` 的同一條路）：關看板、開收件匣直接進對話。`ProjectDetail` 只在已登入的非 owner 時渲染它。
-            actions={(project) => <SendMessageButton to={project.owner_id} label={MESSAGE_OWNER_LABEL} onBeforeOpen={closePanel} />}
-          />
-        ) : formOpen
+        selected !== null
+          ? ({ reload }) => (
+              <ProjectDetail
+                id={selected}
+                preview={preview?.id === selected ? preview : undefined}
+                labels={DETAIL_LABELS}
+                onBack={() => {
+                  if (!actionBusy) selectProject(null)
+                }}
+                // 「私訊發案者」（`FE-K01` 的同一條路）：關看板、開收件匣直接進對話。`ProjectDetail` 只在已登入的非 owner 時渲染它。
+                actions={(project) => <SendMessageButton to={project.owner_id} label={MESSAGE_OWNER_LABEL} onBeforeOpen={closePanel} />}
+                // owner 的成軍／結案（`FE-J04`）。成功後的三個副作用互相獨立（design D6）：先同步 replace，再各自啟動列表重取（只有成軍：案子離開 recruiting 清單）與門重取。
+                ownerActions={({ project, replace }) => (
+                  <OwnerActions
+                    project={project}
+                    onBusyChange={setActionBusy}
+                    onReplaced={(next) => {
+                      replace(next)
+                      if (next.status === 'active') reload()
+                      try {
+                        refreshRooms()
+                      } catch {
+                        // 門重取失敗只影響走廊（既有 stale 規則）；不回滾詳情、不擋列表
+                      }
+                    }}
+                    onSendToTeam={() => {
+                      closePanel()
+                      inbox?.openList(null)
+                    }}
+                  />
+                )}
+              />
+            )
+          : formOpen
           ? ({ reload }) => (
               <div className="flex min-h-0 flex-col gap-gutter overflow-y-auto">
                 <div inert={confirming}>

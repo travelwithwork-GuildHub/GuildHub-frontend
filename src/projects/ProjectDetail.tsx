@@ -35,8 +35,8 @@ export interface ProjectDetailProps {
   labels: { back: string }
   /** 案子上的動作（例如「私訊發案者」）：由呼叫端決定，這裡只給位置；拿到載入完成的案子。 */
   actions?: (project: ProjectOut) => ReactNode
-  /** 只在 owner 時渲染的插槽（`FE-J04` 用）。 */
-  ownerActions?: ReactNode
+  /** 只在 owner 時渲染的插槽（`FE-J04` 的成軍／結案）：拿到載入完成的案子與 `replace`（用回應更新詳情）。 */
+  ownerActions?: ReactNode | ((slot: { project: ProjectOut; replace: (project: ProjectOut) => void }) => ReactNode)
 }
 
 export const OWNER_MARK = '這是你發的案子'
@@ -124,7 +124,7 @@ export function ProjectDetail({ id, preview, onBack, labels, actions, ownerActio
           <p data-testid="owner-mark" className="text-caption text-ink-muted">
             {OWNER_MARK}
           </p>
-          {ownerActions}
+          {typeof ownerActions === 'function' ? ownerActions({ project, replace: detail.replace }) : ownerActions}
         </div>
       )}
       {isVisitor && actions?.(project)}

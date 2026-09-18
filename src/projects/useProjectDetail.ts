@@ -18,6 +18,11 @@ export interface ProjectDetail {
   fetchedAt: number | null
   /** 重試同一個 `id`。 */
   retry: () => void
+  /**
+   * 拿 form-team／close 的回應換掉 `ready` 的資料（`FE-J04` design D1）：回應就是伺服器的真相，不重打 `GET /api/projects/{id}`。
+   * 只在 `ready` 且 id 相同時生效；`fetchedAt` 不動（到期的時鐘是第一次取回的時刻，成軍不改到期）。
+   */
+  replace: (project: ProjectOut) => void
 }
 
 interface State {
@@ -62,14 +67,18 @@ export function useProjectDetail(id: string, preview: ProjectOut | undefined): P
   const retry = useCallback(() => {
     setState((s) => (s.phase === 'error' ? { ...s, phase: 'loading', error: null, attempt: s.attempt + 1 } : s))
   }, [])
+  const replace = useCallback((project: ProjectOut) => {
+    setState((s) => (s.phase === 'ready' && s.id === project.id ? { ...s, fetched: project } : s))
+  }, [])
 
   // 繪製期間 setState 之後這一次的函式還是會跑完：不遮住的話會回傳「新 id 配舊案子」（`useProfileDetail` 同一個坑）。
-  if (state.id !== id) return { phase: 'loading', project: preview, error: null, fetchedAt: null, retry }
+  if (state.id !== id) return { phase: 'loading', project: preview, error: null, fetchedAt: null, retry, replace }
   return {
     phase: state.phase,
     project: state.phase === 'ready' ? state.fetched : preview,
     error: state.error,
     fetchedAt: state.fetchedAt,
     retry,
+    replace,
   }
 }

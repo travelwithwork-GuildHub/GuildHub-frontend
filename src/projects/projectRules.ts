@@ -58,6 +58,17 @@ export const CreateProjectSchema = z.object({
 })
 
 export type CreateProjectInput = z.input<typeof CreateProjectSchema>
+
+// ── 成軍（`FE-J04`）：房間密碼 4～64 個 code point，**不 trim**（密碼的空白是密碼的一部分）。
+// 下限是 `too_small`（送出才說：打到第 3 個字不該被罵）、上限是 `refine`（即時）—— 跟上面同一套時機。
+const roomPassword = effectiveLimit('roomPassword')
+export const FormTeamSchema = z.object({
+  password: z
+    .string()
+    .min(roomPassword.min, { error: `房間密碼至少 ${roomPassword.min} 個字（本站的上限）。` })
+    .refine(within(roomPassword.max as number), { error: `房間密碼最多 ${roomPassword.max} 個字（本站的上限）。` }),
+})
+export type FormTeamInput = z.input<typeof FormTeamSchema>
 export type CreateProjectOutput = z.output<typeof CreateProjectSchema>
 
 export const INITIAL: CreateProjectInput = { title: '', body: '', skills: '', seat_count: '4' }
