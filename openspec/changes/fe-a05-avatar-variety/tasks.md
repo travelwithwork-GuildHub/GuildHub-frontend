@@ -8,7 +8,7 @@
 ## 2. 判準先紅
 
 - [x] 2.1 `tests/avatar-look.test.ts` 補 `S14`（八組兩兩不同、`av=7` 有效、`av=8` 回預設）與 `S15`（前兩款色碼不變，從 `worldColor` 讀）（Requirement〈`av` 決定角色的外觀…〉）
-      → `tests/avatar-look.test.ts` 加兩條
+      → `tests/avatar-look.test.ts` 加兩條；`S15` 的期望是擴充前的色碼快照（不從 `worldColor` 讀，否則恆真）
 - [x] 2.2 `tests/e2e/avatar-pixels.mjs` 擴成八個 `av`、二十八對 `stableDiff ≥ SIGNAL_FLOOR`＋差異包圍盒高度 ≥ 角色高 1/3（`S16`）（Requirement〈兩款外觀之間的差異…〉）
       → `avatar-pixels.mjs` 加 S16 段：八個 av 各抓穩定幀、28 對 stableDiff ≥ 500 ＋ 包圍盒高 ≥ 角色高 1/3（角色高拿「沒鄰居 vs 一個鄰居」的包圍盒 88 px）
 - [x] 2.3 jsdom `tests/identity-random-avatar.test.ts`：`S21`（注入亂數 0／0.999／0.5 → 0／7／4；款數 3 → 0／2／1；沒注入時 spy `Math.random` 回 0.5 → 呼叫一次、送 4）、`S19`（金鑰／密碼登入不呼叫 `updateMyProfile`）、`S20`（`PATCH` 失敗回原 profile、只送一次）（Requirement〈首次建立身分時隨機指派一款外觀〉）
@@ -28,7 +28,7 @@
 ## 4. 驗證
 
 - [x] 4.1 突變：`AVATAR_COUNT` 改回 2 → `S14`／`S22` 紅；某兩款同色 → `S14`＋`S16` 紅；亂數來源不呼叫（固定 0）→ `S21` 的「恰好呼叫一次」紅；預設來源改成 `() => 0`（保留注入路徑）→ `S21` 的 spy 那一半紅；金鑰路徑也 `PATCH` → `S19` 紅；失敗時重試 → `S20` 紅；`Math.floor(r × 8)` 寫死 8 → `S21` 的款數 3 那一半紅；拿掉 `flex-wrap` → `S23` 紅；`PATCH` 不 await 就導向 → `S17` 的順序紅
-      → 9 個突變：8 個紅（見 PR 留言）；拿掉 `flex-wrap` **綠** —— 八個選項在 1024 寬只佔 ~770 px，不換行也放得下；規格的兩個寬度量不到它，留著當更窄視窗的防禦，PR 內文明說
+      → 10 個突變全紅（見 PR 留言）；拿掉 `flex-wrap` 第一版判準綠（八個選項在 1024 寬只佔 ~770 px）→ `S23` 加 600 寬驗真的換行才紅；`S15` 期望改成色碼快照才抓得到 token 改值
 - [x] 4.2 `S16` 二十八對的最小 `stableDiff` 貼 PR（design 待答）
       → 28 對最小 stableDiff：1071（av 0／4）；換色前 510（av 1／7）
 - [x] 4.3 截圖 `docs/evidence/fe-a05-variety/`：八款並排（八個遠端玩家各一款）、選擇器 1280 與 1024
