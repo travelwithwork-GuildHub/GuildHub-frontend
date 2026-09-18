@@ -11,17 +11,17 @@
 
 ## 2. 契約（PR：`--contract`；前置：**後端 BE-G12 已合併進後端 main**）
 
-- [ ] 2.1 先寫判準：`[FE-J14-S25]`（新增／更新／輸出三個 schema 的正反例，更新 `{"label":null}` 失敗）、`[FE-J14-S26]`（產出型別檔恰好 21 組、operations coverage 含 `DELETE`）、`[FE-J14-S27]`（label 100／101／0、url 2048／2049、`LIMIT_SOURCES` 兩筆）—— 重產前先紅
-- [ ] 2.2 從合併後的後端重產 `src/api/contract/schema.d.ts`；`rest.ts` 加三個 schema（更新用 `.optional()`，不用 `.nullable()`）；`drift.ts` 登錄三個實體；`rest.ts` 檔頭與 `api-contract` 範圍改 21；`transport.ts` 的 `METHODS` 加 `DELETE`；`limits.ts` 加 `resourceLabel`、`resourceUrl`、`resourcesPerProject`，`LIMIT_SOURCES` 指向後端檔案行號（design D9）；`operations.ts` 加四個操作 —— `pnpm run typecheck`、`pnpm test` 綠
-- [ ] 2.3 突變：更新 schema 改 `.nullable()` → drift 相等斷言紅；`drift.ts` 少登錄一個 → 涵蓋率紅；`METHODS` 拿掉 `DELETE` → 刪除操作 typecheck 紅；`LIMITS.resourceUrl.max` 改 2000 → S27 紅
+- [x] 2.1 先寫判準：`[FE-J14-S25]`（新增／更新／輸出三個 schema 的正反例，更新 `{"label":null}` 失敗）、`[FE-J14-S26]`（產出型別檔恰好 21 組、operations coverage 含 `DELETE`）、`[FE-J14-S27]`（label 100／101／0、url 2048／2049、`LIMIT_SOURCES` 兩筆）—— 重產前先紅
+- [x] 2.2 從合併後的後端重產 `src/api/contract/schema.d.ts`；`rest.ts` 加三個 schema（更新用 `.optional()`，不用 `.nullable()`）；`drift.ts` 登錄三個實體；`rest.ts` 檔頭與 `api-contract` 範圍改 21；`transport.ts` 的 `METHODS` 加 `DELETE`；`limits.ts` 加 `resourceLabel`、`resourceUrl`、`resourcesPerProject`，`LIMIT_SOURCES` 指向後端檔案行號（design D9）；`operations.ts` 加四個操作 —— `pnpm run typecheck`、`pnpm test` 綠
+- [x] 2.3 突變：更新 schema 改 `.nullable()` → drift 相等斷言紅；`drift.ts` 少登錄一個 → 涵蓋率紅；`METHODS` 拿掉 `DELETE` → 刪除操作 typecheck 紅；`LIMITS.resourceUrl.max` 改 2000 → S27 紅
 
 ## 3. 本地後端：資源四端點（PR：`--local-resources`；前置：2）
 
-- [ ] 3.1 先寫契約測試 `tests/contract/rest/resources.contract.ts`：`[FE-J14-S28]`、`[FE-J14-S30]`、`[FE-J14-S31]`、`[FE-J14-S32]`，以及 `[FE-J14-S29]` 裡**不需要票**的每一列（未登入、專案不存在、owner 的三種狀態、非 owner 沒有票）；`tests/contract/boundaries.ts` 加兩欄與網址的保長度塑形（`min` 側只驗 reject、用原值，design／`contract-tests` delta）、`[FE-J14-S33]` —— 先對 `guildhub` 目標綠、對 `internal` 紅
-- [ ] 3.2 `db/schema/001_schema.sql` 逐位元組同步後端 001（`FE-O04-S01` 綠）；若後端這次也動了 `002_seed.sql`，一起同步並依實際筆數更新 `FE-O04-S03`（今天後端 seed 沒有資源列，預期不用改）；`db:reset`
-- [ ] 3.3 `handle()` 支援 `DELETE` 與 `204` 無 body、`loc` 以 `path` 開頭的 422
-- [ ] 3.4 `src/app/api/projects/[project_id]/resources/route.ts`（GET／POST）與 `…/[resource_id]/route.ts`（PATCH／DELETE）：矩陣、先鎖再計數寫入兩句（design D3）、未知欄位忽略、PATCH `{}` 原樣、網址 check 不分大小寫（`~*`）
-- [ ] 3.5 突變：鎖跟計數合成一句 → S32 並行那段紅；closed 允許寫 → S29 紅；handler 自己擋長度回 422 → S33 紅；PATCH 改到 `created_at` → S31 紅；DELETE 不走 `handle()` → S28 的 422 那段紅；網址 check 寫成 `~`（區分大小寫）→ S30 的大寫那列紅（`next build` 之後才算數）
+- [x] 3.1 先寫契約測試 `tests/contract/rest/resources.contract.ts`：`[FE-J14-S28]`、`[FE-J14-S30]`、`[FE-J14-S31]`、`[FE-J14-S32]`，以及 `[FE-J14-S29]` 裡**不需要票**的每一列（未登入、專案不存在、owner 的三種狀態、非 owner 沒有票）；`tests/contract/boundaries.ts` 加兩欄與網址的保長度塑形（`min` 側只驗 reject、用原值，design／`contract-tests` delta）、`[FE-J14-S33]` —— 先對 `guildhub` 目標綠、對 `internal` 紅
+- [x] 3.2 `db/schema/001_schema.sql` 逐位元組同步後端 001（`FE-O04-S01` 綠）；若後端這次也動了 `002_seed.sql`，一起同步並依實際筆數更新 `FE-O04-S03`（今天後端 seed 沒有資源列，預期不用改）；`db:reset`
+- [x] 3.3 `handle()` 支援 `DELETE` 與 `204` 無 body、`loc` 以 `path` 開頭的 422
+- [x] 3.4 `src/app/api/projects/[project_id]/resources/route.ts`（GET／POST）與 `…/[resource_id]/route.ts`（PATCH／DELETE）：矩陣、先鎖再計數寫入兩句（design D3）、未知欄位忽略、PATCH `{}` 原樣、網址 check 不分大小寫（`~*`）
+- [x] 3.5 突變：鎖跟計數合成一句 → S32 並行那段紅；closed 允許寫 → S29 紅；handler 自己擋長度回 422 → S33 紅；PATCH 改到 `created_at` → S31 紅；DELETE 不走 `handle()` → S28 的 422 那段紅；網址 check 寫成 `~`（區分大小寫）→ S30 的大寫那列紅（`next build` 之後才算數）
 
 ## 4. 本地後端：房間票的伺服器端記錄（PR：`--room-grants`；前置：3）
 
