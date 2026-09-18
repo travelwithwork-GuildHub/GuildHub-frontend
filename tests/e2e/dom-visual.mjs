@@ -187,6 +187,8 @@ const install = (page) =>
           const cs = getComputedStyle(el)
           return {
             level: levelOf(el), alert: el.closest('[role="alert"]') !== null && hasText(el), label: label(el), shown: shown(el),
+            // 九輪審查：標了層級、自己沒有字、底下也沒有看得見的字 —— 空殼不能替一個層級「存在」
+            empty: !hasText(el) && ![...el.querySelectorAll('*')].some((d) => visible(d) && hasText(d)),
             size: parseFloat(cs.fontSize), leading: parseFloat(cs.lineHeight) / parseFloat(cs.fontSize), raw: cs.color, text: rgba(cs.color), bg: composite(el),
           }
         })
@@ -248,12 +250,15 @@ async function inspect(page, surface, reduce) {
   // S03／S04：帶層級標記的元素與每一個 p。必備層級逐一斷言存在；層級之間比的是「高一級的最小」對「低一級的最大」（任兩個都成立）
   if (!NO_TEXT_CHECK.has(surface.name)) {
     const texts = await page.evaluate((root) => window.__dv.text(root), surface.root)
-    const at = (level) => texts.filter((t) => t.level === level).map((t) => t.size)
+    // 只有**真的畫在畫面上的字**才算一個層級存在、才進字級比較（九輪：帶標記的空殼、只有隱藏後代的容器都不算）
+    for (const t of texts) if (t.level !== null && t.empty) bad(`[S03] ${surface.name}「${t.label}」標了層級 ${t.level} 卻沒有字`, '空殼不算一個層級存在')
+    const painted = texts.filter((t) => t.shown === true)
+    const at = (level) => painted.filter((t) => t.level === level).map((t) => t.size)
     const required = surface.levels
     if (required !== undefined) {
       const missing = required.filter((l) => at(l).length === 0)
       // 綠的時候也印出每一級被算到的是哪個元素（審查：殼的 h2 被 inert 排除時，要看得出子畫面的 title 是誰在扛）
-      const who = required.map((l) => `${l}「${texts.find((t) => t.level === l)?.label}」`).join('、')
+      const who = required.map((l) => `${l}「${painted.find((t) => t.level === l)?.label}」`).join('、')
       missing.length === 0 ? ok(`[S03] ${surface.name}：必備層級都在 —— ${who}`) : bad(`[S03] ${surface.name} 少了層級 ${missing.join('、')}`, texts.map((t) => `${t.level ?? 'alert'}「${t.label}」`).join('、') || '一個文字元素都沒有')
     }
     const present = LEVELS.filter((l) => at(l).length > 0)
@@ -268,10 +273,11 @@ async function inspect(page, surface, reduce) {
     if (at('display').length > 0 && at('body').length > 0) Math.min(...at('display')) >= 1.5 * bodyMax ? ok(`[S03] ${surface.name}：頁面標題 ≥ 1.5 × 內文`) : bad(`[S03] ${surface.name}：頁面標題 ${Math.min(...at('display'))}px 不到內文 ${bodyMax}px 的 1.5 倍`)
     for (const t of texts) {
       const who = `${surface.name}「${t.label}」`
+      if (t.shown === false) { bad(`[S03] ${who}的字不在畫面上`, '文字節點的矩形沒有跟視窗相交（移出盒子或視窗）'); continue }
+      if (t.shown === null) continue // 容器：字在後代身上，後代自己會被量
       if (t.level === 'body') t.size >= 16 && t.leading >= 1.5 ? ok(`[S03] ${who}內文 ${t.size}px／${t.leading.toFixed(2)}`) : bad(`[S03] ${who}內文 ${t.size}px／行高 ${t.leading}`, '下限 16px、1.5')
       if (t.level === 'caption') t.size >= 13 ? ok(`[S03] ${who}說明 ${t.size}px`) : bad(`[S03] ${who}說明只有 ${t.size}px`, '下限 13px')
       // 量不到就紅 —— 對每一個被算進 S03 的元素都是（審查：透明的 title 不在 S04 的對比清單裡，也不能綠著過 S03）
-      if (t.shown === false) { bad(`[S03] ${who}的字不在畫面上`, '文字節點的矩形沒有跟視窗相交（移出盒子或視窗）'); continue }
       if (t.text === null || !Array.isArray(t.bg)) { bad(`[S04] ${who}的顏色或背景量不到`, `color=${JSON.stringify(t.raw)}、合成背景=${JSON.stringify(t.bg)}`); continue }
       if (t.level !== 'body' && t.level !== 'caption' && !t.alert) continue
       if (t.alert) alertsMeasured += 1
