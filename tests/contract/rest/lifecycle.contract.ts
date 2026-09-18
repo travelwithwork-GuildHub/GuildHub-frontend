@@ -94,12 +94,20 @@ describe('POST /api/projects/{project_id}/close', () => {
     await sql('insert into seats (project_id, seat_index, user_id, desk_template) values ($1, 0, $2, 0), ($1, 1, $3, 0)', [p.id, me.id, someone.id])
     expect(await sql('select 1 from seats where project_id = $1', [p.id])).toHaveLength(2)
 
+    const before = (await sql<{ password_hash: string | null; room_template: number | null }>('select password_hash, room_template from projects where id = $1', [p.id]))[0]!
     const r = await close(owner, p.id)
     expect(r.status, r.text.slice(0, 200)).toBe(200)
     expect(Object.keys(r.json as object).sort()).toEqual([...KEYS].sort())
-    expect(ProjectOut.parse(r.json).status).toBe('closed')
+    const closed = ProjectOut.parse(r.json)
+    expect(closed.status).toBe('closed')
     expect(await sql('select 1 from seats where project_id = $1', [p.id]), '座位沒有整批清掉').toEqual([])
     expect(await doorIds(other)).not.toContain(p.id)
+    // 密碼雜湊與模板留著（`FE-N08-S12`：closed 但有密碼的 enter 仍 200）—— SQL 前後比、再用原密碼 enter 一次
+    const after = (await sql<{ password_hash: string | null; room_template: number | null }>('select password_hash, room_template from projects where id = $1', [p.id]))[0]!
+    expect(after.password_hash, 'close 清掉了 password_hash').toBe(before.password_hash)
+    expect(after.room_template, 'close 清掉了 room_template').toBe(before.room_template)
+    expect(closed.room_template).toBe(before.room_template)
+    expect((await enter(other, p.id, 'guild1234')).status, 'closed 但有密碼的 enter 要仍是 200').toBe(200)
 
     const again = await close(owner, p.id)
     expect(again.status, '重複 close 要冪等').toBe(200)
