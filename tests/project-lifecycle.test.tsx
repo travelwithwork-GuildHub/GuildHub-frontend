@@ -389,6 +389,8 @@ describe('結案要確認；成功後沒有動作', () => {
     await waitFor(() => expect(status()).toBe('已結案'))
     expect(within(actions()!).queryAllByRole('button')).toEqual([])
     expect(refreshRooms).toHaveBeenCalledTimes(1)
+    // 重取是 effect 裡的非同步請求：等一拍再數，才抓得到「結案也 reload」的實作
+    await new Promise((r) => setTimeout(r, 50))
     expect(listGets().length, '結案不該重取列表').toBe(listBefore)
     expect(closeCalls(A.id)[0]?.body ?? null, 'close 沒有 body').toBeNull()
   })
