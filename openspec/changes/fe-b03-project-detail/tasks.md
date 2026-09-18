@@ -37,5 +37,5 @@
 ## 5. 收尾
 
 - [x] 5.1 `ui-ux-pro-max` pre-delivery（詳情版面、焦點、對比）；`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm exec tsc --noEmit`、`pnpm test`；`bash .github/scripts/pr-size.sh`
-- [ ] 5.2 量 client JS 前後差貼 PR（全部 chunk gz 1291.5 → 1292.5 KB；BoardPanel 那個 chunk 157.4 → 158.3 KB，+0.9 KB）；合併後 `vercel deploy --prod`
-- [ ] 5.3 `archive/fe-b03-project-detail`：`openspec validate --archived --strict` 與 `--all --strict`；Sheet `FE-B03` Done
+- [x] 5.2 量 client JS 前後差貼 PR（全部 chunk gz 1291.5 → 1292.5 KB；BoardPanel 那個 chunk 157.4 → 158.3 KB，+0.9 KB；最終 1292.6 KB）；合併後 `vercel deploy --prod` —— #501 合併、已部署 READY；閘道單次人工 smoke（只走不壓）：20 張卡 → 詳情 ready＋發案者名片、`?project=<id>`、Escape 回清單、0 console error
+- [x] 5.3 `archive/fe-b03-project-detail`：`openspec validate --archived --strict` 與 `--all --strict`；Sheet `FE-B03` Done
