@@ -189,7 +189,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
 
   // 即時層替身：另一個程序、另一個 port；`GET /api/rooms` 透過 INTERNAL_REALTIME_PORT 找到它。
   const stubPort = await freePort()
-  const stub = spawn('npx', ['tsx', 'scripts/realtime-stub.ts'], {
+  const stub = spawn(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'scripts/realtime-stub.ts'], {
     cwd: ROOT,
     env: { ...process.env, INTERNAL_DATABASE_URL: db.url, INTERNAL_SESSION_SECRET: CONTRACT_SESSION_SECRET, INTERNAL_REALTIME_PORT: String(stubPort) },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -215,7 +215,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
 
   const port = await freePort()
   const base = `http://127.0.0.1:${port}`
-  const child = spawn('npx', ['next', 'start', '-p', String(port), '-H', '127.0.0.1'], {
+  const child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', String(port), '-H', '127.0.0.1'], {
     cwd: ROOT,
     env: {
       ...process.env,
