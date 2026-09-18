@@ -62,13 +62,13 @@ const near = (a, b, tol = 1) => Math.abs(a - b) <= tol
 await mkdir(OUT, { recursive: true })
 const browser = await chromium.launch({ headless: !HEADED, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 
-async function open(others, { url = '/world', room = false, token = room } = {}) {
+async function open(others, { url = '/world', room = false, token = room, holdSnapshot = () => false } = {}) {
   const sockets = []
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
   guardLoopback(context)
   if (token) await context.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [tokenKey(P.id), TOKEN])
   await countOverlays(context)
-  await fakeRealtime(context, sockets, { others })
+  await fakeRealtime(context, sockets, { others, holdSnapshot })
   const page = await context.newPage()
   await fakeRest(page, { current: P }, ROOMS)
   const response = await page.goto(`${FRONTEND}${url}`).catch(() => null)
@@ -278,6 +278,23 @@ try {
     if (texts.includes('房主') && !texts.includes('小玉')) ok('[S10] 是房間裡的人；大廳的「小玉」隨舊子樹卸載、不在 DOM 裡')
     else bad('[S10] 房間的名單不對（大廳的牌子沒卸載？）', JSON.stringify(texts))
     await page.screenshot({ path: path.join(OUT, 'room.png') })
+    await context.close()
+  }
+
+  // ── E：S10 的另一半 —— 房間的 snapshot 永遠不到：大廳的牌子仍然要隨舊子樹卸載（不是被新名單蓋掉） ──
+  {
+    const { page, context } = await open(() => [at('u-yu', '小玉', 1, 0)], { token: true, holdSnapshot: (scene) => scene?.startsWith('room:') ?? false })
+    if (await waitTags(page, 1)) ok('[S10] 大廳裡先看到「小玉」（房間不送 snapshot 的那一組）')
+    else bad('[S10] 大廳的牌子沒出現')
+    const { approachDoor } = walker({ room: ROOM, decoy: uuid(2), title: '星際導航', out: OUT })
+    await approachDoor(page)
+    const since = await overlaysSeen(page)
+    await page.keyboard.press('KeyE')
+    await waitForTransition(page, '按 E 進房間（不送 snapshot）', since, 'S10')
+    await page.waitForTimeout(1500)
+    const left = await tagsText(page)
+    if (left.length === 0) ok('[S10] 房間的名單還沒到：大廳的牌子已經隨舊子樹卸載（DOM 裡沒有任何牌子）')
+    else bad('[S10] 舊場景的牌子還留在 DOM 裡（cleanup 沒送空名單）', JSON.stringify(left))
     await context.close()
   }
 } finally {
