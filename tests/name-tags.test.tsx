@@ -6,8 +6,9 @@ import type { RemoteIdentity, RemoteMotion } from '@/realtime/remotePlayers'
 import { RENDER_DELAY_MS, appendSample, createTrack } from '@/realtime/interpolation'
 import { cameraOffset } from '@/world/camera'
 import { NameTags, type NameTagNodes } from '@/world/NameTags'
-import { NAME_TAG_SIZE, hasName } from '@/world/player/nameTag'
+import { NAME_TAG_ANCHOR_Y, NAME_TAG_SIZE, hasName } from '@/world/player/nameTag'
 import { RemotePlayers } from '@/world/RemotePlayers'
+import { screenPixelFor } from '@/world/rooms/labelProjection'
 
 // 名字牌。規格 `openspec/specs/name-tag/spec.md`（change `fe-w08-name-tag`）。
 //
@@ -16,7 +17,9 @@ import { RemotePlayers } from '@/world/RemotePlayers'
 // 兩半靠同一個 `nodesRef`（Map）接起來 —— 跟正式碼一樣。
 //
 // ⚠️ 像素期望值是**手算的常數**（`AT`）：viewport 1280×720、相機 target 在原點時 1 世界單位 = 60 px、
-// 錨點 y=1.6 在 (0,0) 投影到 y≈292.12。不呼叫 `screenPixelFor` 算期望值 —— 那跟被測的投影同源，投影寫偏會一起錯。
+// 錨點 y=1.6 在 (0,0) 投影到 y≈292.12。不呼叫 `screenPixelFor` 算**位置**的期望值 —— 那跟被測的投影同源，投影寫偏會一起錯。
+// 例外是「同一幀」那一半（`S05`）：每一幀拿 three 的 group **這一幀**的位置去投影、跟牌子比 —— 這裡量的是時間差不是投影，
+// 位置的正確性由手算常數守。（突變「牌子用上一幀的 pose」在只看終點時是綠的，這一條才抓得到。）
 
 const VIEWPORT = { width: 1280, height: 720 }
 const TRANSLATE = /translate3d\((-?[\d.]+)px, (-?[\d.]+)px, 0\)/
@@ -132,10 +135,16 @@ describe('位置半邊：角色自己每幀寫牌子', () => {
     appendSample(motion.get('u1')!, { x: 2, z: 1, f: 0 }, clock + 100)
     clock += RENDER_DELAY_MS
     const seen = new Set<string>()
+    const group = renderer.scene.children[0]!.instance as unknown as { position: { x: number; z: number } }
     for (let i = 0; i < 10; i += 1) {
       clock += 10
       await frames(renderer, 1)
       seen.add(node.style.transform)
+      // 同一幀：牌子對的是 group **這一幀**的位置（不是上一幀的、不是另外求值的）
+      const want = screenPixelFor({ x: group.position.x, y: NAME_TAG_ANCHOR_Y, z: group.position.z }, { x: 0, z: 0 }, VIEWPORT)
+      const got = xy(node)
+      expect(Math.abs((got?.x ?? NaN) - want.x), `第 ${i + 1} 幀牌子 x 沒對齊角色`).toBeLessThanOrEqual(1)
+      expect(Math.abs((got?.y ?? NaN) - want.y), `第 ${i + 1} 幀牌子 y 沒對齊角色`).toBeLessThanOrEqual(1)
     }
     expect(seen.size, '10 幀裡 transform 應該每幀不同').toBe(10)
     clock += RENDER_DELAY_MS
