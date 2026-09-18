@@ -51,8 +51,8 @@ export interface OwnerActionsProps {
   project: ProjectOut
   /** 成軍／結案的回應：呼叫端用它更新詳情，並各自啟動列表與門的重取。 */
   onReplaced: (project: ProjectOut) => void
-  /** 「寄給隊員」的草稿已進剪貼簿：呼叫端關看板、開收件匣**清單**。 */
-  onSendToTeam: () => void
+  /** 「寄給隊員」的草稿已進剪貼簿：呼叫端關看板、開收件匣**清單**。沒給（沒有收件匣）就不長那顆按鈕 —— 跟 `SendMessageButton` 同一條規則。 */
+  onSendToTeam?: () => void
   /** 送出中（成軍或結案）：呼叫端要擋住返回／關閉／Escape。**在送出的同一個 tick 同步呼叫**（不等 effect），呼叫端要用 ref 收（design D6；審查抓到 effect 有一格空窗）。 */
   onBusyChange?: (busy: boolean) => void
   /** 判準注入「會成功／會失敗」的剪貼簿（`FE-A06` design D4）；真的由 e2e 讀回來比對（`S09`）。 */
@@ -64,6 +64,10 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
   const [revealed, setRevealed] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [sendFailed, setSendFailed] = useState(false)
+  // 剪貼簿一次只寫一件：兩顆按鈕共用一把同步的 guard（ref：同一批次的第二下看到的 state 是舊的）。
+  // 沒有它的話「複製」與「寄給隊員」可以交錯 —— 慢的那次晚回來覆蓋快的那次的結果，甚至舊的成功把看板關掉（兩個審查者都抓到）
+  const writing = useRef(false)
+  const [writingNow, setWritingNow] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [closing, setClosing] = useState(false)
   // 連按的 guard 用 ref：同一批次裡的第二下 click 看到的 `closing` 是舊的 closure（`useForm` 的 `inFlightRef` 同一個理由）
@@ -109,7 +113,9 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
 
   // ⚠️ 兩個都要在 `await` **之後**才改狀態：放在前面的話寫入失敗畫面照樣說「已複製」／照樣開收件匣（`S05`／`S06` 要擋的假實作）
   const copy = useCallback(async () => {
-    if (revealed === null) return
+    if (revealed === null || writing.current) return
+    writing.current = true
+    setWritingNow(true)
     // 再按一次先收掉上一次的結果：寫入還沒回報之前不能還掛著「已複製」
     setCopyState('idle')
     try {
@@ -117,16 +123,24 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
       setCopyState('copied')
     } catch {
       setCopyState('failed')
+    } finally {
+      writing.current = false
+      setWritingNow(false)
     }
   }, [clipboard, revealed])
   const sendToTeam = useCallback(async () => {
-    if (revealed === null) return
+    if (revealed === null || writing.current) return
+    writing.current = true
+    setWritingNow(true)
     setSendFailed(false)
     try {
       await clipboard.write(passwordDraft(project, revealed))
-      onSendToTeam()
+      onSendToTeam?.()
     } catch {
       setSendFailed(true)
+    } finally {
+      writing.current = false
+      setWritingNow(false)
     }
   }, [clipboard, project, revealed, onSendToTeam])
 
@@ -215,14 +229,16 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
           </p>
           <p className="text-caption text-ink-muted">{OWNER_ACTION_LABELS.revealHint}</p>
           <div className="flex flex-wrap gap-gutter">
-            <button type="button" className={SECONDARY} onClick={() => void copy()}>
+            <button type="button" className={SECONDARY} aria-disabled={writingNow} onClick={() => void copy()}>
               {OWNER_ACTION_LABELS.copy}
             </button>
-            <button type="button" className={SECONDARY} onClick={() => void sendToTeam()}>
-              {OWNER_ACTION_LABELS.sendToTeam}
-            </button>
+            {onSendToTeam && (
+              <button type="button" className={SECONDARY} aria-disabled={writingNow} onClick={() => void sendToTeam()}>
+                {OWNER_ACTION_LABELS.sendToTeam}
+              </button>
+            )}
           </div>
-          <p className="text-caption">{OWNER_ACTION_LABELS.sendHint}</p>
+          {onSendToTeam && <p className="text-caption">{OWNER_ACTION_LABELS.sendHint}</p>}
           {copyState === 'copied' && <p role="status">{OWNER_ACTION_LABELS.copied}</p>}
           {copyState === 'failed' && (
             <p role="alert" className="text-danger">

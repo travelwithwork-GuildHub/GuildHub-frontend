@@ -74,6 +74,11 @@ describe('密碼只在這一次詳情裡呈現，可複製、可寄給隊員，�
     clipboardWrite.mockImplementationOnce(() => new Promise<void>((_, reject) => (fail = reject)))
     click(btn('複製密碼'))
     expect(within(detail()).queryByRole('status'), '第二次寫入還沒回報就仍說已複製').toBeNull()
+    // 寫入中再按「複製」與「寄給隊員」都不算：剪貼簿一次只寫一件（慢的那次晚回來會覆蓋快的那次、舊的成功會把看板關掉 —— 審查抓到）
+    click(btn('複製密碼'))
+    click(btn('寄給隊員'))
+    expect(clipboardWrite, '寫入中又寫了').toHaveBeenCalledTimes(2)
+    expect(screen.queryByTestId('inbox-panel'), '寫入中按寄給隊員把收件匣開了').toBeNull()
     await act(async () => fail(new Error('不准')))
     await waitFor(() => expect(within(detail()).getByRole('alert').textContent).toContain('自己選起來'))
     expect(within(detail()).queryByRole('status'), '寫入失敗卻說已複製').toBeNull()
@@ -106,10 +111,18 @@ describe('密碼只在這一次詳情裡呈現，可複製、可寄給隊員，�
     expect(within(detail()).getByTestId('room-password-draft').textContent).toBe(draft())
     expect(within(detail()).getAllByRole('alert').length).toBeGreaterThanOrEqual(1)
 
-    // 成功：草稿進剪貼簿、看板關、收件匣停在清單、焦點在收件匣
+    // 成功（壓著不回）：寫入中連按不再寫、看板還開著；放行後草稿進剪貼簿、看板關、收件匣停在清單、焦點在收件匣
     server.replyFor('/api/messages', 200, [message(OTHER.id, ME.id, '嗨')])
     server.replyFor(`/api/profiles/${OTHER.id}`, 200, OTHER)
+    let release: () => void = () => {}
+    clipboardWrite.mockImplementationOnce(() => new Promise<void>((resolve) => (release = resolve)))
+    const writesBefore = clipboardWrite.mock.calls.length
     click(btn('寄給隊員'))
+    click(btn('寄給隊員'))
+    click(btn('複製密碼'))
+    expect(clipboardWrite.mock.calls.length - writesBefore, '寫入中又寫了').toBe(1)
+    expect(screen.queryByTestId('list-panel'), '還沒寫進去就關了看板').not.toBeNull()
+    await act(async () => release())
     await waitFor(() => expect(screen.queryByTestId('list-panel')).toBeNull())
     expect(clipboardWrite).toHaveBeenLastCalledWith(draft())
     const inbox = screen.getByTestId('inbox-panel')
@@ -162,6 +175,7 @@ describe('密碼只在這一次詳情裡呈現，可複製、可寄給隊員，�
       for (const w of all) {
         expect(w, '密碼落地了').not.toContain(PW)
         expect(w, '密碼 encoded 後落地了').not.toContain(encodeURIComponent(PW))
+        expect(w, '密碼 form-encoded（空白成 +）後落地了').not.toContain(new URLSearchParams({ pw: PW }).toString().slice(3))
       }
       expect(window.location.href).not.toContain(PW)
       expect(document.cookie).not.toContain(PW)

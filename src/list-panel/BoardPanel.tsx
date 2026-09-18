@@ -231,11 +231,16 @@ function ProjectBoard() {
                         // 門重取失敗只影響走廊（既有 stale 規則）；不回滾詳情、不擋列表
                       }
                     }}
-                    // 草稿已在剪貼簿：關看板、開收件匣**清單**（不進對話、不帶草稿 —— design D4）。跟 `SendMessageButton` 同一種交接，只是停在清單
-                    onSendToTeam={() => {
-                      closePanel()
-                      inbox?.openList(null)
-                    }}
+                    // 草稿已在剪貼簿：關看板、開收件匣**清單**（不進對話、不帶草稿 —— design D4）。跟 `SendMessageButton` 同一種交接，只是停在清單；
+                    // 沒有收件匣就不給這顆按鈕。`openList(null)`：沒有開啟者，收件匣關閉時焦點回世界錨（provider 既有的 fallback，`FE-X06-S13`）
+                    onSendToTeam={
+                      inbox
+                        ? () => {
+                            closePanel()
+                            inbox.openList(null)
+                          }
+                        : undefined
+                    }
                   />
                 )}
               />
