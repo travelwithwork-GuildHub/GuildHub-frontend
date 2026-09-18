@@ -1,6 +1,7 @@
 import { boundaryValues } from '@/api/contract/boundaries'
 import { LIMITS, UNBOUNDED, codePointLength } from '@/api/contract/limits'
 import { ProfileOut, ProjectOut, ProjectResourceOut } from '@/api/contract/rest'
+import { trackProject } from './cleanup'
 import type { ContractClient } from './client'
 
 // 成對邊界表：**欄位 → 端點**。值由 `FE-O06` 的 `boundaryValues()` 從 `LIMITS` 算（這裡沒有任何長度數字）。
@@ -78,7 +79,8 @@ async function activeProject(c: ContractClient): Promise<string> {
   const id = ProjectOut.parse(created.json).id
   const formed = await c.raw('POST', `/api/projects/${id}/form-team`, { body: { password: 'guild1234' } })
   if (formed.status !== 200) throw new Error(`成軍失敗：${formed.status} ${formed.text.slice(0, 200)}`)
-  return id
+  // 跑完要結案 —— 每個 active 專案都在跟 seed 的兩間房搶 12 個門位（`cleanup.ts` 檔頭）。
+  return trackProject(c, id)
 }
 
 const RESOURCE_BASE = { label: '原本的資源', type: 'github', url: 'https://example.com/base' }

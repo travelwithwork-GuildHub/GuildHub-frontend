@@ -1,7 +1,8 @@
 import pg from 'pg'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { ProjectOut, ProjectResourceOut } from '@/api/contract/rest'
 import { ValidationError } from '@/api/contract/errors'
+import { closeTrackedProjects, trackProject } from '../cleanup'
 import { ContractClient, baseUrl, databaseUrl } from '../client'
 
 // 規格：openspec/changes/fe-j14-project-resources/specs/internal-backend/spec.md
@@ -41,7 +42,8 @@ async function project(c: ContractClient, title: string, to: 'recruiting' | 'act
   const id = ProjectOut.parse(created.json).id
   if (to !== 'recruiting') expect((await c.raw('POST', `/api/projects/${id}/form-team`, { body: { password: 'guild1234' } })).status).toBe(200)
   if (to === 'closed') expect((await c.raw('POST', `/api/projects/${id}/close`)).status).toBe(200)
-  return id
+  // 跑完要收掉：active 專案會跟 seed 的兩間房搶走廊的 12 個門位（`cleanup.ts` 檔頭）。
+  return trackProject(c, id)
 }
 
 /** 新增一筆當前置（本身不是判準）。 */
@@ -54,11 +56,17 @@ async function seedOne(c: ContractClient, p: string, label = '既有的'): Promi
 /** 直接把 n 筆塞進庫（跳過端點）—— 只給「已經有 N 筆」這種前置用。 */
 async function fillTo(projectId: string, n: number): Promise<void> {
   await sql('delete from project_resources where project_id = $1', [projectId])
+  // `created_at` **兩兩相同**（`(i / 2)` 是整數除法）：這樣 `order by created_at asc, id asc` 兩半都有事做 ——
+  // 只有 `created_at` 的話平手那兩列的順序沒被釘住，只有 `id` 的話跨秒的順序沒被釘住。
   await sql(
-    "insert into project_resources (project_id, label, type, url) select $1::uuid, 'seed ' || i, 'github', 'https://example.com/' || i from generate_series(1, $2) as i",
+    "insert into project_resources (project_id, label, type, url, created_at) " +
+      "select $1::uuid, 'seed ' || i, 'github', 'https://example.com/' || i, now() - interval '1 hour' + ((i / 2) * interval '1 second') from generate_series(1, $2) as i",
     [projectId, n],
   )
 }
+
+// 每個檔案跑完把自己建的 active 專案收掉（`cleanup.ts` 檔頭：走廊只有 12 個門位，seed 那兩間會被擠掉）。
+afterAll(closeTrackedProjects)
 
 describe('專案資源：權限與狀態', () => {
   it('[FE-J14-S29] 未登入／專案不存在／active／closed／recruiting 每一列的碼與 detail', async () => {
@@ -112,8 +120,14 @@ describe('專案資源：權限與狀態', () => {
       expect(r.status).toBe(409)
       expect(detailOf(r)).toBe('專案已結案，資源不能再修改')
     }
-    expect((await list(other, closed)).status).toBe(403)
-    expect((await add(other, closed)).status).toBe(403)
+    const closedPeek = await list(other, closed)
+    expect(closedPeek.status).toBe(403)
+    expect(detailOf(closedPeek)).toBe('尚未通過房間密碼驗證')
+    // 三種寫入都要打：「非 owner」排在「已結案」前面 —— 漏掉 PATCH／DELETE 的話，那兩個回 409 也看不出來。
+    for (const r of [await add(other, closed), await patch(other, closed, inClosed.id, { label: 'x' }), await remove(other, closed, inClosed.id)]) {
+      expect(r.status, r.text.slice(0, 200)).toBe(403)
+      expect(detailOf(r)).toBe('只有發起人可以做這件事')
+    }
 
     // recruiting：owner 讀到空陣列、寫是 409；非 owner 一律 403
     const recruiting = await project(owner, '矩陣 recruiting', 'recruiting')
@@ -124,8 +138,13 @@ describe('專案資源：權限與狀態', () => {
       expect(r.status).toBe(409)
       expect(detailOf(r)).toBe('專案還沒成軍，還沒有房間可以放資源')
     }
-    expect((await list(other, recruiting)).status).toBe(403)
-    expect((await add(other, recruiting)).status).toBe(403)
+    const recruitingPeek = await list(other, recruiting)
+    expect(recruitingPeek.status).toBe(403)
+    expect(detailOf(recruitingPeek)).toBe('尚未通過房間密碼驗證')
+    for (const r of [await add(other, recruiting), await patch(other, recruiting, ZERO, { label: 'x' }), await remove(other, recruiting, ZERO)]) {
+      expect(r.status, r.text.slice(0, 200)).toBe(403)
+      expect(detailOf(r)).toBe('只有發起人可以做這件事')
+    }
   })
 })
 
@@ -227,6 +246,23 @@ describe('專案資源：部分更新、順序、刪除', () => {
     const twice = await remove(owner, p, b.id)
     expect(twice.status).toBe(404)
     expect(detailOf(twice)).toBe('資源不存在')
+
+    // ⚠️ **3 筆證明不了順序。** 那麼少的列 planner 走 `(project_id, created_at, id)` 的 Index Only Scan，
+    // 順序是索引順手給的 —— 把 `order by created_at asc, id asc` 整句拿掉，上面那條仍然全綠（審查抓到）。
+    // 50 筆時 planner 改走 Seq Scan，順序變成堆裡的實體順序，而 `UPDATE` 過的列會被搬到堆的最後面。
+    // 所以這一段：塞滿 50 筆（`created_at` 兩兩相同）、改中間那一列、再讀一次，順序必須還是 (created_at, id)。
+    const many = await project(owner, '順序用', 'active')
+    await fillTo(many, 50)
+    const rowsOf = async () => ((await list(owner, many)).json as unknown[]).map((x) => ProjectResourceOut.parse(x))
+    const sortKey = (x: { created_at: string; id: string }) => `${x.created_at}|${x.id}`
+    const before = await rowsOf()
+    expect(before.length).toBe(50)
+    expect(before.map(sortKey), '50 筆的順序不是 (created_at, id)').toEqual([...before.map(sortKey)].sort())
+    const middle = before[25]
+    expect(middle).toBeDefined()
+    const moved = await patch(owner, many, (middle as ProjectResourceOut).id, { label: '被改過的' })
+    expect(moved.status, moved.text.slice(0, 200)).toBe(200)
+    expect((await rowsOf()).map((x) => x.id), 'PATCH 過的那一列在清單裡換位置了').toEqual(before.map((x) => x.id))
 
     // 用 P 的 path 去動 Q 的資源：404，而且 Q 沒變
     const q = await project(owner, '另一個專案', 'active')

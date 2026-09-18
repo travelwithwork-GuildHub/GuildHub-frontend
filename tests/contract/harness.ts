@@ -194,6 +194,8 @@ export default async function setup(project: TestProject): Promise<() => Promise
     env: { ...process.env, INTERNAL_DATABASE_URL: db.url, INTERNAL_SESSION_SECRET: CONTRACT_SESSION_SECRET, INTERNAL_REALTIME_PORT: String(stubPort) },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
+    // Windows：不要為子程序開主控台視窗（本機跑一次契約測試會閃兩個黑窗）。其他平台忽略這個選項。
+    windowsHide: true,
   })
   let stubLog = ''
   const collectStub = (d: Buffer) => {
@@ -226,6 +228,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
+    windowsHide: true,
   })
   // 只在啟動期間收 log（給失敗訊息用）；ready 之後就不再累積，不然整個套件期間的輸出都堆在記憶體裡。
   let log = ''
