@@ -115,8 +115,9 @@ function ProjectBoard() {
   const signedIn = identity.state === 'signed-in'
   // 成軍／結案（`FE-J04`）的交接：門的立即重取（沒有 provider 是 no-op）、「寄給隊員」開收件匣清單（沒有收件匣就只關看板）。
   const refreshRooms = useRoomsRefresh()
-  // 成軍／結案送出中：返回、Escape、面板關閉都擋住（`FE-J04-S04`／`S07`）—— 跟表單送出中同一條規則
-  const [actionBusy, setActionBusy] = useState(false)
+  // 成軍／結案送出中：返回、Escape、面板關閉都擋住（`FE-J04-S04`／`S07`）—— 跟表單送出中同一條規則。
+  // 用 ref：`OwnerActions` 在送出的同一個 tick 同步通知，擋的那一刻要讀得到最新值（state 會晚一格、closure 會是舊的）。
+  const actionBusy = useRef(false)
   const [composing, setComposing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   // 詳情的載入中預覽：列表手上的那一筆（深連結沒有）。跟 `TalentBoard` 同一招。
@@ -151,7 +152,7 @@ function ProjectBoard() {
   }
 
   const onClose = () => {
-    if (actionBusy) return
+    if (actionBusy.current) return
     const requestClose = closeIntentRef.current
     if (requestClose) requestClose()
     else closePanel()
@@ -208,7 +209,7 @@ function ProjectBoard() {
                 preview={preview?.id === selected ? preview : undefined}
                 labels={DETAIL_LABELS}
                 onBack={() => {
-                  if (!actionBusy) selectProject(null)
+                  if (!actionBusy.current) selectProject(null)
                 }}
                 // 「私訊發案者」（`FE-K01` 的同一條路）：關看板、開收件匣直接進對話。`ProjectDetail` 只在已登入的非 owner 時渲染它。
                 actions={(project) => <SendMessageButton to={project.owner_id} label={MESSAGE_OWNER_LABEL} onBeforeOpen={closePanel} />}
@@ -216,7 +217,9 @@ function ProjectBoard() {
                 ownerActions={({ project, replace }) => (
                   <OwnerActions
                     project={project}
-                    onBusyChange={setActionBusy}
+                    onBusyChange={(busy) => {
+                      actionBusy.current = busy
+                    }}
                     onReplaced={(next) => {
                       replace(next)
                       if (next.status === 'active') reload()

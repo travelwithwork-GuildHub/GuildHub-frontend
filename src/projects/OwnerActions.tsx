@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import type { ProjectOut } from '@/api/contract/rest'
 import { closeProject, formTeam } from '@/api/operations'
 import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
@@ -34,7 +35,7 @@ export interface OwnerActionsProps {
   project: ProjectOut
   /** 成軍／結案的回應：呼叫端用它更新詳情，並各自啟動列表與門的重取。 */
   onReplaced: (project: ProjectOut) => void
-  /** 送出中（成軍或結案）：呼叫端要擋住返回／關閉／Escape。 */
+  /** 送出中（成軍或結案）：呼叫端要擋住返回／關閉／Escape。**在送出的同一個 tick 同步呼叫**（不等 effect），呼叫端要用 ref 收（design D6；審查抓到 effect 有一格空窗）。 */
   onBusyChange?: (busy: boolean) => void
 }
 
@@ -42,6 +43,8 @@ export function OwnerActions({ project, onReplaced, onBusyChange }: OwnerActions
   const [composing, setComposing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [closing, setClosing] = useState(false)
+  // 連按的 guard 用 ref：同一批次裡的第二下 click 看到的 `closing` 是舊的 closure（`useForm` 的 `inFlightRef` 同一個理由）
+  const closingRef = useRef(false)
   const [closeError, setCloseError] = useState<string | null>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
 
@@ -55,10 +58,25 @@ export function OwnerActions({ project, onReplaced, onBusyChange }: OwnerActions
       onReplaced(next)
     },
   })
-  const anyBusy = busy || closing
-  useEffect(() => {
-    onBusyChange?.(anyBusy)
-  }, [anyBusy, onBusyChange])
+  // busy 在 submit **事件的當下**就通知（`useForm` 的 guard 也是這一刻上鎖；resolver 是非同步的，等 handler 才通知會晚幾個 microtask）。
+  // 驗證沒過 `onSubmit` 也會 resolve → 解除。**用深度計數**：連按的第二下被 `useForm` 擋掉、立刻 resolve，不能把第一下的 busy 解掉（實測抓到）。
+  const busyDepth = useRef(0)
+  const enterBusy = useCallback(() => {
+    busyDepth.current += 1
+    if (busyDepth.current === 1) onBusyChange?.(true)
+  }, [onBusyChange])
+  const leaveBusy = useCallback(() => {
+    busyDepth.current -= 1
+    if (busyDepth.current === 0) onBusyChange?.(false)
+  }, [onBusyChange])
+  const submitGuarded = async (event: React.FormEvent<HTMLFormElement>) => {
+    enterBusy()
+    try {
+      await onSubmit(event)
+    } finally {
+      leaveBusy()
+    }
+  }
 
   const passwordField = useRef<HTMLInputElement | null>(null)
   useEffect(() => {
@@ -66,7 +84,9 @@ export function OwnerActions({ project, onReplaced, onBusyChange }: OwnerActions
   }, [composing])
 
   const confirmClose = useCallback(async () => {
-    if (closing) return
+    if (closingRef.current) return
+    closingRef.current = true
+    enterBusy()
     setClosing(true)
     setCloseError(null)
     try {
@@ -76,15 +96,17 @@ export function OwnerActions({ project, onReplaced, onBusyChange }: OwnerActions
     } catch (error) {
       setCloseError(toUiError(error).message)
     } finally {
+      closingRef.current = false
       setClosing(false)
+      leaveBusy()
     }
-  }, [closing, project.id, onReplaced])
+  }, [project.id, onReplaced, enterBusy, leaveBusy])
   const cancelClose = useCallback(() => {
-    if (closing) return
-    setConfirming(false)
-    // 焦點回「結案」（開它的那顆）
-    queueMicrotask(() => closeButton.current?.focus())
-  }, [closing])
+    if (closingRef.current) return
+    // 同步提交這一格，「結案」那顆才在 DOM 上可以接焦點（microtask 會跑在 re-render 之前 —— 審查抓到）
+    flushSync(() => setConfirming(false))
+    closeButton.current?.focus()
+  }, [])
 
   const registered = form.register('password')
   return (
@@ -96,7 +118,7 @@ export function OwnerActions({ project, onReplaced, onBusyChange }: OwnerActions
       )}
 
       {project.status === 'recruiting' && composing && (
-        <form className={FORM} onSubmit={onSubmit} noValidate data-testid="form-team-form" aria-busy={busy}>
+        <form className={FORM} onSubmit={(e) => void submitGuarded(e)} noValidate data-testid="form-team-form" aria-busy={busy}>
           <label className={FIELD_LABEL}>
             {OWNER_ACTION_LABELS.password}
             <input
@@ -145,7 +167,10 @@ export function OwnerActions({ project, onReplaced, onBusyChange }: OwnerActions
   )
 }
 
-/** 結案的確認層（design D6）：`alertdialog`、焦點在安全的「取消」、Escape ＝ 取消；送出中兩顆都鎖、Escape 也擋。 */
+/**
+ * 結案的確認層（design D6）：`alertdialog`、焦點在安全的「取消」、Escape ＝ 取消；送出中兩顆都擋（`aria-disabled`：`disabled` 會把焦點丟回 body）、Escape 也擋。
+ * **不是 modal**（沒有 `aria-modal`、不圈焦點）：它住在詳情裡，詳情的返回／面板關閉在送出中由呼叫端擋。
+ */
 function CloseConfirm({ busy, error, onConfirm, onCancel }: { busy: boolean; error: string | null; onConfirm: () => void; onCancel: () => void }) {
   const root = useRef<HTMLDivElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
@@ -157,7 +182,6 @@ function CloseConfirm({ busy, error, onConfirm, onCancel }: { busy: boolean; err
     <div
       ref={root}
       role="alertdialog"
-      aria-modal="true"
       aria-labelledby="close-project-title"
       aria-describedby="close-project-body"
       aria-busy={busy}
@@ -170,10 +194,10 @@ function CloseConfirm({ busy, error, onConfirm, onCancel }: { busy: boolean; err
       <p id="close-project-body">{OWNER_ACTION_LABELS.closeBody}</p>
       <SubmitError message={error} />
       <div className="flex gap-gutter">
-        <button ref={cancel} type="button" className={PRIMARY} disabled={busy} onClick={onCancel}>
+        <button ref={cancel} type="button" className={PRIMARY} aria-disabled={busy} onClick={onCancel}>
           {OWNER_ACTION_LABELS.cancel}
         </button>
-        <button type="button" className={SECONDARY} disabled={busy} onClick={onConfirm}>
+        <button type="button" className={SECONDARY} aria-disabled={busy} onClick={onConfirm}>
           {OWNER_ACTION_LABELS.closeConfirm}
         </button>
       </div>

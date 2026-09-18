@@ -60,12 +60,17 @@ export const CreateProjectSchema = z.object({
 export type CreateProjectInput = z.input<typeof CreateProjectSchema>
 
 // ── 成軍（`FE-J04`）：房間密碼 4～64 個 code point，**不 trim**（密碼的空白是密碼的一部分）。
-// 下限是 `too_small`（送出才說：打到第 3 個字不該被罵）、上限是 `refine`（即時）—— 跟上面同一套時機。
+// 下限也用 code point（`.min()` 數的是 UTF-16：三個 emoji 會被當成 6 個字放行 —— 審查抓到）；但 issue 的 `code` 仍是 `too_small`，
+// `useForm` 才會把它延到送出才說（打到第 3 個字不該被罵）。上限是 `refine`（`custom`，即時）—— 跟上面同一套時機。
 const roomPassword = effectiveLimit('roomPassword')
 export const FormTeamSchema = z.object({
   password: z
     .string()
-    .min(roomPassword.min, { error: `房間密碼至少 ${roomPassword.min} 個字（本站的上限）。` })
+    .check((ctx) => {
+      if (codePointLength(ctx.value) < roomPassword.min) {
+        ctx.issues.push({ code: 'too_small', minimum: roomPassword.min, origin: 'string', inclusive: true, input: ctx.value, message: `房間密碼至少 ${roomPassword.min} 個字（本站的上限）。` })
+      }
+    })
     .refine(within(roomPassword.max as number), { error: `房間密碼最多 ${roomPassword.max} 個字（本站的上限）。` }),
 })
 export type FormTeamInput = z.input<typeof FormTeamSchema>

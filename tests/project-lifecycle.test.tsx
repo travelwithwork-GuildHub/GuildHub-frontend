@@ -176,7 +176,11 @@ describe('成軍：密碼由前端守上限，成功後詳情呈現回應', () =
     await submitForm()
     expect(formTeamCalls()).toHaveLength(0)
     expect(passwordField().getAttribute('aria-invalid')).toBe('true')
-    // emoji：4 個 code point（8 個 UTF-16 code unit）、64 個 —— 都要送得出（以 code point 計）
+    // emoji：3 個 code point（6 個 UTF-16 code unit）送出才紅、不送；4 個、64 個 —— 都要送得出（以 code point 計）
+    await type(passwordField(), '😀'.repeat(3))
+    await submitForm()
+    expect(formTeamCalls(), '3 個 emoji（6 個 code unit）被當成夠長送出了').toHaveLength(0)
+    expect(passwordField().getAttribute('aria-invalid')).toBe('true')
     server.replyFor(`/api/projects/${P.id}/form-team`, 500, { detail: '壞了' })
     await type(passwordField(), '😀'.repeat(4))
     await submitForm()
@@ -243,10 +247,12 @@ describe('成軍：密碼由前端守上限，成功後詳情呈現回應', () =
     await waitFor(() => expect(within(detail()).getByRole('alert').textContent).toContain(VOCABULARY['permission-denied']))
     expect(within(detail()).getByRole('alert').textContent).not.toContain('只有發起人可以做這件事')
 
-    // 壓著不回：連按兩次只送一次；返回、Escape、面板關閉都被擋
+    // 壓著不回：連按兩次只送一次；返回、Escape、面板關閉都被擋 —— **送出的同一個 tick 內**就按返回（不等任何更新；effect 通知會有一格空窗，審查抓到）
     const held = gate()
     server.replyFor(`/api/projects/${P.id}/form-team`, 200, { ...P, status: 'active' }, { after: held.promise })
-    await submitForm()
+    ;(screen.getByTestId('form-team-form') as HTMLFormElement).requestSubmit()
+    fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
+    expect(screen.queryByTestId('project-detail'), '送出的同一個 tick 內按返回把詳情關掉了').not.toBeNull()
     await submitForm()
     await waitFor(() => expect(formTeamCalls()).toHaveLength(3))
     fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
@@ -266,7 +272,7 @@ describe('結案要確認；成功後沒有動作', () => {
     const listBefore = listGets().length
     click(btn('結案'))
     const dialog = screen.getByRole('alertdialog')
-    expect(dialog.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement, '焦點要在安全的「取消」上，不是「確定結案」').toBe(within(dialog).getByRole('button', { name: '取消' }))
     click(within(dialog).getByRole('button', { name: '取消' }))
     expect(closeCalls(A.id)).toHaveLength(0)
     await waitFor(() => expect(document.activeElement).toBe(btn('結案')))
@@ -280,7 +286,10 @@ describe('結案要確認；成功後沒有動作', () => {
     const held = gate()
     server.replyFor(`/api/projects/${A.id}/close`, 200, { ...A, status: 'closed' }, { after: held.promise })
     click(btn('結案'))
-    click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '確定結案' }))
+    // 同一個 tick：確定 → 立刻按返回（不等更新）
+    within(screen.getByRole('alertdialog')).getByRole('button', { name: '確定結案' }).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    within(detail()).getByRole('button', { name: '返回' }).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(screen.queryByTestId('project-detail'), '結案送出的同一個 tick 內按返回把詳情關掉了').not.toBeNull()
     click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '確定結案' }))
     escape()
     fireEvent.click(within(detail()).getByRole('button', { name: '返回' }))
