@@ -1,12 +1,12 @@
 # 0012. 名字牌：第三個「render loop → DOM」的消費者；角色自己寫牌子的位置，投影只用既有的 `screenPixelFor`、不抽通用元件
 
-- **Status**: Proposed（`spec/fe-w08-name-tag`；實作合併後改 Accepted）
+- **Status**: Accepted
 - **Date**: 2026-09-19
-- **Deciders**: 寫 `FE-W08` 名字牌規格的那個 session；兩位外部審查（規格 PR）
-- **邊界狀態**: 僅約定
-- **證據**: openspec/changes/fe-w08-name-tag/design.md:12、src/world/rooms/labelProjection.ts:49
+- **Deciders**: 寫 `FE-W08` 名字牌規格的那個 session；兩位外部審查（規格 PR #522 三輪、實作 PR）
+- **邊界狀態**: 已強制
+- **證據**: tests/name-tags.test.tsx:109、tests/name-tags.test.tsx:183、tests/e2e/name-tags.mjs:107、src/world/player/RemotePlayer.tsx:102、src/world/NameTags.tsx:27
 
-> `邊界狀態` 與 `證據` 兩欄由 `bash .github/scripts/arch-view.sh` 讀。實作合併時改成 `已強制`，證據換成 `tests/name-tags.test.tsx` 與 `tests/e2e/name-tags.mjs`。
+> `邊界狀態` 與 `證據` 兩欄由 `bash .github/scripts/arch-view.sh` 讀。
 
 ## 背景
 
@@ -46,7 +46,7 @@ ADR 0010 記了「render loop 直接寫 Canvas 外面的 DOM」這條路（門�
 
 - `RemotePlayer` 多一個 DOM 依賴（`tagNodesRef`）；單獨測它時要給一個空 Map。
 - 三個消費者兩種形狀 —— 下一個人看到門標籤的做法去找「名字牌的投影器」會找不到；設計文件與這份 ADR 是唯一的路標。
-- 40 個牌子每幀 40 次 `transform` 寫入：比前兩個消費者多一個量級；`render-budget.mjs` 量過再決定要不要先判 `inside` 再寫。
+- 40 個牌子每幀 40 次 `transform` 寫入：比前兩個消費者多一個量級。**量過**（2026-09-19，`render-budget.mjs` N=40、真後端、swiftshader）：main 19.8 FPS／p99 66.8 ms，這一片 19.7 FPS／p99 66.7 ms —— 在雜訊內；不先判 `inside` 再寫（已經是：`inside` 為 false 只寫 `visibility`）。
 
 ## 什麼情況下要重新考慮
 
