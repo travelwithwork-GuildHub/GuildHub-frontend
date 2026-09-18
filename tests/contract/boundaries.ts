@@ -53,6 +53,13 @@ export const BOUNDARY_CASES = {
   skillCount: { pending: 'FE-J01 有 POST /api/projects 了，但後端 text[] 沒有 check，沒有邊界可成對' },
   skillLength: { pending: 'FE-J01 有 POST /api/projects 了，但後端 text[] 沒有 check，沒有邊界可成對' },
   chatBody: { pending: 'WS 的 chat.body 只驗是字串、沒有上限（FE-R11 design D5；BE-G16 未解），不走 REST 這張表' },
+  // FE-J14：後端 BE-G12 已經有這四個端點（DB check → 500），但**前端還沒有**
+  // POST /api/projects/{id}/resources ——`--local-resources` 那一片才做。
+  // 在那之前給 via 會對 internal 目標紅，而那個紅是「還沒做」不是「壞了」。
+  resourceLabel: { pending: 'FE-J14 --local-resources：POST /api/projects/{id}/resources（DB check → 500）；body 還要 type 與 url，這張表的 POST 還不支援額外欄位' },
+  resourceUrl: { pending: 'FE-J14 --local-resources：同上；另外 url 的塑形要保長度（不能用 boundaryValues 的原值填字），design 另有規定' },
+  // 這一條**永遠是 pending**：它是數量不是長度，`boundaryValues()` 產不出「第 51 筆」這種值。
+  resourcesPerProject: { pending: 'FE-J14：是數量不是長度（滿 50 回 409），成對邊界由 S32 的並行測試直接驗，不走這張表' },
 } satisfies Record<keyof typeof LIMITS, BoundaryCase>
 
 export type Field = keyof typeof BOUNDARY_CASES

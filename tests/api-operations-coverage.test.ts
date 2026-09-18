@@ -31,8 +31,8 @@ describe('每一個 operation 都走一次真實路徑', () => {
     expect(exported.filter((name) => !covered.includes(name)), '有操作沒被這個檔案涵蓋').toEqual([])
   })
 
-  it.each(CASES)('%s', async (_name, invoke, reply, method, pathname) => {
-    server.reply(200, reply)
+  it.each(CASES)('%s', async (_name, invoke, reply, method, pathname, status) => {
+    server.reply(status ?? 200, reply)
     await invoke()
 
     expect(server.calls).toHaveLength(1)

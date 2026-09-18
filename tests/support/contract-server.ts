@@ -26,6 +26,8 @@ const REQUEST_SCHEMAS: Record<string, z.ZodType> = {
   'POST /api/projects/{project_id}/enter': contract.EnterIn,
   'POST /api/projects/{project_id}/seats': contract.SeatClaim,
   'POST /api/messages': contract.MessageCreate,
+  'POST /api/projects/{project_id}/resources': contract.ProjectResourceCreate,
+  'PATCH /api/projects/{project_id}/resources/{resource_id}': contract.ProjectResourceUpdate,
 }
 
 /** 把實際路徑還原成樣板：`/api/projects/abc/seats` → `/api/projects/{project_id}/seats`。 */

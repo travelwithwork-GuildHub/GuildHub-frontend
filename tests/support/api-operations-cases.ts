@@ -48,7 +48,21 @@ const MESSAGE = {
 }
 
 /** 每一個操作：怎麼呼叫、server 要回什麼、預期的 method 與路徑。 */
-export const CASES: Array<[string, () => Promise<unknown>, unknown, string, string]> = [
+const RESOURCE = {
+  id: '22222222-2222-4222-8222-222222222222',
+  project_id: UUID,
+  label: 'Repo',
+  type: 'github',
+  url: 'https://github.com/o/r',
+  created_at: '2026-09-17T06:00:00Z',
+}
+
+/**
+ * 第六個欄位是**回應的 status**，省略就是 200。
+ * `DELETE` 回 204 且沒有 body —— 用 200 帶一份 body 代跑的話，
+ * `transport.ts` 那條「204 不去 `json()`」的分支永遠不會被走到。
+ */
+export const CASES: Array<[string, () => Promise<unknown>, unknown, string, string, number?]> = [
   ['login', () => ops.login({ nickname: '阿福' }), PROFILE, 'POST', '/api/login'],
   ['register', () => ops.register({ login_id: 'alice', password: 'correct horse', nickname: '愛麗絲' }), PROFILE, 'POST', '/api/register'],
   // ⚠️ 這一列曾經寫成 `/api/profiles/me`，跟被測的程式碼**抄了同一個錯誤** ——
@@ -98,4 +112,33 @@ export const CASES: Array<[string, () => Promise<unknown>, unknown, string, stri
     '/api/messages',
   ],
   ['listRooms', () => ops.listRooms(), [{ project_id: UUID, title: 'x', online_count: 0 }], 'GET', '/api/rooms'],
+  [
+    'listResources',
+    () => ops.listResources(UUID),
+    [RESOURCE],
+    'GET',
+    `/api/projects/${UUID}/resources`,
+  ],
+  [
+    'createResource',
+    () => ops.createResource(UUID, { label: 'Repo', type: 'github', url: 'https://github.com/o/r' }),
+    RESOURCE,
+    'POST',
+    `/api/projects/${UUID}/resources`,
+  ],
+  [
+    'updateResource',
+    () => ops.updateResource(UUID, RESOURCE.id, { label: '改過的名字' }),
+    RESOURCE,
+    'PATCH',
+    `/api/projects/${UUID}/resources/${RESOURCE.id}`,
+  ],
+  [
+    'deleteResource',
+    () => ops.deleteResource(UUID, RESOURCE.id),
+    null,
+    'DELETE',
+    `/api/projects/${UUID}/resources/${RESOURCE.id}`,
+    204,
+  ],
 ]

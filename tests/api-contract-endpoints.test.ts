@@ -28,10 +28,15 @@ function generatedOperations(): Array<[string, string]> {
   return found
 }
 
-/** `/api/projects/{project_id}/seats` → 比得上 `/api/projects/<uuid>/seats` 的 regex。 */
-function asMatcher(template: string): RegExp {
-  const escaped = template.replace(/[.*+?^${}()|[\]\]/g, '\$&').replace(/\\{[a-z_]+\\}/g, '[^/]+')
-  return new RegExp(`^${escaped}$`)
+/** `/api/projects/{project_id}/seats` 這種樣板，比不比得上一個真的路徑。 */
+function matchesTemplate(template: string, pathname: string): boolean {
+  const wanted = template.split('/')
+  const got = pathname.split('/')
+  if (wanted.length !== got.length) return false
+  // 樣板段（`{project_id}`）吃掉任何非空的一段；其餘要逐字相同。
+  return wanted.every((seg, n) =>
+    seg.startsWith('{') && seg.endsWith('}') ? (got[n] ?? '').length > 0 : seg === got[n],
+  )
 }
 
 const RESOURCE_OPERATIONS: Array<[string, string]> = [
@@ -57,9 +62,8 @@ describe('契約的範圍等於後端的端點集合', () => {
     // 每一個資料存取操作送出的 method 與路徑，都要落在這 21 組裡。
     // `DELETE` 也算 —— 只認 `transport.ts` 的 `METHODS` 的話，新加的 method
     // 會在這裡靜靜地被跳過。
-    const matchers = api.map(([method, template]) => [method, asMatcher(template)] as const)
     for (const [name, , , method, pathname] of CASES) {
-      const hit = matchers.some(([m, re]) => m === method && re.test(pathname))
+      const hit = api.some(([m, template]) => m === method && matchesTemplate(template, pathname))
       expect(hit, `${name}：${method} ${pathname} 不在產出型別檔的 21 組裡`).toBe(true)
     }
   })

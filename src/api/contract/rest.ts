@@ -3,8 +3,10 @@ import { LIMITS } from './limits'
 
 // REST 契約。規格 FE-O01「資料形狀只有一份定義」。
 //
-// **範圍是真後端今天存在的 16 個 `/api/*` 端點**，那組端點已凍結
-// （`API-前端整合指南.md` §5，後端 `tests/test_contract.py` 鎖住）。
+// **範圍是真後端今天存在的 21 個 `/api/*` 端點**：原本凍結的 16 個
+// （`API-前端整合指南.md` §5，後端 `tests/test_contract.py` 鎖住）、
+// 2026-09-08 L3 裁決加的 `POST /api/register`（原文寫 16 時漏了它），
+// 以及 `BE-G12` 的專案資源四個。
 // Role / Application / Invitation / Offer 後端沒有（`BE-G10`），
 // 刻意不出現在這裡 —— 它們由各自的工作項目在自己那一週加進來。
 //
@@ -202,6 +204,63 @@ export const MessageOut = z.object({
   read_at: datetime.nullable(),
 })
 
+// ---------------------------------------------------------------- 專案資源
+
+/**
+ * `project_resources.type`。**封閉集合，V1 沒有 `other`** ——
+ * 未分類的連結會讓前端的圖示推導失去意義（後端 `models.py::ResourceType` 的理由）。
+ *
+ * 跟 `ProjectStatus` 一樣鏡像資料庫的 check：留給資料庫的話，打錯一個字是 500 不是 422。
+ */
+export const ResourceType = z.enum(['github', 'figma', 'notion', 'drive', 'meeting'])
+
+/**
+ * `POST /api/projects/{project_id}/resources`。
+ *
+ * ⚠️ 長度是**資料庫的 check**，應用層刻意不重複驗（後端 `[P15]`）——
+ * 也就是說超長在後端是 **500 不是 422**，所以前端非擋不可。數字從 `LIMITS` 來。
+ *
+ * ⚠️ 另外兩條 check（`btrim(label) <> ''`、`url ~* '^https?://…'`）**不寫在這裡**：
+ * 它們不是長度，而網址要送**原字串**（不正規化、不 trim），前端擋的是
+ * 「`safeHref` 不過」或「含空白」—— 那是表單層的事（`project-resources` 的 `S11`／`S13`）。
+ * 契約多擋一層的話，後端收得下的網址會在前端被拒，而使用者只看到「打不進去」。
+ */
+export const ProjectResourceCreate = z.object({
+  label: z.string().min(LIMITS.resourceLabel.min).max(LIMITS.resourceLabel.max),
+  type: ResourceType,
+  url: z.string().min(LIMITS.resourceUrl.min).max(LIMITS.resourceUrl.max),
+})
+
+/**
+ * `PATCH /api/projects/{project_id}/resources/{resource_id}`。
+ *
+ * ⚠️⚠️ **三個欄位都用 `.optional()`，不准用 `.nullable()`。**
+ * 後端三欄在資料庫都是 NOT NULL、Pydantic 的型別是 `str`（預設值 `None` 只代表
+ * 「這次沒給」，由 `model_fields_set` 分辨），所以明確送 `{"label": null}` 是 422。
+ * 寫成 `.nullable()` 的話 `drift.ts` 的雙向相等會紅 —— 而**放寬那條斷言來遷就它是禁止的**。
+ */
+export const ProjectResourceUpdate = z.object({
+  label: z.string().min(LIMITS.resourceLabel.min).max(LIMITS.resourceLabel.max).optional(),
+  type: ResourceType.optional(),
+  url: z.string().min(LIMITS.resourceUrl.min).max(LIMITS.resourceUrl.max).optional(),
+})
+
+/**
+ * 資源的輸出。**沒有 `updated_at`** —— 後端那張表只有 `created_at`
+ * （`sql/001_schema.sql:94`～`103`），清單固定以 `(created_at, id)` 排序。
+ *
+ * 回來的資料**不加長度限制**（檔頭那條規則）：它已經過了後端的 check，
+ * 前端再擋一次只會在後端改上限的那天讓整個面板掛掉。
+ */
+export const ProjectResourceOut = z.object({
+  id: uuid,
+  project_id: uuid,
+  label: z.string(),
+  type: ResourceType,
+  url: z.string(),
+  created_at: datetime,
+})
+
 // ---------------------------------------------------------------- 走廊門位
 
 /** ⚠️ `online_count` 只在 REST 回應裡，**不會自己更新** —— 要自行輪詢。 */
@@ -228,3 +287,7 @@ export type SeatOut = z.infer<typeof SeatOut>
 export type MessageCreate = z.infer<typeof MessageCreate>
 export type MessageOut = z.infer<typeof MessageOut>
 export type RoomDoorOut = z.infer<typeof RoomDoorOut>
+export type ResourceType = z.infer<typeof ResourceType>
+export type ProjectResourceCreate = z.infer<typeof ProjectResourceCreate>
+export type ProjectResourceUpdate = z.infer<typeof ProjectResourceUpdate>
+export type ProjectResourceOut = z.infer<typeof ProjectResourceOut>

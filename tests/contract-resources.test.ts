@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ProjectResourceCreate, ProjectResourceOut, ProjectResourceUpdate } from '@/api/contract/rest'
-import { LIMITS, LIMIT_SOURCES } from '@/api/contract/limits'
+import { LIMIT_SOURCES } from '@/api/contract/limits'
 
 // 規格：openspec/changes/fe-j14-project-resources/specs/api-contract/spec.md
 //   Requirement: 資料形狀只有一份定義 —— Scenario FE-J14-S25
@@ -60,16 +60,19 @@ describe('專案資源的契約形狀', () => {
 
 describe('專案資源的長度邊界', () => {
   it('[FE-J14-S27] 資源名稱與網址的邊界成對，且有出處', () => {
-    const labelMax = LIMITS.resourceLabel.max as number
-    const urlMax = LIMITS.resourceUrl.max as number
+    // ⚠️⚠️ **數字寫死，不從 `LIMITS` 讀。**
+    // 讀 `LIMITS.resourceUrl.max` 的話，把它改成 2000 之後這條測試的期望值
+    // 跟著變成 2000／2001，然後**照樣是綠的** —— 那是恆真，不是判準
+    //（`contract-limits.test.ts` 的 S03 同樣寫死 20／21，理由一樣）。
+    // 這裡的 2048 是**規格的字面**（Scenario S27），不是從程式抄的。
 
     // emoji 一個算一個 code point，不是 UTF-16 的兩個。
-    expect(ProjectResourceCreate.safeParse({ ...create, label: '😀'.repeat(labelMax) }).success, `${labelMax} 個 emoji 應該通過`).toBe(true)
-    expect(ProjectResourceCreate.safeParse({ ...create, label: '字'.repeat(labelMax + 1) }).success, `${labelMax + 1} 個字應該失敗`).toBe(false)
+    expect(ProjectResourceCreate.safeParse({ ...create, label: '😀'.repeat(100) }).success, '100 個 emoji 應該通過').toBe(true)
+    expect(ProjectResourceCreate.safeParse({ ...create, label: '字'.repeat(101) }).success, '101 個字應該失敗').toBe(false)
     expect(ProjectResourceCreate.safeParse({ ...create, label: '' }).success, '空字串應該失敗').toBe(false)
 
-    expect(ProjectResourceCreate.safeParse({ ...create, url: urlOfLength(urlMax) }).success, `${urlMax} 個字的網址應該通過`).toBe(true)
-    expect(ProjectResourceCreate.safeParse({ ...create, url: urlOfLength(urlMax + 1) }).success, `${urlMax + 1} 個字的網址應該失敗`).toBe(false)
+    expect(ProjectResourceCreate.safeParse({ ...create, url: urlOfLength(2048) }).success, '2048 個字的網址應該通過').toBe(true)
+    expect(ProjectResourceCreate.safeParse({ ...create, url: urlOfLength(2049) }).success, '2049 個字的網址應該失敗').toBe(false)
 
     // 出處：兩筆都要指向後端的 `sql/001_schema.sql`，而且是**行號**，不是散文。
     for (const key of ['resourceLabel', 'resourceUrl'] as const) {
