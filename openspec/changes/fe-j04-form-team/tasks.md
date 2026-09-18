@@ -38,11 +38,11 @@
 
 - [x] 3b.1 `tests/project-password-reveal.test.tsx`：`S05`／`S06`（`vi.mock('@/identity/clipboard')` 控制成功／失敗；`S05` 第二次複製用「壓著不回」抓「先說已複製再改回」、`S06` 進對話驗輸入框是空的）、`S08`（掛載前攔 `setItem`／cookie setter／`pushState`／`replaceState`，原文與 encoded 都掃；密碼含空白與 `#` 讓 encoded 長得不一樣；流程含「寄給隊員」→ 關收件匣 → 重開看板與詳情）；先 commit 紅（3 條全紅）
 - [x] 3b.2 `OwnerActions`：`revealed` state、密碼區塊（`room-password-reveal`、一次性提示）、「複製密碼」（`ClipboardPort`）、「寄給隊員」（草稿進剪貼簿成功才 `onSendToTeam`）；`BoardPanel`：`onSendToTeam` = `closePanel()` ＋ `inbox?.openList(null)`
-- [x] 3b.3 **突變**：密碼寫進 sessionStorage 之後刪掉 → `S08` 紅；剪貼簿失敗也開收件匣 → `S06` 紅；複製失敗也說已複製 → `S05` 紅；返回重開還呈現密碼 → `S05`／`S08` 紅；另加：密碼 encoded 進網址 → `S08` 紅（encoded 那條抓的）、「寄給隊員」開的是對話 → `S06` 紅（6／6）
+- [x] 3b.3 **突變**：密碼寫進 sessionStorage 之後刪掉 → `S08` 紅；剪貼簿失敗也開收件匣 → `S06` 紅；複製失敗也說已複製 → `S05` 紅；返回重開還呈現密碼 → `S05`／`S08` 紅；另加：密碼 encoded 進網址 → `S08` 紅（encoded 那條抓的）、「寄給隊員」開的是對話 → `S06` 紅（6／6）；審查後再加：拿掉複製／寄給隊員共用的同步 guard → `S05`／`S06` 紅（7／7）
 - [x] 3b.4 `tests/e2e/form-team.mjs`：`S09`（發案 → 成軍 → 複製 → 門長出來且 rooms 請求數增加 → 深連結回詳情 → 結案 → 門消失）；對 `next start`＋internal 跑綠（13 ✅）
 
 ## 4. 收尾
 
-- [ ] 4.1 `ui-ux-pro-max` pre-delivery（密碼欄、確認層、一次性提示）；`pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm exec tsc --noEmit`、`pnpm test`；`bash .github/scripts/pr-size.sh`
-- [ ] 4.2 量 client JS 前後差貼 PR；合併後 `vercel deploy --prod`；閘道單次人工 smoke（只走不壓）
-- [ ] 4.3 `archive/fe-j04-form-team`：`openspec validate --archived --strict` 與 `--all --strict`；Sheet `FE-J04` Done
+- [x] 4.1 `ui-ux-pro-max` pre-delivery（密碼欄、確認層、一次性提示：狀態用 `role="status"`／`role="alert"` 回報、寫入中 `aria-disabled` 不丟焦點、密碼與草稿 `select-all` 可手動選取、按鈕走 `@/design/controls`）；每片都跑 `pnpm exec eslint --ignore-pattern '.claude/worktrees/**' .`、`pnpm exec tsc --noEmit`、`pnpm test`（合併後在 main 再跑一次：全綠）；`bash .github/scripts/pr-size.sh` 每片 ≤250／≤800（`--reveal` 117／437）
+- [x] 4.2 量 client JS 前後差貼 PR（`--rooms`／`--backend` 無可量的差；`--actions` 全部 chunk gz 1292.6 → ~1294 KB；`--close` +~1 KB；`--reveal` 含 `OwnerActions` 的 chunk 163,149 → 163,853 B gz，+704 B）；沒有新套件、沒有新請求；每片合併後 `vercel deploy --prod` READY（最後 #511）；閘道單次人工 smoke（只走不壓）：`/login` 200
+- [x] 4.3 `archive/fe-j04-form-team`：`openspec validate --archived --strict` 與 `--all --strict`；Sheet `FE-J04` Done
