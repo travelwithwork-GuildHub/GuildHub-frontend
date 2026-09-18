@@ -36,8 +36,9 @@ export const failureCount = () => failures
  * 假的即時後端。每一條連線記一筆 `{ scene, token }`（順序就是建立的順序），回 `hello` ＋ 只有自己的 `snapshot`，讓連線走到 `ready`。
  * `refuse(scene)` 回 true 的連線在 open 之前就關掉（握手被拒：客戶端看到 `opened=false`）。
  * `others(scene)` 回這個場景的 snapshot 裡除了自己以外的人（協定的 player：`x`／`y` 是像素）；預設沒有別人。
+ * `holdSnapshot(scene)` 回 true 的連線只送 `hello`、不送 snapshot（連線開著、名單永遠不到）—— 驗「新場景的名單還沒到之前，舊場景的東西已經卸載」用。
  */
-export function fakeRealtime(context, sockets, { refuse = () => false, others = () => [] } = {}) {
+export function fakeRealtime(context, sockets, { refuse = () => false, others = () => [], holdSnapshot = () => false } = {}) {
   return context.routeWebSocket(/\/ws(\?|$)/, async (ws) => {
     const url = new URL(ws.url())
     const scene = url.searchParams.get('scene')
@@ -51,6 +52,7 @@ export function fakeRealtime(context, sockets, { refuse = () => false, others = 
     }
     const you = `self-${sockets.length}`
     ws.send(JSON.stringify({ t: 'hello', you, hz: 10 }))
+    if (holdSnapshot(scene)) return
     ws.send(JSON.stringify({ t: 'snapshot', players: [{ id: you, name: '訪客', av: 0, x: 0, y: 0, f: 0, st: 'idle' }, ...others(scene)] }))
   })
 }
