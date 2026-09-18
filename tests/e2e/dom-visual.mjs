@@ -34,26 +34,27 @@ const openProfile = async (page) => { await world(page); await page.click('[data
 const openInboxList = async (page) => { await world(page); await page.click('[data-testid="inbox-button"]'); await page.waitForSelector('[data-testid="inbox-thread-item"]') }
 /** 一個表面：怎麼到、根節點是哪個、要不要登入。 */
 const SURFACES = [
-  { name: '/login', guest: true, root: 'body', open: (page) => page.goto(`${FRONTEND}/login`).then(() => page.waitForSelector('form')) },
+  { name: '/login', guest: true, root: 'body', levels: ['display', 'body', 'caption'], open: (page) => page.goto(`${FRONTEND}/login`).then(() => page.waitForSelector('form')) },
   // S04 的 `role="alert"` 要真的量到一個：空名字送出，`SubmitError` 出現（`FE-A01-S02`）
   { name: '/login（送出失敗）', guest: true, root: 'body', open: async (page) => { await page.goto(`${FRONTEND}/login`); await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]'); await page.waitForSelector('[data-testid="submit-error"]') } },
   {
     name: '金鑰交接', guest: true, root: 'section[aria-labelledby="key-heading"]',
     open: async (page) => { await page.goto(`${FRONTEND}/login`); await page.fill('form[aria-labelledby="nickname-heading"] input', '新來的'); await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]'); await page.waitForSelector('[data-testid="recovery-key"]') },
   },
-  { name: '訪客提示', guest: true, root: '[data-testid="first-entry-notice"]', open: (page) => page.goto(`${FRONTEND}/world`).then(() => waitForWorld(page)).then(() => page.waitForSelector('[data-testid="first-entry-notice"]')) },
-  { name: '看板清單', root: '[data-testid="list-panel"]', open: async (page) => { await world(page, '?panel=projects'); await page.waitForSelector('[data-testid="project-card"]') } },
-  { name: '看板詳情', root: '[data-testid="list-panel"]', open: async (page) => { await world(page, `?panel=projects&project=${PROJECTS[0].id}`); await page.waitForSelector('[data-testid="project-detail"][data-phase="ready"]') } },
+  { name: '訪客提示', guest: true, root: '[data-testid="first-entry-notice"]', levels: ['title', 'body'], open: (page) => page.goto(`${FRONTEND}/world`).then(() => waitForWorld(page)).then(() => page.waitForSelector('[data-testid="first-entry-notice"]')) },
+  // 規格的「看板清單／詳情」是案件與人才兩種（名詞表）：兩邊必備的層級相同
+  { name: '看板清單', root: '[data-testid="list-panel"]', levels: ['title', 'heading', 'body', 'caption'], open: async (page) => { await world(page, '?panel=projects'); await page.waitForSelector('[data-testid="project-card"]') } },
+  { name: '看板詳情', root: '[data-testid="list-panel"]', levels: ['title', 'body', 'caption'], open: async (page) => { await world(page, `?panel=projects&project=${PROJECTS[0].id}`); await page.waitForSelector('[data-testid="project-detail"][data-phase="ready"]') } },
   { name: 'owner 案件詳情（招募中）', root: '[data-testid="list-panel"]', open: async (page) => { await world(page, `?panel=projects&project=${MINE_RECRUITING.id}`); await page.waitForSelector('[data-testid="owner-actions-body"]') } },
   {
     name: '結案確認', root: '[data-testid="close-project-confirm"]',
     open: async (page) => { await world(page, `?panel=projects&project=${MINE_ACTIVE.id}`); await page.click('[data-testid="owner-actions-body"] >> text=結案'); await page.waitForSelector('[data-testid="close-project-confirm"]') },
   },
-  { name: '人才清單', root: '[data-testid="list-panel"]', open: async (page) => { await world(page, '?panel=profiles'); await page.waitForSelector('[data-testid="talent-card"]') } },
-  { name: '人才詳情', root: '[data-testid="list-panel"]', open: async (page) => { await world(page, `?panel=profiles&profile=${OTHER.id}`); await page.waitForSelector('[data-testid="talent-detail"][data-phase="ready"]') } },
+  { name: '人才清單', root: '[data-testid="list-panel"]', levels: ['title', 'heading', 'body', 'caption'], open: async (page) => { await world(page, '?panel=profiles'); await page.waitForSelector('[data-testid="talent-card"]') } },
+  { name: '人才詳情', root: '[data-testid="list-panel"]', levels: ['title', 'body', 'caption'], open: async (page) => { await world(page, `?panel=profiles&profile=${OTHER.id}`); await page.waitForSelector('[data-testid="talent-detail"][data-phase="ready"]') } },
   { name: '收件匣清單', root: '[data-testid="inbox-panel"]', open: openInboxList },
-  { name: '收件匣對話', root: '[data-testid="inbox-panel"]', open: async (page) => { await openInboxList(page); await page.click('[data-testid="inbox-thread-item"]'); await page.waitForSelector('[data-testid="inbox-message"]') } },
-  { name: '我的名片', root: '[data-testid="profile-panel"]', open: openProfile },
+  { name: '收件匣對話', root: '[data-testid="inbox-panel"]', levels: ['title', 'body', 'caption'], open: async (page) => { await openInboxList(page); await page.click('[data-testid="inbox-thread-item"]'); await page.waitForSelector('[data-testid="inbox-message"]') } },
+  { name: '我的名片', root: '[data-testid="profile-panel"]', levels: ['title', 'body'], open: openProfile },
   { name: '我的名片（編輯）', root: '[data-testid="profile-panel"]', open: async (page) => { await openProfile(page); await page.click('[data-testid="profile-panel"] >> text=編輯'); await page.waitForSelector('[data-testid="profile-form"]') } },
   {
     name: '放棄修改確認', root: '[data-testid="profile-discard-confirm"]',
@@ -134,10 +135,17 @@ const install = (page) =>
           while (stack.length > 0) { const f = stack.pop(); bg = [...[0, 1, 2].map((i) => f[i] * f[3] + bg[i] * (1 - f[3])), 1] }
           return bg
         }
-        return [...document.querySelector(root).querySelectorAll('[data-text], p, [role="alert"]')].filter(visible).map((el) => {
+        // 量的集合：每個 [data-text]／p／alert 本身，加上它們底下**自己帶文字節點**的每一個後代（審查：alert 裡一個換了顏色的 span 不能靠外層過關）。
+        // 後代的層級跟著最近的 p／[data-text] 祖先；文字空白的 alert 不算「量到 alert」。
+        const hasText = (el) => [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim() !== '')
+        const levelOf = (el) => { const o = el.closest('[data-text], p'); return o === null ? null : (o.getAttribute('data-text') ?? (o.tagName === 'P' ? 'body' : null)) }
+        const owners = [...document.querySelector(root).querySelectorAll('[data-text], p, [role="alert"]')].filter(visible)
+        const els = new Set(owners)
+        for (const o of owners) for (const d of o.querySelectorAll('*')) if (visible(d) && hasText(d)) els.add(d)
+        return [...els].map((el) => {
           const cs = getComputedStyle(el)
           return {
-            level: el.getAttribute('data-text') ?? (el.tagName === 'P' ? 'body' : null), alert: el.closest('[role="alert"]') !== null, label: label(el),
+            level: levelOf(el), alert: el.closest('[role="alert"]') !== null && hasText(el), label: label(el),
             size: parseFloat(cs.fontSize), leading: parseFloat(cs.lineHeight) / parseFloat(cs.fontSize), raw: cs.color, text: rgba(cs.color), bg: composite(el),
           }
         })
@@ -152,12 +160,8 @@ const same = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-6)
 const ms = (s) => s.split(',').map((x) => (x.trim().endsWith('ms') ? parseFloat(x) : parseFloat(x) * 1000))
 const TC = ['Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC']
 
-// S03：五級由大到小；`body` 對 `caption` 是 ≥，其餘是 >。規格點名的六個表面各自必備的層級（少一個就紅，不是「有的都對」）。
+// S03：五級由大到小；`body` 對 `caption` 是 ≥，其餘是 >。必備層級由每個表面自己宣告（`levels`），少一個就紅，不是「有的都對」。
 const LEVELS = ['display', 'title', 'heading', 'body', 'caption']
-const REQUIRED = {
-  '/login': ['display', 'body', 'caption'], 訪客提示: ['title', 'body'], 看板清單: ['title', 'heading', 'body', 'caption'],
-  看板詳情: ['title', 'body', 'caption'], 收件匣對話: ['title', 'body', 'caption'], 我的名片: ['title', 'body'],
-}
 // 場景聊天框是蓋在 canvas 上的 HUD（底 `surface/90`）：CSS 量不到它真正的背景，規格的六個表面也不含它 —— 其餘每個表面都量。
 const NO_TEXT_CHECK = new Set(['場景聊天框'])
 
@@ -204,10 +208,12 @@ async function inspect(page, surface, reduce) {
   if (!NO_TEXT_CHECK.has(surface.name)) {
     const texts = await page.evaluate((root) => window.__dv.text(root), surface.root)
     const at = (level) => texts.filter((t) => t.level === level).map((t) => t.size)
-    const required = REQUIRED[surface.name]
+    const required = surface.levels
     if (required !== undefined) {
       const missing = required.filter((l) => at(l).length === 0)
-      missing.length === 0 ? ok(`[S03] ${surface.name}：必備層級 ${required.join('、')} 都在`) : bad(`[S03] ${surface.name} 少了層級 ${missing.join('、')}`, texts.map((t) => `${t.level ?? 'alert'}「${t.label}」`).join('、') || '一個文字元素都沒有')
+      // 綠的時候也印出每一級被算到的是哪個元素（審查：殼的 h2 被 inert 排除時，要看得出子畫面的 title 是誰在扛）
+      const who = required.map((l) => `${l}「${texts.find((t) => t.level === l)?.label}」`).join('、')
+      missing.length === 0 ? ok(`[S03] ${surface.name}：必備層級都在 —— ${who}`) : bad(`[S03] ${surface.name} 少了層級 ${missing.join('、')}`, texts.map((t) => `${t.level ?? 'alert'}「${t.label}」`).join('、') || '一個文字元素都沒有')
     }
     const present = LEVELS.filter((l) => at(l).length > 0)
     for (let i = 1; i < present.length; i += 1) {
