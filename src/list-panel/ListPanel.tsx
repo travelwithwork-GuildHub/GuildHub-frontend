@@ -49,6 +49,8 @@ export interface ListPanelProps<K extends ListKind> {
    * 只標成 `inert` —— 頁碼與捲動位置才留得住（`FE-B04-S11`／`S12`／`S16`）。
    */
   overlay?: ReactNode | ((slot: ListPanelSlot) => ReactNode)
+  /** 子畫面開著時標題列換成它的標題、前面加返回（`FE-X16-S07`）。沒給就是清單自己的標題、沒有返回。 */
+  subScreen?: { title: string; back: { label: string; onBack: () => void } }
   /** 列表上方的動作（例如「發案」，`FE-J01`）。跟列表一起在內容區，overlay 開著時一樣 `inert`。 */
   toolbar?: ReactNode
   onClose: () => void
@@ -66,6 +68,7 @@ export function ListPanel<K extends ListKind>({
   exhausted,
   error,
   overlay,
+  subScreen,
   toolbar,
   onClose,
   page,
@@ -93,7 +96,8 @@ export function ListPanel<K extends ListKind>({
 
   return (
     <PanelShell
-      title={title}
+      title={overlayOpen && subScreen !== undefined ? subScreen.title : title}
+      back={overlayOpen ? subScreen?.back : undefined}
       closeLabel={labels.close}
       testId="list-panel"
       bodyTestId="list-panel-list"

@@ -127,7 +127,7 @@ async function surfaceChecks(page, name, sel) {
   s.bg[3] === 1 ? ok(`[S05] ${name}：底 alpha = 1`) : bad(`[S05] ${name}：底 alpha ${s.bg[3]}`, JSON.stringify(s.bg))
   const r = s.borderWidth > 0 && s.borderStyle !== 'none' ? contrast(over(s.border, s.page), s.page) : 0
   r >= 3 ? ok(`[S05] ${name}：邊界 ${s.borderWidth}px、對 surface ${r.toFixed(2)}:1`) : bad(`[S05] ${name}：邊界不夠`, `${s.borderStyle} ${s.borderWidth}px、${r.toFixed(2)}:1`)
-  s.shadow !== 'none' && s.shadowAlphas.some((a) => a > 0) ? ok(`[S05] ${name}：有陰影（alpha ${s.shadowAlphas.join('/')}）`) : bad(`[S05] ${name}：沒有陰影`, s.shadow)
+  s.shadow !== 'none' && s.shadowAlphas.some((a) => a > 0) ? ok(`[S05] ${name}：有陰影 ${s.shadow}`) : bad(`[S05] ${name}：沒有陰影`, s.shadow)
 }
 
 /** S06：一個確認視窗／世界上的視窗的遮罩 */
@@ -138,7 +138,8 @@ async function scrimChecks(page, name, scrimSel, coveredSel, inertSels) {
   s.alpha >= 0.3 && s.alpha <= 0.6 ? ok(`[S06] ${name}：遮罩 alpha ${s.alpha.toFixed(2)}`) : bad(`[S06] ${name}：遮罩 alpha ${s.alpha}`, '要在 [0.3, 0.6]')
   s.covers ? ok(`[S06] ${name}：遮罩蓋住被擋的那一層`) : bad(`[S06] ${name}：遮罩沒蓋滿被擋的那一層`)
   s.onTop ? ok(`[S06] ${name}：被擋那一層的中心點上是遮罩（或視窗）`) : bad(`[S06] ${name}：中心點上不是遮罩`)
-  s.inert.every((v) => v === true) ? ok(`[S06] ${name}：被遮的那一層 inert`) : bad(`[S06] ${name}：被遮的那一層不是 inert`, JSON.stringify(s.inert))
+  // 面板的內容區用 `inert` 屬性；世界區（canvas）沒有可聚焦的內容，「被擋」由上一條的中心點命中證明、鍵盤由世界命令鎖擋（`room-entry.mjs` 既有）
+  if (inertSels.length > 0) s.inert.every((v) => v === true) ? ok(`[S06] ${name}：被遮的那一層 inert`) : bad(`[S06] ${name}：被遮的那一層不是 inert`, JSON.stringify(s.inert))
 }
 
 await mkdir(OUT, { recursive: true })

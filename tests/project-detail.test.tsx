@@ -48,7 +48,6 @@ const profile = (id: string, extra: Partial<ProfileOut> = {}): ProfileOut => ({
 })
 const projectPath = (id: string) => `/api/projects/${id}`
 const profilePath = (id: string) => `/api/profiles/${id}`
-const LABELS = { back: '返回' }
 const signedInAs = (id: string) => {
   identity.current = { state: 'signed-in', profile: profile(id, { display_name: '我' }) }
 }
@@ -70,7 +69,7 @@ const detail = () => screen.getByTestId('project-detail')
 const owner = () => within(detail()).getByTestId('owner-card')
 const calls = () => server.calls.map((c) => c.pathname)
 const mount = (id: string, preview: ProjectOut | undefined, extra: Partial<Parameters<typeof ProjectDetail>[0]> = {}) =>
-  render(<ProjectDetail id={id} preview={preview} onBack={() => {}} labels={LABELS} {...extra} />)
+  render(<ProjectDetail id={id} preview={preview} onBack={() => {}} {...extra} />)
 /** 案子與發案者都回 200 並等到兩塊都 ready。 */
 async function mountReady(p: ProjectOut, extra: Partial<Parameters<typeof ProjectDetail>[0]> = {}) {
   server.replyFor(projectPath(p.id), 200, p)
@@ -181,7 +180,7 @@ describe('案子本體一律來自 GET /api/projects/{id}', () => {
     // 時鐘是回應到達的那一刻：之後時間過了、畫面重繪，剩幾天不變（改回 render 時的 Date.now() 這裡要紅）
     const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3 * 86_400_000)
     try {
-      view.rerender(<ProjectDetail id={p.id} preview={undefined} onBack={() => {}} labels={{ back: '返回！' }} />)
+      view.rerender(<ProjectDetail id={p.id} preview={undefined} onBack={() => {}} />)
       expect(within(detail()).getByTestId('project-expires').textContent, '剩幾天跟著 render 的時鐘走了').toContain('剩 2 天')
     } finally {
       spy.mockRestore()
@@ -233,7 +232,7 @@ describe('發案者名片是獨立的載入單元', () => {
     const view = mount(UUID(0), undefined)
     await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
     await waitFor(() => expect(calls()).toContain(profilePath(X)))
-    view.rerender(<ProjectDetail id={UUID(1)} preview={undefined} onBack={() => {}} labels={LABELS} />)
+    view.rerender(<ProjectDetail id={UUID(1)} preview={undefined} onBack={() => {}} />)
     await waitFor(() => expect(within(owner()).queryByTestId('owner-name')?.textContent).toBe('Y 的名字'))
     gateX.release()
     await new Promise((r) => setTimeout(r, 50))

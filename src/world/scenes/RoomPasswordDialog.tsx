@@ -159,6 +159,8 @@ function OpenDialog({ request, title, onClose }: { request: RoomEntryRequest; ti
   }
 
   return (
+    // 世界上的視窗（`FE-X16-S06`）：一層遮罩蓋住世界區（不蓋標題列），視窗置中；底／邊界／陰影／寬度都是 token（`S05`）
+    <div data-testid="world-scrim" style={{ zIndex: layer('modal') }} className="bg-scrim absolute inset-0 flex items-center justify-center p-gutter">
     <div
       ref={root}
       role="dialog"
@@ -168,8 +170,7 @@ function OpenDialog({ request, title, onClose }: { request: RoomEntryRequest; ti
       data-testid="room-password-dialog"
       data-project-id={request.projectId}
       onKeyDown={onKeyDown}
-      style={{ zIndex: layer('modal') }}
-      className="bg-surface-raised border-control-edge text-ink absolute top-1/2 left-1/2 flex w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-gutter rounded border p-gutter"
+      className="bg-surface-raised border-control-edge text-ink shadow-dialog rounded-panel w-dialog flex max-w-full flex-col gap-gutter border p-gutter"
     >
       <h2 id={titleId} {...TITLE}>
         {ROOM_ENTRY_LABELS.title(title)}
@@ -199,6 +200,7 @@ function OpenDialog({ request, title, onClose }: { request: RoomEntryRequest; ti
           </button>
         </div>
       </form>
+    </div>
     </div>
   )
 }

@@ -46,6 +46,10 @@
   --spacing-gutter: 1rem;
   --spacing-section: 2.5rem;
 
+  /* 寬度兩級：阻斷式面板（S07 五個面板同寬）、視窗。都留 2rem 給視窗兩側。 */
+  --container-panel: min(26rem, calc(100vw - 2rem));
+  --container-dialog: min(22rem, calc(100vw - 2rem));
+
   /* 圓角兩級：控制項、面板。 */
   --radius-control: 0.375rem;
   --radius-panel: 0.75rem;

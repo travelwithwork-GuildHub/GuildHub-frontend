@@ -8,6 +8,7 @@ import { CAPTION, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, TITLE, withClass
 import { toUiError } from '@/errors/uiError'
 import { FORM_LIMITS } from '@/forms/limits'
 import { SubmitError } from '@/forms/SubmitError'
+import { PanelDialog } from '@/panel/PanelDialog'
 import { useForm } from '@/forms/useForm'
 import { browserClipboard, type ClipboardPort } from '@/identity/clipboard'
 import { useEscapeLayer } from '@/world/interaction/escapeLayers'
@@ -270,7 +271,8 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
 
 /**
  * 結案的確認層（design D6）：`alertdialog`、焦點在安全的「取消」、Escape ＝ 取消；送出中兩顆都擋（`aria-disabled`：`disabled` 會把焦點丟回 body）、Escape 也擋。
- * **不是 modal**（沒有 `aria-modal`、不圈焦點）：它住在詳情裡，詳情的返回／面板關閉在送出中由呼叫端擋。
+ * 走 `PanelDialog`（`FE-X16-S06`）：遮罩蓋住面板內容區、詳情 inert；沒有 `aria-modal`、不自己圈焦點（殼的 focus trap 已包住它）。
+ * 詳情的返回／面板關閉在送出中由呼叫端擋。
  */
 function CloseConfirm({ busy, error, onConfirm, onCancel }: { busy: boolean; error: string | null; onConfirm: () => void; onCancel: () => void }) {
   const root = useRef<HTMLDivElement>(null)
@@ -280,15 +282,16 @@ function CloseConfirm({ busy, error, onConfirm, onCancel }: { busy: boolean; err
     cancel.current?.focus()
   }, [])
   return (
-    <div
-      ref={root}
-      role="alertdialog"
-      aria-labelledby="close-project-title"
-      aria-describedby="close-project-body"
-      aria-busy={busy}
-      data-testid="close-project-confirm"
-      className="bg-surface-raised border-line flex flex-col gap-gutter rounded border p-gutter"
-    >
+    <PanelDialog>
+      <div
+        ref={root}
+        role="alertdialog"
+        aria-labelledby="close-project-title"
+        aria-describedby="close-project-body"
+        aria-busy={busy}
+        data-testid="close-project-confirm"
+        className="bg-surface-raised border-control-edge shadow-dialog rounded-panel w-dialog flex max-w-full flex-col gap-gutter border p-gutter"
+      >
       <p id="close-project-title" {...TITLE}>
         {OWNER_ACTION_LABELS.closeTitle}
       </p>
@@ -302,6 +305,7 @@ function CloseConfirm({ busy, error, onConfirm, onCancel }: { busy: boolean; err
           {OWNER_ACTION_LABELS.closeConfirm}
         </button>
       </div>
-    </div>
+      </div>
+    </PanelDialog>
   )
 }

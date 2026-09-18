@@ -44,7 +44,9 @@ import type { ListKind } from './paging'
 
 const TITLES: Record<ListKind, string> = { projects: '專案看板', profiles: '人才看板' }
 const LABELS = { next: '下一頁', close: '關閉' }
-const DETAIL_LABELS = { back: '返回' }
+/** 子畫面的標題列（`FE-X16-S07`）：標題換成種類、前面加返回；案子／人的名字留在內容區當條目標題。 */
+const DETAIL_TITLES: Record<ListKind, string> = { projects: '案件', profiles: '人才' }
+const BACK_LABEL = '返回'
 const CREATE_LABEL = '發案'
 const MESSAGE_OWNER_LABEL = '私訊發案者'
 
@@ -86,12 +88,12 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
       empty={<EmptyState kind="first-empty" />}
       exhausted={<EmptyState kind="exhausted" />}
       error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
+      subScreen={{ title: DETAIL_TITLES.profiles, back: { label: BACK_LABEL, onBack: () => selectProfile(null) } }}
       overlay={
         selected === null ? undefined : (
           <TalentDetail
             id={selected}
             preview={preview?.id === selected ? preview : undefined}
-            labels={DETAIL_LABELS}
             onBack={() => selectProfile(null)}
             // 「寄信給他」（`FE-K01`）：關掉這個面板、開收件匣直接進對話。只在已登入、對方不是我、有收件匣 provider 時出現。
             actions={<SendMessageButton to={selected} onBeforeOpen={closePanel} />}
@@ -203,13 +205,14 @@ function ProjectBoard() {
       empty={<EmptyState kind="first-empty" />}
       exhausted={<EmptyState kind="exhausted" />}
       error={({ retry, cause }) => <EmptyState kind="failure" error={toUiError(cause)} retry={retry} />}
+      // 詳情才是子畫面（返回＋換標題）；表單開著時標題列照舊（關閉走 `onClose` 的 dirty 分支）
+      subScreen={selected !== null ? { title: DETAIL_TITLES.projects, back: { label: BACK_LABEL, onBack: () => { if (!actionBusy.current) selectProject(null) } } } : undefined}
       overlay={
         selected !== null
           ? ({ reload }) => (
               <ProjectDetail
                 id={selected}
                 preview={preview?.id === selected ? preview : undefined}
-                labels={DETAIL_LABELS}
                 onBack={() => {
                   if (!actionBusy.current) selectProject(null)
                 }}

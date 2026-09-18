@@ -319,7 +319,7 @@ describe('對話詳情與寄信', SLOW, () => {
     expect(list.slice(0, 2).map((m) => m.dataset.mine)).toEqual(['true', 'false'])
     expect(list[0]?.textContent).toContain('哈囉')
     expect(within(thread).queryByRole('button', { name: '載入更多' }), '對話裡不該有載入更多').toBeNull()
-    click(within(thread).getByRole('button', { name: '返回' }))
+    click(screen.getByRole('button', { name: '返回' }))
     expect(document.activeElement).toBe(items()[0])
     // Escape 回清單也一樣回那一列（審查抓到 Escape 那條路漏了記焦點）。
     click(items()[0]!)
@@ -332,7 +332,7 @@ describe('對話詳情與寄信', SLOW, () => {
     server.replyFor('/api/messages', 200, [msg(A, ME, '10:00', '嗨')])
     click(screen.getByTestId('send-message'))
     await waitFor(() => expect(panel().querySelector('[aria-busy="true"]')).toBeNull())
-    click(within(screen.getByTestId('inbox-thread')).getByRole('button', { name: '返回' }))
+    click(screen.getByRole('button', { name: '返回' }))
     expect(items().some((el) => el.dataset.with === B), '沒寄的空對話出現在清單').toBe(false)
     expect(document.activeElement?.tagName).toBe('H3')
   })
@@ -441,7 +441,7 @@ describe('對話詳情與寄信', SLOW, () => {
     await submit(screen.getByTestId('compose-form'))
     await waitFor(() => expect(screen.getAllByTestId('inbox-message')).toHaveLength(1))
     expect(thread.querySelector('[data-empty-state="first-empty"]')).toBeNull()
-    click(within(thread).getByRole('button', { name: '返回' }))
+    click(screen.getByRole('button', { name: '返回' }))
     expect(items().some((el) => el.dataset.with === A)).toBe(true)
   })
 
