@@ -19,8 +19,8 @@ const PATTERNS: ReadonlyArray<readonly [kind: string, re: RegExp]> = [
   ['字體堆疊', new RegExp(FONT_FAMILY, 'g')],
   // 前面要是行首、空白、引號或 variant 的冒號（帶 `hover:` 前綴的也要抓）；`!`（important）與 `-`（負值）也算（審查抓到）
   ['任意值', new RegExp(`(?:^|[\\s"'\`:])!?-?(?:${ARBITRARY.join('|')})-\\[`, 'g')],
-  // `=` 前後可以有空白（JSX 合法）
-  ['層級標記', new RegExp(`\\b(?:${TIER_ATTR}|${TEXT_ATTR})\\s*=`, 'g')],
+  // `=` 前後可以有空白（JSX 合法）；物件字面鍵（展開、createElement）也算 —— 定義檔是 `controls.ts`，測試那邊放行
+  ['層級標記', new RegExp(`(?:\\b(?:${TIER_ATTR}|${TEXT_ATTR})\\s*=|['"](?:${TIER_ATTR}|${TEXT_ATTR})['"]\\s*:)`, 'g')],
 ]
 
 /** 這一行要求豁免。**冒號後面要有理由**；沒有理由算違規。 */

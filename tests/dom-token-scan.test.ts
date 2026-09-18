@@ -13,6 +13,8 @@ const ROOT = join(import.meta.dirname, '..')
 const SRC = join(ROOT, 'src')
 /** token 定義檔：DOM 的在 `globals.css`（七類）、3D 的在 `design/world.ts`（`FE-W09`）。只有這兩個可以出現字面值。 */
 const TOKEN_FILES = new Set(['src/app/globals.css', 'src/design/world.ts'])
+/** 層級標記的定義檔：只有它可以寫 `data-tier`／`data-text` 的物件鍵；其他類別照抓。 */
+const TIER_DEFINITION = 'src/design/controls.ts'
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = []
@@ -41,7 +43,10 @@ describe('src/** 只從 token 取值', () => {
       if (TOKEN_FILES.has(file)) continue
       const scan = domTokenScan(readFileSync(join(ROOT, file), 'utf8'))
       exemptions += scan.exemptions
-      for (const v of scan.violations) problems.push(`${file}:${v.line} ${v.kind}：${v.text}`)
+      for (const v of scan.violations) {
+        if (file === TIER_DEFINITION && v.kind === '層級標記') continue
+        problems.push(`${file}:${v.line} ${v.kind}：${v.text}`)
+      }
     }
     expect(problems, '字面值或任意值。改用 globals.css 的 token／design/controls 的常數；真的要字面值就在該行加 `dom-token-allow: <理由>` 並調高上限').toEqual([])
     expect(exemptions, `豁免 ${exemptions} 個，超過上限 ${MAX_EXEMPTIONS}`).toBeLessThanOrEqual(MAX_EXEMPTIONS)
@@ -58,6 +63,8 @@ describe('src/** 只從 token 取值', () => {
     // 審查抓到的繞法：JSX 允許 `=` 前後有空白；Tailwind 的 important 與負值前綴
     ['<button data-tier = "primary" />', '層級標記'],
     ['<div className="!bg-[red] -z-[1] hover:text-[blue]" />', '任意值'],
+    ['<button {...{ "data-tier": "primary" }} />', '層級標記'],
+    ["createElement('button', { 'data-text': 'caption' })", '層級標記'],
   ])('[FE-X16-S01] 假輸入被抓：%s', (input, kind) => {
     const scan = domTokenScan(`export const x = 1\n${input}\n`)
     expect(scan.violations.map((v) => v.kind), `沒抓到 ${kind}`).toContain(kind)
