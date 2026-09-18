@@ -99,9 +99,11 @@ describe('密碼只在這一次詳情裡呈現，可複製、可寄給隊員，�
     // 先驗失敗的那一條（看板還開著）：不開收件匣、alert、草稿可選取
     clipboardWrite.mockRejectedValueOnce(new Error('不准'))
     click(btn('寄給隊員'))
-    await waitFor(() => expect(within(detail()).getByTestId('room-password-draft').textContent).toBe(draft()))
+    // 等到「有結果」：不是草稿出現就是收件匣開了 —— 開了就是錯（等錯的那一邊會 timeout，訊息看不出原因）
+    await waitFor(() => expect(screen.queryByTestId('room-password-draft') ?? screen.queryByTestId('inbox-panel')).not.toBeNull())
     expect(screen.queryByTestId('inbox-panel'), '剪貼簿失敗還開了收件匣').toBeNull()
     expect(screen.queryByTestId('list-panel'), '剪貼簿失敗還關了看板').not.toBeNull()
+    expect(within(detail()).getByTestId('room-password-draft').textContent).toBe(draft())
     expect(within(detail()).getAllByRole('alert').length).toBeGreaterThanOrEqual(1)
 
     // 成功：草稿進剪貼簿、看板關、收件匣停在清單、焦點在收件匣
@@ -125,7 +127,8 @@ describe('密碼只在這一次詳情裡呈現，可複製、可寄給隊員，�
   })
 
   it('[FE-J04-S08] 密碼不落地：攔截整段流程的每一次寫入（原文與 encoded）', async () => {
-    const PW = 'sekret-9x7'
+    // 含空白與 `#`：encoded 後長得不一樣，「只擋原文」的尺才分得出來
+    const PW = 'sek ret#9x7'
     const writes: string[] = []
     const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
       writes.push(`${k}=${v}`)
