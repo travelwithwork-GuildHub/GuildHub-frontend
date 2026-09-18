@@ -1,4 +1,4 @@
-// `FE-X16` 的真瀏覽器判準（design D7）：`S02` 字體、`S10` 三級與焦點環／hover、`S11` 高度、`S12` 動態。
+// `FE-X16` 的真瀏覽器判準（design D7）：`S02` 字體、`S03` 五級文字、`S04` 文字對比、`S10` 三級與焦點環／hover、`S11` 高度、`S12` 動態。
 // 規格點名的表面各走一次：`/login`、金鑰交接、訪客提示、標題列、看板清單／詳情（案件與人才；owner 的案件另量）、收件匣清單／對話、
 // 我的名片（看／改）、場景聊天框、結案確認、放棄修改確認、房間密碼（真的走到門前按 E，走位借 `lib/world.mjs` 的里程計）。
 // REST 全部 `page.route` 偽造、只打本機自己起的 `next start`（`lib/world.mjs` 的 loopback 守衛）。
@@ -35,6 +35,8 @@ const openInboxList = async (page) => { await world(page); await page.click('[da
 /** 一個表面：怎麼到、根節點是哪個、要不要登入。 */
 const SURFACES = [
   { name: '/login', guest: true, root: 'body', open: (page) => page.goto(`${FRONTEND}/login`).then(() => page.waitForSelector('form')) },
+  // S04 的 `role="alert"` 要真的量到一個：空名字送出，`SubmitError` 出現（`FE-A01-S02`）
+  { name: '/login（送出失敗）', guest: true, root: 'body', open: async (page) => { await page.goto(`${FRONTEND}/login`); await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]'); await page.waitForSelector('[data-testid="submit-error"]') } },
   {
     name: '金鑰交接', guest: true, root: 'section[aria-labelledby="key-heading"]',
     open: async (page) => { await page.goto(`${FRONTEND}/login`); await page.fill('form[aria-labelledby="nickname-heading"] input', '新來的'); await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]'); await page.waitForSelector('[data-testid="recovery-key"]') },
@@ -117,6 +119,29 @@ const install = (page) =>
         return out
       },
       focused() { const el = document.activeElement; return el && el.hasAttribute('data-dv') ? { i: Number(el.getAttribute('data-dv')), ...style(el) } : null },
+      /**
+       * S03／S04：這個表面上每一個帶層級標記的元素、每一個 `p`、每一個 `role="alert"`。
+       * 背景是**從元素自己往上真的合成**（chip 的底蓋在面板的底上），走到第一個不透明的層為止；走不到就回 null（判準要紅，不能算通過）。
+       * 顏色字串空的或 CSS 解析不出來也回 null —— canvas 對壞字串會沿用上一次的 fillStyle，直接畫會拿到假的黑色。
+       */
+      text(root) {
+        const rgba = (css) => (css !== '' && CSS.supports('color', css) ? toRgba(css) : null)
+        const composite = (el) => {
+          const stack = []
+          for (let n = el; n; n = n.parentElement) { const c = rgba(getComputedStyle(n).backgroundColor); if (c === null) return null; if (c[3] > 0) stack.push(c); if (c[3] >= 1) break }
+          let bg = stack.pop()
+          if (bg === undefined || bg[3] < 1) return null
+          while (stack.length > 0) { const f = stack.pop(); bg = [...[0, 1, 2].map((i) => f[i] * f[3] + bg[i] * (1 - f[3])), 1] }
+          return bg
+        }
+        return [...document.querySelector(root).querySelectorAll('[data-text], p, [role="alert"]')].filter(visible).map((el) => {
+          const cs = getComputedStyle(el)
+          return {
+            level: el.getAttribute('data-text') ?? (el.tagName === 'P' ? 'body' : null), alert: el.closest('[role="alert"]') !== null, label: label(el),
+            size: parseFloat(cs.fontSize), leading: parseFloat(cs.lineHeight) / parseFloat(cs.fontSize), raw: cs.color, text: rgba(cs.color), bg: composite(el),
+          }
+        })
+      },
     }
   })
 
@@ -127,11 +152,21 @@ const same = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-6)
 const ms = (s) => s.split(',').map((x) => (x.trim().endsWith('ms') ? parseFloat(x) : parseFloat(x) * 1000))
 const TC = ['Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC']
 
+// S03：五級由大到小；`body` 對 `caption` 是 ≥，其餘是 >。規格點名的六個表面各自必備的層級（少一個就紅，不是「有的都對」）。
+const LEVELS = ['display', 'title', 'heading', 'body', 'caption']
+const REQUIRED = {
+  '/login': ['display', 'body', 'caption'], 訪客提示: ['title', 'body'], 看板清單: ['title', 'heading', 'body', 'caption'],
+  看板詳情: ['title', 'body', 'caption'], 收件匣對話: ['title', 'body', 'caption'], 我的名片: ['title', 'body'],
+}
+// 場景聊天框是蓋在 canvas 上的 HUD（底 `surface/90`）：CSS 量不到它真正的背景，規格的六個表面也不含它 —— 其餘每個表面都量。
+const NO_TEXT_CHECK = new Set(['場景聊天框'])
+
 const fontRequests = []
 const durations = new Set()
+let alertsMeasured = 0
 let referenceFill = null
 
-/** 在一個表面上跑 S02／S10／S11／S12（reduce 那一輪只跑 S12 的歸零段）。 */
+/** 在一個表面上跑 S02／S03／S04／S10／S11／S12（reduce 那一輪只跑 S12 的歸零段）。 */
 async function inspect(page, surface, reduce) {
   await install(page)
   const controls = await page.evaluate((root) => window.__dv.controls(root), surface.root)
@@ -163,6 +198,37 @@ async function inspect(page, surface, reduce) {
   if (surface.name === '看板清單') {
     const missing = Object.entries(fonts).filter(([, v]) => v === null).map(([k]) => k)
     missing.length === 0 ? ok('[S02] 看板清單：五種樣本都找到了') : bad('[S02] 看板清單：五種樣本沒找齊', `少了 ${missing.join('、')}`)
+  }
+
+  // S03／S04：帶層級標記的元素與每一個 p。必備層級逐一斷言存在；層級之間比的是「高一級的最小」對「低一級的最大」（任兩個都成立）
+  if (!NO_TEXT_CHECK.has(surface.name)) {
+    const texts = await page.evaluate((root) => window.__dv.text(root), surface.root)
+    const at = (level) => texts.filter((t) => t.level === level).map((t) => t.size)
+    const required = REQUIRED[surface.name]
+    if (required !== undefined) {
+      const missing = required.filter((l) => at(l).length === 0)
+      missing.length === 0 ? ok(`[S03] ${surface.name}：必備層級 ${required.join('、')} 都在`) : bad(`[S03] ${surface.name} 少了層級 ${missing.join('、')}`, texts.map((t) => `${t.level ?? 'alert'}「${t.label}」`).join('、') || '一個文字元素都沒有')
+    }
+    const present = LEVELS.filter((l) => at(l).length > 0)
+    for (let i = 1; i < present.length; i += 1) {
+      const [hi, lo] = [present[i - 1], present[i]]
+      const [hMin, lMax] = [Math.min(...at(hi)), Math.max(...at(lo))]
+      const strict = hi !== 'body'
+      ;(strict ? hMin > lMax : hMin >= lMax) ? ok(`[S03] ${surface.name}：${hi} ${hMin}px ${strict ? '>' : '≥'} ${lo} ${lMax}px`) : bad(`[S03] ${surface.name}：${hi} 最小 ${hMin}px 沒有${strict ? '大於' : ' ≥ '}${lo} 最大 ${lMax}px`)
+    }
+    const bodyMax = Math.max(...at('body'))
+    if (at('title').length > 0 && at('body').length > 0) Math.min(...at('title')) >= 1.25 * bodyMax ? ok(`[S03] ${surface.name}：面板標題 ≥ 1.25 × 內文`) : bad(`[S03] ${surface.name}：面板標題 ${Math.min(...at('title'))}px 不到內文 ${bodyMax}px 的 1.25 倍`)
+    if (at('display').length > 0 && at('body').length > 0) Math.min(...at('display')) >= 1.5 * bodyMax ? ok(`[S03] ${surface.name}：頁面標題 ≥ 1.5 × 內文`) : bad(`[S03] ${surface.name}：頁面標題 ${Math.min(...at('display'))}px 不到內文 ${bodyMax}px 的 1.5 倍`)
+    for (const t of texts) {
+      const who = `${surface.name}「${t.label}」`
+      if (t.level === 'body') t.size >= 16 && t.leading >= 1.5 ? ok(`[S03] ${who}內文 ${t.size}px／${t.leading.toFixed(2)}`) : bad(`[S03] ${who}內文 ${t.size}px／行高 ${t.leading}`, '下限 16px、1.5')
+      if (t.level === 'caption') t.size >= 13 ? ok(`[S03] ${who}說明 ${t.size}px`) : bad(`[S03] ${who}說明只有 ${t.size}px`, '下限 13px')
+      if (t.level !== 'body' && t.level !== 'caption' && !t.alert) continue
+      if (t.alert) alertsMeasured += 1
+      if (t.text === null || t.bg === null) { bad(`[S04] ${who}的顏色或背景量不到`, `color=${JSON.stringify(t.raw)}、合成背景=${JSON.stringify(t.bg)}`); continue }
+      const r = contrast(over(t.text, t.bg), t.bg)
+      r >= 4.5 ? ok(`[S04] ${who}${t.alert ? 'alert ' : ''}${r.toFixed(2)}:1`) : bad(`[S04] ${who}只有 ${r.toFixed(2)}:1`, `字 ${JSON.stringify(t.text)} 底 ${JSON.stringify(t.bg)}（下限 4.5）`)
+    }
   }
 
   // S10 第一段：三級可區分
@@ -261,6 +327,7 @@ try {
     await context.close()
   }
   fontRequests.length === 0 ? ok('[S02] 整趟沒有任何字型請求') : bad('[S02] 有字型請求', fontRequests.join('\n   '))
+  alertsMeasured > 0 ? ok(`[S04] 量到 ${alertsMeasured} 個 role="alert" 的文字`) : bad('[S04] 整趟沒有量到任何 role="alert" 的文字', '空的斷言不算過')
   durations.size === 1 ? ok(`[S12] 所有過渡時長相等：${[...durations][0]}ms`) : bad('[S12] 過渡時長不只一種', [...durations].join(', '))
 } catch (e) {
   bad('腳本中途爆掉', e.stack ?? e.message)
