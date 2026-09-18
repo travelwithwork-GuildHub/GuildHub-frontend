@@ -52,6 +52,24 @@ export const TERTIARY: Control = {
   className: `text-accent hover:bg-surface-sunken rounded-control px-2 py-2 font-medium ${DISABLED}`,
 }
 
+/** 文字的層級（`FE-X16-S03`）。內文是預設，不標；`body` 不在這裡，因為「沒有標記的 p」就是內文。 */
+export type TextLevel = 'display' | 'title' | 'heading' | 'caption'
+
+/** 一個文字常數：字級 class ＋ 層級標記。跟 `Control` 一樣用 `{...TITLE}` 展開，`withClass()` 加自己的 class。 */
+export interface TextStyle {
+  readonly className: string
+  readonly 'data-text': TextLevel
+}
+
+/** 頁面標題（`/login`、`/`、404 的 h1）：`≥ 1.5 ×` 內文。 */
+export const DISPLAY: TextStyle = { 'data-text': 'display', className: 'text-display font-semibold tracking-tight' }
+/** 面板標題（殼的標題列、視窗的第一行、`/login` 三個區塊的 h2）：`≥ 1.25 ×` 內文。 */
+export const TITLE: TextStyle = { 'data-text': 'title', className: 'text-title font-semibold' }
+/** 條目標題（卡片標題、對話對象的名字）：介於面板標題與內文之間。 */
+export const HEADING: TextStyle = { 'data-text': 'heading', className: 'text-heading font-medium' }
+/** 說明文字（欄位提示、狀態列、chip、時間戳）：`≥ 13px`；顏色由呼叫端決定（`ink-muted`、`danger` 都要對背景 `≥ 4.5:1`，`S04`）。 */
+export const CAPTION: TextStyle = { 'data-text': 'caption', className: 'text-caption' }
+
 /**
  * 文字輸入框。
  *

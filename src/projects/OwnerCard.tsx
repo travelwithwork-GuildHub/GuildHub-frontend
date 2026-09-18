@@ -5,6 +5,7 @@ import { avatarLook } from '@/design/avatar'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { useProfileDetail } from '@/talent/useProfileDetail'
+import { CAPTION, withClass } from '@/design/controls'
 
 // 發案者名片：案件詳情裡「誰發的」那一塊。規格 `FE-B03`〈發案者名片是獨立的載入單元〉。
 //
@@ -26,7 +27,7 @@ export function OwnerCard({ ownerId }: { ownerId: string }) {
       aria-labelledby={headingId}
       className="flex flex-col gap-2"
     >
-      <h4 id={headingId} className="text-caption text-ink-muted">
+      <h4 id={headingId} {...withClass(CAPTION, 'text-ink-muted')}>
         發案者
       </h4>
       {detail.phase === 'error' && <EmptyState kind="failure" error={toUiError(detail.error)} retry={detail.retry} />}
@@ -45,7 +46,7 @@ export function OwnerCard({ ownerId }: { ownerId: string }) {
             {profile.skills.length > 0 && (
               <span className="flex flex-wrap gap-1">
                 {profile.skills.map((skill) => (
-                  <span key={skill} data-testid="talent-skill" className="bg-surface text-caption rounded px-1.5 py-0.5">
+                  <span key={skill} data-testid="talent-skill" {...withClass(CAPTION, 'bg-surface rounded px-1.5 py-0.5')}>
                     {skill}
                   </span>
                 ))}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, type KeyboardEv
 import { z } from 'zod'
 import type { RoomDoorOut } from '@/api/contract/rest'
 import { enterProject } from '@/api/operations'
-import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
+import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, TITLE } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { toUiError } from '@/errors/uiError'
 import { SubmitError } from '@/forms/SubmitError'
@@ -171,7 +171,7 @@ function OpenDialog({ request, title, onClose }: { request: RoomEntryRequest; ti
       style={{ zIndex: layer('modal') }}
       className="bg-surface-raised border-control-edge text-ink absolute top-1/2 left-1/2 flex w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-gutter rounded border p-gutter"
     >
-      <h2 id={titleId} className="text-title">
+      <h2 id={titleId} {...TITLE}>
         {ROOM_ENTRY_LABELS.title(title)}
       </h2>
       <p id={descriptionId}>{ROOM_ENTRY_LABELS.description}</p>

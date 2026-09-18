@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type RefObject } from 'react'
 import type { MessageOut } from '@/api/contract/rest'
-import { SECONDARY } from '@/design/controls'
+import { CAPTION, HEADING, SECONDARY, withClass } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { PanelShell } from '@/panel/PanelShell'
@@ -68,7 +68,7 @@ function ThreadList({ inbox, returnFocusRef }: { inbox: InboxValue; returnFocusR
   const firstEmpty = !loading && !blocked && loadError === null && threads.length === 0
   return (
     <div ref={root} tabIndex={-1} data-testid="inbox-list" aria-busy={loading || fetching} className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto outline-none">
-      <h3 ref={heading} tabIndex={-1} className="text-caption text-ink-muted outline-none">
+      <h3 ref={heading} tabIndex={-1} {...withClass(CAPTION, 'text-ink-muted outline-none')}>
         對話
       </h3>
       {/* 第 0 頁失敗（含 401 → `permission-blocked`，此時 provider 已把信清掉）：`FE-X04` 的失敗節點、可重試。 */}
@@ -113,11 +113,11 @@ function ThreadRow({ thread, name, me, onOpen }: { thread: Thread; name: string 
         <span data-testid="inbox-thread-name" className="font-medium">
           {typeof name === 'string' ? name : shortId(thread.with)}
         </span>
-        <time dateTime={latest.created_at} className="text-caption text-ink-muted">
+        <time dateTime={latest.created_at} {...withClass(CAPTION, 'text-ink-muted')}>
           {new Date(latest.created_at).toLocaleString('zh-TW')}
         </time>
       </span>
-      <span data-testid="inbox-thread-preview" className="text-caption text-ink-muted">
+      <span data-testid="inbox-thread-preview" {...withClass(CAPTION, 'text-ink-muted')}>
         {mine ? INBOX_LABELS.you : ''}
         {preview(latest.body)}
       </span>
@@ -151,7 +151,7 @@ function ThreadView({ inbox, withId, openedFrom, returnFocusRef }: { inbox: Inbo
         <button type="button" {...SECONDARY} onClick={back}>
           {INBOX_LABELS.back}
         </button>
-        <h3 className="text-title" data-testid="inbox-thread-name">
+        <h3 {...HEADING} data-testid="inbox-thread-name">
           {typeof name === 'string' ? name : shortId(withId)}
         </h3>
       </header>
@@ -161,7 +161,7 @@ function ThreadView({ inbox, withId, openedFrom, returnFocusRef }: { inbox: Inbo
           const mine = m.sender_id === me
           return (
             <li key={m.id} data-testid="inbox-message" data-mine={mine} className={mine ? 'self-end text-right' : 'self-start'}>
-              <p className="text-caption text-ink-muted">
+              <p {...withClass(CAPTION, 'text-ink-muted')}>
                 {mine ? INBOX_LABELS.me : typeof name === 'string' ? name : shortId(withId)} ·{' '}
                 <time dateTime={m.created_at}>{new Date(m.created_at).toLocaleString('zh-TW')}</time>
               </p>

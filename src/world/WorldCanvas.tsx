@@ -39,6 +39,7 @@ import { RoomPasswordDialog } from './scenes/RoomPasswordDialog'
 import { useScene } from './scenes/SceneProvider'
 import { SceneTransitionOverlay } from './scenes/SceneTransitionOverlay'
 import { OnlineCount } from './OnlineCount'
+import { CAPTION } from '@/design/controls'
 
 // 規格 FE-W01-S04：載入中的呈現**必須是 DOM**，不是 3D 物件 ——
 // WebGL 還沒起來的時候畫不出 3D 的等待畫面。
@@ -67,7 +68,7 @@ function WebGLUnavailable() {
       className="border-line text-ink-muted border p-gutter"
     >
       <p>這台裝置或瀏覽器無法顯示 3D 世界。</p>
-      <p className="text-caption">需要支援 WebGL2 的瀏覽器。</p>
+      <p {...CAPTION}>需要支援 WebGL2 的瀏覽器。</p>
     </div>
   )
 }

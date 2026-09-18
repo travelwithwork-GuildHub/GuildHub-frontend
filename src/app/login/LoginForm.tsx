@@ -6,7 +6,7 @@ import { useWatch, type FieldPath, type FieldValues } from 'react-hook-form'
 import { z } from 'zod'
 import { registerAccount, signInWithNickname, signInWithPassword, signInWithRecoveryKey } from '@/identity/session'
 import { CredentialsRejectedError, LoginIdTakenError, NicknameLengthError, RecoveryKeyRejectedError, type Identity } from '@/identity/types'
-import { CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
+import { CAPTION, CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, TITLE, withClass } from '@/design/controls'
 import type { ClipboardPort } from '@/identity/clipboard'
 import { KeyHandoff } from '@/first-entry/KeyHandoff'
 import { markFirstEntryDone } from '@/first-entry/seen'
@@ -176,7 +176,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
   return (
     <div className="flex flex-col gap-section">
       <form className={FORM} aria-labelledby="nickname-heading" onSubmit={nick.onSubmit} noValidate>
-        <h2 id="nickname-heading" className="text-title">
+        <h2 id="nickname-heading" {...TITLE}>
           取一個名字就可以進去
         </h2>
         <label className={FIELD_LABEL}>
@@ -190,7 +190,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
         </label>
         {/* 剩餘字數可為負：「超過 3 字」比「0」有用。`remaining` 對這個欄位永遠是數字（有上限）。
             這一行就是這個欄位的錯誤訊息（超過時變成「超過 N 字」），以 `aria-describedby` 掛在欄位上；不另外再畫一份 schema 的文案。 */}
-        <p id="nickname-remaining" data-testid="nickname-remaining" data-remaining={nicknameRemaining} className="text-caption text-ink-muted">
+        <p id="nickname-remaining" data-testid="nickname-remaining" data-remaining={nicknameRemaining} {...withClass(CAPTION, 'text-ink-muted')}>
           {nicknameRemaining !== null && nicknameRemaining < 0 ? `超過 ${-nicknameRemaining} 字` : `還可以輸入 ${nicknameRemaining ?? '—'} 字`}
         </p>
         <label className={CHECK_ROW}>
@@ -199,7 +199,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
         </label>
         {/* **預設不勾，而且要說出代價。** 規格：使用者要知道「沒有備份、
             又清掉瀏覽器資料的話，這個身分回不來」 */}
-        <p className="text-caption text-ink-muted">
+        <p {...withClass(CAPTION, 'text-ink-muted')}>
           不勾的話，這台裝置不會留下任何東西 —— 換裝置或清掉資料就要靠恢復金鑰回來。
         </p>
         <SubmitError message={nick.submitError} />
@@ -212,7 +212,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
       </form>
 
       <form className={FORM} aria-labelledby="resume-heading" onSubmit={recovery.onSubmit} noValidate>
-        <h2 id="resume-heading" className="text-title">
+        <h2 id="resume-heading" {...TITLE}>
           已經有身分了？
         </h2>
         {/* `S17`：手上有金鑰的人，在一台全新的裝置上回得去 */}
@@ -228,7 +228,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
 
       {/* 第三塊：帳號密碼（`FE-A08`）。這是三種入場方式裡唯一在驗證身分的那一種；匿名路仍是第一個表單、仍是主路。 */}
       <section className={FORM} aria-labelledby="account-heading" data-testid="account-section">
-        <h2 id="account-heading" className="text-title">
+        <h2 id="account-heading" {...TITLE}>
           {ACCOUNT_LABELS.heading}
         </h2>
         <div role="group" aria-label={ACCOUNT_LABELS.heading} className="flex gap-gutter">
@@ -311,7 +311,7 @@ function AccountField<TInput extends FieldValues, TOutput extends FieldValues>({
         <input {...FIELD} type={type} autoComplete={autoComplete} {...api.form.register(name)} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} />
       </label>
       {error && (
-        <p id={errorId} data-testid={errorId} className="text-caption text-danger">
+        <p id={errorId} data-testid={errorId} {...withClass(CAPTION, 'text-danger')}>
           {error}
         </p>
       )}

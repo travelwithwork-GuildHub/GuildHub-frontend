@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { ClipboardPort } from '@/identity/clipboard'
 import { signInWithNickname } from '@/identity/session'
 import { NicknameLengthError, type Identity } from '@/identity/types'
-import { CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY } from '@/design/controls'
+import { CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, TITLE } from '@/design/controls'
 import { KeyHandoff } from './KeyHandoff'
 
 // 首次進入的流程本身。規格 `FE-A06`。
@@ -65,7 +65,7 @@ export function FirstEntryFlow({ onDone, clipboard }: FirstEntryFlowProps) {
         void create()
       }}
     >
-      <h2 id="first-entry-heading" className="text-title">
+      <h2 id="first-entry-heading" {...TITLE}>
         取一個名字就可以進去
       </h2>
       <label className={FIELD_LABEL}>

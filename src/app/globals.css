@@ -63,6 +63,9 @@
   body {
     background: var(--color-surface);
     color: var(--color-ink);
+    /* 內文是預設、不標（S03）：16px／1.5 從這裡繼承，`p` 不用再掛 class。 */
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
   }
 
   /* 所有控制項共有的：高度下限（S11）、過渡（S12，只動顏色類，不動寬高）。

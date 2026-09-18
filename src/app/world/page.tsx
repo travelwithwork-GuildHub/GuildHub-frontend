@@ -15,6 +15,7 @@ import { FirstEntryNotice } from './FirstEntryNotice'
 import { OtherTabNotice } from './OtherTabNotice'
 import { WorldGate } from './WorldGate'
 import { WorldBoundary } from './WorldBoundary'
+import { TITLE } from '@/design/controls'
 
 // 規格 FE-X01-S03。**這個元件刻意保持同步**（不是 async Server Component）——
 // Vitest 目前不支援 async Server Component，非同步的話這條 Scenario
@@ -45,7 +46,7 @@ export default function WorldPage() {
             {/* ⚠️ **`relative` 是換角色面板 `absolute` 的定位基準。**
                 少了它，面板會相對於整個視窗定位。 */}
             <div data-testid="app-header" className="p-gutter relative flex shrink-0 items-center gap-gutter">
-              <h1 className="text-title">GuildHub</h1>
+              <h1 {...TITLE}>GuildHub</h1>
               <IdentityBadge />
               {/* 收件匣入口（`FE-K01`）：只在已登入時出現。 */}
               <InboxButton />

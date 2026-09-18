@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
 import type { ProjectOut } from '@/api/contract/rest'
 import { createProject } from '@/api/operations'
-import { FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY } from '@/design/controls'
+import { CAPTION, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, withClass } from '@/design/controls'
 import { FORM_LIMITS } from '@/forms/limits'
 import { SubmitError } from '@/forms/SubmitError'
 import { useForm } from '@/forms/useForm'
@@ -70,7 +70,7 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
   const describedBy = (name: keyof CreateProjectInput, hint?: string) => (visibleErrors[name] ? `project-error-${name}` : hint)
   const fieldError = (name: keyof CreateProjectInput) =>
     visibleErrors[name] ? (
-      <p id={`project-error-${name}`} data-testid={`project-error-${name}`} className="text-caption text-danger">
+      <p id={`project-error-${name}`} data-testid={`project-error-${name}`} {...withClass(CAPTION, 'text-danger')}>
         {visibleErrors[name]}
       </p>
     ) : null
@@ -100,7 +100,7 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
         {CREATE_PROJECT_LABELS.skills}
         <input {...FIELD} {...form.register('skills')} aria-invalid={!!visibleErrors.skills} aria-describedby={describedBy('skills', 'project-hint-skills')} />
       </label>
-      {fieldError('skills') ?? <p id="project-hint-skills" className="text-caption">{CREATE_PROJECT_LABELS.skillsHint}</p>}
+      {fieldError('skills') ?? <p id="project-hint-skills" {...CAPTION}>{CREATE_PROJECT_LABELS.skillsHint}</p>}
       <label className={FIELD_LABEL}>
         {CREATE_PROJECT_LABELS.seats}
         <input
@@ -115,7 +115,7 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
           aria-describedby={describedBy('seat_count', 'project-hint-seats')}
         />
       </label>
-      {fieldError('seat_count') ?? <p id="project-hint-seats" className="text-caption">{CREATE_PROJECT_LABELS.seatsHint}</p>}
+      {fieldError('seat_count') ?? <p id="project-hint-seats" {...CAPTION}>{CREATE_PROJECT_LABELS.seatsHint}</p>}
 
       <SubmitError message={submitError} />
       <div className="flex gap-gutter">

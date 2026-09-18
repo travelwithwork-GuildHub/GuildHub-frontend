@@ -1,4 +1,5 @@
 import { LoginForm } from './LoginForm'
+import { DISPLAY } from '@/design/controls'
 
 // `/login`。規格 `FE-A01`（identity-session）。
 //
@@ -8,7 +9,9 @@ import { LoginForm } from './LoginForm'
 export default function LoginPage() {
   return (
     <main className="p-gutter flex flex-col gap-gutter">
-      <h1 className="text-title">GuildHub</h1>
+      <h1 {...DISPLAY}>GuildHub</h1>
+      {/* 一句話說這裡是什麼（`FE-X16-S03`：這一頁要有內文，不能只有標題跟表單）。 */}
+      <p className="max-w-prose">走進 3D 的公會大廳：發案、找人、組隊，都在同一個世界裡。</p>
       <LoginForm />
     </main>
   )

@@ -14,9 +14,14 @@ const ROOT = join(import.meta.dirname, '..')
 const SRC = join(ROOT, 'src')
 /** token 定義檔：DOM 的在 `globals.css`（七類）、3D 的在 `design/world.ts`（`FE-W09`）。只有這兩個可以出現字面值。 */
 const TOKEN_FILES = new Set(['src/app/globals.css', 'src/design/world.ts'])
-/** 層級標記的定義檔：只有它可以寫 `data-tier` 的物件鍵 —— 而且只能是型別那一行加三個值各一次（下面另一條測試數）；其他類別照抓。 */
+/** 層級標記的定義檔：只有它可以寫 `data-tier`／`data-text` 的物件鍵 —— 而且只能是型別那一行加各值各一次（下面另一條測試數）；其他類別照抓。 */
 const TIER_DEFINITION = 'src/design/controls.ts'
-const TIER_KEY = "'data-tier':"
+/** 兩種標記各自：物件鍵的寫法、標成哪個型別、哪些 export 各帶哪一個值、介面上那一行。 */
+const MARKS = {
+  'data-tier': { key: "'data-tier':", type: 'Control', owners: { PRIMARY: ['primary'], SECONDARY: ['secondary'], TERTIARY: ['tertiary'] }, member: "'data-tier':Tier" },
+  'data-text': { key: "'data-text':", type: 'TextStyle', owners: { DISPLAY: ['display'], TITLE: ['title'], HEADING: ['heading'], CAPTION: ['caption'] }, member: "'data-text':TextLevel" },
+}
+const KEYS = new Set(Object.values(MARKS).map((m) => m.key))
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = []
@@ -46,7 +51,7 @@ describe('src/** 只從 token 取值', () => {
       const scan = domTokenScan(readFileSync(join(ROOT, file), 'utf8'))
       exemptions += scan.exemptions
       for (const v of scan.violations) {
-        if (file === TIER_DEFINITION && v.kind === '層級標記' && v.text === TIER_KEY) continue
+        if (file === TIER_DEFINITION && v.kind === '層級標記' && KEYS.has(v.text)) continue
         problems.push(`${file}:${v.line} ${v.kind}：${v.text}`)
       }
     }
@@ -54,31 +59,31 @@ describe('src/** 只從 token 取值', () => {
     expect(exemptions, `豁免 ${exemptions} 個，超過上限 ${MAX_EXEMPTIONS}`).toBeLessThanOrEqual(MAX_EXEMPTIONS)
   })
 
-  // 三輪審查：純文字計數會被註解與沒用到的假物件騙 —— 改讀 AST：三個 export 各恰一個合法值、標成 `Control`、沒有別的物件帶這個鍵、沒有 computed 鍵。
-  it('[FE-X16-S01] 定義檔：只有 PRIMARY／SECONDARY／TERTIARY 三個 export 帶層級標記、各一個值、沒有 computed 鍵', () => {
+  // 三輪審查：純文字計數會被註解與沒用到的假物件騙 —— 改讀 AST：每個 export 各恰一個合法值、標成該型別、沒有別的物件帶這個鍵、沒有 computed 鍵。
+  it.each(Object.entries(MARKS))('[FE-X16-S01] 定義檔：只有列出的 export 帶 %s、各一個值、沒有 computed 鍵', (attr, mark) => {
     const source = readFileSync(join(ROOT, TIER_DEFINITION), 'utf8')
-    const marks = domTokenScan(source).violations.filter((v) => v.kind === '層級標記').map((v) => v.text)
-    expect(marks).toEqual([TIER_KEY, TIER_KEY, TIER_KEY, TIER_KEY])
+    const marks = domTokenScan(source).violations.filter((v) => v.kind === '層級標記' && v.text === mark.key)
+    expect(marks, '介面那一行加每個 export 各一次').toHaveLength(1 + Object.keys(mark.owners).length)
     const sf = ts.createSourceFile(TIER_DEFINITION, source, ts.ScriptTarget.Latest, true)
     const owners: Record<string, string[]> = {}
     let computed = 0
     const nameOf = (n: ts.PropertyName) => (ts.isStringLiteral(n) || ts.isIdentifier(n) ? n.text : (computed += 1, '<computed>'))
     const walk = (node: ts.Node) => {
-      if (ts.isPropertyAssignment(node) && nameOf(node.name) === 'data-tier') {
+      if (ts.isPropertyAssignment(node) && nameOf(node.name) === attr) {
         const decl = node.parent.parent
         const stmt = decl.parent?.parent
         const hasExport = stmt !== undefined && ts.canHaveModifiers(stmt) && (ts.getModifiers(stmt) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-        const exported = hasExport && ts.isVariableDeclaration(decl) && ts.isIdentifier(decl.name) && decl.type?.getText() === 'Control' && decl.initializer === node.parent
-        const owner = exported ? (decl as ts.VariableDeclaration).name.getText() : `<不是標成 Control 的 export：${node.getText()}>`
+        const exported = hasExport && ts.isVariableDeclaration(decl) && ts.isIdentifier(decl.name) && decl.type?.getText() === mark.type && decl.initializer === node.parent
+        const owner = exported ? (decl as ts.VariableDeclaration).name.getText() : `<不是標成 ${mark.type} 的 export：${node.getText()}>`
         ;(owners[owner] ??= []).push(ts.isStringLiteral(node.initializer) ? node.initializer.text : '<不是字串>')
       }
       ts.forEachChild(node, walk)
     }
     walk(sf)
-    expect(owners).toEqual({ PRIMARY: ['primary'], SECONDARY: ['secondary'], TERTIARY: ['tertiary'] })
+    expect(owners).toEqual(mark.owners)
     expect(computed, '定義檔不准有 computed 鍵').toBe(0)
-    const iface = sf.statements.find((s): s is ts.InterfaceDeclaration => ts.isInterfaceDeclaration(s) && s.name.text === 'Control')
-    expect(iface?.members.map((m) => `${m.name?.getText()}:${(m as ts.PropertySignature).type?.getText()}`)).toContain("'data-tier':Tier")
+    const iface = sf.statements.find((s): s is ts.InterfaceDeclaration => ts.isInterfaceDeclaration(s) && s.name.text === mark.type)
+    expect(iface?.members.map((m) => `${m.name?.getText()}:${(m as ts.PropertySignature).type?.getText()}`)).toContain(mark.member)
   })
 
   // 六段假輸入各要被抓 —— 判準不是恆真。每一段單獨餵，抓到的那一條要說得出是哪一類。

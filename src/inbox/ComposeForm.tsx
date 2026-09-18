@@ -2,7 +2,7 @@
 
 import { z } from 'zod'
 import { LIMITS } from '@/api/contract/limits'
-import { FIELD, FIELD_LABEL, FORM, PRIMARY } from '@/design/controls'
+import { CAPTION, FIELD, FIELD_LABEL, FORM, PRIMARY, withClass } from '@/design/controls'
 import { SubmitError } from '@/forms/SubmitError'
 import { useForm } from '@/forms/useForm'
 import { RecipientGoneError } from './errors'
@@ -40,7 +40,7 @@ export function ComposeForm({ onSend, sending }: { onSend: (body: string) => Pro
         <textarea {...FIELD} rows={3} {...form.register('body')} aria-invalid={error ? true : undefined} aria-describedby={error ? 'compose-error' : undefined} />
       </label>
       {error && (
-        <p id="compose-error" data-testid="compose-error" className="text-caption text-danger">
+        <p id="compose-error" data-testid="compose-error" {...withClass(CAPTION, 'text-danger')}>
           {error}
         </p>
       )}
