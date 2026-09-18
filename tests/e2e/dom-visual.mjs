@@ -132,12 +132,12 @@ const install = (page) =>
         const composite = (el) => {
           // 會改變最終像素、量尺不模擬的效果要看完整條祖先鏈（不透明的面板外面再包一層 opacity: .1，面板的底也跟著透；
           // 五、六輪審查：`filter: opacity(0)`、mask、mix-blend-mode、clip-path、`-webkit-text-fill-color` 一樣能讓 `color` 照舊、畫面上卻沒有字）；
-          // 背景只收到第一個不透明層。這張表守的是「字色跟量到的不一樣」那一類；把字移出盒子（transform、text-indent）的由 shown() 量字的幾何
+          // 背景只收到第一個不透明層。八輪：text-indent 也進表（把字畫到盒子外）；transform 不進 —— 置中的視窗合法用 translate，位移由 shown() 用排版位置對照畫出來的位置抓
           for (let n = el; n; n = n.parentElement) {
             const cs = getComputedStyle(n)
             const effect = [
               ['opacity', cs.opacity, '1'], ['filter', cs.filter, 'none'], ['mask-image', cs.maskImage, 'none'], ['mix-blend-mode', cs.mixBlendMode, 'normal'], ['clip-path', cs.clipPath, 'none'],
-              ['-webkit-text-fill-color', cs.webkitTextFillColor, cs.color],
+              ['-webkit-text-fill-color', cs.webkitTextFillColor, cs.color], ['text-indent', cs.textIndent, '0px'],
             ].find(([, v, rest]) => v !== rest)
             if (effect !== undefined) return `${n.tagName.toLowerCase()} 的 ${effect[0]}=${effect[1]}`
           }
@@ -159,18 +159,24 @@ const install = (page) =>
         // 後代的層級跟著最近的 p／[data-text] 祖先；文字空白的 alert 不算「量到 alert」。
         const hasText = (el) => [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim() !== '')
         const levelOf = (el) => { const o = el.closest('[data-text], p'); return o === null ? null : (o.getAttribute('data-text') ?? (o.tagName === 'P' ? 'body' : null)) }
-        // 七輪審查：字真的畫在畫面上嗎 —— 量**文字節點**的矩形（Range.getClientRects），不是盒子；`text-indent: -9999px`、`translateX(-9999px)` 盒子都還在。
-        // 先 scrollIntoView（面板裡捲到下面的內文不算藏起來），量完把每一層的捲動位置還回去。沒有自己的字的容器回 null（不驗）。
+        // 七、八輪審查：字真的畫在畫面上嗎 —— 量**文字節點**的矩形（Range.getClientRects），不是盒子。
+        // 不用 scrollIntoView（它會把往正方向移出去的元素也捲進來）：只准**每個會裁切的祖先各自垂直捲**到元素的**排版位置**（offsetTop 鏈，不含 transform；
+        // 面板裡捲到下面的內文是正常捲動流），然後文字矩形要同時跟視窗、以及每一個會裁切的祖先的可視框相交；水平方向不捲。
+        // 被 transform 推走的字：容器捲到排版位置，畫出來的矩形卻在別處 → 不相交 → 紅。量完把捲動位置還回去。沒有自己的字的容器回 null（不驗）。
+        const layoutTop = (n) => { let y = 0; for (; n; n = n.offsetParent) y += n.offsetTop; return y }
         const shown = (el) => {
           const nodes = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim() !== '')
           if (nodes.length === 0) return null
-          const saved = []
-          for (let n = el.parentElement; n; n = n.parentElement) saved.push([n, n.scrollTop, n.scrollLeft])
+          const clippers = []
+          for (let n = el.parentElement; n; n = n.parentElement) { const o = getComputedStyle(n).overflowY; if (o !== 'visible') clippers.push([n, n.scrollTop]) }
           const [sx, sy] = [scrollX, scrollY]
-          el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+          for (const [c] of clippers) { const rel = layoutTop(el) - layoutTop(c) - c.clientTop; if (rel < 0 || rel > c.clientHeight - 1) c.scrollTop = rel }
+          const top = layoutTop(el); if (top < sy || top > sy + innerHeight - 1) scrollTo(sx, top)
+          const boxes = clippers.map(([c]) => c.getBoundingClientRect())
+          const hit = (b, r) => b.right > r.left && b.left < r.right && b.bottom > r.top && b.top < r.bottom
           const range = document.createRange()
-          const onScreen = nodes.some((t) => { range.selectNodeContents(t); return [...range.getClientRects()].some((b) => b.width > 0 && b.height > 0 && b.right > 0 && b.bottom > 0 && b.left < innerWidth && b.top < innerHeight) })
-          for (const [n, top, left] of saved) { n.scrollTop = top; n.scrollLeft = left }
+          const onScreen = nodes.some((t) => { range.selectNodeContents(t); return [...range.getClientRects()].some((b) => b.width > 0 && b.height > 0 && hit(b, { left: 0, top: 0, right: innerWidth, bottom: innerHeight }) && boxes.every((r) => hit(b, r))) })
+          for (const [c, top] of clippers) c.scrollTop = top
           scrollTo(sx, sy)
           return onScreen
         }
