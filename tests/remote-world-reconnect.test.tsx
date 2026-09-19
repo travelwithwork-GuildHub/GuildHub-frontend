@@ -23,6 +23,35 @@ import WorldCanvas from '@/world/WorldCanvas'
 
 const identity = vi.hoisted(() => ({ current: { state: 'unknown' } as Identity }))
 vi.mock('@/identity/IdentityProvider', () => ({ useIdentity: () => identity.current, useAdoptIdentity: () => vi.fn() }))
+// 可控的分頁資格：一個可訂閱的小 store，`lease.set(false)` 真的觸發重繪（跟正式站 `WorldLeaseProvider` 的 setHeld 一樣），
+// 個別測試用它模擬失去資格（`FE-R06`）。
+const lease = vi.hoisted(() => {
+  const listeners = new Set<() => void>()
+  let allowed = true
+  return {
+    get: () => allowed,
+    set: (v: boolean) => {
+      allowed = v
+      for (const l of [...listeners]) l()
+    },
+    subscribe: (l: () => void) => {
+      listeners.add(l)
+      return () => {
+        listeners.delete(l)
+      }
+    },
+  }
+})
+vi.mock('@/realtime/WorldLeaseProvider', async () => {
+  const { useSyncExternalStore } = await import('react')
+  return {
+    useWorldLease: () => {
+      const allowed = useSyncExternalStore(lease.subscribe, lease.get, lease.get)
+      return { allowed, blockedByOtherTab: !allowed, takeOver: () => {} }
+    },
+    WorldLeaseProvider: ({ children }: { children: ReactNode }) => children,
+  }
+})
 vi.mock('@react-three/fiber', () => ({
   useThree: (selector?: (s: unknown) => unknown) => {
     const state = { set: () => {}, size: { width: 800, height: 600 } }
@@ -135,6 +164,7 @@ beforeEach(() => {
   HTMLCanvasElement.prototype.getContext = vi.fn((id: string) => (id === 'webgl2' ? ({} as RenderingContext) : null)) as typeof realGetContext
   window.sessionStorage.clear()
   identity.current = { state: 'signed-in', profile: PROFILE }
+  lease.set(true)
 })
 afterEach(() => {
   cleanup()
@@ -160,7 +190,7 @@ async function tick(ms: number) {
 function arriveAt(url: string, status: StatusStore = createStatusStore()) {
   window.history.replaceState(window.history.state, '', url)
   const sinkRef: RefObject<Probe | null> = { current: null }
-  const view = render(
+  const tree = (
     <SceneProvider>
       <SceneChatProvider>
         <StatusProvider store={status}>
@@ -169,10 +199,12 @@ function arriveAt(url: string, status: StatusStore = createStatusStore()) {
           <WorldCanvas />
         </StatusProvider>
       </SceneChatProvider>
-    </SceneProvider>,
+    </SceneProvider>
   )
+  const view = render(tree)
   return {
     view,
+    rerender: () => view.rerender(tree),
     status,
     probe: () => sinkRef.current!.scene,
     chat: () => sinkRef.current!.chat,
@@ -289,6 +321,19 @@ describe('ready 之後意外斷線', () => {
     await tick(500)
     expect(w.sockets()).toHaveLength(9)
   })
+
+  it('[FE-R12-S07] 等待重連期間失去分頁資格：不再對原場景連、通知消失（archive-review）', async () => {
+    const w = await inHall()
+    await serverDrops(w)
+    expect(w.notice()).not.toBeNull()
+    // 失去資格（別的分頁搶走）：effect 依 `allowed` 重跑
+    await act(async () => {
+      lease.set(false)
+    })
+    await tick(60_000)
+    expect(w.lobbySockets(), '失去資格後不再對大廳連').toHaveLength(1)
+    expect(w.notice(), '不在重連了，通知不該留著').toBeNull()
+  })
 })
 
 describe('重連之後接回來；舊連線的事件不算', () => {
@@ -371,6 +416,19 @@ describe('單一迴圈；停得下來；不搶過場的活', () => {
     expect(w2.lobbySockets(), '不對大廳再連').toHaveLength(1)
     const rooms = w2.sockets().filter((s) => s.scene === `room:${ROOM}`)
     expect(rooms, '房間那條照過場建、恰好一條').toHaveLength(1)
+  })
+
+  it('[FE-R12-S10] 退避到點與 enterRoom 擠在同一個 act：仍不對大廳重連（canReconnect 讀最新狀態，archive-review）', async () => {
+    const w = await inHall()
+    await serverDrops(w) // 排下 0.5 秒的重連
+    // enterRoom 排 state 更新、退避計時器同一批到期：canReconnect('lobby') 若讀到過期的 transition/scene 會建舊大廳連線
+    await act(async () => {
+      w.probe().enterRoom(ROOM, { title: '星際導航' })
+      await vi.advanceTimersByTimeAsync(500)
+    })
+    await tick(60_000)
+    expect(w.lobbySockets(), '過場中不得對大廳重連').toHaveLength(1)
+    expect(w.sockets().filter((s) => s.scene === `room:${ROOM}`), '房間那條照過場建').toHaveLength(1)
   })
 
   it('[FE-R12-S08] 從沒 ready 過就失敗：open 前 close、或 open 了沒 hello 就 close —— 不重連、沒通知', async () => {
