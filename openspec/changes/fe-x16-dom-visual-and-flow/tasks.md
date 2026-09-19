@@ -78,17 +78,17 @@
 
 ## 6. 突變（驗收條件：拔掉防禦要紅）
 
-- [ ] 6.1 拿掉 `--font-sans` 的繁中家族 → `S02` 紅；把某個表面的內文改成 `14px` → `S03` 紅（`--text`：`--text-body` 改 0.875rem → 17 條紅）；`ink-muted` 調淡 → `S04` 紅（`--text`：L 0.52 → 0.7 → 29 條 2.51～2.67:1）；假輸入六段任一掃不到 → `S01` 紅
+- [x] 6.1（`--tasks`：拿掉三個繁中家族 → `S02` 18 條紅（每個表面一條＋整趟）；假輸入六段是 `tests/dom-token-scan.test.ts` 自己的負向 fixture，掃不到那條就紅）拿掉 `--font-sans` 的繁中家族 → `S02` 紅；把某個表面的內文改成 `14px` → `S03` 紅（`--text`：`--text-body` 改 0.875rem → 17 條紅）；`ink-muted` 調淡 → `S04` 紅（`--text`：L 0.52 → 0.7 → 29 條 2.51～2.67:1）；假輸入六段任一掃不到 → `S01` 紅
 - [x] 6.2 面板底改成半透明 → `S05` 紅（`/80`：三個面板「底 alpha 0.8」）；給面板加一層世界遮罩 → `S05` 紅（「有 1 個蓋住世界的元素」）；確認視窗遮罩拿掉 → `S06` 紅（三個視窗「遮罩 alpha 0」）；
       關閉搬到標題列最前 → `S07` 紅（十個面板×viewport 各兩條）；`<header>` 放進捲動容器 → `S08` 紅（「標題列在捲動容器裡面」）＋ `S07` 紅（第一個區塊是 div）；陰影拿掉 → `S05` 紅；視窗開著內容區不 inert → `S06` 紅（兩個確認視窗）
-- [ ] 6.3（`--surfaces` 跑過前兩個＋五個自己加的：7 紅；`min-h-11` 留著 → e2e `S19` 紅）場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
+- [x] 6.3（`--surfaces` 跑過前兩個＋五個自己加的：7 紅；`min-h-11` 留著 → e2e `S19` 紅；`--tasks`：`outline: none` → `S10` 66 條紅、`reduce` 的 media query 改成 `no-preference` → `S12` 95 條紅、殼 `transition-all` → `S12` 9 條紅（每個面板一條））場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
 - [x] 6.4（`--flow-yield` 跑過 12 個：11 紅、1 量不到 —— `AvatarPicker` 另讀協調者關自己，焦點移出已經關了它，那段拔掉；jsdom 量不到的 `scrollTop` 用真瀏覽器 `S16` 量（拔掉還原 → 紅）；`--flow` 跑過 11 個、10 紅：收件匣的 `yieldPanel` 只清子狀態與 ref、下一次開啟都會覆寫 —— 量不到，記著）協調者不 `onYield()` 就取代 → `S13` 紅（第一版量不到：讓位只靠推導「不掛」也全綠 —— 補「再按 E 是乾淨的清單」）；讓位時還焦點給開啟者 → `S13` 紅；provider 自己持有 open（不從 `active` 推導）→ `S22` 紅；鎖留在 provider 的開啟呼叫裡同步取 → `S21` 紅；殼的 cleanup 清 `active` → `S22` Strict Mode 段紅；`useBlockingPanelOpen` 用 `active !== null` → `S22` 幽靈段紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
       聊天框展開不還原 `scrollTop` → `S16` 紅；下一頁被拒不 `replaceState`（或用了 `pushState`）→ `S17` 紅；被拒時彈出層留著 → `S18` 紅；同一事件的第二個請求不取代第一個（兩個都掛）→ `S21` 紅
-- [ ] 6.5 每次突變前 commit；突變後還原並重 build `.next`
+- [x] 6.5（每個突變前都在 commit 上、`git checkout --` 還原、跑完重 build）每次突變前 commit；突變後還原並重 build `.next`
 
 ## 7. 收尾
 
-- [ ] 7.1 每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；e2e 對 `next start` 跑過（`board-panel`、`inbox`、`first-entry`、`form-team`、`scene-chat`、`deep-link`、`control-contrast`、`dom-visual`）
-- [ ] 7.2 既有判準沒有變紅：`FE-X13`（對比）、`FE-X06`（Escape 層級、焦點、彈出層）、`FE-A06`（提示不擋世界、關掉不落地）、`FE-K04`（聊天記憶體、S11／S12）、`FE-K01-S02`、`FE-B09`（網址）
-- [ ] 7.3 合併後 `vercel deploy --prod`、閘道 `/login` smoke（只走不壓）
-- [ ] 7.4 Sheet `FE-X16` 進度（使用者先在 Sheet 加列）；每片 PR 回報效能影響
+- [x] 7.1（每片的 PR 都貼了；`--surfaces` 之後在 main `882408e` 再跑 `deep-link` 23 綠）每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；e2e 對 `next start` 跑過（`board-panel`、`inbox`、`first-entry`、`form-team`、`scene-chat`、`deep-link`、`control-contrast`、`dom-visual`）
+- [x] 7.2（`pnpm test` 177 檔 1356 綠；e2e `control-contrast`／`first-entry`／`scene-chat`／`inbox`／`deep-link` 綠）既有判準沒有變紅：`FE-X13`（對比）、`FE-X06`（Escape 層級、焦點、彈出層）、`FE-A06`（提示不擋世界、關掉不落地）、`FE-K04`（聊天記憶體、S11／S12）、`FE-K01-S02`、`FE-B09`（網址）
+- [x] 7.3（每片合併後都部署；#535 → `guildhub-frontend-63ji1w3ic`，`/login` 一次人工 200）合併後 `vercel deploy --prod`、閘道 `/login` smoke（只走不壓）
+- [x] 7.4（每片 PR 都有〈效能影響〉；Sheet 2026-09-19 仍沒有 `FE-X16` 列 —— 同步回「找不到 ID」，列加上之後打 Done）Sheet `FE-X16` 進度（使用者先在 Sheet 加列）；每片 PR 回報效能影響
