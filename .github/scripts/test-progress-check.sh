@@ -1071,6 +1071,56 @@ baseline
 mkdone "Done+Cancelled｜兩個都標"
 run 1 "Done 跟 Cancelled 並存要紅" ""
 
+# ── 標記 Later：排在 demo 之後 ─────────────────────────────────────
+#
+# 2026-09-19：demo 只做「後端已有的 API 都有對應操作」那一圈，其餘全部延後。
+# 之前的處置是「那些列照原樣留著」，於是 progress.sh 把 70 幾項算進「未開始」，
+# 看的人分不出「demo 前還要做」跟「之後才輪到」（使用者原話：「不要搞混」）。
+# Later 是一個處置，不是狀態：狀態叫「demo 之後」，**不算未開始**、預設不列出。
+
+baseline
+mkdone "Later｜demo 之後：要靠後端沒有的 API"
+run 0 "標 Later 的項目：綠" ""
+run_field_has "而且狀態是「demo 之後」" "EVD-A01" "state" "demo 之後"
+run_all_has "--all 才列出來" "EVD-A01"
+
+# 預設輸出（不帶旗標）**不列** demo 之後的項目，跟未開始一樣；但摘要要把它單獨數出來 ——
+# 混進「未開始」就回到原本的問題。`run_absent` 看的是 --check 的輸出（那裡本來就不印項目表），
+# 所以這兩條直接跑預設模式。
+out="$(cd "$W" && bash "$SCRIPT" 2>&1)"
+if printf '%s' "$out" | grep -q "EVD-A01"; then
+  echo "✗ 預設輸出不列 demo 之後的項目 —— EVD-A01 出現了"; bump_fail
+else
+  echo "✓ 預設輸出不列 demo 之後的項目（跟未開始一樣）"; PASS=$((PASS + 1))
+fi
+if printf '%s' "$out" | grep -q "1 項排在 demo 之後"; then
+  echo "✓ 摘要單獨數 demo 之後"; PASS=$((PASS + 1))
+else
+  echo "✗ 摘要單獨數 demo 之後 —— 沒有「1 項排在 demo 之後」"; bump_fail
+fi
+
+# 沒有理由的 Later 跟其他標記一樣紅。
+baseline
+mkdone "Later"
+run 1 "Later 沒有寫理由要紅" "理由"
+
+# 規格談好了、實作延後：有 active change 也可以標 Later，狀態仍是 demo 之後。
+baseline
+mkchange evd-a01-x
+mkdone "Later｜規格先談好，實作 demo 之後"
+run_field_has "有 active change 的 Later：demo 之後" "EVD-A01" "state" "demo 之後"
+
+# **封存了還標 Later 是兩份紀錄打架。** 跟 Cancelled 同一個處置：報矛盾，不挑一邊信。
+baseline
+mkarchived evd-a01-x
+mkdone "Later｜其實已經做完了"
+run_field_has "封存了還標 Later：報矛盾" "EVD-A01" "state" "矛盾"
+
+# 互斥：Later 跟 Pending 不得並存。
+baseline
+mkdone "Later+Pending｜兩個都標"
+run 1 "Later 跟 Pending 並存要紅" "互斥"
+
 
 # ── docs/WBS.md 的進度區塊 ────────────────────────────────────────
 #
