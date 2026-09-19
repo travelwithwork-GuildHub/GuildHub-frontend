@@ -37,6 +37,9 @@ vi.mock('@/api/operations', () => ({
   listProfiles: vi.fn(async () => []),
   listProjects: vi.fn(async () => []),
   getProfile: vi.fn(async () => null),
+  // 進了房間會問座位（`FE-J13`）：這裡不驗座位，讓它一直在飛
+  listSeats: vi.fn(() => new Promise(() => {})),
+  getProject: vi.fn(() => new Promise(() => {})),
 }))
 
 type Listener = (e: unknown) => void

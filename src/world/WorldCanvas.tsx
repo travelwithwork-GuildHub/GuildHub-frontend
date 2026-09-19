@@ -28,8 +28,8 @@ import { RoomsNotice } from './rooms/RoomsNotice'
 import { CORRIDOR_SLOTS } from './rooms/slots'
 import { RoomsRefreshProvider } from './rooms/RoomsRefreshContext'
 import { useRooms } from './rooms/useRooms'
-import { SEAT_ANCHORS } from './seats/anchors'
-import { SeatAnchors, useSeatAnchorNodes } from './seats/SeatAnchors'
+import { useSeatAnchorNodes } from './seats/SeatAnchors'
+import { RoomSeats } from './seats/SeatMarkers'
 import { sceneOf } from './scenes/registry'
 import { useSceneRef } from './scenes/SceneContext'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
@@ -255,8 +255,9 @@ export default function WorldCanvas() {
           {/* 門標籤與走廊提示也是大廳的（`FE-V01-S03`）：房間裡沒有走廊。 */}
           {hall && <DoorLabels anchors={anchors} nodesRef={labelNodesRef} />}
           {hall && <RoomsNotice view={rooms} />}
-          {/* 工位的投影錨點（`FE-W16-S06`）**只在房間**：aria-hidden、沒有內容，是 `FE-J13` 座位標籤的位置與 e2e 的尺。 */}
-          {!hall && <SeatAnchors anchors={SEAT_ANCHORS} nodesRef={seatNodesRef} />}
+          {/* 工位的投影錨點（`FE-W16-S06`）**只在房間**，裡面是座位標籤與回饋（`FE-J13`）；沒登入就只有錨點（aria-hidden、沒內容、e2e 的尺）。
+              以 `projectId` 為 key：換房間名字快取從頭來。 */}
+          {scene.id === 'room' && <RoomSeats key={scene.projectId} projectId={scene.projectId} nodesRef={seatNodesRef} />}
           </div>
           {/* 房間密碼視窗（`FE-N08`）：沒票的門按 E 開；同一把鎖、同一個焦點錨。開關在 page.tsx 的 RoomEntryGateProvider。在 `world-stage` 外面：遮罩蓋的是它以外的整層。 */}
           <RoomPasswordDialog rooms={rooms.all} />
