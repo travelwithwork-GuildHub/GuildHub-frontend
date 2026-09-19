@@ -11,8 +11,10 @@ import { createStatusStore, type SetStatusResult, type StatusPort, type StatusSn
 
 const Ctx = createContext<StatusStore | null>(null)
 
-export function StatusProvider({ children }: { children: ReactNode }) {
-  const [store] = useState(createStatusStore)
+/** `store` 只給測試注入（要對同一個 store 送回聲）；正式碼不傳。 */
+export function StatusProvider({ children, store: injected }: { children: ReactNode; store?: StatusStore }) {
+  const [own] = useState(createStatusStore)
+  const store = injected ?? own
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }
 

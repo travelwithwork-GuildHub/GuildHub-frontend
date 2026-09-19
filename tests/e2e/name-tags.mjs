@@ -198,8 +198,10 @@ try {
       const c = document.createElement('canvas'); c.width = 1; c.height = 1
       const ctx = c.getContext('2d', { willReadFrequently: true })
       const rgba = (css) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = css; ctx.fillRect(0, 0, 1, 1); const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255] }
-      const cs = getComputedStyle(el)
-      return { hitIsTag: hit === el || el.contains(hit), text: rgba(cs.color), bg: rgba(cs.backgroundColor), z: cs.zIndex, pe: cs.pointerEvents }
+      // 字色與底色看**名字盒**（`name-tag-name`：看得見的那一塊）；牌子 `name-tag` 是槽，底是透明的（`FE-K05` 的狀態從槽上方長出來）
+      const cs = getComputedStyle(el.querySelector('[data-testid="name-tag-name"]') ?? el)
+      const slot = getComputedStyle(el)
+      return { hitIsTag: hit === el || el.contains(hit), text: rgba(cs.color), bg: rgba(cs.backgroundColor), z: slot.zIndex, pe: slot.pointerEvents }
     })
     const lum = ([r, g, b]) => [r, g, b].map((c) => { const x = c / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4 }).reduce((s, c, i) => s + [0.2126, 0.7152, 0.0722][i] * c, 0)
     const contrast = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05) }
@@ -245,7 +247,8 @@ try {
     if (!texts.some((t) => /訪客|未命名/.test(t))) ok('[S03] 沒有替代字')
     else bad('[S03] 出現替代字', JSON.stringify(texts))
     const m = await page.evaluate((longName) => {
-      const all = [...document.querySelectorAll('[data-testid="name-tag"]')]
+      // `S07` 量的是**名字盒**（`name-tag-name`）：牌子 `name-tag` 是槽（位置、尺寸），名字盒在裡面自己截字；`FE-K05` 的狀態從槽上方長出來、不在盒裡
+      const all = [...document.querySelectorAll('[data-testid="name-tag-name"]')]
       const long = all.find((t) => t.textContent === longName)
       const short = all.find((t) => t.textContent === '阿明')
       const r = (el) => { const b = el.getBoundingClientRect(); return { w: b.width, h: b.height } }

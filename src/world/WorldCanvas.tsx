@@ -38,6 +38,7 @@ import { useRequestEntry } from './scenes/EntryGate'
 import { useSceneChatPortIfProvided } from '@/realtime/SceneChatProvider'
 import { useStatusPortIfProvided } from '@/realtime/StatusProvider'
 import { SceneChatHud } from '@/chat/SceneChatHud'
+import { StatusHud } from '@/status/StatusHud'
 import { useRoomEntryGateIfProvided } from './scenes/RoomEntryGate'
 import { RoomPasswordDialog } from './scenes/RoomPasswordDialog'
 import { useScene } from './scenes/SceneProvider'
@@ -245,6 +246,8 @@ export default function WorldCanvas() {
           <NameTags roster={roster} nodesRef={tagNodesRef} />
           {/* 場景聊天（`FE-K04`）：非阻斷的 HUD，靠左下、不遮提示；只看不鎖，輸入框有焦點才鎖（`EditableFocusLock`）。沒 provider 就不畫。 */}
           <SceneChatHud />
+          {/* 自己的狀態文字（`FE-K05`）：HUD，在線數底下；只給已登入的人、沒 provider 不畫；輸入框有焦點才鎖（同一道 `EditableFocusLock`）。 */}
+          <StatusHud />
           {/* 看板開出來的清單面板（`FE-B01`）。DOM，`layer('panel')`。 */}
           <BoardPanel />
           {/* 「我的名片」面板（`FE-A04`）：開關在標題列的按鈕，面板在這裡 —— 同一個定位基準、同一把鎖的 provider 底下。 */}

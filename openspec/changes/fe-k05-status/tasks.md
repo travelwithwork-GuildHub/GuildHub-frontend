@@ -15,9 +15,9 @@
 
 ## 3. `--hud`：「狀態」控制與名字牌的狀態段（〈設定狀態〉的畫面半邊、〈名字牌上的狀態〉；design D3／D5）
 
-- [ ] 3.1 判準先紅：`tests/status-hud.test.tsx`（`S01` 快捷鈕、送出中、回聲後目前狀態；`S02` 剩餘字數、超過停用；`S03` 沒 ready 的回饋、訪客沒有控制；焦點在輸入框時 `EditableFocusLock` 鎖住、Escape 放掉）；`tests/name-tag-status.test.tsx`（`S05` 一有一無、名字盒 176×28；`S06` 換掉／清空／不認識的 id；`S07` 單行截字、位置不經 React —— 沿用 `name-tag` 測試的 `act` 計數法）
-- [ ] 3.2 `ui-ux-pro-max` 先問控制的位置與形狀；`src/status/StatusHud.tsx`、`src/status/quickStatuses.ts`、`NameTags.tsx` 加狀態節點；`WorldCanvas` 掛 HUD
-- [ ] 3.3 突變：訪客也有控制 → `S03` 紅；狀態節點改成往下長／改牌子高度 → `S05` 紅；空字串也掛節點 → `S05`／`S06` 紅；不認識的 id 也畫 → `S06` 紅
+- [x] 3.1（`status-hud.test.tsx` 4 條、`name-tag-status.test.tsx` 3 條）判準先紅：`tests/status-hud.test.tsx`（`S01` 快捷鈕、送出中、回聲後目前狀態；`S02` 剩餘字數、超過停用；`S03` 沒 ready 的回饋、訪客沒有控制；焦點在輸入框時 `EditableFocusLock` 鎖住、Escape 放掉）；`tests/name-tag-status.test.tsx`（`S05` 一有一無、名字盒 176×28；`S06` 換掉／清空／不認識的 id；`S07` 單行截字、位置不經 React —— 沿用 `name-tag` 測試的 `act` 計數法）
+- [x] 3.2（ui-ux-pro-max：輸入要有可見標籤、disabled 看得出、toast 3–5 秒；位置：在線數底下的膠囊，展開成小卡；截圖抓到牌子 `overflow-hidden` 切掉往上長的狀態 → 牌子拆成槽＋名字盒，W08 的 e2e S07／S09 改量名字盒）`ui-ux-pro-max` 先問控制的位置與形狀；`src/status/StatusHud.tsx`、`src/status/quickStatuses.ts`、`NameTags.tsx` 加狀態節點；`WorldCanvas` 掛 HUD
+- [x] 3.3（7 個：訪客也有控制紅、超過上限照送**等價**（store 也擋、`status-store` 那邊紅）、送出前畫成已生效紅、離線沒回饋紅、狀態往下長紅、空字串也掛紅、可換行紅）突變：訪客也有控制 → `S03` 紅；狀態節點改成往下長／改牌子高度 → `S05` 紅；空字串也掛節點 → `S05`／`S06` 紅；不認識的 id 也畫 → `S06` 紅
 
 ## 4. `--e2e`：真瀏覽器（〈真瀏覽器裡兩個人互見狀態〉）
 
