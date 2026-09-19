@@ -69,7 +69,8 @@ const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync
 const marker = (i: number) => document.querySelector<HTMLElement>(`[data-testid="seat-marker"][data-seat-index="${i}"]`)
 const markers = () => screen.queryAllByTestId('seat-marker')
 const anchor = (i: number) => document.querySelector<HTMLElement>(`[data-testid="seat-anchor"][data-seat-index="${i}"]`)!
-const claimButtons = () => screen.queryAllByRole('button', { name: /^入座$/ })
+// ⚠️ 不用 `getAllByRole`：錨點在被投影之前 `visibility: hidden`（這個殼沒有投影器），role 查詢會把裡面的按鈕全部當成不存在 —— 「沒有入座」會恆真
+const claimButtons = () => [...document.querySelectorAll<HTMLButtonElement>('[data-testid="seat-marker"] button')].filter((b) => b.textContent === '入座')
 const claimIn = (i: number) => {
   const m = marker(i)
   if (m === null) throw new Error(`座位 ${i} 沒有標籤`)

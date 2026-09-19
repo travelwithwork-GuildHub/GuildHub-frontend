@@ -30,6 +30,9 @@ vi.mock('@/world/RemotePlayers', () => ({ RemotePlayers: () => null }))
 vi.mock('@/world/PositionSync', () => ({ PositionSync: () => null }))
 const listRooms = vi.hoisted(() => vi.fn())
 vi.mock('@/api/operations', () => ({
+  // 進了房間會問座位（`FE-J13`）：這裡不驗座位，讓它一直在飛
+  listSeats: vi.fn(() => new Promise(() => {})),
+  getProject: vi.fn(() => new Promise(() => {})),
   listRooms,
   listProfiles: vi.fn(async () => []),
   listProjects: vi.fn(async () => []),
