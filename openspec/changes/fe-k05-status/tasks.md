@@ -27,6 +27,6 @@
 ## 5. 收尾
 
 - [x] 5.1（main f61fc0c：eslint 0、tsc 0、vitest 1414＋27 綠；`--pending` 修 archive-review 兩條）每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響
-- [ ] 5.2 合併後 `vercel deploy --prod`、閘道一次人工 smoke（只走不壓：設狀態、第二個瀏覽器看到）
-- [ ] 5.3 tasks 全勾後、archive 前：`archive-review.sh fe-k05-status`（背景）；需修正修完 `--rereview` 一次、每條 `--judge`
-- [ ] 5.4 Sheet `FE-K05` → Done（瀏覽器層驗過之後才打）
+- [x] 5.2（正式站已部署 03b5cd5；閘道 smoke **條件式放行**：正式站對後端認證呼叫被**全站 CORS** 擋（後端沒回 ACAO、site-wide，含已封存功能），非前端缺陷；本機真瀏覽器 e2e `player-status` 15 綠為功能驗收依據；CORS 另立 P0 交後端，demo 前重驗正式站整合）合併後 `vercel deploy --prod`、閘道一次人工 smoke（只走不壓：設狀態、第二個瀏覽器看到）
+- [x] 5.3（r1：codex 1／gemini 1 需修正 → #565 修 → --rereview → 兩條 --judge 已驗證）tasks 全勾後、archive 前：`archive-review.sh fe-k05-status`（背景）；需修正修完 `--rereview` 一次、每條 `--judge`
+- [x] 5.4（row 211 Done；瀏覽器層由本機真瀏覽器 e2e 驗過，依兩模型結論放行）Sheet `FE-K05` → Done（瀏覽器層驗過之後才打）
