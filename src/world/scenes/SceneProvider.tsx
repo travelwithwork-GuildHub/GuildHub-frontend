@@ -95,6 +95,8 @@ export type ConnectionEvent =
   | { readonly kind: 'closed'; readonly opened: boolean }
   /** `ready` 之後意外斷線、**已經排下**一次重連（`FE-R12`）。沒 ready 過的失敗不會發這個。 */
   | { readonly kind: 'recovering' }
+  /** 不打算連這個場景（單人預覽的 `none`、失去分頁資格）——收掉重連通知（`FE-R12-S07`）。 */
+  | { readonly kind: 'idle' }
 
 export const TRANSITION_TIMEOUT_MS = 10_000
 
@@ -169,6 +171,9 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
     setTransitionSeq((n) => n + 1)
     setRecoveringScene(null)
   }, [])
+  // 「現在打算連哪個場景」（`FE-R12-S10` 的競態防線）：事件 callback **同步**寫，退避計時器讀。詳見 `canReconnect`。
+  const intendedRef = useRef(sceneOf(initialDesired().ref).wsScene)
+  const committedWsRef = useRef(sceneOf(HALL).wsScene)
   const identity = useIdentity()
   // `undefined`：還沒問完；`null`：問完了，沒有身分（匿名進不了房間：票的持有人比對對不上任何一張）。
   const profileId =
@@ -176,6 +181,7 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
 
   const enterRoom = useCallback(
     (projectId: string, { mode = 'push', title }: EnterOptions = {}) => {
+      intendedRef.current = sceneOf({ id: 'room', projectId }).wsScene // 同步：立刻不再對舊場景重連
       setDesired({ ref: { id: 'room', projectId }, mode, forProfile: profileId, title })
       newWish()
       setGateNotice(null)
@@ -184,6 +190,7 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
   )
   const returnToHall = useCallback(
     (mode: UrlMode = 'push') => {
+      intendedRef.current = sceneOf(HALL).wsScene
       setDesired({ ref: HALL, mode, forProfile: undefined })
       newWish()
       setGateNotice(null)
@@ -192,6 +199,7 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
   )
   const applyUrl = useCallback(
     (room: string | null) => {
+      intendedRef.current = sceneOf(refOf(room)).wsScene
       setDesired({ ref: refOf(room), mode: 'replace', forProfile: profileId })
       newWish()
       setGateNotice(null)
@@ -238,6 +246,9 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
   const latest = useRef({ transition, scene: resolved.scene, profileId, auto: desired.auto === true, seq: transitionSeq, title: desired.title })
   useEffect(() => {
     latest.current = { transition, scene: resolved.scene, profileId, auto: desired.auto === true, seq: transitionSeq, title: desired.title }
+    // catch-all 同步（`FE-R12-S10`）：事件 callback 已同步寫過 race 關鍵路徑，這裡收尾其它讓 `resolved.scene`／`committed` 變的路徑。
+    intendedRef.current = sceneOf(resolved.scene).wsScene
+    committedWsRef.current = sceneOf(committed).wsScene
   })
   /** 失敗。`seq` 是排下這個判定時的過場代號：代號不對就是遲到的，忽略。 */
   const fail = useCallback((seq: number, target: SceneRef) => {
@@ -246,6 +257,7 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
     if (transition === null || !sameScene(transition.to, target) || !sameScene(scene, target)) return
     if (target.id === 'room') {
       // 握手被拒／逾時：回大廳（replace，不多一層）、通知、**票留著**（連不上跟票失效分不出來）。
+      intendedRef.current = sceneOf(HALL).wsScene
       setDesired({ ref: HALL, mode: 'replace', forProfile: profileId, auto: true })
       newWish()
       setNotice(title === undefined ? { kind: 'failed', room: target.projectId } : { kind: 'failed', room: target.projectId, title })
@@ -271,6 +283,12 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
         if (current === wsScene) setRecoveringScene(wsScene)
         return
       }
+      // `idle`：`RemoteWorld` 不打算連這個場景了（單人預覽的 `none`、失去分頁資格）——正在重連的通知要收掉（`FE-R12-S07`），
+      // 否則失去資格時會留下一則「正在重新連線」但其實沒有人在重連。
+      if (event.kind === 'idle') {
+        if (current === wsScene) setRecoveringScene(null)
+        return
+      }
       if (event.kind === 'ready' && current === wsScene) setRecoveringScene(null)
       if (transition === null || current !== wsScene) return
       if (event.kind === 'connecting') {
@@ -292,10 +310,9 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
     },
     [fail, timeoutMs],
   )
-  const canReconnect = useCallback((wsScene: string) => {
-    const { transition, scene } = latest.current
-    return transition === null && sceneOf(scene).wsScene === wsScene
-  }, [])
+  // 放行條件：打算連的是它、而且已經提交在它（沒有過場進行中）。過場中 committed≠目標 → 目標也不放行；舊場景被 `intendedRef` 擋。
+  // 兩個 ref 由事件 callback 同步寫（race 關鍵路徑）＋下面的 effect 當 catch-all 同步（其它讓 `resolved.scene`／`committed` 變的路徑）。
+  const canReconnect = useCallback((wsScene: string) => intendedRef.current === wsScene && committedWsRef.current === wsScene, [])
   const recovering = recoveringScene !== null && transition === null && recoveringScene === sceneOf(resolved.scene).wsScene
 
   const value = useMemo<SceneValue>(

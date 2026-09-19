@@ -159,7 +159,10 @@ export function RemoteWorld({
     // ⚠️ **早退在最前面，而且不留任何痕跡** —— `none` 是一個正常狀態，
     // 不是錯誤。在這裡 `console.warn` 一行會讓每一個單人預覽的訪客
     // 在 console 看到一則警告，而那會教人忽略警告。
-    if (realtimeAdapter() === 'none') return
+    if (realtimeAdapter() === 'none') {
+      onConnection?.({ kind: 'idle' }, scene)
+      return
+    }
 
     // ⚠️ **這個早退要在建立 client 之前，不是在 `connect()` 之前。**
     // 建了再不連的話，`clientRef` 上會掛一個永遠 `idle` 的 client，
@@ -167,7 +170,11 @@ export function RemoteWorld({
     // —— 那會讓「取得資格之後接手」多一次莫名其妙的重置。
     //
     // 規格 `FE-R06-S02`：「第二個分頁 **MUST NOT 建立 world 連線**」。
-    if (!allowed) return
+    if (!allowed) {
+      // 失去分頁資格（原本 ready、現在被別的分頁搶走）：正在重連的通知要收掉（`FE-R12-S07`）——不然會留一則沒人在重連的通知。
+      onConnection?.({ kind: 'idle' }, scene)
+      return
+    }
 
     // 違規通報。**必填** —— `FE-R02` 的契約明文寫著它保證不了呼叫端有沒有在看，
     // 所以這裡要真的接上一個東西，而不是傳一個空函式。
