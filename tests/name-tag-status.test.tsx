@@ -23,7 +23,9 @@ const who = (id: string, name: string, st = ''): RemoteIdentity => ({ id, name, 
 const rosterOf = (people: RemoteIdentity[]): ReadonlyMap<string, RemoteIdentity> => new Map(people.map((p) => [p.id, p]))
 const nodesFor = (): RefObject<NameTagNodes> => ({ current: new Map() })
 const tag = (id: string) => document.querySelector<HTMLElement>(`[data-testid="name-tag"][data-player="${id}"]`)
-const statusOf = (id: string) => tag(id)?.querySelector<HTMLElement>('[data-testid="name-tag-status"]') ?? null
+/** 登記進 nodesRef、每幀被寫 transform 的槽（狀態是它的 child，名字盒也是）。 */
+const slot = (id: string) => document.querySelector<HTMLElement>(`[data-testid="name-tag-slot"][data-player="${id}"]`)
+const statusOf = (id: string) => slot(id)?.querySelector<HTMLElement>('[data-testid="name-tag-status"]') ?? null
 const TWELVE = '一二三四五六七八九十壹貳'
 
 describe('名字牌上的狀態', () => {
@@ -33,12 +35,16 @@ describe('名字牌上的狀態', () => {
     expect(statusOf('a')?.textContent).toBe('趕工中')
     expect(statusOf('b'), '空字串不掛狀態節點').toBeNull()
     expect(tag('b')?.textContent).toBe('乙')
+    expect(tag('a')?.textContent, '名字盒的 textContent 只有名字（e2e 靠它找人）').toBe('甲')
     for (const id of ['a', 'b']) {
-      const node = tag(id)!
+      const node = slot(id)!
+      expect(nodesRef.current.get(id)).toBe(node)
       expect(node.style.width).toBe(`${NAME_TAG_SIZE.width}px`)
       expect(node.style.height).toBe(`${NAME_TAG_SIZE.height}px`)
       // 牌子節點自己的 translate（CSS `translate` 屬性由 class 給）：底邊中點對錨點，跟 W08 一樣；狀態往上長（bottom-full），不在名字盒裡
       expect(node.className).toMatch(/-translate-y-full/)
+      expect(node.className, '槽不能裁，不然往上長的狀態會被切掉').not.toMatch(/overflow-hidden/)
+      expect(tag(id)!.className, '名字盒自己截字').toMatch(/overflow-hidden/)
     }
     const status = statusOf('a')!
     expect(status.className).toMatch(/bottom-full/)
