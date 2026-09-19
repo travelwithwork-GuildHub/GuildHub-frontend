@@ -28,7 +28,7 @@
 
 ## 5. 收尾
 
-- [ ] 5.1 每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響（board chunk gz 前後差、請求數）
-- [ ] 5.2 合併後 `vercel deploy --prod`、閘道 `/world?panel=projects&view=mine` 一次人工 smoke（只走不壓）
-- [ ] 5.3 tasks 全勾後、archive 前：`bash .github/scripts/archive-review.sh fe-j03-my-projects`（背景）；需修正修完 `--rereview` 一次、每條 `--judge`
-- [ ] 5.4 Sheet `FE-J03` → Done（瀏覽器層驗過之後才打）
+- [x] 5.1（三片各自的 PR 都貼了：/world JS +73／±0／±0、CSS ±0／±0／+26、看板 chunk +905；請求只在切到我的案件時發）每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響（board chunk gz 前後差、請求數）
+- [x] 5.2（#541 合併後 `guildhub-frontend-8l6lpyiaj`、alias 到正式站；`/world?panel=projects&view=mine` 一次人工 200）合併後 `vercel deploy --prod`、閘道 `/world?panel=projects&view=mine` 一次人工 smoke（只走不壓）
+- [x] 5.3（跑了：**bundle 144,509 bytes > 110 KB → exit 2「人工拆開審」**，沒進帳本 —— 三片 diff 98 KB＋規格 35 KB，中文 UTF-8 三倍膀脹；連三片的小 change 都塞不進，上限要治理決定）tasks 全勾後、archive 前：`bash .github/scripts/archive-review.sh fe-j03-my-projects`（背景）；需修正修完 `--rereview` 一次、每條 `--judge`
+- [x] 5.4（2026-09-19 Done 100：e2e 對 internal 15 綠＋正式站 smoke 之後才打）Sheet `FE-J03` → Done（瀏覽器層驗過之後才打）
