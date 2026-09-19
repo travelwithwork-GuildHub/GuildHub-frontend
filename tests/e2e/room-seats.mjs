@@ -39,6 +39,16 @@ const feedback = (page) => page.$eval('[data-testid="seat-feedback"]', (n) => ({
 await mkdir(OUT, { recursive: true })
 const browser = await chromium.launch({ headless: !HEADED, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 
+/**
+ * 兩個人同時畫 3D（swiftshader）會讓走位的相機收斂不了（`settle` 20 輪不穩 —— 實測第二次起就紅）。
+ * 一個人走的時候把另一個人的分頁**凍住**（CDP `Page.setWebLifecycleState`：rAF／timer 都停），走完再解凍；判準都在解凍之後量。
+ */
+async function frozen(who, value) {
+  const cdp = await who.context.newCDPSession(who.page)
+  await cdp.send('Page.setWebLifecycleState', { state: value ? 'frozen' : 'active' })
+  await cdp.detach()
+}
+
 /** 一個人：自己的 context、建身分、進世界。`rooms` 是一個盒子，成軍之後才知道 project id。 */
 async function person(name, rooms) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 })
@@ -88,6 +98,10 @@ async function enterRoom(who, room) {
   const { page } = who
   await page.goto(`${FRONTEND}/world`)
   await waitForWorld(page)
+  // 兩個 context 同開時，後開的那頁拿走了瀏覽器的焦點：前一頁的 `keyboard.down` 送到了、視窗卻不算 focused，角色不動（實測：`hasFocus()` 仍是 true，點一下才會動）。
+  await page.bringToFront()
+  await page.mouse.click(640, 300)
+  await page.waitForTimeout(200)
   const { approachDoor } = walker({ room, decoy: DECOY, title: TITLE, out: OUT })
   const { prompt } = await approachDoor(page)
   if (prompt === null || !prompt.includes(TITLE)) throw new Error(`${who.name} 不在門前（提示是「${prompt}」）`)
@@ -118,8 +132,13 @@ try {
   const apiHits = []
   const onRequest = (r) => { if (r.url().includes('/api/')) apiHits.push(`${r.method()} ${new URL(r.url()).pathname.replace(room, '<room>').replace(/[0-9a-f-]{36}/, '<id>')}`) }
   A.context.on('request', onRequest)
+  await frozen(B, true)
   await enterRoom(A, room)
+  await frozen(B, false)
+  await frozen(A, true)
   await enterRoom(B, room)
+  await frozen(A, false)
+  await A.page.waitForTimeout(1000)
   for (const who of [A, B]) {
     check(`[S05] ${who.name}：0 號是空位`, (await markerText(who.page, 0))?.includes('空位'), true)
     check(`[S05] ${who.name}：1 號是空位`, (await markerText(who.page, 1))?.includes('空位'), true)
