@@ -5,13 +5,13 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-j13-seats` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-j13-seats --strict` 通過且 PR 已合併
+- [x] 1.1（#544）規格已在 PR 上談定（`spec/fe-j13-seats` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-j13-seats --strict` 通過且 PR 已合併
 
 ## 2. `--backend`：替身的 seats（`internal-backend` ADDED；design D5）
 
-- [ ] 2.1 判準先紅：`tests/contract/rest/seats.contract.ts` 的 `S06`（403 沒票、200 `[]`、201、兩種 409 逐字、400 ×2、422、401、404→403）；對 internal 是 404（沒有 route）
-- [ ] 2.2 `src/server/seats.ts`（`listSeats`、`claimSeat`：單一句 INSERT … SELECT、PG 錯誤碼分類）、`src/app/api/projects/[project_id]/seats/route.ts`（`handle({ auth: 'required' })`＋`hasRoomGrant`）
-- [ ] 2.3 對 `internal` 綠；對 `guildhub`（本機自起）跑一次綠；突變：拿掉 `hasRoomGrant` → 403 那段紅；409 兩種文字對調 → 紅；`< seat_count` 拿掉 → 400 那段紅
+- [x] 2.1 判準先紅：`tests/contract/rest/seats.contract.ts` 的 `S06`（403 沒票、200 `[]`、201、兩種 409 逐字、400 ×2、422、401、404→403）；對 internal 是 404（沒有 route）
+- [x] 2.2 `src/server/seats.ts`（`listSeats`、`claimSeat`：單一句 INSERT … SELECT、PG 錯誤碼分類）、`src/app/api/projects/[project_id]/seats/route.ts`（`handle({ auth: 'required' })`＋`hasRoomGrant`）
+- [x] 2.3（internal 綠；guildhub 本機自起：seats＋lifecycle 3 綠；突變三個三紅：拿掉門 → 200 ≠ 403、409 文字對調 → 紅、`< seat_count` 拿掉 → 2 號 201 ≠ 400）對 `internal` 綠；對 `guildhub`（本機自起）跑一次綠；突變：拿掉 `hasRoomGrant` → 403 那段紅；409 兩種文字對調 → 紅；`< seat_count` 拿掉 → 400 那段紅
 
 ## 3. `--state`：`useSeats`、`seatRules`、名字（〈重取為準〉〈失敗回饋〉的狀態半邊；design D2／D3）
 
