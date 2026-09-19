@@ -27,8 +27,8 @@
 
 ## 5. `--e2e`：真瀏覽器（〈真瀏覽器裡兩個人各自進房〉）
 
-- [ ] 5.1 `tests/e2e/room-seats.mjs` 的 `S05`（對 `internal`：兩個 context、密碼進房、A 坐 0、B 搶 0 被拒、B 坐 1、A 30 秒內看到、A 重新整理）；`FE-W16-S08`、`room-entry`、`scene-switch`、`name-tags` 沒變紅
-- [ ] 5.2 截圖貼 PR（兩個名字、一個空位、回饋）；`ui-ux-pro-max` pre-delivery checklist；效能：world chunk 前後差、房間裡的請求數
+- [x] 5.1（28 綠 ×3；突變 3 個 3 紅：輪詢 300 秒 → 「30 秒內看到」紅、409 不分文字 → 「被搶」紅、201 不重取 → 「0 號是我的」紅；regression project-room／room-entry／scene-switch／name-tags 全綠）`tests/e2e/room-seats.mjs` 的 `S05`（對 `internal`：兩個 context、密碼進房、A 坐 0、B 搶 0 被拒、B 坐 1、A 30 秒內看到、A 重新整理）；`FE-W16-S08`、`room-entry`、`scene-switch`、`name-tags` 沒變紅
+- [x] 5.2（`docs/evidence/fe-j13-seats/`；world chunk +1,839 B gz 在 #551；房間裡 ~80 秒：GET seats ×5、GET profile ×1）截圖貼 PR（兩個名字、一個空位、回饋）；`ui-ux-pro-max` pre-delivery checklist；效能：world chunk 前後差、房間裡的請求數
 
 ## 6. 收尾
 
