@@ -173,8 +173,9 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
   const registered = form.register('password')
   return (
     <div data-testid="owner-actions-body" className="flex flex-col gap-gutter">
+      {/* 單獨一顆的鈕不拉滿整欄（截圖對出來的：拉滿的邊框鈕看起來像一條分隔線） */}
       {project.status === 'recruiting' && !composing && (
-        <button type="button" {...PRIMARY} onClick={() => setComposing(true)}>
+        <button type="button" {...withClass(PRIMARY, 'self-start')} onClick={() => setComposing(true)}>
           {OWNER_ACTION_LABELS.formTeam}
         </button>
       )}
@@ -259,7 +260,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
       )}
 
       {project.status === 'active' && !confirming && (
-        <button ref={closeButton} type="button" {...(revealed === null ? PRIMARY : SECONDARY)} onClick={() => setConfirming(true)}>
+        <button ref={closeButton} type="button" {...withClass(revealed === null ? PRIMARY : SECONDARY, 'self-start')} onClick={() => setConfirming(true)}>
           {OWNER_ACTION_LABELS.close}
         </button>
       )}
