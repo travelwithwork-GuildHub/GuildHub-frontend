@@ -425,4 +425,23 @@ describe('RealtimeClient', () => {
     client.connect()
     expect(() => client.connect()).toThrow(RealtimeError)
   })
+  it('[FE-R12-S05] 意外 close 之後 listener 全拆：舊 socket 遲到的 message／open／close 不再打到 client', () => {
+    const { client, sockets, states, messages, closed } = setup()
+    client.connect()
+    sockets[0]!.emit('open', null)
+    sockets[0]!.emit('message', { data: HELLO() })
+    expect(client.state).toBe('ready')
+    sockets[0]!.emit('close', { code: 1012, reason: '', wasClean: false }) // 伺服器關的
+    expect(client.state).toBe('closed')
+    expect(closed).toHaveLength(1)
+    expect(sockets[0]!.listenerCount, '意外 close 之後不留任何 listener').toBe(0)
+    const before = { states: states.length, messages: messages.length }
+    sockets[0]!.emit('message', { data: SNAPSHOT() })
+    sockets[0]!.emit('open', null)
+    sockets[0]!.emit('close', { code: 1006, reason: '', wasClean: false })
+    expect(messages, '遲到的 message 不交出去').toHaveLength(before.messages)
+    expect(states, '遲到的 open 不改狀態').toHaveLength(before.states)
+    expect(closed, '遲到的 close 不再發').toHaveLength(1)
+    expect(client.state).toBe('closed')
+  })
 })
