@@ -178,13 +178,14 @@ export async function enterProject(projectId: string, input: contract.EnterIn) {
 
 // ---------------------------------------------------------------- 座位
 
-export async function listSeats(projectId: string) {
+export async function listSeats(projectId: string, options: { signal?: AbortSignal } = {}) {
   return send(
     'listSeats',
     {
       method: 'GET',
       path: '/api/projects/{project_id}/seats',
       params: { project_id: projectId },
+      signal: options.signal,
     },
     z.array(contract.SeatOut),
   )

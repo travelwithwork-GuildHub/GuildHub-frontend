@@ -15,9 +15,9 @@
 
 ## 3. `--state`：`useSeats`、`seatRules`、名字（〈重取為準〉〈失敗回饋〉的狀態半邊；design D2／D3）
 
-- [ ] 3.1 判準先紅：`tests/seat-rules.test.ts`（`classify409` 兩種文字與其他、`canClaim` 的四個條件）；`tests/room-seats-state.test.tsx`（hook：`S04` 全部 —— 30 秒、不可見停／可見立即、離開停、輪詢失敗留舊、換房間不混；`S02` 的 claim 送出中只送一次與 201 重取；`S03` 四種結果的狀態）
-- [ ] 3.2 `src/world/seats/seatRules.ts`、`src/world/seats/useSeats.ts`、`src/world/seats/useSeatNames.ts`
-- [ ] 3.3 突變：不可見仍輪詢 → `S04` 紅；離開房間不 abort → `S04` 紅；輪詢失敗清空 → `S04` 紅；409 不分文字 → `S03` 紅；claim 中再按送第二個 → `S02` 紅
+- [x] 3.1（`room-seats-state.test.tsx` 6 條）判準先紅：`tests/seat-rules.test.ts`（`classify409` 兩種文字與其他、`canClaim` 的四個條件）；`tests/room-seats-state.test.tsx`（hook：`S04` 全部 —— 30 秒、不可見停／可見立即、離開停、輪詢失敗留舊、換房間不混；`S02` 的 claim 送出中只送一次與 201 重取；`S03` 四種結果的狀態）
+- [x] 3.2（`useSeatNames` 留到 `--markers` 跟標籤一起做：它的判準是 S01 的畫面）`src/world/seats/seatRules.ts`、`src/world/seats/useSeats.ts`、`src/world/seats/useSeatNames.ts`
+- [x] 3.3（6 個 6 紅：不可見仍輪詢、離開不 abort、輪詢失敗清空、409 文字對調、連按不擋、403 不鎖）突變：不可見仍輪詢 → `S04` 紅；離開房間不 abort → `S04` 紅；輪詢失敗清空 → `S04` 紅；409 不分文字 → `S03` 紅；claim 中再按送第二個 → `S02` 紅
 
 ## 4. `--markers`：錨點插槽、標籤、回饋、掛進世界（〈每個座位有一個標籤〉〈一鍵入座〉〈失敗回饋〉的畫面半邊；`project-room-layout` MODIFIED；design D1／D4）
 
