@@ -146,11 +146,15 @@ export function WorldUrlSync(): null {
         reconcileRef.current()
         return
       }
-      restore(parsed.panel)
+      // 上一頁／下一頁要求重開看板也經過協調者（`FE-X16-S17`）：被拒 → 把**目前這一筆**改回實際狀態（跟 canonical 同一招）、不 push、畫面不換
+      if (!restore(parsed.panel)) {
+        const ours = lineageOf(window.history.state)
+        write('replace', latestRef.current.search, { session, pushed: ours?.session === session ? ours.pushed : 0 })
+      }
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [restore, applyUrl])
+  }, [restore, applyUrl, session])
 
   return null
 }

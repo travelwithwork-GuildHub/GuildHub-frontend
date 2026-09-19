@@ -69,8 +69,10 @@ describe('暱稱欄的數字來自 LIMITS', () => {
     act(() => {
       button().dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    await waitFor(() => expect(server.calls).toHaveLength(1))
-    expect(server.calls[0]?.body).toEqual({ nickname: emoji })
+    // 只數登入那一次：登入成功後緊接著一個 PATCH（`FE-A05-S17` 隨機發外觀），數全部的話只有在 PATCH 之前那一瞬間才是 1（CI 慢才碰得到、本機一律超時）
+    const logins = () => server.calls.filter((c) => c.pathname === '/api/login')
+    await waitFor(() => expect(logins()).toHaveLength(1))
+    expect(logins()[0]?.body).toEqual({ nickname: emoji })
   })
 
   it('太短（含空）不禁用：按下去走 FE-A01-S02 的 alert（兩位審查者一致，規格修正 #343）', async () => {

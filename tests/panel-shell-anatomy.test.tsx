@@ -8,10 +8,12 @@ import { InteractionProvider } from '@/world/interaction/InteractionProvider'
 // 標題列是面板的第一個區塊、返回是它第一個可聚焦的、關閉是最後一個；內容區在標題列外面。
 // `S06` 的結構半邊：確認視窗走 `PanelDialog` → 遮罩層在內容區上、內容區 `inert`；沒有殼時原地渲染（單獨測元件的既有測試不用改）。
 
+/** 讓位協定（`FE-X16`）：這裡只驗解剖，登記隨便一個。 */
+const PANEL = { id: 'profile-panel' as const, canYield: () => true, onYield: () => {} }
 const shell = (props: Partial<Parameters<typeof PanelShell>[0]> = {}) =>
   render(
     <InteractionProvider>
-      <PanelShell title="殼" closeLabel="關閉" testId="p" onCloseRequest={() => {}} {...props}>
+      <PanelShell title="殼" closeLabel="關閉" testId="p" panel={PANEL} onCloseRequest={() => {}} {...props}>
         <button type="button">內容裡的按鈕</button>
       </PanelShell>
     </InteractionProvider>,
@@ -48,7 +50,7 @@ describe('阻斷式面板的解剖', () => {
   it('[FE-X16-S06] PanelDialog：遮罩層掛在內容區上（不蓋標題列）、內容區與標題列都 inert；卸掉之後 inert 拿掉', () => {
     const view = render(
       <InteractionProvider>
-        <PanelShell title="殼" closeLabel="關閉" testId="p" onCloseRequest={() => {}}>
+        <PanelShell title="殼" closeLabel="關閉" testId="p" panel={PANEL} onCloseRequest={() => {}}>
           <button type="button">內容裡的按鈕</button>
           <PanelDialog>
             <div role="alertdialog" data-testid="dlg">
@@ -67,7 +69,7 @@ describe('阻斷式面板的解剖', () => {
     expect((section.firstElementChild as HTMLElement).hasAttribute('inert')).toBe(true)
     view.rerender(
       <InteractionProvider>
-        <PanelShell title="殼" closeLabel="關閉" testId="p" onCloseRequest={() => {}}>
+        <PanelShell title="殼" closeLabel="關閉" testId="p" panel={PANEL} onCloseRequest={() => {}}>
           <button type="button">內容裡的按鈕</button>
         </PanelShell>
       </InteractionProvider>,
