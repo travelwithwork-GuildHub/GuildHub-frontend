@@ -8,7 +8,7 @@ import { createContext, useContext, useEffect, useRef, useState, useSyncExternal
 // 「≤ 1」於是是結構上的事：一個值只能指向一個 id，延遲 commit 的舊請求掛不出第二個面板（掛不掛由 `active` 決定）。
 // **同步決定**（直接讀 store，不等 commit）：`active` 空、或指向還沒登記的 id（殼還沒掛成）→ 取代；已登記且 `canYield()` → 先 `onYield()` 再取代；否則拒絕、`active` 不變。
 // 同一次事件裡的兩個請求：後者對前者做同一套判斷，前者還沒掛成就被取代（`S21`／`S22`）。
-// **殼的卸載不動 `active`**（Strict Mode 的模擬卸載跟真卸載是同一條 cleanup）：登記是有身分的一筆、cleanup 只刪自己那筆；`active` 只由 `requestClose(id)`（compare-and-clear）與被取代改變。
+// **殼的卸載不動 `active`**（Strict Mode 的模擬卸載跟真卸載是同一條 cleanup）：登記是有身分的一筆、cleanup 只刪自己那筆（同 id 多筆時留下的仍算數，最晚登記的那筆是持有者 —— 審查抓到只留最後一筆會讓先登記的在後者解除時一起消失）；`active` 只由 `requestClose(id)`（compare-and-clear）與被取代改變。
 // 「有阻斷式面板開著」＝ `active` 指向的殼**已登記**，不是 `active !== null` —— 幽靈 `active`（provider 在 commit 前卸載）對畫面沒有作用。
 //
 // ⚠️ 巢狀時**內層沿用外層**（不拋錯）：`ListPanelProvider` 在 `WorldCanvas` 裡、另外兩個在 `page.tsx`，三個 provider 各自確保上面有協調者 ——
@@ -28,16 +28,17 @@ type Store = ReturnType<typeof createStore>
 
 function createStore() {
   let active: BlockingPanelId | null = null
-  const registrations = new Map<BlockingPanelId, PanelRegistration>()
+  const registrations = new Map<BlockingPanelId, PanelRegistration[]>()
+  const holder = (id: BlockingPanelId | null) => (id === null ? undefined : registrations.get(id)?.at(-1))
   const listeners = new Set<() => void>()
   let snapshot: Snapshot = { active, open: false }
   const emit = () => {
-    snapshot = { active, open: active !== null && registrations.has(active) }
+    snapshot = { active, open: holder(active) !== undefined }
     for (const l of listeners) l()
   }
   return {
     requestOpen: (id: BlockingPanelId): boolean => {
-      const current = active === null ? undefined : registrations.get(active)
+      const current = holder(active)
       if (current !== undefined && current.id !== id) {
         if (!current.canYield()) return false
         current.onYield()
@@ -54,11 +55,10 @@ function createStore() {
       emit()
     },
     register: (registration: PanelRegistration) => {
-      registrations.set(registration.id, registration)
+      registrations.set(registration.id, [...(registrations.get(registration.id) ?? []), registration])
       emit()
       return () => {
-        if (registrations.get(registration.id) !== registration) return
-        registrations.delete(registration.id)
+        registrations.set(registration.id, (registrations.get(registration.id) ?? []).filter((r) => r !== registration))
         emit()
       }
     },

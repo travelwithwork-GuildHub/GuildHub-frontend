@@ -349,12 +349,17 @@ describe('同一時間只有一個阻斷式面板', () => {
       }, [value])
       return null
     }
-    // 同一個 id 的第二筆登記（比殼晚掛、比殼晚卸）：殼卸載時只能刪自己那筆 —— React 的 effect 順序下 Strict Mode 本身量不到 compare-and-delete，這一筆才量得到
+    // 同一個 id 的第二筆登記（比殼晚掛）：殼卸載時只能刪自己那筆 —— React 的 effect 順序下 Strict Mode 本身量不到 compare-and-delete，這一筆才量得到；
+    // 反過來（晚登記的先解除）先登記的那筆也要還在、而且它的 `canYield` 算數（codex 審查：只留最後一筆的話它會一起消失、讓位協定被繞過）
     function Later() {
       useRegisterBlockingPanel({ id: 'profile-panel', canYield: () => true, onYield: () => {} })
       return null
     }
-    const shell = (mounted: boolean, later = false) => (
+    function Stubborn() {
+      useRegisterBlockingPanel({ id: 'profile-panel', canYield: () => false, onYield: () => {} })
+      return null
+    }
+    const shell = (mounted: boolean, later = false, stubborn = false) => (
       <StrictMode>
         <BlockingPanelCoordinator>
           <InteractionProvider>
@@ -365,6 +370,7 @@ describe('同一時間只有一個阻斷式面板', () => {
                 <span />
               </PanelShell>
             )}
+            {stubborn && <Stubborn />}
             {later && <Later />}
           </InteractionProvider>
         </BlockingPanelCoordinator>
@@ -382,6 +388,15 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(probe(), '殼卸載只刪自己那筆：晚掛的那筆還在').toEqual({ active: 'profile-panel', open: true })
     view.rerender(shell(false))
     expect(probe(), '殼卸載不動 active').toEqual({ active: 'profile-panel', open: false })
+    // 先登記一筆不讓位的、再登記一筆，把後者解除：前者還在、還是持有者
+    view.rerender(shell(false, false, true))
+    view.rerender(shell(false, true, true))
+    view.rerender(shell(false, false, true))
+    expect(probe(), '晚登記的解除後，先登記的仍在').toEqual({ active: 'profile-panel', open: true })
+    act(() => {
+      expect(panels!.requestOpen('inbox-panel'), '先登記那筆的 canYield 要算數').toBe(false)
+    })
+    view.rerender(shell(false))
     act(() => {
       expect(panels!.requestOpen('inbox-panel')).toBe(true)
     })
