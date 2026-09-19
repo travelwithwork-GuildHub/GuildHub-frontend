@@ -233,7 +233,8 @@ async function inspect(page, surface, reduce) {
     return ok(`[S12] reduce 下 ${surface.name} 的 ${controls.length} 個控制項${panel === null ? '' : '與面板'}、整份文件的元素與偽元素動態都是 0s`)
   }
 
-  // S02：這個表面上找得到的樣本都要跟 body 相同、含繁中家族；五種樣本（body、面板標題、卡片標題、按鈕、輸入框）齊全的那一頁（看板清單：聊天框有輸入框）
+  // S02：這個表面上找得到的樣本都要跟 body 相同、含繁中家族；五種樣本（body、面板標題、卡片標題、按鈕、輸入框）分兩頁湊齊：
+  // 看板清單有卡片標題、收件匣對話有輸入框（面板開著時聊天框收成一行、沒有輸入框 —— `FE-X16-S16`）
   // 另外**逐一斷言存在** —— 找不到的樣本被過濾掉的話，只剩 body 也會綠（審查抓到）
   const fonts = await page.evaluate((root) => {
     const f = (sel) => { const el = document.querySelector(sel); return el ? getComputedStyle(el).fontFamily : null }
@@ -242,9 +243,10 @@ async function inspect(page, surface, reduce) {
   const seen = Object.entries(fonts).filter(([, v]) => v !== null)
   if (seen.every(([, v]) => v === fonts.body) && TC.some((n) => fonts.body.includes(n))) ok(`[S02] ${surface.name}：${seen.length} 處 font-family 相同且含繁中家族`)
   else bad(`[S02] ${surface.name}：font-family 不一致或沒有繁中家族`, JSON.stringify(fonts))
-  if (surface.name === '看板清單') {
-    const missing = Object.entries(fonts).filter(([, v]) => v === null).map(([k]) => k)
-    missing.length === 0 ? ok('[S02] 看板清單：五種樣本都找到了') : bad('[S02] 看板清單：五種樣本沒找齊', `少了 ${missing.join('、')}`)
+  const need = { 看板清單: ['body', 'title', 'card', 'button'], 收件匣對話: ['body', 'title', 'button', 'input'] }[surface.name]
+  if (need !== undefined) {
+    const missing = need.filter((k) => fonts[k] === null)
+    missing.length === 0 ? ok(`[S02] ${surface.name}：${need.length} 種樣本都找到了`) : bad(`[S02] ${surface.name}：樣本沒找齊`, `少了 ${missing.join('、')}`)
   }
 
   // S03／S04：帶層級標記的元素與每一個 p。必備層級逐一斷言存在；層級之間比的是「高一級的最小」對「低一級的最大」（任兩個都成立）

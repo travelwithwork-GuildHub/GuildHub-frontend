@@ -1,9 +1,9 @@
 # 0011. 阻斷式面板一次只開一個，由一個協調者持有
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-09-18
 - **Deciders**: fergus（規格 PR 雙審：codex、Gemini）
-- **邊界狀態**: 僅約定（實作合併後改「已強制」，證據補 `tests/dom-visual-flow.test.tsx`）
+- **邊界狀態**: 已強制（`tests/dom-visual-flow.test.tsx` 10 條 jsdom、`tests/e2e/dom-flow.mjs` 22 條真瀏覽器；`--flow` #531、`--flow-yield`）
 - **證據**: `openspec/changes/fe-x16-dom-visual-and-flow/specs/dom-visual-system/spec.md` 的「同一時間只有一個阻斷式面板」
 
 ## 背景

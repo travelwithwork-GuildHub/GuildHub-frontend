@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CAPTION, SECONDARY, withClass } from '@/design/controls'
 import { layer } from '@/design/layers'
+import { useBlockingPanelOpen } from '@/panel/BlockingPanelCoordinator'
 import { useSceneChatIfProvided } from '@/realtime/SceneChatProvider'
 import { SceneChatComposer } from './SceneChatComposer'
 import { SceneChatFeed } from './SceneChatFeed'
@@ -17,12 +18,16 @@ import { SceneChatFeed } from './SceneChatFeed'
 //
 // 捲動（D5）：新訊息到達時，使用者在底部 → 捲到最新；已往上讀 → 位置不動、出現「回到最新」的控制。
 // 「在底部」＝**最後一列完整落在捲動容器的可見區裡**（就是規格 S11／S12 的定義；不是一個像素閾值 —— 第一版的 24px 會讓「最後一列被切掉一點」時仍被拉到底，跟 S12 的前提衝突，審查抓到的）。
+// 收起（`FE-X16-S16`，design D5）：阻斷式面板開著時只畫一行（區域名稱＋期間新到的數；沒有列表、沒有輸入框，所以不可能持鎖）。
+// `log` 照舊由 provider 持有，展開時訊息都在；「期間新到的數」＝ `log.length − 收起時的長度`（換場景清空時歸零）。
+// 捲動位置：列表卸載會丟 `scrollTop`，所以 `onScroll` 一直記著最後一次的值，展開後在 layout effect 還原（在底部 → 捲到底；不在 → 還原、有新的就亮「回到最新」）。
 // 沒有 `SceneChatProvider`（單獨掛 `WorldCanvas` 的測試、預覽）就什麼都不畫。
 // ⚠️ 這裡的字是元件常數，不是規格。
 
 export const CHAT_HUD_LABELS = {
   region: '場景聊天',
   jumpToLatest: '回到最新',
+  newWhileCollapsed: (n: number) => `新訊息 ${n}`,
 }
 const focusWorldAnchor = () => document.querySelector<HTMLElement>('[data-focus-anchor="world"]')?.focus()
 /** 最後一列是不是完整在可見區裡（沒有列＝在底部）。次像素容差 0.5px。 */
@@ -42,6 +47,38 @@ export function SceneChatHud() {
   const atBottom = useRef(true)
   const [unseen, setUnseen] = useState(false)
   const log = chat?.log
+  const lastScrollTop = useRef(0)
+
+  // 收起：記下那一刻的 log 長度（「上一次繪製的值」模式，繪製期間 setState，不等 effect）
+  const blocking = useBlockingPanelOpen()
+  const [collapsedFrom, setCollapsedFrom] = useState<number | null>(null)
+  if (log !== undefined) {
+    if (blocking && collapsedFrom === null) setCollapsedFrom(log.length)
+    else if (!blocking && collapsedFrom !== null) setCollapsedFrom(null)
+    else if (collapsedFrom !== null && log.length < collapsedFrom) setCollapsedFrom(0) // 換場景清空：從 0 數
+  }
+  // 展開：還原捲動；收起期間有新的而且不在底部 → 亮「回到最新」
+  const wasCollapsedFrom = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    if (collapsedFrom !== null) {
+      wasCollapsedFrom.current = collapsedFrom
+      return
+    }
+    const from = wasCollapsedFrom.current
+    wasCollapsedFrom.current = null
+    const el = scroller.current
+    if (from === null || el === null || log === undefined) return
+    if (atBottom.current) {
+      el.scrollTop = el.scrollHeight
+      return
+    }
+    el.scrollTop = lastScrollTop.current
+    if (log.length <= from) return
+    const frame = requestAnimationFrame(() => {
+      if (!atBottom.current) setUnseen(true)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [collapsedFrom, log])
 
   useLayoutEffect(() => {
     const el = scroller.current
@@ -71,12 +108,22 @@ export function SceneChatHud() {
     })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [chat])
+  }, [chat, collapsedFrom])
 
   if (chat === null) return null
+  if (collapsedFrom !== null) {
+    return (
+      <section aria-label={CHAT_HUD_LABELS.region} data-testid="scene-chat" data-collapsed="" style={{ zIndex: layer('hud') }} className="bg-surface/90 border-line text-ink absolute bottom-gutter left-gutter w-[min(20rem,30vw)] rounded border p-2 backdrop-blur-sm">
+        <p {...withClass(CAPTION, 'text-ink-muted')}>
+          {CHAT_HUD_LABELS.region} · {CHAT_HUD_LABELS.newWhileCollapsed(chat.log.length - collapsedFrom)}
+        </p>
+      </section>
+    )
+  }
   const onScroll = () => {
     const el = scroller.current
     if (el === null) return
+    lastScrollTop.current = el.scrollTop
     atBottom.current = lastRowFullyVisible(el)
     if (atBottom.current) setUnseen(false)
   }
