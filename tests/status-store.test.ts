@@ -9,7 +9,7 @@ import { createStatusStore } from '@/realtime/statusStore'
 //
 // 純 store：`send` 是替身，不連任何外部服務。
 
-const TWELVE = '十二個全形字剛好十二個'
+const TWELVE = '一二三四五六七八九十壹貳'
 const THIRTEEN = `${TWELVE}多`
 const status = (text: string): StatusIn => ({ t: 'status', text })
 

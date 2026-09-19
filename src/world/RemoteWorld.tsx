@@ -8,6 +8,7 @@ import type { ConnectionEvent } from '@/world/scenes/SceneProvider'
 import { useWorldLease } from '@/realtime/WorldLeaseProvider'
 import { createMessageValidator, type ProtocolViolation } from '@/realtime/protocol'
 import type { SceneChatPort } from '@/realtime/sceneChatStore'
+import type { StatusLink, StatusPort } from '@/realtime/statusStore'
 import {
   applyMessage,
   createRemotePlayersState,
@@ -86,6 +87,11 @@ export interface RemoteWorldProps {
    */
   chat?: SceneChatPort
   /**
+   * 自己的狀態文字的口（`FE-K05`，design D1）：每條連線 **ready 之後** `attach()` 一次（attach 會重送非空的狀態，沒 ready 送會拋），
+   * `id === 自己` 的 `status` 回聲交給 `link.confirm()`（不進名單 —— 自己本來就不在名單裡）。**prop 不是 context**。沒給就沒有狀態。
+   */
+  status?: StatusPort
+  /**
    * 目前 scene 的在線人數變了（`FE-R10`，design D4）。`null` 是「還沒有初始 snapshot」—— 不是 0。
    *
    * ⚠️ **身分要穩定**（例如直接傳 `useState` 的 setter）：它在 effect 的依賴裡，
@@ -115,6 +121,7 @@ export function RemoteWorld({
   closeGateRef,
   onConnection,
   chat,
+  status,
   onOnlineCountChange,
   onRosterChange,
   tagNodesRef,
@@ -168,6 +175,7 @@ export function RemoteWorld({
     let cancelled = false
     // 這條連線在聊天記憶體裡的身分。注入的 sender 只收 `ChatIn`：序列化在這裡、`client.send()` 沒 ready 就拋 `RealtimeError`，不包、不吞。
     let link: ReturnType<SceneChatPort['attach']> | null = null
+    let statusLink: StatusLink | null = null
     // 在線人數跟著低頻 Presence view 一起通知（`FE-R10` D4）。status 也會走到這裡但人數沒變 ——
     // **不另外去重**：呼叫端傳的是 `useState` 的 setter，值相同時 React 不會重繪，
     // 在這裡多記一份「上次通知的值」是驗不到的程式碼。
@@ -177,7 +185,11 @@ export function RemoteWorld({
       scene,
       token,
       onStateChange: (state) => {
-        if (state === 'ready') onConnection?.({ kind: 'ready' }, scene)
+        if (state === 'ready') {
+          onConnection?.({ kind: 'ready' }, scene)
+          // 狀態的口在 ready 之後才接（`FE-K05-S04`）：attach 會把非空的狀態重送到這條新連線
+          statusLink ??= status?.attach((input) => client.send(JSON.stringify(input))) ?? null
+        }
       },
       onClosed: (info) => {
         // 卸載時 `client.close()` 也會發一次（code 1000、`opened` 看情況）—— 那是自己關的，不是連不上。
@@ -188,6 +200,8 @@ export function RemoteWorld({
         if (!result.ok) return
         // 聊天只分流 `t === 'chat'`，交的是驗證器產出的那個物件（`FE-R11-S01`）；自己的回聲也交（D2）。
         if (result.message.t === 'chat') link?.receive(result.message)
+        // 自己的 `status` 回聲是「目前狀態」的唯一來源（`FE-K05` D2）；別人的照樣進名單（下面的 `applyMessage`）
+        if (result.message.t === 'status' && result.message.id === client.selfId) statusLink?.confirm(result.message.text)
         // `selfId` 用來把自己排除在遠端玩家之外 —— `snapshot` 裡包含自己。
         if (applyMessage(state, result.message, client.selfId, now())) {
           // 名單真的變了才重繪。**這是唯一會呼叫 setState 的地方。**
@@ -221,6 +235,7 @@ export function RemoteWorld({
       cancelled = true
       clientRef.current = null
       link?.detach()
+      statusLink?.detach()
       const acked = client.close()
       // ⚠️ **接在前一個閘門後面，不是蓋掉它。** 連換兩次（A→B→C）時 B 可能還沒等到 A 的 ack 就卸載了：
       // B 自己沒有 socket，`close()` 立刻解決 —— 直接放進去的話 C 會立刻連，A 的 ack 就被跳過了。
@@ -241,7 +256,7 @@ export function RemoteWorld({
     // ⚠️ **`now` 也在依賴裡**，所以傳一個 inline 箭頭函式會每次重繪都重連。
     // 正式碼傳的是模組層級的 `monotonicNow`（身分穩定）；
     // 測試要傳假時鐘的話，也要傳一個身分穩定的。
-  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection, chat, onOnlineCountChange, onRosterChange])
+  }, [state, now, allowed, generation, scene, token, closeGateRef, onConnection, chat, status, onOnlineCountChange, onRosterChange])
 
   return (
     <>

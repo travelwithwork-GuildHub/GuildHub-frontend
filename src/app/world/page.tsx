@@ -6,6 +6,7 @@ import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
 import { RoomEntryGateProvider } from '@/world/scenes/RoomEntryGate'
 import { SceneChatProvider } from '@/realtime/SceneChatProvider'
+import { StatusProvider } from '@/realtime/StatusProvider'
 import { SceneNotices } from '@/world/scenes/SceneNotices'
 import { SceneProvider } from '@/world/scenes/SceneProvider'
 import { AppHeader } from './AppHeader'
@@ -37,6 +38,8 @@ export default function WorldPage() {
         <RoomEntryGateProvider>
         {/* 場景聊天（`FE-R11`）：記憶體與送出口在這裡，Canvas 裡的 `RemoteWorld` 靠 `WorldCanvas` 用 prop 接上；UI 是 `FE-K04`。 */}
         <SceneChatProvider>
+        {/* 自己的狀態文字（`FE-K05`）：送出口與「目前狀態」在這裡，跨場景不清；`RemoteWorld` 同樣靠 `WorldCanvas` 用 prop 接上。 */}
+        <StatusProvider>
         <WorldGate>
           <main className="flex h-dvh flex-col">
             {/* ⚠️ 標題列裡的 `IdentityBadge` 是 client component，這一頁仍然是同步的
@@ -54,6 +57,7 @@ export default function WorldPage() {
             </div>
           </main>
         </WorldGate>
+        </StatusProvider>
         </SceneChatProvider>
         </RoomEntryGateProvider>
         </SceneProvider>
