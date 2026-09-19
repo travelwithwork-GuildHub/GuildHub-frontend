@@ -18,7 +18,11 @@ const ResourceCreateBody = z.object({
   url: z.string(),
 })
 
-export const GET = handle({ auth: 'required' }, async ({ me, params }) => listResources(pathUuid(params, 'project_id'), me as string))
+// 讀取要看「這個 session 有沒有這間房的票」，所以把原始的 `Cookie` header 往下傳（`src/server/roomGrant.ts`）——
+// **前端的請求上不帶票**，帶的是它本來就會帶的 cookie，兩個目標的請求因此相同。
+export const GET = handle({ auth: 'required' }, async ({ me, params, request }) =>
+  listResources(pathUuid(params, 'project_id'), me as string, request.headers.get('cookie')),
+)
 
 export const POST = handle({ auth: 'required', body: ResourceCreateBody }, async ({ me, params, body }) =>
   json(await insertResource(pathUuid(params, 'project_id'), me as string, body), { status: 201 }),

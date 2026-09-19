@@ -103,6 +103,15 @@ export function onlineUrl(): string | null {
   return inject('contractOnlineUrl')
 }
 
+/**
+ * 這個目標把「伺服器端記住的票」放在名稱以此為前綴的 cookie 裡（一間房一個，`room-entry-gate` 的 D4）；
+ * 真後端放在它自己的 session cookie 裡、格式不是前端的事（ADR 0008）→ `null`。
+ * 這是目標的**能力**，不是目標的名字 —— 測試檔仍然不知道自己在打誰（`FE-O05-S02`）。
+ */
+export function roomGrantPrefix(): string | null {
+  return inject('contractRoomGrantPrefix')
+}
+
 /** 替身的格式探針（`FE-O03-S21`）：一張名片的 cookie，以及替它簽好的「不合法 scene 的票」與「seed 房間的票」；真後端沒有 → null。 */
 export interface StubProbe {
   id: string
@@ -122,5 +131,6 @@ declare module 'vitest' {
     contractUnimplemented: string[]
     contractOnlineUrl: string | null
     contractStubProbe: StubProbe | null
+    contractRoomGrantPrefix: string | null
   }
 }
