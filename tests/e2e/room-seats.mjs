@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
-import { assertLoopback, bad, failureCount, fakeRealtime, guardLoopback, ok, promptText, waitForWorld, walker } from './lib/world.mjs'
+import { assertLoopback, bad, failureCount, fakeRealtime, guardLoopback, lastReportedPosition, ok, promptText, waitForWorld, walker } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://127.0.0.1:3101'
 const OUT = process.env.OUT ?? '/tmp/guildhub-room-seats-shots'
@@ -37,24 +37,20 @@ const claimCount = (page) => page.locator('[data-testid="seat-marker"] button', 
 const feedback = (page) => page.$eval('[data-testid="seat-feedback"]', (n) => ({ role: n.getAttribute('role'), kind: n.dataset.kind, text: n.textContent ?? '' })).catch(() => null)
 
 await mkdir(OUT, { recursive: true })
-const browser = await chromium.launch({ headless: !HEADED, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
-
-/**
- * 兩個人同時畫 3D（swiftshader）會讓走位的相機收斂不了（`settle` 20 輪不穩 —— 實測第二次起就紅）。
- * 一個人走的時候把另一個人的分頁**凍住**（CDP `Page.setWebLifecycleState`：rAF／timer 都停），走完再解凍；判準都在解凍之後量。
- */
-async function frozen(who, value) {
-  const cdp = await who.context.newCDPSession(who.page)
-  await cdp.send('Page.setWebLifecycleState', { state: value ? 'frozen' : 'active' })
-  await cdp.detach()
-}
+// ⚠️ **兩個人各開一個瀏覽器（兩個 process）**，不是同一個瀏覽器兩個 context：同站的兩頁共用一個 renderer，後開的那頁拿走焦點、
+// 前一頁的鍵盤送到了角色卻不動；兩頁一起畫 3D（swiftshader）時 rAF 掉到 8 fps、門標籤的投影根本沒寫進 DOM（實測三次）。
+const launch = () => chromium.launch({ headless: !HEADED, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+const browsers = []
 
 /** 一個人：自己的 context、建身分、進世界。`rooms` 是一個盒子，成軍之後才知道 project id。 */
 async function person(name, rooms) {
+  const browser = await launch()
+  browsers.push(browser)
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 })
   guardLoopback(context)
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: FRONTEND })
-  fakeRealtime(context, [])
+  const sockets = []
+  fakeRealtime(context, sockets)
   await context.route('**/api/rooms', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rooms.current) }))
   const page = await context.newPage()
   await page.goto(`${FRONTEND}/login`)
@@ -66,7 +62,7 @@ async function person(name, rooms) {
   await page.click('button:has-text("進入世界")')
   await page.waitForURL('**/world', { timeout: 30_000 })
   await waitForWorld(page)
-  return { context, page, name }
+  return { context, page, name, sockets }
 }
 
 /** owner 在面板裡發案（座位 2）並成軍，回 project id。 */
@@ -93,15 +89,42 @@ async function createAndForm(page) {
   return projectId
 }
 
+/**
+ * 角色吃不吃鍵盤，看**自己回報給（假）socket 的位置**有沒有變 —— 不看門標籤：門在畫面邊緣時標籤放不進畫面、投影根本不寫（`labelRectFor` 回 null），
+ * 拿它當「沒動」的證據會誤判（實測）。沒動就點一下世界再試（最多 4 次）：後開的分頁會拿走焦點，鍵盤送到了角色卻不動。
+ */
+async function ensureKeyboardMoves(who) {
+  const { page, sockets, name } = who
+  const socket = () => sockets[sockets.length - 1]
+  for (let i = 0; i < 4; i++) {
+    const before = lastReportedPosition(socket())
+    await page.keyboard.down('ArrowRight')
+    await page.waitForTimeout(250)
+    await page.keyboard.up('ArrowRight')
+    await page.waitForTimeout(600)
+    const after = lastReportedPosition(socket())
+    if (before !== null && after !== null && Math.abs(after.x - before.x) > 0.05) {
+      if (i > 0) console.log(`   （${name} 點了 ${i} 次才吃到鍵盤）`)
+      // 走回去（往西同樣久），讓 walker 從出生點附近開始
+      await page.keyboard.down('ArrowLeft')
+      await page.waitForTimeout(250)
+      await page.keyboard.up('ArrowLeft')
+      await page.waitForTimeout(300)
+      return
+    }
+    await page.mouse.click(640, 300)
+    await page.waitForTimeout(300)
+  }
+  throw new Error(`${name} 的角色不吃鍵盤（點了 4 次）：${JSON.stringify({ before: lastReportedPosition(socket()), frames: socket()?.sent.length })}`)
+}
+
 /** 從大廳走到門前、按 E、輸入密碼、等過場結束、等座位標籤。 */
 async function enterRoom(who, room) {
   const { page } = who
   await page.goto(`${FRONTEND}/world`)
   await waitForWorld(page)
   // 兩個 context 同開時，後開的那頁拿走了瀏覽器的焦點：前一頁的 `keyboard.down` 送到了、視窗卻不算 focused，角色不動（實測：`hasFocus()` 仍是 true，點一下才會動）。
-  await page.bringToFront()
-  await page.mouse.click(640, 300)
-  await page.waitForTimeout(200)
+  await ensureKeyboardMoves(who)
   const { approachDoor } = walker({ room, decoy: DECOY, title: TITLE, out: OUT })
   const { prompt } = await approachDoor(page)
   if (prompt === null || !prompt.includes(TITLE)) throw new Error(`${who.name} 不在門前（提示是「${prompt}」）`)
@@ -132,13 +155,10 @@ try {
   const apiHits = []
   const onRequest = (r) => { if (r.url().includes('/api/')) apiHits.push(`${r.method()} ${new URL(r.url()).pathname.replace(room, '<room>').replace(/[0-9a-f-]{36}/, '<id>')}`) }
   A.context.on('request', onRequest)
-  await frozen(B, true)
+  // A 走的時候 B 先停在空白頁（少一個 3D 畫面的負載）；B 進房時 A 已在房間裡（那就是要觀察的畫面，不能離開）
+  await B.page.goto('about:blank')
   await enterRoom(A, room)
-  await frozen(B, false)
-  await frozen(A, true)
   await enterRoom(B, room)
-  await frozen(A, false)
-  await A.page.waitForTimeout(1000)
   for (const who of [A, B]) {
     check(`[S05] ${who.name}：0 號是空位`, (await markerText(who.page, 0))?.includes('空位'), true)
     check(`[S05] ${who.name}：1 號是空位`, (await markerText(who.page, 1))?.includes('空位'), true)
@@ -207,7 +227,7 @@ try {
 } catch (err) {
   bad('腳本中途拋出', err instanceof Error ? (err.stack ?? err.message) : String(err))
 } finally {
-  await browser.close()
+  for (const b of browsers) await b.close()
 }
 if (failureCount() > 0) {
   console.log(`\n${failureCount()} 條沒過`)
