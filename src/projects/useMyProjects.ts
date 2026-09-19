@@ -23,7 +23,10 @@ export interface MyProjectsApi {
 }
 
 const LOADING: MyProjectsState = { phase: 'loading' }
-/** 一次掃描的識別：誰、開不開、第幾次重掃。結果帶著它，對不上的就是舊掃描（跟 abort 是兩道防線）；也讓「新掃描開始＝載入中」是推導的，不用在 effect 裡 setState。 */
+/**
+ * 一次掃描的識別：誰、開不開、第幾次重掃 —— 讓「新掃描開始＝載入中」是推導的（不在 effect 裡 setState）。
+ * ⚠️ **它不是舊回應的防線**：切走再切回來 key 一樣。作廢靠 effect cleanup 的 `abort()`（突變：拿掉 abort → `S05` 紅；只拿掉 key 比對 → 仍綠，是等價突變）。
+ */
 const keyOf = (me: string, active: boolean, generation: number) => `${me}:${active ? 1 : 0}:${generation}`
 
 /** 一種狀態從第 0 頁翻到底或上限；回每一頁與有沒有到上限。 */
