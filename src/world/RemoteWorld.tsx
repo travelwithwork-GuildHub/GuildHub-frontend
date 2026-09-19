@@ -233,8 +233,8 @@ export function RemoteWorld({
           clearRemote()
           onConnection?.({ kind: 'recovering' }, scene)
           retry.schedule(() => {
-            if (cancelled) return
-            // 到點才問「還是我嗎」（`S10`）：過場中、場景換了就放棄，新的 effect 會接手
+            // 排到點才跑：卸載／換場景時 cleanup 已 `retry.cancel()` 清掉這個計時器，走到這裡代表還掛著。
+            // 剩下問「還是我嗎」（`S10`）：過場中、場景換了就放棄，新的 effect 會接手。
             if (canReconnect !== undefined && !canReconnect(scene)) return
             open()
           })
