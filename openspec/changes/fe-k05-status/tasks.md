@@ -5,7 +5,7 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-k05-status` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-k05-status --strict` 通過且 PR 已合併
+- [x] 1.1（#560 合併）規格已在 PR 上談定（`spec/fe-k05-status` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-k05-status --strict` 通過且 PR 已合併
 
 ## 2. `--store`：送出的口、重送、回聲（〈設定狀態〉的傳輸半邊、〈重送〉；design D1／D2／D4）
 
@@ -26,7 +26,7 @@
 
 ## 5. 收尾
 
-- [ ] 5.1 每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響
+- [x] 5.1（main f61fc0c：eslint 0、tsc 0、vitest 1414＋27 綠；`--pending` 修 archive-review 兩條）每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響
 - [ ] 5.2 合併後 `vercel deploy --prod`、閘道一次人工 smoke（只走不壓：設狀態、第二個瀏覽器看到）
 - [ ] 5.3 tasks 全勾後、archive 前：`archive-review.sh fe-k05-status`（背景）；需修正修完 `--rereview` 一次、每條 `--judge`
 - [ ] 5.4 Sheet `FE-K05` → Done（瀏覽器層驗過之後才打）
