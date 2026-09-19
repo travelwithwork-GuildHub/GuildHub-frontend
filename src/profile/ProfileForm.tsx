@@ -132,7 +132,8 @@ export function ProfileForm({ profile, onDone, closeIntentRef, askDiscard }: Pro
 
       <SubmitError message={submitError} />
       <div className="flex gap-gutter">
-        <button type="submit" {...PRIMARY} disabled={!canSubmit}>
+        {/* 沒改就沒有東西可存：`disabled`（`FE-X16-S09` 名片「沒改：零個」）；dirty 的定義跟關閉確認同一份 */}
+        <button type="submit" {...PRIMARY} disabled={!canSubmit || !dirty}>
           {PROFILE_FORM_LABELS.save}
         </button>
         <button type="button" {...SECONDARY} onClick={requestClose} disabled={busy}>

@@ -230,7 +230,8 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
           </p>
           <p {...withClass(CAPTION, 'text-ink-muted')}>{OWNER_ACTION_LABELS.revealHint}</p>
           <div className="flex flex-wrap gap-gutter">
-            <button type="button" {...SECONDARY} aria-disabled={writingNow} onClick={() => void copy()}>
+            {/* 密碼呈現中推薦的下一步是把密碼帶走（`FE-X16-S09`）：「複製密碼」主要、「寄給隊員」次要、下面的「結案」也退成次要 */}
+            <button type="button" {...PRIMARY} aria-disabled={writingNow} onClick={() => void copy()}>
               {OWNER_ACTION_LABELS.copy}
             </button>
             {onSendToTeam && (
@@ -258,7 +259,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
       )}
 
       {project.status === 'active' && !confirming && (
-        <button ref={closeButton} type="button" {...SECONDARY} onClick={() => setConfirming(true)}>
+        <button ref={closeButton} type="button" {...(revealed === null ? PRIMARY : SECONDARY)} onClick={() => setConfirming(true)}>
           {OWNER_ACTION_LABELS.close}
         </button>
       )}

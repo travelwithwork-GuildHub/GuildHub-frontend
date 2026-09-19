@@ -1,6 +1,6 @@
 'use client'
 
-import { SECONDARY } from '@/design/controls'
+import { PRIMARY } from '@/design/controls'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { useInboxIfProvided } from './InboxPanelProvider'
 
@@ -18,7 +18,8 @@ export function SendMessageButton({ to, label = SEND_MESSAGE_LABEL }: { to: stri
   return (
     <button
       type="button"
-      {...SECONDARY}
+      // 這個詳情上唯一的前進動作 → 主要（`FE-X16-S09`）
+      {...PRIMARY}
       data-testid="send-message"
       // 協調者讓看板讓位（不還焦點），收件匣掛載時持自己那把鎖、把焦點拿進來。design `D1` 的交接。
       onClick={() => inbox.openThreadFromTalent(to)}
