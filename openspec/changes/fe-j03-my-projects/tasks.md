@@ -15,9 +15,9 @@
 
 ## 3. `--scan`：掃描與 `MyProjects`（〈三種狀態逐頁掃描〉〈晚到的回應〉；design D2／D3）
 
-- [ ] 3.1 判準先紅：`tests/my-projects.test.tsx` 的 `S02`（8 個請求、9 筆、排序、看過 128、`closed` 到上限）、`S03`（loading／empty／failed＋重試／blocked）、`S05`（切回招募中晚到不混；重掃作廢）；`tests/list-panel*.test.tsx` 補「有 `body` 時不畫列表與翻頁、`useListPage` 不打」
-- [ ] 3.2 `src/projects/myProjectsScan.ts`（`mergeMine`、`nextPage`、`MAX_PAGES=5`）、`src/projects/useMyProjects.ts`（三條並行、generation＋abort）、`src/projects/MyProjects.tsx`（三種狀態、標示、卡片）、`ListPanel` 的 `body`
-- [ ] 3.3 突變：到上限不停 → `S02` 紅；不滿一頁繼續打 → `S02` 紅；沒過濾 `owner_id` → `S02` 紅；失敗仍呈現部分結果 → `S03` 紅；不比 generation → `S05` 紅
+- [x] 3.1（`my-projects.test.tsx` 7 條：純函式 2、S02、S03 ×2、S05 hook 半邊、S04 patch；`list-panel-container.test.tsx` body 1 條；contract-server 的 `replyFor` 可帶 query —— 三種 status 並行時回應要對得上）判準先紅：`tests/my-projects.test.tsx` 的 `S02`（8 個請求、9 筆、排序、看過 128、`closed` 到上限）、`S03`（loading／empty／failed＋重試／blocked）、`S05`（切回招募中晚到不混；重掃作廢）；`tests/list-panel*.test.tsx` 補「有 `body` 時不畫列表與翻頁、`useListPage` 不打」
+- [x] 3.2（`ListPanel` 把分頁那一半抽成 `PagedList`，`body` 開著時它不掛；`reload` 由子元件掛載後交上來）`src/projects/myProjectsScan.ts`（`mergeMine`、`nextPage`、`MAX_PAGES=5`）、`src/projects/useMyProjects.ts`（三條並行、generation＋abort）、`src/projects/MyProjects.tsx`（三種狀態、標示、卡片）、`ListPanel` 的 `body`
+- [x] 3.3（8 個：6 紅、2 等價 —— 成功回呼不看 aborted／不比 key，abort 之後 fetch 本來就 reject；**拿掉 abort → S05 紅**，切走再切回來 key 相同，abort 是唯一防線，已註明）突變：到上限不停 → `S02` 紅；不滿一頁繼續打 → `S02` 紅；沒過濾 `owner_id` → `S02` 紅；失敗仍呈現部分結果 → `S03` 紅；不比 generation → `S05` 紅
 
 ## 4. `--board`：工具列切換、詳情接合、真瀏覽器（〈入口〉〈卡片與詳情共用〉〈真瀏覽器〉；design D4／D5）
 
