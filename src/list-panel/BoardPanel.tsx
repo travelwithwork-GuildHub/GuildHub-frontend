@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ProfileOut, ProjectOut } from '@/api/contract/rest'
-import { PRIMARY } from '@/design/controls'
+import { PRIMARY, SECONDARY } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { toUiError } from '@/errors/uiError'
 import { useIdentity } from '@/identity/IdentityProvider'
@@ -12,6 +12,8 @@ import type { CloseIntent } from '@/profile/ProfileForm'
 import { ProjectCard } from '@/projects/ProjectCard'
 import { OwnerActions } from '@/projects/OwnerActions'
 import { ProjectDetail } from '@/projects/ProjectDetail'
+import { MyProjects } from '@/projects/MyProjects'
+import { useMyProjects } from '@/projects/useMyProjects'
 import { useRoomsRefresh } from '@/world/rooms/RoomsRefreshContext'
 import { TalentCard } from '@/talent/TalentCard'
 import { useInboxIfProvided } from '@/inbox/InboxPanelProvider'
@@ -49,6 +51,8 @@ const LABELS = { next: '下一頁', close: '關閉' }
 const DETAIL_TITLES: Record<ListKind, string> = { projects: '案件', profiles: '人才' }
 const BACK_LABEL = '返回'
 const CREATE_LABEL = '發案'
+/** 案件看板的視圖切換（`FE-J03`）：兩顆 `aria-pressed` 的次要鈕，只給已登入的人（跟「發案」同一條）。 */
+export const BOARD_VIEW_LABELS = { group: '看板視圖', recruiting: '招募中', mine: '我的案件' } as const
 const MESSAGE_OWNER_LABEL = '私訊發案者'
 
 /** 人才那一支：選中的 id 在 provider，列表手上的那一筆（詳情的載入中預覽）在這裡。 */
@@ -116,9 +120,13 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
  * `requestClose()` 回 `void`，`??` 右邊照樣執行，dirty 確認與送出中不可關全部被繞過（codex 審查抓到的；`S07` 對殼的關閉鈕有判準）。
  */
 function ProjectBoard() {
-  const { closePanel, yieldPanel, page, reportPage, selected, selectProject } = useListPanel()
+  const { closePanel, yieldPanel, page, reportPage, selected, selectProject, view, setView } = useListPanel()
   const identity = useIdentity()
   const signedIn = identity.state === 'signed-in'
+  // 「我的案件」視圖（`FE-J03`）：`view=mine` 就換內容（身分還沒問完也先換 —— 直達時不能先送一次招募中的 `page=0`，`S07`）；
+  // 掃描等身分問完才開始（訪客照掃、401 → 權限阻擋，跟招募中清單對訪客的行為一樣）。
+  const mineActive = view === 'mine'
+  const mine = useMyProjects({ me: identity.state === 'signed-in' ? identity.profile.id : '', active: mineActive && identity.state !== 'unknown' })
   // 成軍／結案（`FE-J04`）的交接：門的立即重取（沒有 provider 是 no-op）、「寄給隊員」開收件匣清單（沒有收件匣就只關看板）。
   const refreshRooms = useRoomsRefresh()
   const inbox = useInboxIfProvided()
@@ -203,9 +211,39 @@ function ProjectBoard() {
       onShownPage={reportPage}
       toolbar={
         signedIn ? (
-          <button type="button" {...PRIMARY} onClick={() => setComposing(true)}>
-            {CREATE_LABEL}
-          </button>
+          <div className="flex flex-wrap items-center gap-gutter">
+            <button type="button" {...PRIMARY} onClick={() => setComposing(true)}>
+              {CREATE_LABEL}
+            </button>
+            {/* 視圖切換（`FE-J03-S01`）：同一個面板換內容，網址走 replace（同一層）。一個操作區一個主要動作：「發案」主要、這兩顆次要（`FE-X16-S09`） */}
+            <div role="group" aria-label={BOARD_VIEW_LABELS.group} className="flex gap-2">
+              <button type="button" {...SECONDARY} aria-pressed={!mineActive} onClick={() => setView(null)}>
+                {BOARD_VIEW_LABELS.recruiting}
+              </button>
+              <button type="button" {...SECONDARY} aria-pressed={mineActive} onClick={() => setView('mine')}>
+                {BOARD_VIEW_LABELS.mine}
+              </button>
+            </div>
+          </div>
+        ) : undefined
+      }
+      // 我的案件：換掉分頁列表（design D2）；卡片同一種、點開同一個詳情
+      body={
+        mineActive ? (
+          <MyProjects
+            state={mine.state}
+            retry={mine.retry}
+            renderItem={(item, { fetchedAt }) => (
+              <ProjectCard
+                project={item}
+                now={fetchedAt}
+                onOpen={() => {
+                  setPreview(item)
+                  selectProject(item.id)
+                }}
+              />
+            )}
+          />
         ) : undefined
       }
       empty={<EmptyState kind="first-empty" />}
@@ -233,6 +271,8 @@ function ProjectBoard() {
                     }}
                     onReplaced={(next) => {
                       replace(next)
+                      // 我的案件裡那一筆就地更新、不重掃（`FE-J03-S04`；招募中視圖沒在掃，`patch` 是 no-op）
+                      mine.patch(next)
                       if (next.status === 'active') reload()
                       try {
                         refreshRooms()
@@ -255,7 +295,9 @@ function ProjectBoard() {
                     // 成功：關表單、列表回第 0 頁重取（不插入回應，design D2）；焦點由 `ListPanel` 還給列表。
                     onCreated={() => {
                       closeForm()
-                      reload()
+                      // 招募中：回第 0 頁重取；我的案件：重掃（新案子要出現在裡面，design D5）
+                      if (mineActive) mine.retry()
+                      else reload()
                     }}
                     onDismiss={closeForm}
                     closeIntentRef={closeIntentRef}

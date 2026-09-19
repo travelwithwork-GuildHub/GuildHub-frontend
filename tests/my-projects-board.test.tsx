@@ -24,9 +24,9 @@ const UUID = (n: number) => `66666666-6666-4666-8666-${String(n).padStart(12, '0
 const ME = { id: UUID(900), display_name: '我', avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-10T00:00:00Z' }
 const OTHER = { ...ME, id: UUID(901), display_name: '別人' }
 let seq = 0
-const project = (owner: string, status: ProjectStatus, title: string): ProjectOut => {
+const project = (owner: { id: string }, status: ProjectStatus, title: string): ProjectOut => {
   seq += 1
-  return { id: UUID(seq), owner_id: owner, title, body: '內容', needed_skills: [], status, room_template: status === 'recruiting' ? null : 0, seat_count: 4, expires_at: new Date(Date.now() + 5 * 86_400_000).toISOString(), updated_at: new Date(Date.UTC(2026, 8, 1) - seq * 60_000).toISOString() }
+  return { id: UUID(seq), owner_id: owner.id, title, body: '內容', needed_skills: [], status, room_template: status === 'recruiting' ? null : 0, seat_count: 4, expires_at: new Date(Date.now() + 5 * 86_400_000).toISOString(), updated_at: new Date(Date.UTC(2026, 8, 1) - seq * 60_000).toISOString() }
 }
 const recruitingPage = (n: number) => Array.from({ length: PAGE_SIZE }, (_, i) => project(OTHER, 'recruiting', `招募 ${n}-${i}`))
 const path = (status: ProjectStatus, n: number) => `/api/projects?status=${status}&page=${n}`
@@ -173,6 +173,8 @@ describe('卡片與詳情共用；詳情裡成軍或結案之後回來，那一�
     expect(refreshRooms, '門的立即重取照舊').toHaveBeenCalledTimes(1)
     click(btn('返回'))
     await waitFor(() => expect(screen.queryByTestId('project-detail')).toBeNull())
+    // 返回是 `history.go(-1)`（非同步 popstate）：等網址落地，不然 popstate 會打到下一條測試（`deep-link.test.tsx` 的教訓）
+    await waitFor(() => expect(url()).toBe('/world?panel=projects&view=mine'))
     expect(within(cards()[0] as HTMLElement).getByTestId('project-status').textContent).toBe('已成軍')
     expect(scanCalls().length, '成軍回來不該重掃').toBe(scansBefore)
 
@@ -186,6 +188,7 @@ describe('卡片與詳情共用；詳情裡成軍或結案之後回來，那一�
     await waitFor(() => expect(within(screen.getByTestId('project-detail')).getByTestId('project-status').textContent).toBe('已結案'))
     click(btn('返回'))
     await waitFor(() => expect(screen.queryByTestId('project-detail')).toBeNull())
+    await waitFor(() => expect(url()).toBe('/world?panel=projects&view=mine'))
     expect(titles()).toEqual(['我的招募'])
     expect(within(cards()[0] as HTMLElement).getByTestId('project-status').textContent).toBe('已結案')
     expect(scanCalls().length).toBe(scansBefore)
