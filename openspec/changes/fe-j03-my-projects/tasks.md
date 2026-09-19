@@ -5,13 +5,13 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-j03-my-projects` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-j03-my-projects --strict` 通過且 PR 已合併
+- [x] 1.1（#538）規格已在 PR 上談定（`spec/fe-j03-my-projects` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-j03-my-projects --strict` 通過且 PR 已合併
 
 ## 2. `--url`：`view=mine` 進網址與 provider；`listProjects` 多 `status`（`deep-link` MODIFIED；design D1）
 
-- [ ] 2.1 判準先紅：`tests/deep-link*.test.tsx` 補 `S07`（`view=mine` 開在我的案件且不送 `page=0`；`profiles` 下去掉；`bogus` 去掉；`view=mine` 去 `page`；切換兩次網址依序、`pushState` 零次）；契約判準補 `listProjects({ status })` 的請求形狀
-- [ ] 2.2 `urlState.ts`（解析／序列化 `view`）、`ListPanelProvider`（`route.view`、`setView`）、`PanelUrlSync`（replace）；`operations.ts` 的 `listProjects` 多 `status`
-- [ ] 2.3 突變：`view` 在 `profiles` 下不去掉 → `S07` 紅；`view=mine` 留 `page` → `S07` 紅；切換用 push → `S07` 紅
+- [x] 2.1（`url-state.test.ts` 純函式 15 條、`deep-link.test.tsx` 網址半邊 3 條、`list-paging-request.test.ts` 2 條；「不送 page=0」與「返回回到我的案件」要等視圖的畫面，在 `--board`）判準先紅：`tests/deep-link*.test.tsx` 補 `S07`（`view=mine` 開在我的案件且不送 `page=0`；`profiles` 下去掉；`bogus` 去掉；`view=mine` 去 `page`；切換兩次網址依序、`pushState` 零次）；契約判準補 `listProjects({ status })` 的請求形狀
+- [x] 2.2 `urlState.ts`（解析／序列化 `view`）、`ListPanelProvider`（`route.view`、`setView`）、`PanelUrlSync`（replace）；`operations.ts` 的 `listProjects` 多 `status`
+- [x] 2.3（四個：profiles 下不去掉 → 2 紅；view=mine 留 page（解析）→ 2 紅；序列化寫 page → 1 紅；depthOf 把 view 算一層（等於 push）→ 2 紅）突變：`view` 在 `profiles` 下不去掉 → `S07` 紅；`view=mine` 留 `page` → `S07` 紅；切換用 push → `S07` 紅
 
 ## 3. `--scan`：掃描與 `MyProjects`（〈三種狀態逐頁掃描〉〈晚到的回應〉；design D2／D3）
 
