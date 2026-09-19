@@ -27,8 +27,8 @@ import { SceneProvider } from '@/world/scenes/SceneProvider'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
 // 規格：openspec/changes/fe-x16-dom-visual-and-flow/specs/dom-visual-system/spec.md
-//   Requirement: 同一時間只有一個阻斷式面板；讓位有協定；非阻斷的提示讓位 —— S13、S14、S15、S16、S17、S18、S21、S22（jsdom 半邊；
-//   `focusin` 序列、捲動位置、真瀏覽器的上一頁／下一頁在 `tests/e2e/dom-visual.mjs`）
+//   Requirement: 同一時間只有一個阻斷式面板；讓位有協定；非阻斷的提示讓位 —— S13（看板↔收件匣、寄信那條路）、S17（接受的那一半）、S21（前兩段）、S22
+//   （jsdom 半邊；名片、拒絕讓位、非阻斷表面在 `--flow-yield`；`focusin` 序列、真瀏覽器的上一頁／下一頁在 `tests/e2e/dom-visual.mjs`）
 //
 // 整棵樹是 `page.tsx` ＋ `WorldCanvas` 的形狀：協調者 > IdentityProvider（真的，contract-server 給 /api/me）> ProfilePanelProvider > InboxPanelProvider >
 // SceneProvider > SceneChatProvider > [ 標題列（名片、收件匣、換角色），InteractionProvider > ListPanelProvider > [ WorldUrlSync、看板、世界錨裡的三個面板與聊天框 ]，訪客提示 ]。
@@ -201,48 +201,12 @@ const url = () => `${window.location.pathname}${window.location.search}`
 const inboxButton = () => screen.getByTestId('inbox-button')
 /** 收件匣每次從關閉打開都重取第 0 頁：開之前先排一份回應（contract-server 的佇列不分方法，不能預先堆 —— 寄信的 POST 會吃到）。 */
 const willOpenInbox = (messages: MessageOut[] = []) => server.replyFor('/api/messages', 200, messages)
-const badge = () => screen.getByRole('button', { name: /^我的名片/ })
 const listPanel = () => screen.queryByTestId('list-panel')
 const inboxPanel = () => screen.queryByTestId('inbox-panel')
 const profilePanel = () => screen.queryByTestId('profile-panel')
 const blockingPanels = () => [listPanel(), inboxPanel(), profilePanel()].filter((p) => p !== null)
-const statusText = () => [...document.querySelectorAll('[role="status"]')].map((el) => el.textContent?.trim() ?? '').filter((t) => t !== '')
-/** 一個可以從外面放行的 pending。 */
-function gate() {
-  let release: () => void = () => {}
-  const promise = new Promise<void>((resolve) => (release = resolve))
-  return { promise, release: () => release() }
-}
-/** 案件詳情裡把成軍表單送出、壓著不回（`FE-J04-S04` 的「送出中」）。 */
-async function holdFormTeam(p: ProjectOut) {
-  const detail = screen.getByTestId('project-detail')
-  await waitFor(() => expect(detail.dataset.phase).toBe('ready'))
-  await waitFor(() => expect(screen.getByTestId('owner-card').dataset.phase).toBe('ready'))
-  click(within(detail).getByRole('button', { name: '成軍', hidden: true }))
-  await type(within(detail).getByLabelText('房間密碼'), 'demo-1234')
-  const held = gate()
-  server.replyFor(`/api/projects/${p.id}/form-team`, 200, { ...p, status: 'active' }, { after: held.promise })
-  await act(async () => (screen.getByTestId('form-team-form') as HTMLFormElement).requestSubmit())
-  await waitFor(() => expect(server.calls.filter((c) => c.pathname === `/api/projects/${p.id}/form-team`)).toHaveLength(1))
-  return held
-}
-/** 收件匣對話裡寄一封、壓著不回。 */
-async function holdSend() {
-  willOpenInbox([msg(1)])
-  click(inboxButton())
-  const row = await screen.findByTestId('inbox-thread-item')
-  click(row)
-  const field = await screen.findByLabelText('寫一封信')
-  await type(field, '哈囉')
-  const held = gate()
-  server.replyFor('/api/messages', 201, msg(9, ME.id, OTHER.id), { after: held.promise })
-  await act(async () => (field.closest('form') as HTMLFormElement).requestSubmit())
-  await waitFor(() => expect(server.calls.filter((c) => c.method === 'POST' && c.pathname === '/api/messages')).toHaveLength(1))
-  return held
-}
-
 describe('同一時間只有一個阻斷式面板', () => {
-  it('[FE-X16-S13] 看板→收件匣→名片→收件匣：後開的取代先開的、焦點在新面板內、不經開啟者與 body、網址退；人才詳情寄信也一樣', SLOW, async () => {
+  it('[FE-X16-S13] 看板→收件匣：後開的取代先開的、焦點在新面板內、不經開啟者與 body、網址退；人才詳情寄信也一樣', SLOW, async () => {
     await mount()
     pressE()
     expect(listPanel()?.dataset.kind).toBe('profiles')
@@ -262,15 +226,6 @@ describe('同一時間只有一個阻斷式面板', () => {
     document.removeEventListener('focusin', onFocusIn)
     await waitFor(() => expect(url()).toBe('/world'))
 
-    click(badge())
-    expect(inboxPanel()).toBeNull()
-    expect(profilePanel()).not.toBeNull()
-    expect(blockingPanels()).toHaveLength(1)
-    willOpenInbox()
-    click(inboxButton())
-    expect(profilePanel()).toBeNull()
-    expect(inboxPanel()).not.toBeNull()
-    expect(blockingPanels()).toHaveLength(1)
     escape()
     expect(blockingPanels()).toHaveLength(0)
 
@@ -289,93 +244,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     await waitFor(() => expect(url()).toBe('/world'))
   })
 
-  it('[FE-X16-S14] 成軍送出中拒絕讓位：收件匣不開、詳情留著、焦點留在按鈕、有 status；回來後接受；名片 dirty 也拒絕且不出確認', SLOW, async () => {
-    const p = project()
-    await mount({ project: p, url: `/world?panel=projects&project=${p.id}` })
-    const held = await holdFormTeam(p)
-    click(inboxButton())
-    expect(inboxPanel()).toBeNull()
-    expect(screen.queryByTestId('project-detail')).not.toBeNull()
-    expect(document.activeElement).toBe(inboxButton())
-    expect(statusText(), '拒絕要有看得到的回饋').not.toHaveLength(0)
-    held.release()
-    await waitFor(() => expect(within(screen.getByTestId('project-detail')).getByTestId('project-status').textContent).toBe('已成軍'))
-    willOpenInbox()
-    click(inboxButton())
-    expect(listPanel()).toBeNull()
-    expect(inboxPanel()).not.toBeNull()
-    escape()
-
-    click(badge())
-    click(within(profilePanel()!).getByRole('button', { name: '編輯' }))
-    const name = within(profilePanel()!).getByLabelText('在世界裡顯示的名字') as HTMLInputElement
-    await type(name, '改了名字')
-    click(inboxButton())
-    expect(inboxPanel()).toBeNull()
-    expect(profilePanel()).not.toBeNull()
-    expect((within(profilePanel()!).getByLabelText('在世界裡顯示的名字') as HTMLInputElement).value).toBe('改了名字')
-    expect(screen.queryByRole('alertdialog'), '讓位不替使用者按下「放棄修改？」').toBeNull()
-    expect(document.activeElement).toBe(inboxButton())
-    expect(statusText()).not.toHaveLength(0)
-  })
-
-  it('[FE-X16-S15] 訪客提示讓位、關了回來、輸入中的名字沒丟；先關掉提示或走完的不回來', SLOW, async () => {
-    await mount({ guest: true })
-    const notice = () => screen.getByTestId('first-entry-notice')
-    expect(notice()).toBeVisible()
-    await type(within(notice()).getByLabelText('在世界裡顯示的名字'), '打到一半')
-    pressE()
-    expect(listPanel()).not.toBeNull()
-    expect(notice()).not.toBeVisible()
-    escape()
-    expect(notice()).toBeVisible()
-    expect((within(notice()).getByLabelText('在世界裡顯示的名字') as HTMLInputElement).value, '讓位不重設提示裡的狀態').toBe('打到一半')
-    click(within(notice()).getByRole('button', { name: '先四處看看' }))
-    expect(screen.queryByTestId('first-entry-notice')).toBeNull()
-    pressE()
-    escape()
-    expect(screen.queryByTestId('first-entry-notice'), '關掉了就不回來').toBeNull()
-  })
-
-  it('[FE-X16-S15] 走完首次進入之後開看板、關看板：提示不回來', SLOW, async () => {
-    await mount({ guest: true })
-    const notice = screen.getByTestId('first-entry-notice')
-    server.replyFor('/api/login', 200, ME)
-    server.replyFor('/api/profiles/me', 200, ME)
-    await type(within(notice).getByLabelText('在世界裡顯示的名字'), '阿福')
-    click(within(notice).getByRole('button', { name: '建立我的身分' }))
-    await screen.findByTestId('recovery-key')
-    await act(async () => {
-      Object.assign(navigator, { clipboard: { writeText: async () => {} } })
-      screen.getByRole('button', { name: '複製鑰匙' }).click()
-    })
-    await screen.findByText(/已經複製了/)
-    click(screen.getByRole('button', { name: '進入世界' }))
-    await waitFor(() => expect(screen.queryByTestId('first-entry-notice')).toBeNull())
-    pressE()
-    escape()
-    expect(screen.queryByTestId('first-entry-notice')).toBeNull()
-  })
-
-  it('[FE-X16-S16] 面板開著聊天框收成一行、顯示期間新到的數、不持鎖；關了展開、訊息都在', SLOW, async () => {
-    await mount()
-    const link = g().chat!.attach(() => {}, 'lobby')
-    const receive = (n: number) => act(() => link.receive({ t: 'chat', id: OTHER.id, name: '別人', body: `第 ${n} 則` }))
-    receive(0)
-    expect(screen.getAllByTestId('chat-row')).toHaveLength(1)
-    pressE()
-    const hud = screen.getByTestId('scene-chat')
-    expect(within(hud).queryByTestId('chat-feed')).toBeNull()
-    expect(within(hud).queryByRole('textbox')).toBeNull()
-    for (let i = 1; i <= 3; i += 1) receive(i)
-    expect(hud.textContent).toContain('3')
-    escape()
-    expect(g().lock.current, '面板關了、聊天框收起狀態沒有留下鎖').toBe(false)
-    expect(screen.getAllByTestId('chat-row')).toHaveLength(4)
-    expect(within(screen.getByTestId('scene-chat')).getByRole('textbox')).toBeTruthy()
-  })
-
-  it('[FE-X16-S17] 下一頁要求重開看板：接受就重開；送出中拒絕 → replaceState 一次、pushState 零次、網址沒有 panel；再上一頁回原本那一筆', SLOW, async () => {
+  it('[FE-X16-S17] 下一頁要求重開看板：持有者接受就重開（拒絕的那一半在 --flow-yield）', SLOW, async () => {
     await mount()
     pressE()
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
@@ -386,51 +255,9 @@ describe('同一時間只有一個阻斷式面板', () => {
     await waitFor(() => expect(listPanel()).not.toBeNull())
     expect(inboxPanel()).toBeNull()
     expect(url()).toBe('/world?panel=profiles')
-
-    const held = await holdSend()
-    await waitFor(() => expect(url()).toBe('/world'))
-    const push = vi.spyOn(window.history, 'pushState')
-    const replace = vi.spyOn(window.history, 'replaceState')
-    await go(1)
-    await act(async () => {})
-    expect(inboxPanel()).not.toBeNull()
-    expect(listPanel()).toBeNull()
-    expect(replace).toHaveBeenCalledTimes(1)
-    expect(push).not.toHaveBeenCalled()
-    expect(url()).toBe('/world')
-    await go(-1)
-    expect(url()).toBe('/world')
-    expect(inboxPanel()).not.toBeNull()
-    held.release()
   })
 
-  it('[FE-X16-S18] 換角色彈出層：成功開面板就關；被拒也因焦點離開而關、草稿丟、焦點在收件匣按鈕', SLOW, async () => {
-    const p = project()
-    await mount({ project: p, url: `/world?panel=projects&project=${p.id}` })
-    const held = await holdFormTeam(p)
-    const picker = () => screen.queryByRole('region', { name: '更換角色' }) ?? document.querySelector<HTMLElement>('section[aria-label="更換角色"]')
-    click(screen.getByRole('button', { name: '更換角色' }))
-    expect(picker()).not.toBeNull()
-    click(within(picker()!).getByRole('button', { name: /^角色 2/ }))
-    click(inboxButton())
-    expect(inboxPanel()).toBeNull()
-    expect(picker(), '焦點離開了它').toBeNull()
-    expect(document.activeElement).toBe(inboxButton())
-    click(screen.getByRole('button', { name: '更換角色' }))
-    expect(within(picker()!).getByRole('button', { name: /^角色 1/ }).getAttribute('aria-pressed'), '草稿丟了').toBe('true')
-    click(inboxButton())
-    held.release()
-    await waitFor(() => expect(within(screen.getByTestId('project-detail')).getByTestId('project-status').textContent).toBe('已成軍'))
-
-    click(screen.getByRole('button', { name: '更換角色' }))
-    expect(picker()).not.toBeNull()
-    willOpenInbox()
-    click(inboxButton())
-    expect(picker()).toBeNull()
-    expect(inboxPanel()).not.toBeNull()
-  })
-
-  it('[FE-X16-S21] 同一個 handler 裡開看板再開收件匣：兩個 true、只掛收件匣、看板從未掛載；關掉後鎖放開、active 空；送出中再請求 → false', SLOW, async () => {
+  it('[FE-X16-S21] 同一個 handler 裡開看板再開收件匣：兩個 true、只掛收件匣、看板從未掛載；關掉後鎖放開、active 空', SLOW, async () => {
     await mount()
     let mountedList = 0
     const observer = new MutationObserver((records) => {
@@ -455,16 +282,6 @@ describe('同一時間只有一個阻斷式面板', () => {
     escape()
     expect(g().lock.current, '關掉後鎖放開').toBe(false)
     expect(probe()).toEqual({ active: null, open: false })
-
-    const held = await holdSend()
-    let c: boolean | undefined
-    act(() => {
-      c = g().list.openPanel('profiles')
-    })
-    expect(c).toBe(false)
-    expect(inboxPanel()).not.toBeNull()
-    expect(listPanel()).toBeNull()
-    held.release()
   })
 
   it('[FE-X16-S22] 看板的殼延後 commit、期間開收件匣：看板掛不出來；provider 在 commit 前卸載：不鎖死、下一次請求成功', SLOW, async () => {
