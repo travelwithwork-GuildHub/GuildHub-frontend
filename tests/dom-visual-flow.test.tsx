@@ -329,6 +329,20 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(screen.queryByRole('alertdialog'), '讓位不替使用者按下「放棄修改？」').toBeNull()
     expect(document.activeElement).toBe(inboxButton())
     expect(statusText()).not.toHaveLength(0)
+
+    // 發案表單打了字沒送（同一條「有未儲存的修改」；突變抓到它沒被量）
+    escape()
+    click(screen.getByRole('button', { name: '丟棄' }))
+    escape()
+    expect(blockingPanels()).toHaveLength(0)
+    pressE('projectBoard')
+    click(await within(listPanel()!).findByRole('button', { name: '發案' }))
+    await type(within(listPanel()!).getByLabelText('標題'), '打到一半的案子')
+    click(inboxButton())
+    expect(inboxPanel()).toBeNull()
+    expect((within(listPanel()!).getByLabelText('標題') as HTMLInputElement).value).toBe('打到一半的案子')
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(document.activeElement).toBe(inboxButton())
   })
 
   it('[FE-X16-S15] 訪客提示讓位、關了回來、輸入中的名字沒丟；先關掉提示或走完的不回來', SLOW, async () => {
