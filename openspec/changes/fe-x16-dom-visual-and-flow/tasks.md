@@ -68,20 +68,20 @@
 
 ## 5. `--surfaces`：每個操作區套上三級與層次、標題列（Requirement〈控制項分三級〉〈標題列是固定的導覽〉）
 
-- [ ] 5.1 判準先紅（jsdom）：`S09` 逐操作區數 `data-tier="primary"`（`≤ 1`）且是列出的那一個、零個的狀態真的零個；`S19` 標題列順序與 `≤ 5`；e2e `S19` 三種身分的 rect 相同、面板 rect 與整個標題列 rect 交集為 0
-- [ ] 5.2 `/login`：三個表單各自一個主要（暱稱：進入世界；金鑰：用金鑰回來；帳號：登入／註冊）；版面順序與標題層次讓暱稱那條領先（D4）
-- [ ] 5.3 金鑰交接：複製前「複製鑰匙」主要、複製後「進入世界」主要、「複製鑰匙」退成次要；訪客提示「先四處看看」文字級
-- [ ] 5.4 案件詳情：owner 成軍／結案主要、送出中零個；密碼呈現「複製密碼」主要、「寄給隊員」次要；非 owner「私訊發案者」主要；結案確認「取消」主要
-- [ ] 5.5 收件匣對話「送出」主要；名片「儲存」主要（沒改 `disabled`）；**場景聊天框「送出」次要**（非阻斷的表面不搶）；標題列（品牌左、其餘右、`≤ 5`）
-- [ ] 5.6 前後截圖五張貼 PR；`ui-ux-pro-max` 的 pre-delivery checklist 逐條對
-- [ ] 5.7 `S20` 裁決：對 1.3 的基線量一次（JS `≤ +4 KB`、CSS `≤ +6 KB` gzip；請求清單：全新 context、停用快取、`(resourceType, 去 hash 路徑)` multiset 相同）
+- [x] 5.1（`tests/dom-visual-surfaces.test.tsx`：S09 八條逐操作區數 `data-tier="primary"`、S19 兩條結構；e2e `tests/e2e/dom-surfaces.mjs`：三種身分 rect、面板不相交，18 綠；第一版實作就被抓到房間的標題列高 2px）判準先紅（jsdom）：`S09` 逐操作區數 `data-tier="primary"`（`≤ 1`）且是列出的那一個、零個的狀態真的零個；`S19` 標題列順序與 `≤ 5`；e2e `S19` 三種身分的 rect 相同、面板 rect 與整個標題列 rect 交集為 0
+- [x] 5.2（金鑰表單升主要；後兩個 h2 降 `HEADING`）`/login`：三個表單各自一個主要（暱稱：進入世界；金鑰：用金鑰回來；帳號：登入／註冊）；版面順序與標題層次讓暱稱那條領先（D4）
+- [x] 5.3（兩顆的層級跟 `done` 走）金鑰交接：複製前「複製鑰匙」主要、複製後「進入世界」主要、「複製鑰匙」退成次要；訪客提示「先四處看看」文字級
+- [x] 5.4（「結案」在密碼呈現中退次要、否則主要；「複製密碼」主要；`SendMessageButton` 主要）案件詳情：owner 成軍／結案主要、送出中零個；密碼呈現「複製密碼」主要、「寄給隊員」次要；非 owner「私訊發案者」主要；結案確認「取消」主要
+- [x] 5.5（名片「儲存」加 `|| !dirty`；聊天送出 `SECONDARY`；標題列抽成 `AppHeader`、入口 `ml-auto` 一組、`ReturnToHallButton` 拿掉 `min-h-11`）收件匣對話「送出」主要；名片「儲存」主要（沒改 `disabled`）；**場景聊天框「送出」次要**（非阻斷的表面不搶）；標題列（品牌左、其餘右、`≤ 5`）
+- [x] 5.6（`docs/evidence/fe-x16/surfaces-{before,after}/` 各五張）前後截圖五張貼 PR；`ui-ux-pro-max` 的 pre-delivery checklist 逐條對
+- [x] 5.7（同 lockfile／Node、`NEXT_PUBLIC_REALTIME_ADAPTER=guildhub`：JS 221,402 → 223,101 B gz（**+1,699**）、CSS 5,768 → 6,403 B gz（**+635**）；請求清單 20 筆 multiset 相同、零 font／image）`S20` 裁決：對 1.3 的基線量一次（JS `≤ +4 KB`、CSS `≤ +6 KB` gzip；請求清單：全新 context、停用快取、`(resourceType, 去 hash 路徑)` multiset 相同）
 
 ## 6. 突變（驗收條件：拔掉防禦要紅）
 
 - [ ] 6.1 拿掉 `--font-sans` 的繁中家族 → `S02` 紅；把某個表面的內文改成 `14px` → `S03` 紅（`--text`：`--text-body` 改 0.875rem → 17 條紅）；`ink-muted` 調淡 → `S04` 紅（`--text`：L 0.52 → 0.7 → 29 條 2.51～2.67:1）；假輸入六段任一掃不到 → `S01` 紅
 - [x] 6.2 面板底改成半透明 → `S05` 紅（`/80`：三個面板「底 alpha 0.8」）；給面板加一層世界遮罩 → `S05` 紅（「有 1 個蓋住世界的元素」）；確認視窗遮罩拿掉 → `S06` 紅（三個視窗「遮罩 alpha 0」）；
       關閉搬到標題列最前 → `S07` 紅（十個面板×viewport 各兩條）；`<header>` 放進捲動容器 → `S08` 紅（「標題列在捲動容器裡面」）＋ `S07` 紅（第一個區塊是 div）；陰影拿掉 → `S05` 紅；視窗開著內容區不 inert → `S06` 紅（兩個確認視窗）
-- [ ] 6.3 場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
+- [ ] 6.3（`--surfaces` 跑過前兩個＋五個自己加的：7 紅；`min-h-11` 留著 → e2e `S19` 紅）場景聊天框「送出」改主要 → `S09` 紅；名片沒改時「儲存」啟用 → `S09` 紅；焦點環拿掉 → `S10` 紅；`reduce` 的 media query 拿掉 → `S12` 紅；面板 `transition-property: all` → `S12` 紅
 - [x] 6.4（`--flow-yield` 跑過 12 個：11 紅、1 量不到 —— `AvatarPicker` 另讀協調者關自己，焦點移出已經關了它，那段拔掉；jsdom 量不到的 `scrollTop` 用真瀏覽器 `S16` 量（拔掉還原 → 紅）；`--flow` 跑過 11 個、10 紅：收件匣的 `yieldPanel` 只清子狀態與 ref、下一次開啟都會覆寫 —— 量不到，記著）協調者不 `onYield()` 就取代 → `S13` 紅（第一版量不到：讓位只靠推導「不掛」也全綠 —— 補「再按 E 是乾淨的清單」）；讓位時還焦點給開啟者 → `S13` 紅；provider 自己持有 open（不從 `active` 推導）→ `S22` 紅；鎖留在 provider 的開啟呼叫裡同步取 → `S21` 紅；殼的 cleanup 清 `active` → `S22` Strict Mode 段紅；`useBlockingPanelOpen` 用 `active !== null` → `S22` 幽靈段紅；`canYield` 恆真 → `S14` 紅；拒絕不發 `status` → `S14` 紅；提示用 return null 讓位（重設狀態）→ `S15` 紅；
       聊天框展開不還原 `scrollTop` → `S16` 紅；下一頁被拒不 `replaceState`（或用了 `pushState`）→ `S17` 紅；被拒時彈出層留著 → `S18` 紅；同一事件的第二個請求不取代第一個（兩個都掛）→ `S21` 紅
 - [ ] 6.5 每次突變前 commit；突變後還原並重 build `.next`
