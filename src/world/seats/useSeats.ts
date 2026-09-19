@@ -12,6 +12,11 @@ import { SEATS_POLL_MS, canClaim, classify409 } from './seatRules'
 //
 // 狀態帶著「這一次進房」的 key（房、人、第幾次重試）：key 對不上就是 loading —— 換房、回大廳再進來都從載入中開始，
 // 不在 effect 裡 setState（lint 擋）；舊回應則靠 abort 擋。
+//
+// 影子審查（codex，2026-09-20）抓到的三個時序洞，都在這裡補：
+// 1. 201／「已有座位」409 之後 **重取回來才放開 `claiming`** —— 先放的話舊座位還是空的、「入座」閃回來一個 RTT、能再送一次。
+// 2. `claimSeat` 也帶房間的 signal：離開房間中止的是「在飛的請求」，不只 GET。
+// 3. 每次 `listSeats` 有序號，只套用比上一次套用更新的回應 —— 壓住的舊輪詢晚到不能蓋掉坐下之後的重取。
 
 export type SeatFeedback =
   | { kind: 'seat-taken' | 'already-seated'; at: number }
@@ -44,13 +49,29 @@ const LOADING: SeatsState = { phase: 'loading' }
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError'
 const keyOf = (projectId: string, me: string, generation: number) => `${projectId}:${me}:${generation}`
 
+/**
+ * 重取座位（進房後的輪詢、201／409 之後共用）：成功換掉 seats、失敗留舊的（stale）、中止不算失敗。
+ * 洞 3：每次送出拿一個序號，回來時只有「比上一次套用的更新」才套 —— 舊輪詢晚到就丟掉。
+ */
+async function refetchSeats(projectId: string, controller: AbortController, seq: { sent: number; applied: number }, update: (patch: (s: Ready) => Ready) => void): Promise<void> {
+  const mine = ++seq.sent
+  try {
+    const seats = await listSeats(projectId, { signal: controller.signal })
+    if (controller.signal.aborted || mine < seq.applied) return
+    seq.applied = mine
+    update((s) => ({ ...s, seats }))
+  } catch {
+    // 中止不是失敗；輪詢失敗留舊的
+  }
+}
+
 export function useSeats({ projectId, me, active }: { projectId: string; me: string; active: boolean }): SeatsApi {
   const [stored, setStored] = useState<{ key: string; state: SeatsState } | null>(null)
   const [generation, setGeneration] = useState(0)
   const key = keyOf(projectId, me, generation)
   const state: SeatsState = active && stored !== null && stored.key === key ? stored.state : LOADING
   // 這一次進房的 controller 與最新狀態（claim 是事件處理器，要讀當下的）
-  const roomRef = useRef<{ key: string; controller: AbortController } | null>(null)
+  const roomRef = useRef<{ key: string; controller: AbortController; seq: { sent: number; applied: number } } | null>(null)
   const stateRef = useRef(state)
   useEffect(() => {
     stateRef.current = state
@@ -61,19 +82,11 @@ export function useSeats({ projectId, me, active }: { projectId: string; me: str
     if (!active) return
     const key = keyOf(projectId, me, generation)
     const controller = new AbortController()
-    roomRef.current = { key, controller }
+    const seq = { sent: 0, applied: 0 }
+    roomRef.current = { key, controller, seq }
     const dead = () => controller.signal.aborted
     const update = (patch: (s: Ready) => Ready) => setStored((r) => (r !== null && r.key === key && r.state.phase === 'ready' ? { key, state: patch(r.state) } : r))
-    // 重取座位：成功換掉 seats、失敗留舊的（stale）
-    const refetch = async () => {
-      try {
-        const seats = await listSeats(projectId, { signal: controller.signal })
-        if (dead()) return
-        update((s) => ({ ...s, seats }))
-      } catch {
-        // 中止不是失敗；輪詢失敗留舊的
-      }
-    }
+    const refetch = () => refetchSeats(projectId, controller, seq, update)
 
     void Promise.all([getProject(projectId, { signal: controller.signal }), listSeats(projectId, { signal: controller.signal })]).then(
       ([project, seats]) => {
@@ -120,7 +133,7 @@ export function useSeats({ projectId, me, active }: { projectId: string; me: str
       const room = roomRef.current
       const current = stateRef.current
       if (room === null || claimingRef.current || current.phase !== 'ready' || !canClaim({ ...current, me })) return
-      const { key, controller } = room
+      const { key, controller, seq } = room
       claimingRef.current = true
       const update = (patch: (s: Ready) => Ready) => setStored((r) => (r !== null && r.key === key && r.state.phase === 'ready' ? { key, state: patch(r.state) } : r))
       update((s) => ({ ...s, claiming: seatIndex, feedback: null }))
@@ -129,18 +142,12 @@ export function useSeats({ projectId, me, active }: { projectId: string; me: str
         claimingRef.current = false
         if (!dead()) update((s) => patch({ ...s, claiming: null }))
       }
-      const refetch = async () => {
-        try {
-          const seats = await listSeats(projectId, { signal: controller.signal })
-          if (!dead()) update((s) => ({ ...s, seats }))
-        } catch {
-          // 留舊的
-        }
-      }
-      void claimSeat(projectId, { seat_index: seatIndex, desk_template: 0 }).then(
+      const refetch = () => refetchSeats(projectId, controller, seq, update)
+      void claimSeat(projectId, { seat_index: seatIndex, desk_template: 0 }, { signal: controller.signal }).then(
         async () => {
-          settle((s) => s)
+          // 洞 1：重取回來才放開 claiming
           await refetch()
+          settle((s) => s)
         },
         async (cause: unknown) => {
           if (isAbort(cause)) return settle((s) => s)
@@ -149,8 +156,8 @@ export function useSeats({ projectId, me, active }: { projectId: string; me: str
           const ui = toUiError(cause)
           if (ui.kind === 'conflict') {
             const kind = classify409(ui.detail ?? null)
-            settle((s) => ({ ...s, feedback: kind === 'unknown' ? { kind: 'failed', at, cause } : { kind, at } }))
             await refetch()
+            settle((s) => ({ ...s, feedback: kind === 'unknown' ? { kind: 'failed', at, cause } : { kind, at } }))
             return
           }
           if (ui.kind === 'permission-denied' || ui.kind === 'authentication-required') {
