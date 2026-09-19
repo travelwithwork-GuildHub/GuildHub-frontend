@@ -36,6 +36,7 @@ import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
 import { SceneObjects } from './scenes/SceneObjects'
 import { useRequestEntry } from './scenes/EntryGate'
 import { useSceneChatPortIfProvided } from '@/realtime/SceneChatProvider'
+import { useStatusPortIfProvided } from '@/realtime/StatusProvider'
 import { SceneChatHud } from '@/chat/SceneChatHud'
 import { useRoomEntryGateIfProvided } from './scenes/RoomEntryGate'
 import { RoomPasswordDialog } from './scenes/RoomPasswordDialog'
@@ -133,6 +134,8 @@ export default function WorldCanvas() {
   const worldDialogOpen = useRoomEntryGateIfProvided()?.request != null
   // 場景聊天的口（`FE-R11`）：context 不跨 R3F 的 renderer 邊界，當 prop 交給 `RemoteWorld`；沒 provider 就沒有聊天。
   const chat = useSceneChatPortIfProvided()
+  // 自己的狀態文字的口（`FE-K05`）：同樣當 prop 交給 `RemoteWorld`；沒 provider 就沒有狀態。
+  const status = useStatusPortIfProvided()
 
   // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
   // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
@@ -208,6 +211,7 @@ export default function WorldCanvas() {
                 closeGateRef={closeGate}
                 onConnection={reportConnection}
                 chat={chat}
+                status={status}
                 onOnlineCountChange={setOnlineCount}
                 onRosterChange={setRoster}
                 tagNodesRef={tagNodesRef}
