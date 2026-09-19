@@ -21,8 +21,8 @@
 
 ## 4. `--e2e`：真瀏覽器（〈真瀏覽器裡兩個人互見狀態〉）
 
-- [ ] 4.1 `tests/e2e/player-status.mjs` 的 `S08`（兩個瀏覽器 process、`routeWebSocket` 偽造、腳本轉送 status、模擬回聲與 join 清空；A 設 → B 看到、A 清 → B 沒有、兩人進房 → 重送與 B 仍看到）；`name-tags`、`scene-switch`、`scene-chat` 沒變紅
-- [ ] 4.2 截圖貼 PR（控制、別人牌子上的狀態、12 字滿版）；`ui-ux-pro-max` pre-delivery checklist；效能：world chunk 前後差、每次設狀態一則訊息
+- [x] 4.1（15 綠 ×3；突變 2 個 2 紅：attach 不重送 → 「重送」與「B 在房間看到」紅、名字牌不畫狀態 → 兩條「B 看到」紅；name-tags／scene-chat／scene-switch 綠；進房走站內場景切換，不是整頁導覽）`tests/e2e/player-status.mjs` 的 `S08`（兩個瀏覽器 process、`routeWebSocket` 偽造、腳本轉送 status、模擬回聲與 join 清空；A 設 → B 看到、A 清 → B 沒有、兩人進房 → 重送與 B 仍看到）；`name-tags`、`scene-switch`、`scene-chat` 沒變紅
+- [x] 4.2（`docs/evidence/fe-k05-status/`；world chunk +110（store）＋909（hud）B gz；每次設狀態一則 WS、每條新連線最多一則重送）截圖貼 PR（控制、別人牌子上的狀態、12 字滿版）；`ui-ux-pro-max` pre-delivery checklist；效能：world chunk 前後差、每次設狀態一則訊息
 
 ## 5. 收尾
 
