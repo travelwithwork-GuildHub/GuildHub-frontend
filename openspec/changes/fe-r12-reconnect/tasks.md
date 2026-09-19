@@ -27,6 +27,6 @@
 ## 5. 收尾
 
 - [x] 5.1（--loop：eslint 0、tsc 0、pnpm test 1444 綠）每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響
-- [ ] 5.2 合併後 `vercel deploy --prod`、閘道一次人工 smoke（只走不壓：兩個瀏覽器互見即可，斷線恢復在本機 e2e 驗）
-- [ ] 5.3 tasks 全勾後、archive 前：`archive-review.sh fe-r12-reconnect`；需修正修完 `--rereview` 一次、每條 `--judge`
-- [ ] 5.4 Sheet `FE-R12` → Done（瀏覽器層驗過之後才打）
+- [x] 5.2（正式站已部署 03b5cd5；閘道 smoke **條件式放行**：正式站對後端認證呼叫被全站 CORS 擋，非前端缺陷、與 K05 同一個後端阻塞；斷線恢復的功能驗收依據是本機真瀏覽器 e2e `reconnect` 10 綠；CORS 另立 P0 交後端、demo 前重驗正式站整合）合併後 `vercel deploy --prod`、閘道一次人工 smoke
+- [x] 5.3（r1：codex 2／gemini 2 需修正，都是 S07 失去資格通知不清＋S10 過場×退避競態；#572 修 → --rereview 兩模型 4 條全「已修」→ 四條 --judge 已修）tasks 全勾後、archive 前：`archive-review.sh fe-r12-reconnect`；需修正修完 `--rereview` 一次、每條 `--judge`
+- [x] 5.4（row 301 Done；瀏覽器層由本機真瀏覽器 e2e reconnect 驗過，依兩模型結論放行）Sheet `FE-R12` → Done（瀏覽器層驗過之後才打）
