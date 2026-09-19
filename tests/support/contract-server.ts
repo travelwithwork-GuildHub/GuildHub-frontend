@@ -65,7 +65,7 @@ export interface ContractServer {
   /** 下一個回應。**沒有設定的話回 500** —— 忘記設定不該看起來像成功。`after` 有給的話，等它 resolve 才回（模擬慢的後端）。 */
   reply(status: number, body: unknown, options?: ReplyOptions): void
   /**
-   * 只給某個路徑的下一個回應；比 `reply()` 的佇列優先。
+   * 只給某個路徑的下一個回應；比 `reply()` 的佇列優先。路徑可以帶 query（`/api/projects?status=active&page=0`）：帶的比不帶的優先。
    *
    * ⚠️ **兩個不同端點的請求交錯時要用這個。** `reply()` 是先到先拿 ——
    * 而「哪一個先到」在被中止的請求上是不確定的：中止得夠早的話它根本不會到，
@@ -126,7 +126,8 @@ export async function startContractServer(): Promise<ContractServer> {
         return
       }
 
-      const next = byPath.get(pathname)?.shift() ?? queue.shift()
+      // 先找「路徑＋query」的（三種 status 並行掃描時，同一個路徑的回應要對得上各自的 query —— `FE-J03`），再找只有路徑的，最後才是共用佇列
+      const next = byPath.get(`${pathname}${search}`)?.shift() ?? byPath.get(pathname)?.shift() ?? queue.shift()
       if (next === undefined) {
         // 忘記 `reply()` 的話回 500 —— 回 200 空物件的話，
         // 一條忘了設定回應的測試會靠「契約允許」意外地通過
