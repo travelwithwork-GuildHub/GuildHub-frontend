@@ -24,15 +24,9 @@ export interface PanelRegistration {
 }
 /** `open`：`active` 指向的殼已登記。 */
 type Snapshot = { active: BlockingPanelId | null; open: boolean }
-interface Store {
-  requestOpen: (id: BlockingPanelId) => boolean
-  requestClose: (id: BlockingPanelId) => void
-  register: (registration: PanelRegistration) => () => void
-  subscribe: (listener: () => void) => () => void
-  getSnapshot: () => Snapshot
-}
+type Store = ReturnType<typeof createStore>
 
-function createStore(): Store {
+function createStore() {
   let active: BlockingPanelId | null = null
   const registrations = new Map<BlockingPanelId, PanelRegistration>()
   const listeners = new Set<() => void>()
@@ -42,7 +36,7 @@ function createStore(): Store {
     for (const l of listeners) l()
   }
   return {
-    requestOpen: (id) => {
+    requestOpen: (id: BlockingPanelId): boolean => {
       const current = active === null ? undefined : registrations.get(active)
       if (current !== undefined && current.id !== id) {
         if (!current.canYield()) return false
@@ -54,12 +48,12 @@ function createStore(): Store {
       }
       return true
     },
-    requestClose: (id) => {
+    requestClose: (id: BlockingPanelId) => {
       if (active !== id) return
       active = null
       emit()
     },
-    register: (registration) => {
+    register: (registration: PanelRegistration) => {
       registrations.set(registration.id, registration)
       emit()
       return () => {
@@ -68,11 +62,13 @@ function createStore(): Store {
         emit()
       }
     },
-    subscribe: (listener) => {
+    subscribe: (listener: () => void) => {
       listeners.add(listener)
-      return () => listeners.delete(listener)
+      return () => {
+        listeners.delete(listener)
+      }
     },
-    getSnapshot: () => snapshot,
+    getSnapshot: (): Snapshot => snapshot,
   }
 }
 

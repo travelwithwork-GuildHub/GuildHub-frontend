@@ -14,8 +14,7 @@ import { groupThreads, mergeById, type Thread } from './threads'
 //
 // 掛在 `page.tsx`（`ProfilePanelProvider` 旁邊）：按鈕在標題列、面板在 `WorldCanvas` 裡，provider 要包住兩者。
 // 世界輸入鎖**不在這裡**（`InteractionProvider` 在 `WorldCanvas` 裡面）—— `InboxPanel` 掛載時自己持。
-// **「開不開」在協調者**（`FE-X16`）：`view.kind !== 'closed'` 只是子狀態，面板掛不掛看 `useActivePanel() === 'inbox-panel'`；
-// 開＝ `requestOpen()`（被拒回 `false`、什麼都不變）、關＝ `requestClose()`、讓位＝ `yieldPanel`（關的副作用、不還焦點）。
+// **「開不開」在協調者**（`FE-X16`）：`view` 只是子狀態，掛不掛看 `useActivePanel() === 'inbox-panel'`；開＝ `requestOpen()`（被拒回 `false`）、關＝ `requestClose()`、讓位＝ `yieldPanel`（不還焦點）。
 //
 // ⚠️ **資料放這裡不放面板**：送出中關掉面板，201 回來還是要合併（`S12`）；名字快取要跨開關存活（`S04`）。
 //
@@ -67,8 +66,6 @@ export interface InboxValue {
   send: (withId: string, body: string) => Promise<boolean>
   /** 送出中的對方（任何一封在送，所有寄信表單都先不能再送）。 */
   sendingTo: string | null
-  /** 同步版：現在有沒有一封在送（讓位協定用；`sendingTo` 是晚一格的 UI 狀態）。 */
-  sending: () => boolean
 }
 
 const InboxContext = createContext<InboxValue | null>(null)
@@ -269,7 +266,6 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
 
   /** provider 層的 guard（同步 ref）：`sendingTo` 是 UI 狀態，擋不住同一批次的第二次。 */
   const sendInFlightRef = useRef(false)
-  const sending = useCallback(() => sendInFlightRef.current, [])
   const send = useCallback(
     async (withId: string, body: string) => {
       if (sendInFlightRef.current) return false
@@ -333,9 +329,8 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
       resolveNames,
       send,
       sendingTo,
-      sending,
     }),
-    [view, openList, openThreadFromTalent, enterThread, backToList, closePanel, yieldPanel, me, messages, threads, loading, loadError, moreError, pagesLoaded, exhausted, fetching, blocked, loadMore, retryFirst, names, resolveNames, send, sendingTo, sending],
+    [view, openList, openThreadFromTalent, enterThread, backToList, closePanel, yieldPanel, me, messages, threads, loading, loadError, moreError, pagesLoaded, exhausted, fetching, blocked, loadMore, retryFirst, names, resolveNames, send, sendingTo],
   )
   return <InboxContext value={value}>{children}</InboxContext>
 }

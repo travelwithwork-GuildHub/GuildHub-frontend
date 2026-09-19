@@ -1,11 +1,9 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { BlockingPanelCoordinator, useActivePanel, useBlockingPanels } from '@/panel/BlockingPanelCoordinator'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 // 「我的名片」面板現在開著沒有。規格 `FE-A04`〈名字是入口，面板是阻斷式的〉；design `D1`（修正後）。
 //
-// ⚠️ **「開不開」在協調者**（`FE-X16`）：`open` ＝ `useActivePanel() === 'profile-panel'`；這裡只管開啟者與關閉後的焦點。讓位（`yieldPanel`）不還焦點。
 // ⚠️ **這個 provider 只管兩件事：開關狀態、關閉後焦點回開啟者。** 世界輸入鎖**不在這裡** ——
 // 它在 `InteractionProvider`，而那一層在 `WorldCanvas` 裡面、標題列（開啟按鈕）在外面，一個 provider 沒辦法同時被兩邊看到。
 // 鎖由 `ProfilePanel` 自己在掛載時持有（它渲染在 `WorldCanvas` 裡）。
@@ -17,10 +15,8 @@ import { BlockingPanelCoordinator, useActivePanel, useBlockingPanels } from '@/p
 interface ProfilePanelValue {
   open: boolean
   /** 開面板。`opener` 是按下去的那個元素 —— 關閉後焦點回它（`S02`）。 */
-  openPanel: (opener: HTMLElement | null) => boolean
+  openPanel: (opener: HTMLElement | null) => void
   closePanel: () => void
-  /** 被協調者讓位：不還焦點（新面板自己取焦）。 */
-  yieldPanel: () => void
 }
 
 const ProfilePanelContext = createContext<ProfilePanelValue | null>(null)
@@ -40,35 +36,18 @@ export function useProfilePanelIfProvided(): ProfilePanelValue | null {
   return useContext(ProfilePanelContext)
 }
 
-const ID = 'profile-panel'
-
-export const ProfilePanelProvider = ({ children }: { children: ReactNode }) => (
-  <BlockingPanelCoordinator>
-    <ProfilePanelState>{children}</ProfilePanelState>
-  </BlockingPanelCoordinator>
-)
-
-function ProfilePanelState({ children }: { children: ReactNode }) {
-  const { requestOpen, requestClose } = useBlockingPanels()
-  const open = useActivePanel() === ID
+export function ProfilePanelProvider({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false)
   const openerRef = useRef<HTMLElement | null>(null)
   const restoreFocusRef = useRef(false)
 
-  const openPanel = useCallback(
-    (opener: HTMLElement | null) => {
-      if (!requestOpen(ID)) return false
-      openerRef.current = opener
-      return true
-    },
-    [requestOpen],
-  )
+  const openPanel = useCallback((opener: HTMLElement | null) => {
+    openerRef.current = opener
+    setOpen(true)
+  }, [])
   const closePanel = useCallback(() => {
     restoreFocusRef.current = true
-    requestClose(ID)
-  }, [requestClose])
-  const yieldPanel = useCallback(() => {
-    restoreFocusRef.current = false
-    openerRef.current = null
+    setOpen(false)
   }, [])
   // 焦點回開啟它的按鈕（`S02`）：不是 `body`（鍵盤使用者迷航）、不是世界焦點錨（這次操作跟世界無關）。
   // **等面板真的卸載之後**才還（effect，不在 closePanel 裡同步做）：面板還掛著時 focus trap 還在，同步 focus 出去可能被拉回來（審查抓到的）。
@@ -81,6 +60,6 @@ function ProfilePanelState({ children }: { children: ReactNode }) {
     if (opener?.isConnected) opener.focus()
   }, [open])
 
-  const value = useMemo(() => ({ open, openPanel, closePanel, yieldPanel }), [open, openPanel, closePanel, yieldPanel])
+  const value = useMemo(() => ({ open, openPanel, closePanel }), [open, openPanel, closePanel])
   return <ProfilePanelContext value={value}>{children}</ProfilePanelContext>
 }

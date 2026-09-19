@@ -28,7 +28,7 @@ import { useProfilePanel, useProfilePanelIfProvided } from './ProfilePanelProvid
 export const PROFILE_PANEL_LABELS = { title: '我的名片', close: '關閉', edit: '編輯' }
 
 function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
-  const { closePanel, yieldPanel } = useProfilePanel()
+  const { closePanel } = useProfilePanel()
   const { holdInputLock } = useInteraction()
   const root = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<'view' | 'edit'>('view')
@@ -49,8 +49,6 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
     if (mode === 'edit') closeIntentRef.current?.()
     else closePanel()
   }
-  // 讓位協定：顯示模式隨時可以；編輯中（送出中、dirty）的 `canYield` 在 `--flow-yield`（`FE-X16-S14`）
-  const panel = { id: 'profile-panel' as const, canYield: () => mode !== 'edit', onYield: yieldPanel }
   const editButton = useRef<HTMLButtonElement>(null)
   const backToView = () => {
     setConfirming(false)
@@ -80,7 +78,8 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
       title={PROFILE_PANEL_LABELS.title}
       closeLabel={PROFILE_PANEL_LABELS.close}
       testId="profile-panel"
-      panel={panel}
+      // 登記身分；provider 從協調者推導「開不開」與讓位規則在 `--flow-yield`（`FE-X16-S13` 名片那兩段、`S14`）
+      panel={{ id: 'profile-panel', canYield: () => true, onYield: () => {} }}
       onCloseRequest={onCloseRequest}
     >
       {/* 只是捲動容器與初始焦點，不是第二個 landmark（殼的 section 已經叫「我的名片」）。 */}

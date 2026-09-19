@@ -35,8 +35,8 @@ function OpenInboxPanel({ inbox }: { inbox: InboxValue }) {
   useEffect(() => holdInputLock('inbox-panel'), [holdInputLock])
   const returnFocusRef = useRef<string | null>(null)
   const view = inbox.view
-  // 讓位協定（`FE-X16-S14`）：有一封在送就不讓（問 provider 的同步 guard，不看晚一格的 state）
-  const panel = { id: 'inbox-panel' as const, canYield: () => !inbox.sending(), onYield: inbox.yieldPanel }
+  // 讓位協定：「送出中不讓」在 `--flow-yield`（`FE-X16-S14`）
+  const panel = { id: 'inbox-panel' as const, canYield: () => true, onYield: inbox.yieldPanel }
   // 返回：焦點回清單那一列（有的話；`S07`）—— 殼標題列的返回鈕（`FE-X16-S07`）與對話的 Escape 走同一條（審查抓到 Escape 漏了）。
   const backToList = () => {
     if (view.kind === 'thread') returnFocusRef.current = view.with
