@@ -26,6 +26,10 @@
 ⚠️ 今天面板狀態全在記憶體：重新整理之後面板關、詳情沒了、翻頁回第 0 頁。
 `FE-B04` 為「連續看很多個人才」做了返回不丟頁碼 —— 那個人一重新整理就掉回第 0 頁。
 
+`panel=projects` 下另有 `view=mine`（`FE-J03` 的「我的案件」視圖）：載入帶它的網址 SHALL 開著我的案件（不送 `GET /api/projects?page=N`，而是三種 `status` 的掃描）；
+`view` 只在 `panel=projects` 下有意義，其餘面板下 SHALL 被去掉；值不是 `mine` 的視同沒有；`view=mine` 時 `page` 沒有意義 SHALL 被去掉；
+`project` 在 `view=mine` 下照舊（詳情蓋在我的案件上、返回回到我的案件）。視圖切換 SHALL 用 replace（跟翻頁一樣不新增瀏覽紀錄）。
+
 #### Scenario: [FE-B09-S01] `?panel=profiles` 開著人才清單
 
 - **WHEN** 載入 `/world?panel=profiles`
@@ -71,6 +75,17 @@
 - **THEN** 網址 SHALL 變成 `/world?panel=projects&project=<id>` 且瀏覽紀錄 SHALL 多一層；瀏覽器的上一頁 SHALL 回到 `/world?panel=projects`（詳情關、清單仍開）
 - **AND WHEN** 載入 `/world?panel=projects&profile=<id>`、`/world?panel=profiles&project=<id>`、`/world?project=<id>&page=2`、`/world?profile=<a>&project=<b>`、`/world?panel=projects&project=<b>&profile=<a>`、`/world?panel=bogus&project=<id>`、`/world?project=not-a-uuid`、`/world?project=<a>&project=<b>` 各一次
 - **THEN** 網址 SHALL 分別被改成 `/world?panel=projects`、`/world?panel=profiles`、`/world?panel=projects&project=<id>&page=2`、`/world?panel=profiles&profile=<a>`、`/world?panel=projects&project=<b>`、`/world`、`/world`、`/world?panel=projects&project=<a>`，每一次都是可操作的畫面，且這些 canonical 化 SHALL NOT 新增瀏覽紀錄（replace）
+
+#### Scenario: [FE-J03-S07] `view=mine` 開著我的案件；只在案件面板下；去掉 `page`；切換用 replace
+
+- **WHEN** 已登入，載入 `/world?panel=projects&view=mine`
+- **THEN** 案件面板 SHALL 開在「我的案件」，並已送出三種 `status` 的第 0 頁；SHALL NOT 送出 `GET /api/projects?page=0`
+- **AND WHEN** 載入 `/world?panel=projects&view=mine&project=<id>`
+- **THEN** 詳情 SHALL 蓋在我的案件上、已送出 `GET /api/projects/<id>`；按返回後 SHALL 回到我的案件且網址 SHALL 是 `/world?panel=projects&view=mine`
+- **AND WHEN** 載入 `/world?panel=profiles&view=mine`、`/world?panel=projects&view=bogus`、`/world?panel=projects&view=mine&page=2` 各一次
+- **THEN** 網址 SHALL 分別被改成 `/world?panel=profiles`、`/world?panel=projects`、`/world?panel=projects&view=mine`（replace），每一次都是可操作的畫面
+- **AND WHEN** 案件清單開著（`/world?panel=projects&page=1`），使用者按「我的案件」再按「招募中」
+- **THEN** 網址 SHALL 依序變成 `/world?panel=projects&view=mine`、`/world?panel=projects`，瀏覽紀錄 SHALL NOT 增加
 
 ### Requirement: 互動寫回網址；上一頁與 Escape 等效
 
