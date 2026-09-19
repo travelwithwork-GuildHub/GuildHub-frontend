@@ -4,7 +4,7 @@ const GID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
 
 // **狀態是 progress.sh 算好送過來的，這裡不重算。**
 // 曾經在這裡重寫過一次，於是網頁跟指令講出不同的答案。
-const KIND = { "等外部": "wait", "待裁決": "wait", "已取消": "stop", "常態": "reg", "未開始": "" };
+const KIND = { "等外部": "wait", "待裁決": "wait", "已取消": "stop", "常態": "reg", "demo 之後": "later", "未開始": "" };
 ITEMS.forEach(it => {
   it.st = { k: KIND[it.state] ?? "", t: it.state };
   it.alarm = it.marks.includes("Alarm");
@@ -35,6 +35,7 @@ const $ = id => document.getElementById(id);
     ["", FE.length, "項在前端手上"],
     ["t-wait", GAPS.filter(g => g.st.t !== "已取消").length, "項待跟後端銜接"],
     ["t-stop", ITEMS.filter(i => i.st.k === "stop").length, "項已取消"],
+    ["", ITEMS.filter(i => i.st.k === "later").length, "項 demo 之後"],
     ["", FE.reduce((a, b) => a + b.pts, 0), "點（估的）"],
   ];
   $("tally").innerHTML = cells.map(([k, n, l]) =>

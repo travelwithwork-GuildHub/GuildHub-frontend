@@ -39,7 +39,7 @@
 #   阻塞  這一項被什麼擋住。**分兩種，差很多**：
 #         「還沒規劃到」是需求，不是牆 —— 這種項目照樣排週次；
 #         「明文不做」才是牆。詳見 docs/WBS.md 的阻塞類型表。
-#   標記  算不出來的人為決定：Cancelled / Pending / TBD / Alarm，後面接理由。
+#   標記  算不出來的人為決定：Cancelled / Pending / TBD / Later / Alarm，後面接理由。
 #
 # 第八欄是選填的**負責人**（表頭要逐字寫 `負責人`）：
 #
@@ -59,10 +59,11 @@
 #   等外部      沒有週次 ＋ 標記 Pending 或有阻塞 —— **不在我們手上**
 #   待裁決      沒有週次 ＋ 標記 TBD —— **還沒決定要不要做**
 #   已取消      標記 Cancelled
+#   demo 之後   標記 Later —— 決定要做，但排在 demo 之後；**不算未開始**
 #   常態        標記 Regular，沒有完成點
 #   矛盾        標了不做、卻有 change 已經封存。**不挑一邊信**
 #
-# 前五個是事實（git 與 OpenSpec 證明得了），後五個來自人寫的標記。
+# 前五個是事實（git 與 OpenSpec 證明得了），後六個來自人寫的標記。
 #
 # 為什麼要有這兩欄：**有些狀態機器永遠猜不到。** git 看得出「有沒有開分支」，
 # 看不出「我們決定不做了」。可以算的就不要讓人寫（會漂），算不出來的才由人寫，
@@ -76,7 +77,7 @@
 #
 #   1. 標記必須是 `標記｜理由`。沒有理由的標記，六個月後沒有人敢刪它
 #   2. 不認得的標記要報，不要當作沒看到
-#   3. 互斥的處置（TBD / Pending / Cancelled / Regular）同時出現要報 ——
+#   3. 互斥的處置（TBD / Pending / Cancelled / Later / Regular）同時出現要報 ——
 #      **不可以靜默挑一個**，那就是「兩份紀錄打架時自己選一邊信」
 #   4. 被別的項目依賴、又沒有工作週次的「缺口」，必須有：
 #        週欄   `決策≤Wn`   最晚哪一週要有答案（是**決策期限**，不是交付估時）
@@ -590,7 +591,7 @@ def scan_ids(text, where):
                     f"範圍 `XX-Y01`–`XX-Y05`）")
     return ids, gids, errs
 
-MARKS_EXCLUSIVE = {"TBD", "Pending", "Cancelled", "Regular", "Done"}
+MARKS_EXCLUSIVE = {"TBD", "Pending", "Cancelled", "Later", "Regular", "Done"}
 MARKS_FLAG = {"Alarm"}
 violations = []
 refs = []      # (被提到的工作項目 ID, 檔名, 行號)
@@ -1206,7 +1207,7 @@ for wid in order:
 
     # 人為決定 —— 機器算不出來的那些。理由寫在同一格，用 ｜ 隔開。
     # 標記可以複合：`Alarm+Pending｜理由`。Alarm 是風險訊號，**跟其他標記並存**，
-    # 不取代它們；TBD / Pending / Cancelled / Regular 之間才互斥。
+    # 不取代它們；TBD / Pending / Cancelled / Later / Regular 之間才互斥。
     mark = info.get("mark", "")
     marks, mark_reason = parse_mark(mark)
     exclusive = marks & MARKS_EXCLUSIVE
@@ -1237,6 +1238,15 @@ for wid in order:
             state, detail, colour = "矛盾", f"標 Cancelled 但 {cid} 已封存", R
         else:
             state, detail, colour = "已取消", reason, D
+    elif mark_word == "Later":
+        # 決定要做、但排在 demo 之後（2026-09-19：demo 只做「後端已有的 API 都有對應操作」
+        # 那一圈，其餘全部延後）。**不算未開始** —— 算進去的話「還剩多少」永遠是產品全貌的
+        # 數字，看的人分不出「demo 前還要做」跟「之後才輪到」。跟 Cancelled 一樣：
+        # 封存了還標 Later 是兩份紀錄打架，攤出來，不挑一邊信。
+        if any(changes.get(c, {}).get("state") == "archived" for c in cids):
+            state, detail, colour = "矛盾", f"標 Later 但 {cid} 已封存", R
+        else:
+            state, detail, colour = "demo 之後", mark_reason, D
     elif mark_word == "Done" and cids:
         # 有 change 就不要手寫 Done —— 狀態算得出來，兩個來源就會漂。
         # **不要挑一個信**，把矛盾攤出來讓人去改（跟 Cancelled 同一個處置）。
@@ -1307,7 +1317,7 @@ for wid in order:
     by_group[re.sub(r"[0-9]+$", "", wid)][state] += 1
     if ONLY_BLOCKED and state not in ("等外部", "待裁決"):
         continue
-    if state == "未開始" and not (SHOW_ALL or ONLY_BLOCKED):
+    if state in ("未開始", "demo 之後") and not (SHOW_ALL or ONLY_BLOCKED):
         continue
     # 名稱裡的 markdown 強調符號在終端機是雜訊，拿掉。
     label = re.sub(r"[*`]", "", info["name"])[:18]
@@ -1569,7 +1579,7 @@ def _render_block(stripped):
     # 按 ID 排的話那幾項會被外部缺口埋在中間。同狀態內再按 ID，
     # 所以順序仍然是決定性的（diff 才不會亂跳）。
     _rank = {"已封存": 0, "已完成": 1, "規格已合併": 2, "常態": 3,
-             "矛盾": 4, "待裁決": 5, "等外部": 6, "已取消": 7}
+             "矛盾": 4, "待裁決": 5, "等外部": 6, "已取消": 7, "demo 之後": 8}
     n = 0
     for wid in sorted(order, key=lambda w: (_rank.get(_durable_of.get(w, ""), 9), w)):
         st = _durable_of.get(wid, "")
@@ -1666,15 +1676,19 @@ if total:
         print()
     if tally.get("矛盾"):
         print(f"{R}⚠ {tally['矛盾']} 項標記與實際狀態打架{X}"
-              f"（標了 Cancelled 卻已經封存）—— 兩邊只有一邊是對的，去改。")
+              f"（標了 Cancelled／Later 卻已經封存）—— 兩邊只有一邊是對的，去改。")
+    if tally.get("demo 之後"):
+        # 「還剩多少」要分兩個數字講：demo 前的，跟 demo 之後才輪到的。
+        print(f"{D}其中 {tally['demo 之後']} 項排在 demo 之後（標記 Later）——"
+              f" 不算未開始；用 --all 看是哪些。{X}")
     stuck = tally.get("等外部", 0) + tally.get("待裁決", 0)
     if stuck:
         print(f"{R}其中 {stuck} 項不在自己手上{X}（等外部或待裁決）——"
               f" 用 --blocked 看是哪些。")
         print(f"{D}把它們算進「未開始」會讓進度看起來只是慢 ——"
               f"「還沒做」跟「不由我決定」是兩件事。{X}")
-    if not (SHOW_ALL or ONLY_BLOCKED) and tally.get("未開始"):
-        print(f"{D}（{tally['未開始']} 項未開始沒有列出，用 --all 看全部）{X}")
+    if not (SHOW_ALL or ONLY_BLOCKED) and (tally.get("未開始") or tally.get("demo 之後")):
+        print(f"{D}（{tally.get('未開始', 0)} 項未開始、{tally.get('demo 之後', 0)} 項 demo 之後沒有列出，用 --all 看全部）{X}")
 
 # 一個工作項目拆成多個 change —— 這是正常的（WBS ID 是交付意圖，不是架構單元；
 # `FE-O01 資料層` 拆成 `fe-o01-api-contract`／`fe-o01-runtime-config` 是對的）。
