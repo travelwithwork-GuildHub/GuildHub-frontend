@@ -21,8 +21,8 @@
 
 ## 4. `--e2e`：真瀏覽器（〈真瀏覽器裡斷線再恢復〉）
 
-- [ ] 4.1 `tests/e2e/reconnect.mjs` 的 `S09`（兩個瀏覽器 process、`routeWebSocket` 偽造、腳本對 A 的假 socket close、再接受新連線）；`player-status`、`name-tags`、`scene-switch` 沒變紅
-- [ ] 4.2 截圖貼 PR（通知、B 消失、B 回來）；效能：world chunk 前後差、斷線期間每次嘗試一條握手、沒斷線時零計時器
+- [x] 4.1（10 綠；突變拿掉 retry.schedule → 「通知消失」「B 回來」兩條紅；player-status 15／name-tags 28／scene-switch 36 綠）`tests/e2e/reconnect.mjs` 的 `S09`（兩個瀏覽器 process、`routeWebSocket` 偽造、腳本對 A 的假 socket close、再接受新連線）；`player-status`、`name-tags`、`scene-switch` 沒變紅
+- [x] 4.2（截圖在 logs/shots-reconnect：重連中、恢復後、B 仍看到）截圖貼 PR（通知、B 消失、B 回來）；效能：world chunk 前後差、斷線期間每次嘗試一條握手、沒斷線時零計時器
 
 ## 5. 收尾
 
