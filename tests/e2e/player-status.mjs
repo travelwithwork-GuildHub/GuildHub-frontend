@@ -131,7 +131,9 @@ try {
   const server = fakeServer()
   const a = await person(A, B, server)
   const b = await person(B, A, server)
-  check('[S08] A、B 各自在大廳、互相在名單裡', (await tagStatusOf(a.page, B.id)) !== null && (await tagStatusOf(b.page, A.id)) !== null, true)
+  // 名單是 snapshot 來的、牌子在 RemoteWorld 連上之後才長出來：等，不搶拍（第一版搶拍偶爾紅）
+  const seeEachOther = await Promise.all([a.page.waitForSelector(`[data-testid="name-tag"][data-player="${B.id}"]`, { timeout: 10_000 }), b.page.waitForSelector(`[data-testid="name-tag"][data-player="${A.id}"]`, { timeout: 10_000 })]).then(() => true).catch(() => false)
+  check('[S08] A、B 各自在大廳、互相在名單裡', seeEachOther, true)
   check('[S08] 一開始 B 看到的 A 沒有狀態', (await tagStatusOf(b.page, A.id))?.status, null)
 
   // A 設「趕工中」
