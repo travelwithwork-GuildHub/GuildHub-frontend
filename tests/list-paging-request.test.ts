@@ -107,3 +107,31 @@ describe('清單 operation 送出去的 query', () => {
     expect(server.calls[0]?.search).toBe(server.calls[1]?.search)
   })
 })
+
+describe('[FE-J03-S02] listProjects 的 status 參數', () => {
+  let server: ContractServer
+  beforeEach(async () => {
+    server = await startContractServer()
+    process.env.NEXT_PUBLIC_GUILDHUB_REST = server.base
+    process.env.NEXT_PUBLIC_DATA_ADAPTER = 'guildhub'
+  })
+  afterEach(async () => {
+    await server.close()
+    delete process.env.NEXT_PUBLIC_GUILDHUB_REST
+    delete process.env.NEXT_PUBLIC_DATA_ADAPTER
+  })
+
+  it('帶 status 時送 status=<s>&page=N；不帶時沒有 status（後端預設 recruiting）', () => {
+    const projects = (query: Record<string, string | number | undefined>) => new URL(buildRequest({ method: 'GET', path: '/api/projects', query }).url)
+    expect(projects({ status: 'active', page: 1 }).search).toBe('?status=active&page=1')
+    expect(projects({ page: 0 }).search).toBe('?page=0')
+  })
+
+  it('listProjects({ status, page }) 送出去的 URL 帶 status；沒給就不帶', async () => {
+    server.reply(200, [])
+    await ops.listProjects({ status: 'closed', page: 3 })
+    server.reply(200, [])
+    await ops.listProjects({ page: 0 })
+    expect(server.calls.map((c) => c.search)).toEqual(['?status=closed&page=3', '?page=0'])
+  })
+})
