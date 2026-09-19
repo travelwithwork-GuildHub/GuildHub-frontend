@@ -19,17 +19,17 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 describe('provider：選中的案件', () => {
   it('[FE-B09-S14] restore 帶 project：面板是案件、selected 是那一筆；帶 profile：selected 是人才那一筆', () => {
     const { result } = renderHook(() => useListPanel(), { wrapper })
-    act(() => result.current.restore({ panel: 'projects', profile: null, project: PID, page: 1 }))
+    act(() => result.current.restore({ panel: 'projects', profile: null, project: PID, page: 1, view: null }))
     expect(result.current.open).toBe('projects')
     expect(result.current.selected).toBe(PID)
     expect(result.current.page).toBe(1)
-    act(() => result.current.restore({ panel: 'profiles', profile: ID, project: null, page: 0 }))
+    act(() => result.current.restore({ panel: 'profiles', profile: ID, project: null, page: 0, view: null }))
     expect(result.current.selected).toBe(ID)
     // 錯位的組合：關著卻殘留 profile、人才面板殘留 project —— selected 都不能冒出來
-    act(() => result.current.restore({ panel: null, profile: ID, project: PID, page: 0 }))
+    act(() => result.current.restore({ panel: null, profile: ID, project: PID, page: 0, view: null }))
     expect(result.current.open).toBeNull()
     expect(result.current.selected, '面板關著卻有選中').toBeNull()
-    act(() => result.current.restore({ panel: 'profiles', profile: null, project: PID, page: 0 }))
+    act(() => result.current.restore({ panel: 'profiles', profile: null, project: PID, page: 0, view: null }))
     expect(result.current.selected, '人才面板讀到了案件的選中').toBeNull()
   })
 

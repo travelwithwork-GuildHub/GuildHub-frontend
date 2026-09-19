@@ -11,18 +11,18 @@ const PID = '44444444-4444-4444-4444-000000000009'
 
 describe('parsePanelUrl：解析出來的一定是 canonical 的', () => {
   it.each([
-    ['?panel=profiles', { panel: 'profiles', profile: null, project: null, page: 0 }],
-    ['?panel=profiles&page=0', { panel: 'profiles', profile: null, project: null, page: 0 }],
-    ['?panel=profiles&page=2', { panel: 'profiles', profile: null, project: null, page: 2 }],
-    [`?panel=profiles&profile=${ID}`, { panel: 'profiles', profile: ID, project: null, page: 0 }],
-    [`?profile=${ID}`, { panel: 'profiles', profile: ID, project: null, page: 0 }],
-    ['?panel=projects', { panel: 'projects', profile: null, project: null, page: 0 }],
-    [`?panel=projects&profile=${ID}`, { panel: 'projects', profile: null, project: null, page: 0 }],
-    ['?panel=profiles&page=-1', { panel: 'profiles', profile: null, project: null, page: 0 }],
-    ['?panel=profiles&page=abc', { panel: 'profiles', profile: null, project: null, page: 0 }],
-    ['?panel=profiles&page=1.5', { panel: 'profiles', profile: null, project: null, page: 0 }],
-    ['?panel=profiles&page=99999999999999999999', { panel: 'profiles', profile: null, project: null, page: 0 }],
-    ['?panel=profiles&profile=not-a-uuid', { panel: 'profiles', profile: null, project: null, page: 0 }],
+    ['?panel=profiles', { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
+    ['?panel=profiles&page=0', { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
+    ['?panel=profiles&page=2', { panel: 'profiles', profile: null, project: null, page: 2, view: null }],
+    [`?panel=profiles&profile=${ID}`, { panel: 'profiles', profile: ID, project: null, page: 0, view: null }],
+    [`?profile=${ID}`, { panel: 'profiles', profile: ID, project: null, page: 0, view: null }],
+    ['?panel=projects', { panel: 'projects', profile: null, project: null, page: 0, view: null }],
+    [`?panel=projects&profile=${ID}`, { panel: 'projects', profile: null, project: null, page: 0, view: null }],
+    ['?panel=profiles&page=-1', { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
+    ['?panel=profiles&page=abc', { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
+    ['?panel=profiles&page=1.5', { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
+    ['?panel=profiles&page=99999999999999999999', { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
+    ['?panel=profiles&profile=not-a-uuid', { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
     ['?panel=bogus', CLOSED],
     ['?panel=bogus&page=3', CLOSED],
     ['?profile=not-a-uuid', CLOSED],
@@ -34,16 +34,16 @@ describe('parsePanelUrl：解析出來的一定是 canonical 的', () => {
 
   // `project=<id>`（`FE-B03`）：八種輸入各有一個確定的 canonical 答案
   it.each([
-    [`?panel=projects&project=${PID}`, { panel: 'projects', profile: null, project: PID, page: 0 }],
-    [`?panel=projects&profile=${ID}`, { panel: 'projects', profile: null, project: null, page: 0 }],
-    [`?panel=profiles&project=${PID}`, { panel: 'profiles', profile: null, project: null, page: 0 }],
-    [`?project=${PID}&page=2`, { panel: 'projects', profile: null, project: PID, page: 2 }],
-    [`?profile=${ID}&project=${PID}`, { panel: 'profiles', profile: ID, project: null, page: 0 }],
-    [`?panel=projects&project=${PID}&profile=${ID}`, { panel: 'projects', profile: null, project: PID, page: 0 }],
-    [`?panel=profiles&project=${PID}&profile=${ID}`, { panel: 'profiles', profile: ID, project: null, page: 0 }],
+    [`?panel=projects&project=${PID}`, { panel: 'projects', profile: null, project: PID, page: 0, view: null }],
+    [`?panel=projects&profile=${ID}`, { panel: 'projects', profile: null, project: null, page: 0, view: null }],
+    [`?panel=profiles&project=${PID}`, { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
+    [`?project=${PID}&page=2`, { panel: 'projects', profile: null, project: PID, page: 2, view: null }],
+    [`?profile=${ID}&project=${PID}`, { panel: 'profiles', profile: ID, project: null, page: 0, view: null }],
+    [`?panel=projects&project=${PID}&profile=${ID}`, { panel: 'projects', profile: null, project: PID, page: 0, view: null }],
+    [`?panel=profiles&project=${PID}&profile=${ID}`, { panel: 'profiles', profile: ID, project: null, page: 0, view: null }],
     [`?panel=bogus&project=${PID}`, CLOSED],
     ['?project=not-a-uuid', CLOSED],
-    [`?project=${PID}&project=${ID}`, { panel: 'projects', profile: null, project: PID, page: 0 }],
+    [`?project=${PID}&project=${ID}`, { panel: 'projects', profile: null, project: PID, page: 0, view: null }],
   ])('[FE-B09-S14] %s', (search, expected) => {
     expect(parsePanelUrl(search)).toEqual(expected)
   })
@@ -66,10 +66,45 @@ describe('parsePanelUrl：解析出來的一定是 canonical 的', () => {
     expect(parsePanelUrl(once)).toEqual(parsePanelUrl(search))
   })
 
+  // `view=mine`（`FE-J03`）：只在案件面板下、去掉 page、不合法視同沒有
+  it.each([
+    ['?panel=projects&view=mine', { panel: 'projects', profile: null, project: null, page: 0, view: 'mine' }],
+    [`?panel=projects&view=mine&project=${PID}`, { panel: 'projects', profile: null, project: PID, page: 0, view: 'mine' }],
+    ['?panel=projects&view=mine&page=2', { panel: 'projects', profile: null, project: null, page: 0, view: 'mine' }],
+    ['?panel=profiles&view=mine', { panel: 'profiles', profile: null, project: null, page: 0, view: null }],
+    ['?panel=projects&view=bogus', { panel: 'projects', profile: null, project: null, page: 0, view: null }],
+    ['?panel=projects&view=bogus&page=2', { panel: 'projects', profile: null, project: null, page: 2, view: null }],
+    [`?project=${PID}&view=mine`, { panel: 'projects', profile: null, project: PID, page: 0, view: 'mine' }],
+    ['?view=mine', CLOSED],
+    ['?panel=projects&view=mine&view=bogus', { panel: 'projects', profile: null, project: null, page: 0, view: 'mine' }],
+  ])('[FE-J03-S07] %s', (search, expected) => {
+    expect(parsePanelUrl(search)).toEqual(expected)
+  })
+
+  it.each([
+    ['?panel=projects&view=mine', '?panel=projects&view=mine'],
+    ['?panel=projects&view=mine&page=2', '?panel=projects&view=mine'],
+    [`?panel=projects&view=mine&project=${PID}`, `?panel=projects&project=${PID}&view=mine`],
+    ['?panel=profiles&view=mine', '?panel=profiles'],
+    ['?panel=projects&view=bogus', '?panel=projects'],
+  ])('[FE-J03-S07] canonical 網址：%s → %s（定點、意義不變）', (search, canonical) => {
+    const once = serializePanelUrl(parsePanelUrl(search))
+    expect(once).toBe(canonical)
+    expect(serializePanelUrl(parsePanelUrl(once))).toBe(once)
+    expect(parsePanelUrl(once)).toEqual(parsePanelUrl(search))
+  })
+
+  it('[FE-J03-S07] 序列化：view 只認案件面板；view=mine 時 page 不寫；depthOf 不因 view 而變（視圖切換是同一層 → replace）', () => {
+    expect(serializePanelUrl({ panel: 'profiles', profile: null, project: null, page: 0, view: 'mine' })).toBe('?panel=profiles')
+    expect(serializePanelUrl({ panel: 'projects', profile: null, project: null, page: 3, view: 'mine' })).toBe('?panel=projects&view=mine')
+    expect(depthOf({ panel: 'projects', profile: null, project: null, page: 0, view: 'mine' })).toBe(1)
+    expect(depthOf({ panel: 'projects', profile: null, project: PID, page: 0, view: 'mine' })).toBe(2)
+  })
+
   it('[FE-B09-S14] 序列化只認對應面板的詳情欄位：錯位的狀態寫不出非 canonical 的網址', () => {
-    expect(serializePanelUrl({ panel: 'profiles', profile: null, project: PID, page: 0 })).toBe('?panel=profiles')
-    expect(serializePanelUrl({ panel: 'projects', profile: ID, project: null, page: 1 })).toBe('?panel=projects&page=1')
-    expect(serializePanelUrl({ panel: 'projects', profile: ID, project: PID, page: 0 })).toBe(`?panel=projects&project=${PID}`)
+    expect(serializePanelUrl({ panel: 'profiles', profile: null, project: PID, page: 0, view: null })).toBe('?panel=profiles')
+    expect(serializePanelUrl({ panel: 'projects', profile: ID, project: null, page: 1, view: null })).toBe('?panel=projects&page=1')
+    expect(serializePanelUrl({ panel: 'projects', profile: ID, project: PID, page: 0, view: null })).toBe(`?panel=projects&project=${PID}`)
   })
 
   it('[FE-B09-S05] 解析 → 序列化 → 解析是定點（canonical 才有終止條件）', () => {
@@ -83,13 +118,13 @@ describe('parsePanelUrl：解析出來的一定是 canonical 的', () => {
 describe('serializePanelUrl', () => {
   it('第 0 頁省略、沒有面板是空字串', () => {
     expect(serializePanelUrl(CLOSED)).toBe('')
-    expect(serializePanelUrl({ panel: 'profiles', profile: null, project: null, page: 0 })).toBe('?panel=profiles')
-    expect(serializePanelUrl({ panel: 'profiles', profile: ID, project: null, page: 3 })).toBe(`?panel=profiles&profile=${ID}&page=3`)
+    expect(serializePanelUrl({ panel: 'profiles', profile: null, project: null, page: 0, view: null })).toBe('?panel=profiles')
+    expect(serializePanelUrl({ panel: 'profiles', profile: ID, project: null, page: 3, view: null })).toBe(`?panel=profiles&profile=${ID}&page=3`)
   })
   it('[FE-B09-S14] depthOf：世界 0、清單 1、詳情 2（profile 與 project 都是第 2 層）', () => {
     expect(depthOf(CLOSED)).toBe(0)
-    expect(depthOf({ panel: 'projects', profile: null, project: null, page: 4 })).toBe(1)
-    expect(depthOf({ panel: 'profiles', profile: ID, project: null, page: 0 })).toBe(2)
-    expect(depthOf({ panel: 'projects', profile: null, project: PID, page: 0 }), '[FE-B09-S14] project 也是第 2 層').toBe(2)
+    expect(depthOf({ panel: 'projects', profile: null, project: null, page: 4, view: null })).toBe(1)
+    expect(depthOf({ panel: 'profiles', profile: ID, project: null, page: 0, view: null })).toBe(2)
+    expect(depthOf({ panel: 'projects', profile: null, project: PID, page: 0, view: null }), '[FE-B09-S14] project 也是第 2 層').toBe(2)
   })
 })

@@ -3,6 +3,7 @@ import type { ListKind } from './paging'
 // 網址 ⇄ 面板狀態。規格 `FE-B09`〈網址表示開著哪一層，複製它就能還原〉（`FE-B03` 加 `project`）。
 //
 // `/world?panel=profiles&profile=<id>&page=N`、`/world?panel=projects&project=<id>&page=N`：開著哪一種清單、哪一筆詳情、第幾頁。
+// `FE-J03`：案件面板下另有 `view=mine`（我的案件視圖）—— 只在 `panel=projects` 下有意義、值不是 `mine` 視同沒有、`view=mine` 時 `page` 去掉。
 // 這裡是**純函式**：解析（含 canonical 化，design `D5`）與序列化。誰去讀 `window.location`、
 // 誰去寫 `history` 在 `PanelUrlSync`（`WorldUrlSync`；`FE-V01` 之後它也管 `room`）。
 //
@@ -17,11 +18,13 @@ export interface PanelUrlState {
   profile: string | null
   /** 只有 `panel === 'projects'` 時才會非 null（`FE-B03`）。 */
   project: string | null
-  /** 0-based。`panel === null` 時一定是 0。 */
+  /** 0-based。`panel === null` 時一定是 0；`view === 'mine'` 時一定是 0（我的案件不是分頁）。 */
   page: number
+  /** 案件面板的視圖（`FE-J03`）：`'mine'` 是我的案件；只有 `panel === 'projects'` 時才會非 null。 */
+  view: 'mine' | null
 }
 
-export const CLOSED: PanelUrlState = { panel: null, profile: null, project: null, page: 0 }
+export const CLOSED: PanelUrlState = { panel: null, profile: null, project: null, page: 0, view: null }
 
 const KINDS: readonly ListKind[] = ['projects', 'profiles']
 /** `<id>` 只做形狀檢查；存不存在由 `GET /api/profiles/{id}`／`GET /api/projects/{id}` 的 404 決定（`FE-X04`）。 */
@@ -46,11 +49,13 @@ export function parsePanelUrl(search: string): PanelUrlState {
   const inferred = profile !== null ? 'profiles' : project !== null ? 'projects' : null
   const panel = rawPanel === null ? inferred : (KINDS as readonly string[]).includes(rawPanel) ? (rawPanel as ListKind) : null
   if (panel === null) return CLOSED
+  const view = panel === 'projects' && params.get('view') === 'mine' ? 'mine' : null
   return {
     panel,
     profile: panel === 'profiles' ? profile : null,
     project: panel === 'projects' ? project : null,
-    page: parsePage(params.get('page')),
+    page: view === 'mine' ? 0 : parsePage(params.get('page')),
+    view,
   }
 }
 
@@ -61,7 +66,10 @@ export function serializePanelUrl(state: PanelUrlState): string {
   // 序列化也只認對應面板的那一個：拿到錯位的狀態（`profiles` 帶 `project`）不能寫出非 canonical 的網址（審查抓到的）
   if (state.panel === 'profiles' && state.profile !== null) params.set('profile', state.profile)
   if (state.panel === 'projects' && state.project !== null) params.set('project', state.project)
-  if (state.page > 0) params.set('page', String(state.page))
+  // 視圖同樣只認案件面板；我的案件不是分頁，`page` 不寫（拿到 `view=mine` 帶 page 的狀態也寫不出來）
+  const mine = state.panel === 'projects' && state.view === 'mine'
+  if (mine) params.set('view', 'mine')
+  if (!mine && state.page > 0) params.set('page', String(state.page))
   return `?${params.toString()}`
 }
 

@@ -149,7 +149,7 @@ describe('表單與詳情共用 overlay：導航贏', () => {
     server.replyFor(detailPath(UUID(1)), 200, project(1))
     server.replyFor(`/api/profiles/${OWNER.id}`, 200, OWNER)
     // 上一頁／下一頁／深連結：provider 的 `restore` 直接帶 project 進來（`WorldUrlSync` 的 popstate 就是走這條）
-    act(() => grabbed.list!.restore({ panel: 'projects', profile: null, project: UUID(1), page: 0 }))
+    act(() => grabbed.list!.restore({ panel: 'projects', profile: null, project: UUID(1), page: 0, view: null }))
     await waitFor(() => expect(detail().dataset.phase).toBe('ready'))
     expect(screen.queryByTestId('create-project-form'), '詳情開著表單還在').toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '返回' }))

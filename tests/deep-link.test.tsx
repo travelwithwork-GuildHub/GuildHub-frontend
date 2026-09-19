@@ -2,7 +2,7 @@ import { useEffect, type RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BoardPanel } from '@/list-panel/BoardPanel'
-import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
+import { ListPanelProvider, useListPanel } from '@/list-panel/ListPanelProvider'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
 import type { InteractableRegistry } from '@/world/interaction/registry'
@@ -78,6 +78,15 @@ function MountProbe() {
   }, [])
   return null
 }
+/** `FE-J03-S07`：provider 的 `view` 寫成屬性、`setView` 交出來（視圖的畫面在 `my-projects-board.test.tsx`，這裡只驗網址與狀態）。 */
+const viewApi: { setView: ((view: 'mine' | null) => void) | null } = { setView: null }
+function ViewProbe() {
+  const { view, setView } = useListPanel()
+  useEffect(() => {
+    viewApi.setView = setView
+  }, [setView])
+  return <span data-testid="view-probe" data-view={view ?? ''} />
+}
 /** 世界的輸入鎖（深連結開著面板時，人也不該走得動：`FE-B01-S18` 的鎖沒有人按 E 也要持有）與看板的 registry。 */
 function WorldProbe({ sinkRef }: { sinkRef: RefObject<World | null> }) {
   const { registry, inputLockRef } = useInteraction()
@@ -112,6 +121,7 @@ function arriveAt(url: string) {
         <WorldProbe sinkRef={sinkRef} />
         <ListPanelProvider>
           <WorldUrlSync />
+          <ViewProbe />
           <MountProbe />
           <BoardTargets />
           <BoardPanel />
@@ -453,5 +463,52 @@ describe('網址改變時世界不重掛', () => {
     // 這裡只證明 provider 那一層沒重掛 —— `key={url}` 綁在 Canvas 上這裡照樣是 1。真的 Canvas 在 e2e。
     expect(probeMounts).toBe(1)
     expect(probeUnmounts, 'provider 那一層被拔掉了').toBe(0)
+  })
+})
+
+describe('[FE-J03-S07] view=mine 的網址：只在案件面板下、去掉 page、切換用 replace', () => {
+  const view = () => screen.getByTestId('view-probe').dataset.view
+  const setView = (v: 'mine' | null) => act(() => viewApi.setView?.(v))
+
+  it('[FE-J03-S07] 直達 ?panel=projects&view=mine：面板開在我的案件（view=mine）、不多一層紀錄', async () => {
+    server.replyFor('/api/projects', 200, [])
+    const { spies } = arriveAt('/world?panel=projects&view=mine')
+    expect(panel()?.dataset.kind).toBe('projects')
+    expect(view()).toBe('mine')
+    await act(async () => {})
+    expect(url()).toBe('/world?panel=projects&view=mine')
+    expect(spies.push()).toBe(0)
+  })
+
+  it('[FE-J03-S07] 帶錯的 view 被 canonical 掉（replace、不 push）：profiles 下去掉、bogus 去掉、view=mine 去 page', async () => {
+    for (const [from, to, kind, expected] of [
+      ['/world?panel=profiles&view=mine', '/world?panel=profiles', 'profiles', ''],
+      ['/world?panel=projects&view=bogus', '/world?panel=projects', 'projects', ''],
+      ['/world?panel=projects&view=mine&page=2', '/world?panel=projects&view=mine', 'projects', 'mine'],
+    ] as const) {
+      server.replyFor('/api/profiles', 200, [])
+      server.replyFor('/api/projects', 200, [])
+      const { spies } = arriveAt(from)
+      expect(panel()?.dataset.kind, from).toBe(kind)
+      expect(view(), from).toBe(expected)
+      await waitFor(() => expect(url(), from).toBe(to))
+      expect(spies.push(), from).toBe(0)
+      cleanup()
+    }
+  })
+
+  it('[FE-J03-S07] 清單第 1 頁按「我的案件」再按「招募中」：網址依序 view=mine、回到沒有 page 的清單；瀏覽紀錄不增加', async () => {
+    server.replyFor('/api/projects', 200, Array.from({ length: 20 }, (_, i) => project(i)))
+    const { spies } = arriveAt('/world?panel=projects&page=1')
+    await waitFor(() => expect(url()).toBe('/world?panel=projects&page=1'))
+    const pushedBefore = spies.push()
+    setView('mine')
+    expect(view()).toBe('mine')
+    await waitFor(() => expect(url()).toBe('/world?panel=projects&view=mine'))
+    server.replyFor('/api/projects', 200, [])
+    setView(null)
+    expect(view()).toBe('')
+    await waitFor(() => expect(url()).toBe('/world?panel=projects'))
+    expect(spies.push() - pushedBefore, '視圖切換不該 push').toBe(0)
   })
 })

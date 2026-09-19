@@ -28,6 +28,10 @@ interface ListPanelValue {
   selected: string | null
   /** 清單畫面上呈現的頁次（0-based）。 */
   page: number
+  /** 案件面板的視圖（`FE-J03`）：`'mine'` 是我的案件；其他面板或關著時 null。 */
+  view: 'mine' | null
+  /** 切換案件面板的視圖；只在案件面板下有效。切到我的案件時 `page` 歸零（不是分頁）。 */
+  setView: (view: 'mine' | null) => void
   /** 回 `false` = 現在開著的面板拒絕讓位（送出中、有未儲存的修改），什麼都沒變。 */
   openPanel: (kind: ListKind) => boolean
   closePanel: () => void
@@ -86,7 +90,7 @@ function ListPanelState({ children }: { children: ReactNode }) {
     (kind: ListKind) => {
       if (!requestOpen(ID)) return false
       // 同一塊看板再按一次 E：什麼都不變（頁碼、詳情都留著）。換一塊、或剛被讓位過：從第 0 頁重新開。
-      setRoute((r) => (r.panel === kind ? r : { panel: kind, profile: null, project: null, page: 0 }))
+      setRoute((r) => (r.panel === kind ? r : { panel: kind, profile: null, project: null, page: 0, view: null }))
       return true
     },
     [requestOpen],
@@ -106,7 +110,11 @@ function ListPanelState({ children }: { children: ReactNode }) {
     setRoute((r) => (r.panel !== 'projects' || r.project === id ? r : { ...r, project: id }))
   }, [])
   const reportPage = useCallback((page: number) => {
-    setRoute((r) => (r.panel === null || r.page === page ? r : { ...r, page }))
+    // 我的案件不是分頁：晚到的頁次回報不能把 `page` 塞進 `view=mine` 的狀態
+    setRoute((r) => (r.panel === null || r.view === 'mine' || r.page === page ? r : { ...r, page }))
+  }, [])
+  const setView = useCallback((view: 'mine' | null) => {
+    setRoute((r) => (r.panel !== 'projects' || r.view === view ? r : { ...r, view, page: 0 }))
   }, [])
   const restore = useCallback(
     (next: PanelUrlState) => {
@@ -124,6 +132,8 @@ function ListPanelState({ children }: { children: ReactNode }) {
       // 三種面板狀態各自分支：關著時一定是 null（`restore` 拿到錯位的組合也不會冒出一個選中）
       selected: panel.panel === 'projects' ? panel.project : panel.panel === 'profiles' ? panel.profile : null,
       page: panel.page,
+      view: panel.panel === 'projects' ? panel.view : null,
+      setView,
       openPanel,
       closePanel,
       yieldPanel,
@@ -132,7 +142,7 @@ function ListPanelState({ children }: { children: ReactNode }) {
       reportPage,
       restore,
     }),
-    [panel, open, openPanel, closePanel, yieldPanel, selectProfile, selectProject, reportPage, restore],
+    [panel, open, openPanel, closePanel, yieldPanel, selectProfile, selectProject, reportPage, setView, restore],
   )
   return <ListPanelContext.Provider value={value}>{children}</ListPanelContext.Provider>
 }

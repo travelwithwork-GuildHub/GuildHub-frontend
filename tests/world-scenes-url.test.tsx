@@ -31,10 +31,10 @@ describe('網址的 codec', () => {
     [`?room=${ROOM}`, { room: ROOM, panel: CLOSED }, `?room=${ROOM}`],
     ['?room=abc', { room: null, panel: CLOSED }, ''],
     [`?room=${ROOM}&panel=profiles&page=2`, { room: ROOM, panel: CLOSED }, `?room=${ROOM}`],
-    ['?panel=profiles&page=2', { room: null, panel: { panel: 'profiles', profile: null, project: null, page: 2 } }, '?panel=profiles&page=2'],
+    ['?panel=profiles&page=2', { room: null, panel: { panel: 'profiles', profile: null, project: null, page: 2, view: null } }, '?panel=profiles&page=2'],
     [`?room=${ROOM.toUpperCase()}`, { room: ROOM, panel: CLOSED }, `?room=${ROOM}`],
     [`?room=${ROOM}&room=${ROOM_B}`, { room: ROOM, panel: CLOSED }, `?room=${ROOM}`],
-    ['?page=2&panel=profiles&foo=1', { room: null, panel: { panel: 'profiles', profile: null, project: null, page: 2 } }, '?panel=profiles&page=2'],
+    ['?page=2&panel=profiles&foo=1', { room: null, panel: { panel: 'profiles', profile: null, project: null, page: 2, view: null } }, '?panel=profiles&page=2'],
   ])('[FE-V01-S08] %s', (search, parsed, canonical) => {
     const state = parseWorldUrl(search)
     expect(state).toEqual(parsed)

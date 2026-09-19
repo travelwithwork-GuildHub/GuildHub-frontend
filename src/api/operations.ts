@@ -112,10 +112,11 @@ export async function getProfile(profileId: string, options: { signal?: AbortSig
  * ⚠️ 而這件事**已經寫進了 request identity 的設計**：`FE-B05` 來的時候
  * 把 `status` 加進 identity 即可，提交規則與 `S14`／`S15` 不用重寫（`design.md` 的 `D3`）。
  */
-export async function listProjects(options: { page?: number; signal?: AbortSignal } = {}) {
+/** `status` 沒給就不帶（後端預設 `recruiting`）；`FE-J03` 的我的案件三種狀態各掃一次。 */
+export async function listProjects(options: { status?: contract.ProjectStatus; page?: number; signal?: AbortSignal } = {}) {
   return send(
     'listProjects',
-    { method: 'GET', path: '/api/projects', query: { page: options.page }, signal: options.signal },
+    { method: 'GET', path: '/api/projects', query: { status: options.status, page: options.page }, signal: options.signal },
     z.array(contract.ProjectOut),
   )
 }
