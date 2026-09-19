@@ -14,7 +14,7 @@ import { InboxPanelProvider, useInbox } from '@/inbox/InboxPanelProvider'
 import { BoardPanel } from '@/list-panel/BoardPanel'
 import { ListPanelProvider, useListPanel } from '@/list-panel/ListPanelProvider'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
-import { BlockingPanelCoordinator, useActivePanel, useBlockingPanelOpen, useBlockingPanels } from '@/panel/BlockingPanelCoordinator'
+import { BlockingPanelCoordinator, useActivePanel, useBlockingPanelOpen, useBlockingPanels, useRegisterBlockingPanel } from '@/panel/BlockingPanelCoordinator'
 import { PanelShell } from '@/panel/PanelShell'
 import { ProfilePanel } from '@/profile/ProfilePanel'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
@@ -240,7 +240,17 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(blockingPanels()).toHaveLength(1)
     await waitFor(() => expect(inboxPanel()!.contains(document.activeElement)).toBe(true))
     expect(screen.getByTestId('inbox-thread').dataset.with).toBe(OTHER.id)
-    // 看板讓位的 `go(-1)` 是非同步的：等它落地再結束（不然 popstate 會打到下一條測試的 history）
+    // 看板讓位的 `go(-1)` 是非同步的：等它落地（不然 popstate 會打到下一條測試的 history）
+    await waitFor(() => expect(url()).toBe('/world'))
+    // 讓位走的是既有的關閉路徑（不只是「不掛」）：再按 E 是乾淨的清單，不是剛剛那一筆詳情
+    escape()
+    escape()
+    expect(blockingPanels()).toHaveLength(0)
+    pressE()
+    expect(listPanel()?.dataset.kind).toBe('profiles')
+    expect(screen.queryByTestId('talent-detail'), '讓位沒有走關閉路徑：上一次的詳情還在').toBeNull()
+    await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
+    escape()
     await waitFor(() => expect(url()).toBe('/world'))
   })
 
@@ -339,7 +349,12 @@ describe('同一時間只有一個阻斷式面板', () => {
       }, [value])
       return null
     }
-    const shell = (mounted: boolean) => (
+    // 同一個 id 的第二筆登記（比殼晚掛、比殼晚卸）：殼卸載時只能刪自己那筆 —— React 的 effect 順序下 Strict Mode 本身量不到 compare-and-delete，這一筆才量得到
+    function Later() {
+      useRegisterBlockingPanel({ id: 'profile-panel', canYield: () => true, onYield: () => {} })
+      return null
+    }
+    const shell = (mounted: boolean, later = false) => (
       <StrictMode>
         <BlockingPanelCoordinator>
           <InteractionProvider>
@@ -350,6 +365,7 @@ describe('同一時間只有一個阻斷式面板', () => {
                 <span />
               </PanelShell>
             )}
+            {later && <Later />}
           </InteractionProvider>
         </BlockingPanelCoordinator>
       </StrictMode>
@@ -361,6 +377,9 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(probe()).toEqual({ active: 'profile-panel', open: false })
     view.rerender(shell(true))
     expect(probe(), 'Strict Mode 的舊 cleanup 不得刪掉新登記').toEqual({ active: 'profile-panel', open: true })
+    view.rerender(shell(true, true))
+    view.rerender(shell(false, true))
+    expect(probe(), '殼卸載只刪自己那筆：晚掛的那筆還在').toEqual({ active: 'profile-panel', open: true })
     view.rerender(shell(false))
     expect(probe(), '殼卸載不動 active').toEqual({ active: 'profile-panel', open: false })
     act(() => {
