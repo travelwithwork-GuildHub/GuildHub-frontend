@@ -115,7 +115,7 @@ MUST NOT 為房間另寫碰撞尺寸或第二份座標。桌椅 MUST NOT 註冊�
 
 房間場景 SHALL 為每個工位提供一個可從 DOM 查到的**投影參考點**（`data-seat-index` 0–7 各一）：元素的**中心** SHALL 在相機跟拍時持續更新，
 相機收斂後 SHALL 對齊「桌面中心」（世界座標 x、z 取桌子的中心，y 取桌面高度）的螢幕投影，容差 ≤ 1 px（門標籤的同一套投影函式，但對齊點是中心不是左上角）；
-座標 SHALL 是有限數（不是 NaN），投影落在畫面外時元素 SHALL 標成 hidden 但仍存在。今天沒有可見內容（`aria-hidden`）。
+座標 SHALL 是有限數（不是 NaN），投影落在畫面外時元素 SHALL 標成 hidden 但仍存在。錨點 SHALL 可以容納一個座位標籤（`FE-J13`）：**沒有內容時** `aria-hidden`、0×0、不接指標事件；**有內容時** SHALL NOT `aria-hidden`、SHALL 接指標事件、內容以錨點的中心為基準排版（標籤的偏移由標籤自己定，錨點的中心仍是投影點）。
 它只在 `room` 場景存在；在 `hall` MUST NOT 存在。相機跟著角色（有阻尼），**收斂後**本地角色在畫面中心容差 ≤ 1 px 內（`scene-switch.mjs` 的里程計就靠這點），
 所以收斂後「角色相對某個錨點的位置」＝畫面中心到那個錨點的向量。換算世界距離：x 每單位 s px（用兩個已知 x 距離的錨點量出）；
 螢幕 y 同時含世界 z 與 y（俯角 45°：`sy = s·(y − z)/√2` 加常數），錨點在桌面高 h、角色的基準在地面，所以反算 z 時 SHALL 先扣掉固定偏移 `s·h/√2`
@@ -128,7 +128,7 @@ MUST NOT 為房間另寫碰撞尺寸或第二份座標。桌椅 MUST NOT 註冊�
 #### Scenario: [FE-W16-S06] 房間裡八個錨點對得回索引；大廳裡沒有
 
 - **WHEN** 場景是 `room`，掛載世界
-- **THEN** DOM SHALL 恰好有八個工位錨點，`data-seat-index` 0–7 各一，全部 `aria-hidden`、沒有文字；跑一個 frame 之後每個錨點的座標 SHALL 是有限數
+- **THEN** DOM SHALL 恰好有八個工位錨點，`data-seat-index` 0–7 各一；沒有給內容的錨點 SHALL `aria-hidden`、沒有文字，給了內容的 SHALL NOT `aria-hidden` 且內容在錨點裡；跑一個 frame 之後每個錨點的座標 SHALL 是有限數
 - **AND WHEN** 把相機目標放在 S01 的門廊代表點、viewport 設成 1280×720（jsdom 裡用投影函式算；受控的畫面外案例，不依賴模板座標）
 - **THEN** 投影落在畫面外的錨點 SHALL 是 hidden、畫面內的 SHALL 不是；至少一個 hidden、至少一個不 hidden（兩邊都有，判準才不空）
 - **AND WHEN** 場景是 `hall`
