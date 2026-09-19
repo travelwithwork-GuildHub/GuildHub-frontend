@@ -21,9 +21,9 @@
 
 ## 4. `--markers`：錨點插槽、標籤、回饋、掛進世界（〈每個座位有一個標籤〉〈一鍵入座〉〈失敗回饋〉的畫面半邊；`project-room-layout` MODIFIED；design D1／D4）
 
-- [ ] 4.1 判準先紅：`tests/room-seats.test.tsx`（`S01` 四個座位兩個有人、`seat_count` 以外沒有、載到之前沒有、404 名字→「有人」、回 hall 沒有；`S02` 按鈕 payload／停用／成功後沒有「入座」／closed 沒有；`S03` 四種回饋的畫面）；`tests/seat-anchors*.test.tsx` 改 `S06`：有內容的錨點不 `aria-hidden`、沒內容的照舊
-- [ ] 4.2 `SeatAnchors` 接 `render(seatIndex)`（有內容才拿掉 `aria-hidden`／`pointer-events-none`）、新 `src/world/seats/SeatMarkers.tsx`（名字／自己的／空位／入座／回饋，`ui-ux-pro-max` 先問）、`WorldCanvas` 房間裡掛上
-- [ ] 4.3 突變：`closed` 也長「入座」→ `S02` 紅；已有座位仍長「入座」→ `S02` 紅；名字查不到畫 id → `S01` 紅；載到之前先畫「空位」→ `S01` 紅；有內容仍 `aria-hidden` → `S06` 紅
+- [x] 4.1（`room-seats.test.tsx` 8 條、anchors 測試改 S06；`seat-rules` 併在 `room-seats-state.test.tsx`）判準先紅：`tests/room-seats.test.tsx`（`S01` 四個座位兩個有人、`seat_count` 以外沒有、載到之前沒有、404 名字→「有人」、回 hall 沒有；`S02` 按鈕 payload／停用／成功後沒有「入座」／closed 沒有；`S03` 四種回饋的畫面）；`tests/seat-anchors*.test.tsx` 改 `S06`：有內容的錨點不 `aria-hidden`、沒內容的照舊
+- [x] 4.2 `SeatAnchors` 接 `render(seatIndex)`（有內容才拿掉 `aria-hidden`／`pointer-events-none`）、新 `src/world/seats/SeatMarkers.tsx`（名字／自己的／空位／入座／回饋，`ui-ux-pro-max` 先問）、`WorldCanvas` 房間裡掛上
+- [x] 4.3（8 個 8 紅：closed 長入座、已有座位長入座、404 畫 id、載到前畫空位、有內容仍 aria-hidden、容器仍 aria-hidden、回饋不消失、ticket 說密碼錯）突變：`closed` 也長「入座」→ `S02` 紅；已有座位仍長「入座」→ `S02` 紅；名字查不到畫 id → `S01` 紅；載到之前先畫「空位」→ `S01` 紅；有內容仍 `aria-hidden` → `S06` 紅
 
 ## 5. `--e2e`：真瀏覽器（〈真瀏覽器裡兩個人各自進房〉）
 
