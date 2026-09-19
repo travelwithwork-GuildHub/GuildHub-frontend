@@ -8,7 +8,7 @@ import { PanelShell } from '@/panel/PanelShell'
 import { TalentFacts } from '@/talent/TalentFacts'
 import { useInteraction } from '@/world/interaction/InteractionProvider'
 import { DiscardConfirm } from './DiscardConfirm'
-import { ProfileForm, type CloseIntent } from './ProfileForm'
+import { ProfileForm } from './ProfileForm'
 import { useProfilePanel, useProfilePanelIfProvided } from './ProfilePanelProvider'
 
 // 「我的名片」面板。規格 `FE-A04`〈名字是入口，面板是阻斷式的〉、〈顯示我的名片，用同一個呈現元件〉、〈編輯四欄⋯⋯〉、〈未儲存就關要確認⋯⋯〉。
@@ -34,7 +34,7 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
   const [mode, setMode] = useState<'view' | 'edit'>('view')
   const [confirming, setConfirming] = useState(false)
   // 表單掛上來的「關閉意圖」處理（送出中無效、dirty 先問、否則回顯示）。顯示模式沒有表單：直接關面板。
-  const closeIntentRef = useRef<CloseIntent | null>(null)
+  const closeIntentRef = useRef<(() => void) | null>(null)
   // 確認層走 `PanelDialog`（表單所在的內容區變 inert）；「繼續編輯」之後焦點要回到剛剛在的地方（視窗卸載時焦點會掉到 body）。
   const focusBeforeConfirm = useRef<HTMLElement | null>(null)
 
@@ -46,11 +46,11 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
   }, [])
 
   const onCloseRequest = () => {
-    if (mode === 'edit') closeIntentRef.current?.requestClose()
+    if (mode === 'edit') closeIntentRef.current?.()
     else closePanel()
   }
-  // 讓位協定（`FE-X16-S14`）：顯示模式隨時可以；編輯中問表單（送出中、dirty → 不行，**不**替使用者按「放棄修改」）。
-  const panel = { id: 'profile-panel' as const, canYield: () => mode !== 'edit' || (closeIntentRef.current?.canYield() ?? true), onYield: yieldPanel }
+  // 讓位協定：顯示模式隨時可以；編輯中（送出中、dirty）的 `canYield` 在 `--flow-yield`（`FE-X16-S14`）
+  const panel = { id: 'profile-panel' as const, canYield: () => mode !== 'edit', onYield: yieldPanel }
   const editButton = useRef<HTMLButtonElement>(null)
   const backToView = () => {
     setConfirming(false)

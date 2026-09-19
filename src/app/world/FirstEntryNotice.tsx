@@ -6,7 +6,6 @@ import { FirstEntryFlow } from '@/first-entry/FirstEntryFlow'
 import { firstEntryDone, markFirstEntryDone } from '@/first-entry/seen'
 import { useAdoptIdentity, useIdentity } from '@/identity/IdentityProvider'
 import { layer } from '@/design/layers'
-import { useBlockingPanelOpen } from '@/panel/BlockingPanelCoordinator'
 
 // 世界裡給訪客看的引導。規格 `FE-A06-S04`／`S05`／`S06`。
 //
@@ -29,8 +28,6 @@ export function FirstEntryNotice() {
   // 走完流程之後這個元件會在同一次繪製裡自己消失，而「進入世界」的
   // 導向還沒發生 —— 畫面會閃一下
   const [alreadyDone] = useState(firstEntryDone)
-  // 阻斷式面板開著時讓位（`FE-X16-S15`）：用 `hidden`、不卸載 —— `dismissed` 與打到一半的名字都留著，面板關了原樣回來。
-  const yielding = useBlockingPanelOpen()
 
   if (identity.state !== 'guest' || dismissed || alreadyDone) return null
 
@@ -42,7 +39,6 @@ export function FirstEntryNotice() {
       className="pointer-events-none absolute inset-0 flex items-start justify-center p-gutter"
       style={{ zIndex: layer('panel') }}
       data-testid="first-entry-notice"
-      hidden={yielding}
     >
       <section
         aria-labelledby="notice-heading"
