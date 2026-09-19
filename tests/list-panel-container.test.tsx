@@ -88,6 +88,26 @@ describe('案件與人才共用同一個容器', () => {
   })
 })
 
+describe('body 插槽（`FE-J03` design D2）：有它就畫它、不畫分頁列表與翻頁、不打請求；其餘照舊', () => {
+  it('[FE-J03-S01] 有 body：內容區是 body、沒有列表與「下一頁」、零個請求；overlay 開著時 body inert；換回沒有 body 才打第 0 頁', async () => {
+    const view = mount('projects', { body: <div data-testid="my-body">我的案件</div>, toolbar: <button type="button">工具</button> })
+    expect(screen.getByTestId('my-body')).toBeDefined()
+    expect(screen.getByRole('button', { name: '工具' }), '工具列照舊').toBeDefined()
+    expect(screen.queryByRole('button', { name: LABELS.next })).toBeNull()
+    expect(screen.queryByRole('list'), 'body 開著時不該有分頁列表').toBeNull()
+    await act(async () => {})
+    expect(server.calls, 'body 開著時分頁的 hook 不該跑').toHaveLength(0)
+    // overlay 蓋上：body 那一層 inert（跟列表一樣）
+    view.rerender(<ListPanel kind="projects" title="清單" labels={LABELS} renderItem={renderItem} onClose={() => {}} body={<div data-testid="my-body">我的案件</div>} overlay={<div data-testid="ov">詳情</div>} />)
+    expect(screen.getByTestId('my-body').closest('[inert]'), 'overlay 開著時 body 要 inert').not.toBeNull()
+    // 換回沒有 body：這時才是分頁清單、才打第 0 頁
+    server.reply(200, ITEMS.projects(2))
+    view.rerender(<ListPanel kind="projects" title="清單" labels={LABELS} renderItem={renderItem} onClose={() => {}} />)
+    await waitFor(() => expect(cards()).toBe(2))
+    expect(server.calls.map((c) => c.search)).toEqual(['?page=0'])
+  })
+})
+
 describe('只做狀態，不做文案', () => {
   it('[FE-B01-S12] 首次無資料：出現呼叫端給的節點', async () => {
     server.reply(200, [])
