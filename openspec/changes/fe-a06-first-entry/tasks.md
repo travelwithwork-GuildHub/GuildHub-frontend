@@ -137,8 +137,8 @@
       `FE-A01` 已封存，要另外處理（跟 `FE-X13` 的按鈕外觀是同一批）
       → 由 `fe-a06-login-entry` 處理：規格 #478、實作 #479（2026-09-17 合併）。閘抽成 `src/first-entry/KeyHandoff.tsx`，
       `/login` 的暱稱路跟 `/`、`/world` 引導層走同一道；`RecoveryKeyPanel` 已刪
-- [ ] 5.2 `governance/` PR：把 `FE-A06` 的「角色選擇」整段移到 `FE-A05`，
+- [x] 5.2（不另開 governance：`FE-A05` 已封存兩個 change —— `fe-a05-avatar` 是選擇器、`fe-a05-avatar-variety` #526～#528 是 8 款外觀＋隨機發一款，「世界要先畫得出不同的外觀」這個前置在那裡成立了；`docs/WBS.md` FE-A05 列已是「已封存」）`governance/` PR：把 `FE-A06` 的「角色選擇」整段移到 `FE-A05`，
       並在 `FE-A05` 上寫明它自己的前置條件（**世界要先畫得出不同的外觀**，
       否則選擇器是假的 —— design D2）
-- [ ] 5.3 `governance/` PR：新增一個工作項目 **「`ChibiPlayer` 依 `av` 呈現差異」**
+- [x] 5.3（同上：`fe-a05-avatar-variety` 就是這個閉環 —— `ChibiPlayer` 依 `av` 畫 8 款、e2e `avatar-pixels`／`avatar-seen-by-others` 驗過；不再新增工作項目）`governance/` PR：新增一個工作項目 **「`ChibiPlayer` 依 `av` 呈現差異」**
       —— codex 指出的最小可見閉環，不必等完整的 `FE-W08`
