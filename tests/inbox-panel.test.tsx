@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { act, useEffect, type RefObject } from 'react'
 import type { MessageOut } from '@/api/contract/rest'
 import { VOCABULARY } from '@/errors/uiError'
-import { IdentityProvider, useAdoptIdentity } from '@/identity/IdentityProvider'
+import { IdentityProvider, useAdoptIdentity, useIdentity } from '@/identity/IdentityProvider'
 import { InboxButton } from '@/inbox/InboxButton'
 import { InboxPanel } from '@/inbox/InboxPanel'
 import { InboxPanelProvider, useInbox } from '@/inbox/InboxPanelProvider'
@@ -45,23 +45,31 @@ const msg = (from: string, to: string, hhmm: string, body = `${from === ME ? 'me
 /** 20 封（剛好一頁）：全部 A→M，時間遞減。 */
 const fullPage = (from = A) => Array.from({ length: 20 }, (_, i) => msg(from, ME, `${String(23 - Math.floor(i / 60)).padStart(2, '0')}:${String(59 - i).padStart(2, '0')}`))
 
-const grabbed: { lock: RefObject<boolean> | null; list: ReturnType<typeof useListPanel> | null; inbox: ReturnType<typeof useInbox> | null; adopt: ReturnType<typeof useAdoptIdentity> | null } = {
+// ⚠️ 這些把手是「目前掛著的那棵樹」的。`InboxPanelProvider` 以 me 為 key：`/api/me` 回來、身分變 signed-in 的那次 commit
+// 會把底下整棵子樹（含 `Grab`）卸載重掛 —— 舊把手的 `openPanel` 落在已卸載的 provider 上，畫面什麼都不會開。
+// 所以 `me` 跟其他把手在**同一個 effect** 裡寫：`mount()` 等到 `me === ME` 才回來，拿到的就一定是新樹的。
+// （CI 2026-09-19 五次紅兩次：S02／S11 是僅有的兩個「mount 之後立刻走把手」的測試，失敗時 world 是空的。）
+const grabbed: { lock: RefObject<boolean> | null; list: ReturnType<typeof useListPanel> | null; inbox: ReturnType<typeof useInbox> | null; adopt: ReturnType<typeof useAdoptIdentity> | null; me: string | null } = {
   lock: null,
   list: null,
   inbox: null,
   adopt: null,
+  me: null,
 }
 function Grab() {
   const { inputLockRef } = useInteraction()
   const list = useListPanel()
   const inbox = useInbox()
   const adopt = useAdoptIdentity()
+  const identity = useIdentity()
+  const me = identity.state === 'signed-in' ? identity.profile.id : null
   useEffect(() => {
     grabbed.lock = inputLockRef
     grabbed.list = list
     grabbed.inbox = inbox
     grabbed.adopt = adopt
-  }, [inputLockRef, list, inbox, adopt])
+    grabbed.me = me
+  }, [inputLockRef, list, inbox, adopt, me])
   return null
 }
 const locked = () => grabbed.lock!.current
@@ -99,9 +107,11 @@ const submit = (form: HTMLElement) =>
   })
 const tick = () => act(async () => {})
 
-/** 掛好、登入（/api/me → 我）。 */
+/** 掛好、登入（/api/me → 我）、**等到登入後那棵樹的把手**（見 `grabbed`）。 */
 async function mount() {
   server.reply(200, profile(ME, '我'))
+  // 先清掉上一個測試留下的把手：不清的話 `me === ME` 可能是舊的，等於沒等
+  grabbed.lock = grabbed.list = grabbed.inbox = grabbed.adopt = grabbed.me = null
   render(
     <IdentityProvider>
       <InboxPanelProvider>
@@ -120,7 +130,10 @@ async function mount() {
       </InboxPanelProvider>
     </IdentityProvider>,
   )
-  return (await screen.findByTestId('inbox-button')) as HTMLButtonElement
+  const button = (await screen.findByTestId('inbox-button')) as HTMLButtonElement
+  // 按鈕出現（DOM mutation）跟新 `Grab` 的 effect 之間沒有先後保證（passive effect 走 Scheduler）—— 等 effect 本身
+  await waitFor(() => expect(grabbed.me).toBe(ME))
+  return button
 }
 const panel = () => screen.getByTestId('inbox-panel')
 const items = () => screen.queryAllByTestId('inbox-thread-item') as HTMLButtonElement[]
