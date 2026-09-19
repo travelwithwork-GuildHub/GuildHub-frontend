@@ -201,7 +201,7 @@ describe('一鍵入座（畫面半邊）', () => {
     fireEvent.click(claimIn(1))
     await flush()
     expect(ops.claimSeat).toHaveBeenCalledTimes(1)
-    expect(ops.claimSeat).toHaveBeenCalledWith(ROOM_ID, { seat_index: 1, desk_template: 0 })
+    expect(ops.claimSeat).toHaveBeenCalledWith(ROOM_ID, { seat_index: 1, desk_template: 0 }, { signal: expect.any(AbortSignal) })
     const buttons = claimButtons()
     expect(buttons).toHaveLength(4)
     for (const b of buttons) expect((b as HTMLButtonElement).disabled, '送出中每個「入座」都要停用').toBe(true)

@@ -192,12 +192,13 @@ export async function listSeats(projectId: string, options: { signal?: AbortSign
 }
 
 /** ⚠️ **409 是正常流程** —— 兩個人同時點同一格，其中一個一定會收到它。 */
-export async function claimSeat(projectId: string, input: contract.SeatClaim) {
+export async function claimSeat(projectId: string, input: contract.SeatClaim, options: { signal?: AbortSignal } = {}) {
   return send(
     'claimSeat',
     {
       method: 'POST',
       path: '/api/projects/{project_id}/seats',
+      signal: options.signal,
       params: { project_id: projectId },
       body: contract.SeatClaim.parse(input),
     },

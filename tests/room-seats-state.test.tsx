@@ -159,7 +159,7 @@ describe('一鍵入座與失敗回饋（狀態半邊）', () => {
     act(() => hook.result.current.claim(1))
     act(() => hook.result.current.claim(2))
     expect(ops.claimSeat).toHaveBeenCalledTimes(1)
-    expect(ops.claimSeat).toHaveBeenCalledWith(ROOM, { seat_index: 1, desk_template: 0 })
+    expect(ops.claimSeat).toHaveBeenCalledWith(ROOM, { seat_index: 1, desk_template: 0 }, { signal: expect.any(AbortSignal) })
     expect(ready(hook).claiming).toBe(1)
     ops.listSeats.mockResolvedValueOnce([seat(1, ME)])
     await act(async () => pending.resolve(seat(1, ME)))
