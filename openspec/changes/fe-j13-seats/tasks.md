@@ -32,7 +32,7 @@
 
 ## 6. 收尾
 
-- [ ] 6.1 每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響
-- [ ] 6.2 合併後 `vercel deploy --prod`、閘道 `/world?room=<seed 的房>` 一次人工 smoke（只走不壓）
-- [ ] 6.3 tasks 全勾後、archive 前：`bash .github/scripts/archive-review.sh fe-j13-seats`（背景）；需修正修完 `--rereview` 一次、每條 `--judge`
-- [ ] 6.4 Sheet `FE-J13` → Done（瀏覽器層驗過之後才打）
+- [x] 6.1（#545／#546／#551／#553／#555 各自 eslint／tsc／pnpm test 全綠、PR 都有效能段）每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響
+- [x] 6.2（7dc69ba 與 32687cf 各部署一次；走閘道進 seed 的成軍房：兩個真名字、兩個空位有「入座」、8 個錨點、請求數同 design D6）合併後 `vercel deploy --prod`、閘道 `/world?room=<seed 的房>` 一次人工 smoke（只走不壓）
+- [x] 6.3（#552 之後第一個真的跑起來的樣本：bundle 160 KB；codex 3 條需修正全部先紅再修 #555、gemini 0 條；--rereview 兩模型皆「已修」；三條 --judge 已修）tasks 全勾後、archive 前：`bash .github/scripts/archive-review.sh fe-j13-seats`（背景）；需修正修完 `--rereview` 一次、每條 `--judge`
+- [x] 6.4（e2e S05 28 綠 ×3、正式站閘道 smoke 之後打）Sheet `FE-J13` → Done（瀏覽器層驗過之後才打）
