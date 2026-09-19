@@ -22,9 +22,9 @@ const now = () => clock
 const who = (id: string, name: string, st = ''): RemoteIdentity => ({ id, name, av: 0, st })
 const rosterOf = (people: RemoteIdentity[]): ReadonlyMap<string, RemoteIdentity> => new Map(people.map((p) => [p.id, p]))
 const nodesFor = (): RefObject<NameTagNodes> => ({ current: new Map() })
-const tag = (id: string) => document.querySelector<HTMLElement>(`[data-testid="name-tag"][data-player="${id}"]`)
-/** 登記進 nodesRef、每幀被寫 transform 的槽（狀態是它的 child，名字盒也是）。 */
-const slot = (id: string) => document.querySelector<HTMLElement>(`[data-testid="name-tag-slot"][data-player="${id}"]`)
+/** 牌子＝槽（登記進 nodesRef、每幀被寫 transform；狀態與名字盒都是它的 child）。 */
+const slot = (id: string) => document.querySelector<HTMLElement>(`[data-testid="name-tag"][data-player="${id}"]`)
+const tag = (id: string) => slot(id)?.querySelector<HTMLElement>('[data-testid="name-tag-name"]') ?? null
 const statusOf = (id: string) => slot(id)?.querySelector<HTMLElement>('[data-testid="name-tag-status"]') ?? null
 const TWELVE = '一二三四五六七八九十壹貳'
 
@@ -35,7 +35,7 @@ describe('名字牌上的狀態', () => {
     expect(statusOf('a')?.textContent).toBe('趕工中')
     expect(statusOf('b'), '空字串不掛狀態節點').toBeNull()
     expect(tag('b')?.textContent).toBe('乙')
-    expect(tag('a')?.textContent, '名字盒的 textContent 只有名字（e2e 靠它找人）').toBe('甲')
+    expect(tag('a')?.textContent, '名字盒的 textContent 只有名字').toBe('甲')
     for (const id of ['a', 'b']) {
       const node = slot(id)!
       expect(nodesRef.current.get(id)).toBe(node)

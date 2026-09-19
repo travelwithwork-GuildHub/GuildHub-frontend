@@ -33,12 +33,12 @@ export function NameTags({ roster, nodesRef }: { roster: ReadonlyMap<string, Rem
     // `pointer-events-none`：點牌子等於點它底下的世界（`S09`）。`hud` 層：面板（`panel`）蓋得住它。
     <div data-testid="name-tags" style={{ zIndex: layer('hud') }} className="pointer-events-none absolute inset-0 overflow-hidden">
       {[...roster.values()].filter((who) => hasName(who.name)).map((who) => (
-        // 登記進 `nodesRef`、每幀被寫 `transform` 的是這個**槽**（176×28、底邊中點對錨點）：
+        // `name-tag`（登記進 `nodesRef`、每幀被寫 `transform`、176×28、底邊中點對錨點）是**槽**：
         // `-translate-x-1/2 -translate-y-full`（CSS 的 `translate` 屬性）把底邊中點對到錨點；每幀寫的是 `transform`，兩者相加。
-        // 槽不裁（狀態要從它上方長出來，`overflow-hidden` 會把狀態切掉 —— 截圖抓到的）；名字盒在裡面，自己裁、自己截字（`S07` 量的是它）。
+        // 槽不裁（狀態要從它上方長出來，`overflow-hidden` 會把狀態切掉 —— 截圖抓到的）；名字盒 `name-tag-name` 在裡面，自己裁、自己截字（`S07` 的尺量它）。
         <div
           key={who.id}
-          data-testid="name-tag-slot"
+          data-testid="name-tag"
           data-player={who.id}
           ref={(node) => {
             const nodes = nodesRef.current
@@ -48,8 +48,8 @@ export function NameTags({ roster, nodesRef }: { roster: ReadonlyMap<string, Rem
           style={{ width: NAME_TAG_SIZE.width, height: NAME_TAG_SIZE.height, visibility: 'hidden' }}
           className="absolute top-0 left-0 -translate-x-1/2 -translate-y-full"
         >
-          {/* 名字盒：跟槽同尺寸（inline style 是尺寸的唯一來源，`S01`／`S07` 的 jsdom 半邊量它）、`leading-7` 撐滿 28 px；單行、超出裁掉、省略記號（`S07`）。`textContent` 只有名字（e2e 靠它找人）。 */}
-          <div data-testid="name-tag" data-player={who.id} style={{ width: NAME_TAG_SIZE.width, height: NAME_TAG_SIZE.height }} {...withClass(CAPTION, 'border-line bg-surface text-ink overflow-hidden border px-2 text-center leading-7 text-ellipsis whitespace-nowrap')}>
+          {/* 名字盒：跟槽同尺寸、`leading-7` 撐滿 28 px；單行、超出裁掉、省略記號（`S07`）。 */}
+          <div data-testid="name-tag-name" style={{ width: NAME_TAG_SIZE.width, height: NAME_TAG_SIZE.height }} {...withClass(CAPTION, 'border-line bg-surface text-ink overflow-hidden border px-2 text-center leading-7 text-ellipsis whitespace-nowrap')}>
             {who.name}
           </div>
           {who.st !== '' && (
