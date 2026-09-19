@@ -90,7 +90,7 @@ pnpm install --frozen-lockfile
 pnpm exec openspec list
 ```
 
-多模型分工：先 `node .agents/skills/llm-team/setup.mjs --check`，流程見 `prompts/07-ticket.md`。
+多模型分工：先 `node .agents/skills/llm-team/setup.mjs --check`，流程見 `.agents/skills/llm-team/prompts/07-ticket.md`（llm-team 快照，正本在 config repo 真源）。
 
 ## `progress.sh --check` 在守什麼
 
