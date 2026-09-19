@@ -10,7 +10,7 @@ import { furnitureDefinition } from '@/world/environment/furnitureProps'
 import { ROOM_LAYOUT, ROOM_POINTS, SEAT_INDICES, STATIONS } from '@/world/layout/projectRoomLayout'
 import { DESK_TOP, SEAT_ANCHORS, seatAnchorsFor } from '@/world/seats/anchors'
 import { SeatAnchorProjector } from '@/world/seats/SeatAnchorProjector'
-import type { SeatAnchorNodes } from '@/world/seats/SeatAnchors'
+import { SeatAnchors, type SeatAnchorNodes } from '@/world/seats/SeatAnchors'
 import { SceneRefProvider } from '@/world/scenes/SceneContext'
 import type { SceneRef } from '@/world/scenes/registry'
 import WorldCanvas from '@/world/WorldCanvas'
@@ -60,7 +60,7 @@ describe('Canvas 外面：錨點的 DOM', () => {
     HTMLCanvasElement.prototype.getContext = realGetContext
   })
 
-  it('[FE-W16-S06] 房間裡恰好八個錨點，data-seat-index 0–7 各一，全部 aria-hidden、沒有文字', () => {
+  it('[FE-W16-S06] 房間裡恰好八個錨點，data-seat-index 0–7 各一；沒人給內容（沒登入就沒有座位標籤）→ 全部 aria-hidden、沒有文字', () => {
     const view = render(
       <SceneRefProvider scene={ROOM}>
         <WorldCanvas />
@@ -78,6 +78,27 @@ describe('Canvas 外面：錨點的 DOM', () => {
     const stub = screen.getByTestId('r3f-canvas-stub')
     for (const anchor of anchors) expect(stub.contains(anchor)).toBe(false)
     view.unmount()
+  })
+
+  it('[FE-W16-S06] 給了內容的錨點：不 aria-hidden、接指標事件、內容在錨點裡；沒給的照舊；容器不 aria-hidden（否則裡面全藏掉）', () => {
+    const nodesRef: RefObject<SeatAnchorNodes> = { current: new Map() }
+    const view = render(<SeatAnchors anchors={SEAT_ANCHORS} nodesRef={nodesRef} render={(i) => (i === 2 ? <span data-testid="probe">二號</span> : null)} />)
+    const anchors = screen.getAllByTestId('seat-anchor')
+    expect(anchors).toHaveLength(8)
+    const two = anchors.find((a) => a.dataset.seatIndex === '2')!
+    expect(two.contains(screen.getByTestId('probe'))).toBe(true)
+    expect(two.getAttribute('aria-hidden')).not.toBe('true')
+    expect(two.className).not.toMatch(/pointer-events-none/)
+    expect(screen.getByTestId('seat-anchors').getAttribute('aria-hidden')).not.toBe('true')
+    for (const a of anchors.filter((a) => a !== two)) {
+      expect(a.getAttribute('aria-hidden')).toBe('true')
+      expect(a.textContent).toBe('')
+    }
+    expect(nodesRef.current.size).toBe(8)
+    view.unmount()
+    // 全部沒內容：容器也 aria-hidden（跟今天一樣）
+    render(<SeatAnchors anchors={SEAT_ANCHORS} nodesRef={nodesRef} render={() => null} />)
+    expect(screen.getByTestId('seat-anchors').getAttribute('aria-hidden')).toBe('true')
   })
 
   it('[FE-W16-S06] 大廳裡一個都沒有', () => {
