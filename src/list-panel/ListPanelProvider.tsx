@@ -15,9 +15,8 @@ import { CLOSED, parsePanelUrl, type PanelUrlState } from './urlState'
 // ⚠️ **必須在 `<InteractionProvider>` 底下。** 面板開著的時候要鎖住世界的移動輸入
 // （`S18`），而那把鎖在互動層；沒有那一層的話這裡直接炸，不會靜默變成「面板開了人還在走」。
 //
-// ⚠️ **「開不開」不在這裡**（`FE-X16`〈同一時間只有一個阻斷式面板〉）：協調者持有 `active`，這裡的 `open` ＝ `active === 'list-panel'` 時的 `route.panel`；
-// 開＝ `requestOpen()`（被拒回 `false`）、關＝ `requestClose()`、讓位＝ `onYield`（關的副作用、不還焦點）。鎖跟著**殼的掛載**走（殼登記了才持、卸載了才放；持有者是這裡，
-// 因為 `InteractionProvider` 在這一層）—— 一個成功但沒掛成的請求（同一事件裡被後者取代、殼在 Suspense 裡延後）什麼都不留。
+// ⚠️ **「開不開」不在這裡**（`FE-X16`）：協調者持有 `active`，`open` ＝ `active === 'list-panel'` 時的 `route.panel`；開＝ `requestOpen()`（被拒回 `false`）、
+// 關＝ `requestClose()`、讓位＝ `onYield`（關的副作用、不還焦點）。鎖跟著**殼的掛載**走（持有者是這裡，`InteractionProvider` 在這一層）—— 沒掛成的請求什麼都不留。
 //
 // ⚠️ **起始狀態從網址來**（`FE-B09-S01`～`S05`）：這個 provider 只在 `ssr: false` 的世界裡掛，
 // 掛載那一刻就知道網址。之後網址 → 狀態（popstate）與狀態 → 網址在 `PanelUrlSync`（`WorldUrlSync`）；
@@ -57,13 +56,11 @@ function initialRoute(): PanelUrlState {
 
 const ID = 'list-panel'
 
-export function ListPanelProvider({ children }: { children: ReactNode }) {
-  return (
-    <BlockingPanelCoordinator>
-      <ListPanelState>{children}</ListPanelState>
-    </BlockingPanelCoordinator>
-  )
-}
+export const ListPanelProvider = ({ children }: { children: ReactNode }) => (
+  <BlockingPanelCoordinator>
+    <ListPanelState>{children}</ListPanelState>
+  </BlockingPanelCoordinator>
+)
 
 function ListPanelState({ children }: { children: ReactNode }) {
   const { holdInputLock } = useInteraction()

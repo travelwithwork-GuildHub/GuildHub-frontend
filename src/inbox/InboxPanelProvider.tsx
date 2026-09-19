@@ -94,9 +94,7 @@ export function InboxPanelProvider({ children }: { children: ReactNode }) {
   // 會有一幀用新的 me 配舊的信；審查提醒）。舊實例在飛的請求回來時 setState 落在已卸載的元件上，什麼都不會寫。
   return (
     <BlockingPanelCoordinator>
-      <InboxState key={me ?? 'anon'} me={me}>
-        {children}
-      </InboxState>
+      <InboxState key={me ?? 'anon'} me={me}>{children}</InboxState>
     </BlockingPanelCoordinator>
   )
 }

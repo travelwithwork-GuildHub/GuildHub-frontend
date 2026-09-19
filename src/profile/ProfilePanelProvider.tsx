@@ -42,13 +42,11 @@ export function useProfilePanelIfProvided(): ProfilePanelValue | null {
 
 const ID = 'profile-panel'
 
-export function ProfilePanelProvider({ children }: { children: ReactNode }) {
-  return (
-    <BlockingPanelCoordinator>
-      <ProfilePanelState>{children}</ProfilePanelState>
-    </BlockingPanelCoordinator>
-  )
-}
+export const ProfilePanelProvider = ({ children }: { children: ReactNode }) => (
+  <BlockingPanelCoordinator>
+    <ProfilePanelState>{children}</ProfilePanelState>
+  </BlockingPanelCoordinator>
+)
 
 function ProfilePanelState({ children }: { children: ReactNode }) {
   const { requestOpen, requestClose } = useBlockingPanels()
