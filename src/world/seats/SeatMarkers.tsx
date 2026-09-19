@@ -74,7 +74,8 @@ export function RoomSeats({ projectId, nodesRef }: { projectId: string; nodesRef
         data-testid="seat-marker"
         data-seat-index={seatIndex}
         data-mine={mine ? 'true' : undefined}
-        className="absolute top-0 left-0 flex -translate-x-1/2 translate-y-3 flex-col items-center gap-1"
+        // `w-max`：錨點是 0×0，沒有它 absolute 的子節點會被擠成 0 寬、每個字換一行（截圖抓到「入／座」）
+        className="absolute top-0 left-0 flex w-max -translate-x-1/2 translate-y-3 flex-col items-center gap-1"
       >
         {/* 單行、超出裁掉、`title` 給完整名字（ui-ux-pro-max：compact label 不換行、可取得全文） */}
         <span title={label} {...withClass(CAPTION, `rounded-control max-w-40 overflow-hidden border px-2 leading-6 text-ellipsis whitespace-nowrap ${chip}`)}>
@@ -86,7 +87,7 @@ export function RoomSeats({ projectId, nodesRef }: { projectId: string; nodesRef
             disabled={!canClaim({ ...ready, me: me.id })}
             aria-busy={ready.claiming === seatIndex ? 'true' : undefined}
             onClick={() => claim(seatIndex)}
-            {...withClass(SECONDARY, 'bg-surface text-caption')}
+            {...withClass(SECONDARY, 'bg-surface text-caption whitespace-nowrap')}
           >
             {SEAT_TEXT.claim}
           </button>
