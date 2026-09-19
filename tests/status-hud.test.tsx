@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LIMITS } from '@/api/contract/limits'
 import type { Identity } from '@/identity/types'
@@ -21,26 +22,27 @@ const store = { current: null as StatusStore | null }
 const ME: Identity = { state: 'signed-in', profile: { id: 'a0000000-0000-4000-8000-000000000001', display_name: '我', avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-01T00:00:00Z' } }
 const TWELVE = '一二三四五六七八九十壹貳'
 
-function LockProbe({ sink }: { sink: { current: boolean } }) {
+/** 把鎖的 ref 本身交出來：鎖是 ref 不是 state，改了不會重繪，要在斷言當下讀 `.current`。 */
+function LockProbe({ onLock }: { onLock: (lock: { current: boolean }) => void }) {
   const lock = useInputLockRef()
-  sink.current = lock.current
+  useEffect(() => onLock(lock), [lock, onLock])
   return null
 }
 /** 掛 HUD（在 InteractionProvider 底下，帶 EditableFocusLock —— 焦點鎖的判準要真的那把鎖）。回一個「讀鎖」的函式。 */
 function mount() {
-  const sink = { current: false }
+  const sinkRef: { current: { current: boolean } | null } = { current: null }
   const tree = () => (
     <InteractionProvider>
       <StatusProvider store={store.current!}>
         <EditableFocusLock />
-        <LockProbe sink={sink} />
+        <LockProbe onLock={(l) => { sinkRef.current = l }} />
         <div data-focus-anchor="world" tabIndex={-1} data-testid="world-anchor" />
         <StatusHud />
       </StatusProvider>
     </InteractionProvider>
   )
   const view = render(tree())
-  return { view, rerender: () => view.rerender(tree()), locked: () => sink.current }
+  return { view, rerender: () => view.rerender(tree()), locked: () => sinkRef.current?.current ?? false }
 }
 const open = () => fireEvent.click(screen.getByRole('button', { name: /設定狀態|狀態：/ }))
 const input = () => screen.getByLabelText(STATUS_HUD_LABELS.field) as HTMLInputElement

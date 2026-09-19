@@ -6,6 +6,9 @@ import { CAPTION, withClass } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { NAME_TAG_SIZE, hasName } from './player/nameTag'
 
+// 狀態（`FE-K05`，design D3）：`st` 非空的人牌子裡多一個 **往上長** 的子節點（`bottom-full`），名字盒 176×28 與 translate 都不動 ——
+// `FE-W08-S04`／`S07` 的尺不變、真瀏覽器的 `name-tags.mjs` 不變。位置照舊由 `RemotePlayer` 寫在牌子節點上，狀態跟著走。
+
 // 遠端玩家頭上的名字牌。規格 `name-tag`（`FE-W08-S01`～`S03`、`S07`～`S09`）。
 //
 // ⚠️⚠️ **這是 DOM，不是 3D 文字**（ADR 0012；理由同門標籤：3D 裡畫字會建 GPU texture，違反 ADR 0003）。
@@ -45,6 +48,11 @@ export function NameTags({ roster, nodesRef }: { roster: ReadonlyMap<string, Rem
           {...withClass(CAPTION, 'border-line bg-surface text-ink absolute top-0 left-0 -translate-x-1/2 -translate-y-full overflow-hidden border px-2 text-center leading-7 text-ellipsis whitespace-nowrap')}
         >
           {who.name}
+          {who.st !== '' && (
+            <span data-testid="name-tag-status" {...withClass(CAPTION, 'bg-surface/90 border-line text-ink-muted absolute bottom-full left-0 mb-0.5 w-full overflow-hidden rounded-sm border px-1 text-center leading-5 text-ellipsis whitespace-nowrap')}>
+              {who.st}
+            </span>
+          )}
         </div>
       ))}
     </div>
