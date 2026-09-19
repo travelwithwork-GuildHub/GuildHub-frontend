@@ -84,6 +84,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-J01 | 已封存 | `fe-j01-create-project` |
 | FE-J03 | 已封存 | `fe-j03-my-projects` |
 | FE-J04 | 已封存 | `fe-j04-form-team` |
+| FE-J13 | 已封存 | `fe-j13-seats` |
 | FE-K01 | 已封存 | `fe-k01-inbox` |
 | FE-K04 | 已封存 | `fe-k04-scene-chat-ui` |
 | FE-N08 | 已封存 | `fe-n08-room-entry-gate` |
@@ -136,7 +137,6 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-O10 | 已完成 | 標記 `Done` |
 | FE-X08 | 已完成 | 標記 `Done` |
 | FE-A06 | 規格已合併 | `fe-a06-first-entry`、`fe-a06-login-entry` |
-| FE-J13 | 規格已合併 | `fe-j13-seats` |
 | FE-J14 | 規格已合併 | `fe-j14-project-resources` |
 | FE-R04 | 規格已合併 | `fe-r04-background-tab` |
 | FE-R10 | 規格已合併 | `fe-r10-presence` |
@@ -237,7 +237,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-X12 | demo 之後 | — |
 | FE-X14 | demo 之後 | — |
 
-共 178 項：demo 之後 70、已封存 59、等外部 17、未開始 14、已取消 6、規格已合併 5、已完成 4、待裁決 2、常態 1
+共 178 項：demo 之後 70、已封存 60、等外部 17、未開始 14、已取消 6、已完成 4、規格已合併 4、待裁決 2、常態 1
 
 來源指紋 `15bde29df95e0355`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
