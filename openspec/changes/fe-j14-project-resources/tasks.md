@@ -31,9 +31,9 @@
 
 ## 5. 資料存取（PR：`--api`；前置：2）
 
-- [ ] 5.1 先寫單元：四個存取函式送出的 method／path／body（原字串、PATCH 只帶有改的鍵）、回應在邊界以契約解析、失敗丟 `HttpError`／`NetworkError`
-- [ ] 5.2 實作；確認元件不 `fetch`（既有 lint）
-- [ ] 5.3 突變：PATCH 改成送全部欄位 → 5.1 的 body 斷言紅；回應不經契約解析 → 邊界測試紅
+- [x] 5.1 先寫單元：四個存取函式送出的 method／path／body（原字串、PATCH 只帶有改的鍵）、回應在邊界以契約解析、失敗丟 `HttpError`／`NetworkError`
+- [x] 5.2 實作；確認元件不 `fetch`（既有 lint）
+- [x] 5.3 突變：PATCH 改成送全部欄位 → 5.1 的 body 斷言紅；回應不經契約解析 → 邊界測試紅
 
 ## 6. 面板：清單、狀態、共享狀態與結案確認（PR：`--panel`；前置：4、5）
 
