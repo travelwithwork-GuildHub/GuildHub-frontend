@@ -3,6 +3,7 @@ import { IdentityProvider } from '@/identity/IdentityProvider'
 import { AvatarDraftProvider } from '@/identity/AvatarDraftProvider'
 import { InboxButton } from '@/inbox/InboxButton'
 import { InboxPanelProvider } from '@/inbox/InboxPanelProvider'
+import { BlockingPanelCoordinator } from '@/panel/BlockingPanelCoordinator'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
 import { ReturnToHallButton } from '@/world/scenes/ReturnToHallButton'
@@ -27,6 +28,8 @@ export default function WorldPage() {
   return (
     <IdentityProvider>
       <AvatarDraftProvider>
+        {/* 同一時間只有一個阻斷式面板（`FE-X16`）：三個面板 provider 的「開著」都從它推導；訪客提示、聊天框、換角色讀它讓位。 */}
+        <BlockingPanelCoordinator>
         {/* 「我的名片」面板的開關（`FE-A04`）：按鈕在標題列、面板在 World 裡 —— provider 要包住兩者。 */}
         <ProfilePanelProvider>
         {/* 收件匣（`FE-K01`）：按鈕在標題列、面板在 World 裡、資料在 provider —— 同樣要包住兩者。 */}
@@ -73,6 +76,7 @@ export default function WorldPage() {
         </RealtimeGenerationProvider>
         </InboxPanelProvider>
         </ProfilePanelProvider>
+        </BlockingPanelCoordinator>
       </AvatarDraftProvider>
     </IdentityProvider>
   )

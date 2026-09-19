@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, ty
 import { SECONDARY, TITLE, withClass } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { useEscapeLayer } from '@/world/interaction/escapeLayers'
+import { useRegisterBlockingPanel, type PanelRegistration } from './BlockingPanelCoordinator'
 import { nextTabStop } from './focusTrap'
 import { DialogHostContext } from './PanelDialog'
 
@@ -13,6 +14,7 @@ import { DialogHostContext } from './PanelDialog'
 // 標題列（返回｜標題｜關閉，`FE-X16-S07`：在捲動容器**外面**、永遠不 inert）、內容區的捲動（`S08`）、
 // 覆蓋層（子畫面蓋住內容區時內容標 `inert`，不卸載 —— `FE-B04-S11`／`S12`／`S16`）、確認視窗的層（`PanelDialog` 的 portal 目標；`S06`）。
 // 外觀（不透明的底、邊界、陰影、圓角、寬度）全部是 token（`S05`）。
+// 掛載時向協調者登記 `{ id, canYield, onYield }`（`FE-X16`〈同一時間只有一個阻斷式面板〉；卸載只刪自己那筆、**不動 `active`**）。
 // 殼**不管**的：世界輸入鎖（呼叫端的 provider 各持各的）、內容、文案（標題與按鈕上的字由呼叫端帶進來）。
 //
 // ⚠️ **關閉是一個「意圖」，不是一個動作。** Escape 與關閉鈕都只呼叫 `onCloseRequest()`；要不要真的關（有未儲存的修改要先問、
@@ -36,12 +38,15 @@ export interface PanelShellProps {
   overlay?: ReactNode
   /** 子畫面的返回（`S07`：標題列第一個可聚焦的）。`title` 由呼叫端同時換成子畫面的標題。 */
   back?: { label: string; onBack: () => void }
+  /** 向協調者登記的身分與讓位協定（`canYield`／`onYield` 每次呼叫讀最新的那份：登記是掛載時那一筆，函式透過 ref 轉）。 */
+  panel: PanelRegistration
   /** Escape、關閉鈕。 */
   onCloseRequest: () => void
   children: ReactNode
 }
 
-export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestId, data, overlay, back, onCloseRequest, children }: PanelShellProps) {
+export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestId, data, overlay, back, panel, onCloseRequest, children }: PanelShellProps) {
+  useRegisterBlockingPanel(panel)
   // Escape 走層級：這個面板是底下那一層，overlay（詳情、確認層）自己再註冊一層在上面。
   // 帶自己的元素：overlay 在這個 section 裡面，就算跟它同一個 commit 掛載（深連結直達詳情）也在它上面。
   const section = useRef<HTMLElement>(null)

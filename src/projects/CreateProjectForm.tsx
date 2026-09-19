@@ -8,6 +8,7 @@ import { FORM_LIMITS } from '@/forms/limits'
 import { SubmitError } from '@/forms/SubmitError'
 import { useForm } from '@/forms/useForm'
 import { CreateProjectSchema, INITIAL, isDirty, toPayload, type CreateProjectInput } from './projectRules'
+import type { CloseIntent } from '@/profile/ProfileForm'
 
 // 發案表單。規格 `FE-J01`。機制全部是 `FE-X05` 的（`useForm`、`SubmitError`），形狀跟 `ProfileForm` 一樣。
 // ⚠️ **恰好四個欄位**（`S02`）：後端的 `ProjectCreate` 只有這四個；Open Role、期程、預算、截止日連 disabled 的都不放。
@@ -19,7 +20,7 @@ export interface CreateProjectFormProps {
   /** 沒有建就關（乾淨的取消、丟棄）。 */
   onDismiss: () => void
   /** 面板把殼的關閉意圖（Escape、關閉鈕）接到這裡。 */
-  closeIntentRef: RefObject<(() => void) | null>
+  closeIntentRef: RefObject<CloseIntent | null>
   /** dirty 時的關閉意圖 → 面板開確認層。 */
   askDiscard: () => void
 }
@@ -52,11 +53,12 @@ export function CreateProjectForm({ onCreated, onDismiss, closeIntentRef, askDis
     else onDismiss()
   }, [busy, form, onDismiss, askDiscard])
   useEffect(() => {
-    closeIntentRef.current = requestClose
+    // `canYield`（`FE-X16-S14`）：送出中或 dirty 都不讓位（dirty 一樣在那一刻算）
+    closeIntentRef.current = { requestClose, canYield: () => !busy && !isDirty(form.getValues()) }
     return () => {
       closeIntentRef.current = null
     }
-  }, [closeIntentRef, requestClose])
+  }, [closeIntentRef, requestClose, busy, form])
 
   // 進表單：焦點到第一欄（按「發案」的那顆鈕在 inert 的列表裡，不接的話焦點掉到 body）。
   const firstField = useRef<HTMLInputElement | null>(null)

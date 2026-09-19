@@ -6,6 +6,7 @@ import type { MessageOut } from '@/api/contract/rest'
 import { getProfile, listMessages, sendMessage } from '@/api/operations'
 import { toUiError } from '@/errors/uiError'
 import { useIdentity } from '@/identity/IdentityProvider'
+import { BlockingPanelCoordinator, useActivePanel, useBlockingPanels } from '@/panel/BlockingPanelCoordinator'
 import { RecipientGoneError } from './errors'
 import { groupThreads, mergeById, type Thread } from './threads'
 
@@ -13,6 +14,8 @@ import { groupThreads, mergeById, type Thread } from './threads'
 //
 // 掛在 `page.tsx`（`ProfilePanelProvider` 旁邊）：按鈕在標題列、面板在 `WorldCanvas` 裡，provider 要包住兩者。
 // 世界輸入鎖**不在這裡**（`InteractionProvider` 在 `WorldCanvas` 裡面）—— `InboxPanel` 掛載時自己持。
+// **「開不開」在協調者**（`FE-X16`）：`view.kind !== 'closed'` 只是子狀態，面板掛不掛看 `useActivePanel() === 'inbox-panel'`；
+// 開＝ `requestOpen()`（被拒回 `false`、什麼都不變）、關＝ `requestClose()`、讓位＝ `yieldPanel`（關的副作用、不還焦點）。
 //
 // ⚠️ **資料放這裡不放面板**：送出中關掉面板，201 回來還是要合併（`S12`）；名字快取要跨開關存活（`S04`）。
 //
@@ -24,15 +27,18 @@ import { groupThreads, mergeById, type Thread } from './threads'
 export type InboxView = { kind: 'closed' } | { kind: 'list' } | { kind: 'thread'; with: string; openedFrom: 'list' | 'talent' }
 
 export interface InboxValue {
+  /** 面板掛不掛看這個（協調者說是我、而且有畫面）；關著一律 `closed`。 */
   view: InboxView
-  /** 標題列的按鈕開清單；`opener` 是那顆按鈕（關閉後焦點回它）。 */
-  openList: (opener: HTMLElement | null) => void
-  /** 從別人的名片進來：直接進對話；開啟者已經不在了（看板關了），關閉後焦點回世界焦點錨。 */
-  openThreadFromTalent: (withId: string) => void
+  /** 標題列的按鈕開清單；`opener` 是那顆按鈕（關閉後焦點回它）。回 `false` = 現在開著的面板拒絕讓位。 */
+  openList: (opener: HTMLElement | null) => boolean
+  /** 從別人的名片進來：直接進對話；開啟者已經不在了（看板讓位），關閉後焦點回世界焦點錨。 */
+  openThreadFromTalent: (withId: string) => boolean
   /** 從清單進對話。 */
   enterThread: (withId: string) => void
   backToList: () => void
   closePanel: () => void
+  /** 被協調者讓位：不還焦點。 */
+  yieldPanel: () => void
   /** 我的名片 id（`signed-in` 才有）。 */
   me: string | null
   /** 已載入的全部信（合併後、未分組）。 */
@@ -61,6 +67,8 @@ export interface InboxValue {
   send: (withId: string, body: string) => Promise<boolean>
   /** 送出中的對方（任何一封在送，所有寄信表單都先不能再送）。 */
   sendingTo: string | null
+  /** 同步版：現在有沒有一封在送（讓位協定用；`sendingTo` 是晚一格的 UI 狀態）。 */
+  sending: () => boolean
 }
 
 const InboxContext = createContext<InboxValue | null>(null)
@@ -76,6 +84,7 @@ export function useInboxIfProvided(): InboxValue | null {
   return useContext(InboxContext)
 }
 
+const CLOSED_VIEW: InboxView = { kind: 'closed' }
 const isUnauthorized = (error: unknown) => toUiError(error).kind === 'authentication-required'
 
 export function InboxPanelProvider({ children }: { children: ReactNode }) {
@@ -84,14 +93,19 @@ export function InboxPanelProvider({ children }: { children: ReactNode }) {
   // 身分換了（登出、換帳號）：整份私訊資料失效 —— 用 `key` 讓整個狀態樹重建，不靠 effect 一個一個清（effect 是渲染之後才跑，
   // 會有一幀用新的 me 配舊的信；審查提醒）。舊實例在飛的請求回來時 setState 落在已卸載的元件上，什麼都不會寫。
   return (
-    <InboxState key={me ?? 'anon'} me={me}>
-      {children}
-    </InboxState>
+    <BlockingPanelCoordinator>
+      <InboxState key={me ?? 'anon'} me={me}>
+        {children}
+      </InboxState>
+    </BlockingPanelCoordinator>
   )
 }
+const ID = 'inbox-panel'
 
 function InboxState({ me, children }: { me: string | null; children: ReactNode }) {
-  const [view, setView] = useState<InboxView>({ kind: 'closed' })
+  const { requestOpen, requestClose } = useBlockingPanels()
+  const [screen, setView] = useState<InboxView>({ kind: 'closed' })
+  const view: InboxView = useActivePanel() === ID ? screen : CLOSED_VIEW
   const openerRef = useRef<HTMLElement | null>(null)
   const restoreFocusRef = useRef<'opener' | 'world' | null>(null)
 
@@ -186,22 +200,31 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
 
   const openList = useCallback(
     (opener: HTMLElement | null) => {
+      if (!requestOpen(ID)) return false
       openerRef.current = opener
       restoreFocusRef.current = 'opener'
       setView({ kind: 'list' })
       beginOpen()
+      return true
     },
-    [beginOpen],
+    [beginOpen, requestOpen],
   )
   const openThreadFromTalent = useCallback(
     (withId: string) => {
+      if (!requestOpen(ID)) return false
       openerRef.current = null
       restoreFocusRef.current = 'world'
       setView({ kind: 'thread', with: withId, openedFrom: 'talent' })
       beginOpen()
+      return true
     },
-    [beginOpen],
+    [beginOpen, requestOpen],
   )
+  const yieldPanel = useCallback(() => {
+    restoreFocusRef.current = null
+    openerRef.current = null
+    setView(CLOSED_VIEW)
+  }, [])
   const enterThread = useCallback((withId: string) => setView({ kind: 'thread', with: withId, openedFrom: 'list' }), [])
   const backToList = useCallback(() => setView({ kind: 'list' }), [])
   const closePanel = useCallback(() => {
@@ -214,8 +237,9 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
     openerRef.current = null
     if (where === 'opener' && opener?.isConnected) opener.focus()
     else if (where !== null) document.querySelector<HTMLElement>('[data-focus-anchor="world"]')?.focus()
-    setView({ kind: 'closed' })
-  }, [])
+    requestClose(ID)
+    setView(CLOSED_VIEW)
+  }, [requestClose])
 
   const loadMore = useCallback(() => {
     if (loading || exhausted) return
@@ -247,6 +271,7 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
 
   /** provider 層的 guard（同步 ref）：`sendingTo` 是 UI 狀態，擋不住同一批次的第二次。 */
   const sendInFlightRef = useRef(false)
+  const sending = useCallback(() => sendInFlightRef.current, [])
   const send = useCallback(
     async (withId: string, body: string) => {
       if (sendInFlightRef.current) return false
@@ -293,6 +318,7 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
       enterThread,
       backToList,
       closePanel,
+      yieldPanel,
       me,
       messages,
       threads,
@@ -309,8 +335,9 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
       resolveNames,
       send,
       sendingTo,
+      sending,
     }),
-    [view, openList, openThreadFromTalent, enterThread, backToList, closePanel, me, messages, threads, loading, loadError, moreError, pagesLoaded, exhausted, fetching, blocked, loadMore, retryFirst, names, resolveNames, send, sendingTo],
+    [view, openList, openThreadFromTalent, enterThread, backToList, closePanel, yieldPanel, me, messages, threads, loading, loadError, moreError, pagesLoaded, exhausted, fetching, blocked, loadMore, retryFirst, names, resolveNames, send, sendingTo, sending],
   )
   return <InboxContext value={value}>{children}</InboxContext>
 }

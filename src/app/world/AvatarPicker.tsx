@@ -8,6 +8,7 @@ import { useAvatarDraft } from '@/identity/AvatarDraftProvider'
 import { useAdoptIdentity, useIdentity } from '@/identity/IdentityProvider'
 import { myAvatar } from '@/identity/myAvatar'
 import { saveAvatar } from '@/identity/saveAvatar'
+import { useBlockingPanelOpen } from '@/panel/BlockingPanelCoordinator'
 import { useRealtimeGeneration } from '@/realtime/RealtimeGenerationProvider'
 import { EscapeLayer } from '@/world/interaction/escapeLayers'
 
@@ -26,6 +27,7 @@ import { EscapeLayer } from '@/world/interaction/escapeLayers'
 // 鍵盤與焦點（`FE-X06`〈非阻斷式的彈出層〉）：Escape 關、Tab 走離就關、關閉後焦點回按鈕；
 // **不鎖世界** —— 邊走邊看新外觀是 `FE-A05` 的產品意圖。
 // 它開著時按 E 開出看板面板：面板取得焦點 → 這裡依「焦點移出就關」關掉，草稿被丟（等同取消，`S03`）。
+// 任一阻斷式面板成功開啟也關（`FE-X16-S18`，擴到所有入口）；請求被拒時照「焦點移出就關」—— 按了別的入口焦點就離開了它。
 // **失焦而關的時候不把焦點搶回按鈕** —— 焦點是刻意去別處的。
 
 /** 存這件事現在走到哪。**「值域外」不在這裡** —— 那是前端的 bug，不是使用者看得懂的狀態。 */
@@ -60,6 +62,14 @@ export function AvatarPicker() {
     setSaving({ at: 'idle' })
     setOpen(false)
   }
+  const blocking = useBlockingPanelOpen()
+  const closeRef = useRef(close)
+  useEffect(() => {
+    closeRef.current = close
+  })
+  useEffect(() => {
+    if (blocking) closeRef.current()
+  }, [blocking])
   /** Escape 或按「取消」：關掉，焦點回按鈕（`FE-X06-S15`）。 */
   function dismiss() {
     close()

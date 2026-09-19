@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import { SECONDARY } from '@/design/controls'
+import type { PanelRegistration } from '@/panel/BlockingPanelCoordinator'
 import { PanelShell } from '@/panel/PanelShell'
 import { edgeState, type ListKind } from './paging'
 import { useListPage, type ListItemOf } from './useListPage'
@@ -54,6 +55,8 @@ export interface ListPanelProps<K extends ListKind> {
   /** 列表上方的動作（例如「發案」，`FE-J01`）。跟列表一起在內容區，overlay 開著時一樣 `inert`。 */
   toolbar?: ReactNode
   onClose: () => void
+  /** 讓位協定（`FE-X16-S14`）：`canYield` 送出中、有未儲存的修改 → `false`；`onYield` 是被讓位時的收尾。沒給（單獨掛的測試）＝隨時可以、什麼都不做。 */
+  panel?: Pick<PanelRegistration, 'canYield' | 'onYield'>
   /** 要看的頁與頁次回報（`FE-B09`）：見 `useListPage` 的 `ListPageOptions`。 */
   page?: number
   onShownPage?: (page: number) => void
@@ -71,6 +74,7 @@ export function ListPanel<K extends ListKind>({
   subScreen,
   toolbar,
   onClose,
+  panel,
   page,
   onShownPage,
 }: ListPanelProps<K>) {
@@ -104,6 +108,7 @@ export function ListPanel<K extends ListKind>({
       overlayTestId="list-panel-overlay"
       data={{ 'data-kind': kind }}
       overlay={overlayNode}
+      panel={{ id: 'list-panel', canYield: panel?.canYield ?? (() => true), onYield: panel?.onYield ?? (() => {}) }}
       onCloseRequest={onClose}
     >
       {toolbar}

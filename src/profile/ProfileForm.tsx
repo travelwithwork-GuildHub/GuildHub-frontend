@@ -21,12 +21,17 @@ import { saveProfile } from './saveProfile'
 //
 // ⚠️ **每次掛載從身分初始化**（`S11`）：這個元件在面板關掉時被卸載，沒有草稿可沿用。
 
+/** 表單掛給面板的兩個同步判斷：關閉意圖（送出中無效、dirty 先問）與能不能讓位（`FE-X16-S14`：送出中或 dirty 都不行、不問）。 */
+export interface CloseIntent {
+  requestClose: () => void
+  canYield: () => boolean
+}
 export interface ProfileFormProps {
   profile: ProfileOut
   /** 回到顯示（成功、丟棄、乾淨的取消）。 */
   onDone: () => void
   /** 面板把殼的關閉意圖（Escape、關閉鈕）接到這裡。 */
-  closeIntentRef: RefObject<(() => void) | null>
+  closeIntentRef: RefObject<CloseIntent | null>
   /** dirty 時的關閉意圖 → 面板開確認層（殼的 overlay，表單變 inert）。 */
   askDiscard: () => void
 }
@@ -64,11 +69,12 @@ export function ProfileForm({ profile, onDone, closeIntentRef, askDiscard }: Pro
     else onDone()
   }, [busy, dirty, onDone, askDiscard])
   useEffect(() => {
-    closeIntentRef.current = requestClose
+    // `canYield`（`FE-X16-S14`）：送出中或 dirty 都不讓位 —— 同一個判斷，但不開確認
+    closeIntentRef.current = { requestClose, canYield: () => !busy && !dirty }
     return () => {
       closeIntentRef.current = null
     }
-  }, [closeIntentRef, requestClose])
+  }, [closeIntentRef, requestClose, busy, dirty])
 
   // 進編輯：焦點到第一欄（按「編輯」的那顆鈕被卸載了，不接的話焦點掉到 body —— 審查抓到的）。
   const firstField = useRef<HTMLInputElement | null>(null)

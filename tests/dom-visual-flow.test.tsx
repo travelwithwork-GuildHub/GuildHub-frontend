@@ -76,7 +76,9 @@ const probe = () => ({ active: screen.getByTestId('probe').dataset.active || nul
 /** 掛不掛世界那一半（`S22` 第二段：provider 在 commit 前整個卸載）；`suspend` 讓看板的殼延後 commit（`S22` 第一段）。 */
 let suspendGate: { promise: Promise<void>; release: () => void; done: boolean } | null = null
 function SuspendBoard({ children }: { children: ReactNode }) {
-  if (suspendGate !== null && !suspendGate.done) throw suspendGate.promise
+  // 讀 `active`：看板被指到的那一次繪製才會走到這裡（不讀的話 React 不重繪它、也就不會 suspend）
+  const active = useActivePanel()
+  if (suspendGate !== null && !suspendGate.done && active === 'list-panel') throw suspendGate.promise
   return children
 }
 function World({ children }: { children?: ReactNode }) {
@@ -149,11 +151,10 @@ afterEach(async () => {
 })
 
 /** 登入成我、掛整棵樹；收件匣與清單的回應先堆好（每次開啟都會重取第 0 頁）。 */
-async function mount(opts: { guest?: boolean; url?: string; messages?: MessageOut[]; project?: ProjectOut } = {}) {
+async function mount(opts: { guest?: boolean; url?: string; project?: ProjectOut } = {}) {
   if (opts.guest) server.replyFor('/api/me', 401, { detail: 'no' })
   else server.replyFor('/api/me', 200, ME)
   for (let i = 0; i < 8; i += 1) {
-    server.replyFor('/api/messages', 200, opts.messages ?? [])
     server.replyFor('/api/profiles', 200, [OTHER])
     server.replyFor(`/api/profiles/${OTHER.id}`, 200, OTHER)
     if (opts.project) {
@@ -198,6 +199,8 @@ const go = (delta: number) =>
   })
 const url = () => `${window.location.pathname}${window.location.search}`
 const inboxButton = () => screen.getByTestId('inbox-button')
+/** 收件匣每次從關閉打開都重取第 0 頁：開之前先排一份回應（contract-server 的佇列不分方法，不能預先堆 —— 寄信的 POST 會吃到）。 */
+const willOpenInbox = (messages: MessageOut[] = []) => server.replyFor('/api/messages', 200, messages)
 const badge = () => screen.getByRole('button', { name: /^我的名片/ })
 const listPanel = () => screen.queryByTestId('list-panel')
 const inboxPanel = () => screen.queryByTestId('inbox-panel')
@@ -225,6 +228,7 @@ async function holdFormTeam(p: ProjectOut) {
 }
 /** 收件匣對話裡寄一封、壓著不回。 */
 async function holdSend() {
+  willOpenInbox([msg(1)])
   click(inboxButton())
   const row = await screen.findByTestId('inbox-thread-item')
   click(row)
@@ -247,6 +251,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     const onFocusIn = (e: FocusEvent) => focusins.push((e.target as HTMLElement).dataset.testid ?? (e.target as HTMLElement).tagName)
     inboxButton().focus()
     document.addEventListener('focusin', onFocusIn)
+    willOpenInbox()
     click(inboxButton())
     expect(listPanel()).toBeNull()
     expect(inboxPanel()).not.toBeNull()
@@ -261,6 +266,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(inboxPanel()).toBeNull()
     expect(profilePanel()).not.toBeNull()
     expect(blockingPanels()).toHaveLength(1)
+    willOpenInbox()
     click(inboxButton())
     expect(profilePanel()).toBeNull()
     expect(inboxPanel()).not.toBeNull()
@@ -272,12 +278,15 @@ describe('同一時間只有一個阻斷式面板', () => {
     pressE()
     click(await screen.findByTestId('talent-card'))
     const send = await screen.findByTestId('send-message')
+    willOpenInbox()
     click(send)
     expect(listPanel()).toBeNull()
     expect(inboxPanel()).not.toBeNull()
     expect(blockingPanels()).toHaveLength(1)
     await waitFor(() => expect(inboxPanel()!.contains(document.activeElement)).toBe(true))
     expect(screen.getByTestId('inbox-thread').dataset.with).toBe(OTHER.id)
+    // 看板讓位的 `go(-1)` 是非同步的：等它落地再結束（不然 popstate 會打到下一條測試的 history）
+    await waitFor(() => expect(url()).toBe('/world'))
   })
 
   it('[FE-X16-S14] 成軍送出中拒絕讓位：收件匣不開、詳情留著、焦點留在按鈕、有 status；回來後接受；名片 dirty 也拒絕且不出確認', SLOW, async () => {
@@ -291,6 +300,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(statusText(), '拒絕要有看得到的回饋').not.toHaveLength(0)
     held.release()
     await waitFor(() => expect(within(screen.getByTestId('project-detail')).getByTestId('project-status').textContent).toBe('已成軍'))
+    willOpenInbox()
     click(inboxButton())
     expect(listPanel()).toBeNull()
     expect(inboxPanel()).not.toBeNull()
@@ -339,7 +349,7 @@ describe('同一時間只有一個阻斷式面板', () => {
       Object.assign(navigator, { clipboard: { writeText: async () => {} } })
       screen.getByRole('button', { name: '複製鑰匙' }).click()
     })
-    await screen.findByText('已經複製了')
+    await screen.findByText(/已經複製了/)
     click(screen.getByRole('button', { name: '進入世界' }))
     await waitFor(() => expect(screen.queryByTestId('first-entry-notice')).toBeNull())
     pressE()
@@ -366,9 +376,10 @@ describe('同一時間只有一個阻斷式面板', () => {
   })
 
   it('[FE-X16-S17] 下一頁要求重開看板：接受就重開；送出中拒絕 → replaceState 一次、pushState 零次、網址沒有 panel；再上一頁回原本那一筆', SLOW, async () => {
-    await mount({ messages: [msg(1)] })
+    await mount()
     pressE()
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
+    willOpenInbox()
     click(inboxButton())
     await waitFor(() => expect(url()).toBe('/world'))
     await go(1)
@@ -413,13 +424,14 @@ describe('同一時間只有一個阻斷式面板', () => {
 
     click(screen.getByRole('button', { name: '更換角色' }))
     expect(picker()).not.toBeNull()
+    willOpenInbox()
     click(inboxButton())
     expect(picker()).toBeNull()
     expect(inboxPanel()).not.toBeNull()
   })
 
   it('[FE-X16-S21] 同一個 handler 裡開看板再開收件匣：兩個 true、只掛收件匣、看板從未掛載；關掉後鎖放開、active 空；送出中再請求 → false', SLOW, async () => {
-    await mount({ messages: [msg(1)] })
+    await mount()
     let mountedList = 0
     const observer = new MutationObserver((records) => {
       for (const r of records) for (const n of r.addedNodes) if (n instanceof HTMLElement && (n.dataset.testid === 'list-panel' || n.querySelector('[data-testid="list-panel"]'))) mountedList += 1
@@ -427,6 +439,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     observer.observe(document.body, { childList: true, subtree: true })
     let a: boolean | undefined
     let b: boolean | undefined
+    willOpenInbox()
     act(() => {
       a = g().list.openPanel('profiles')
       b = g().inbox.openList(null)
@@ -466,6 +479,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(listPanel(), '殼還在 Suspense 裡').toBeNull()
     expect(probe(), '殼沒登記：active 指著它、但「開著」是 false').toEqual({ active: 'list-panel', open: false })
     let b: boolean | undefined
+    willOpenInbox()
     act(() => {
       b = g().inbox.openList(null)
     })
@@ -490,17 +504,22 @@ describe('同一時間只有一個阻斷式面板', () => {
     await waitFor(() => expect(grabbed).not.toBeNull())
     suspendGate = null
     let c: boolean | undefined
+    willOpenInbox()
     act(() => {
       c = g().inbox.openList(null)
     })
     expect(c).toBe(true)
     await waitFor(() => expect(inboxPanel()).not.toBeNull())
+    await waitFor(() => expect(url()).toBe('/world'))
   })
 
   it('[FE-X16-S22] Strict Mode 殼掛→卸→掛：登記是新的那筆、開著是 true、active 仍指向它；殼卸載不動 active', () => {
     let panels: ReturnType<typeof useBlockingPanels> | null = null
     function GrabPanels() {
-      panels = useBlockingPanels()
+      const value = useBlockingPanels()
+      useEffect(() => {
+        panels = value
+      }, [value])
       return null
     }
     const shell = (mounted: boolean) => (
