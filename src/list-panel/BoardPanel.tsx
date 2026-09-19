@@ -52,7 +52,7 @@ const MESSAGE_OWNER_LABEL = '私訊發案者'
 
 /** 人才那一支：選中的 id 在 provider，列表手上的那一筆（詳情的載入中預覽）在這裡。 */
 function TalentBoard({ onClose }: { onClose: () => void }) {
-  const { selected, selectProfile, page, reportPage, closePanel } = useListPanel()
+  const { selected, selectProfile, page, reportPage, yieldPanel } = useListPanel()
   // 只記最後一張點開的卡：詳情的 id 對得上才當預覽，對不上（深連結、上一頁／下一頁）就沒有預覽。
   const [preview, setPreview] = useState<ProfileOut | null>(null)
   // 詳情關閉時焦點回到開它的那張卡（`FE-X06-S12`）。`ListPanel` 自己會把焦點放回列表
@@ -83,6 +83,8 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
         />
       )}
       onClose={onClose}
+      // 人才那一支沒有表單也沒有送出：隨時可以讓位
+      panel={{ canYield: () => true, onYield: yieldPanel }}
       page={page}
       onShownPage={reportPage}
       empty={<EmptyState kind="first-empty" />}
@@ -95,8 +97,8 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
             id={selected}
             preview={preview?.id === selected ? preview : undefined}
             onBack={() => selectProfile(null)}
-            // 「寄信給他」（`FE-K01`）：關掉這個面板、開收件匣直接進對話。只在已登入、對方不是我、有收件匣 provider 時出現。
-            actions={<SendMessageButton to={selected} onBeforeOpen={closePanel} />}
+            // 「寄信給他」（`FE-K01`）：開收件匣直接進對話，這個面板由協調者讓位（`FE-X16-S13`）。只在已登入、對方不是我、有收件匣 provider 時出現。
+            actions={<SendMessageButton to={selected} />}
           />
         )
       }
@@ -113,7 +115,7 @@ function TalentBoard({ onClose }: { onClose: () => void }) {
  * `requestClose()` 回 `void`，`??` 右邊照樣執行，dirty 確認與送出中不可關全部被繞過（codex 審查抓到的；`S07` 對殼的關閉鈕有判準）。
  */
 function ProjectBoard() {
-  const { closePanel, page, reportPage, selected, selectProject } = useListPanel()
+  const { closePanel, yieldPanel, page, reportPage, selected, selectProject } = useListPanel()
   const identity = useIdentity()
   const signedIn = identity.state === 'signed-in'
   // 成軍／結案（`FE-J04`）的交接：門的立即重取（沒有 provider 是 no-op）、「寄給隊員」開收件匣清單（沒有收件匣就只關看板）。
@@ -161,6 +163,8 @@ function ProjectBoard() {
     if (requestClose) requestClose()
     else closePanel()
   }
+  // 讓位協定：成軍／結案送出中不讓；發案表單（送出中、dirty）的判斷在 `--flow-yield`（`FE-X16-S14`）
+  const canYield = () => !actionBusy.current
   const closeForm = () => {
     setConfirming(false)
     setComposing(false)
@@ -193,6 +197,7 @@ function ProjectBoard() {
         />
       )}
       onClose={onClose}
+      panel={{ canYield, onYield: yieldPanel }}
       page={page}
       onShownPage={reportPage}
       toolbar={
@@ -217,7 +222,7 @@ function ProjectBoard() {
                   if (!actionBusy.current) selectProject(null)
                 }}
                 // 「私訊發案者」（`FE-K01` 的同一條路）：關看板、開收件匣直接進對話。`ProjectDetail` 只在已登入的非 owner 時渲染它。
-                actions={(project) => <SendMessageButton to={project.owner_id} label={MESSAGE_OWNER_LABEL} onBeforeOpen={closePanel} />}
+                actions={(project) => <SendMessageButton to={project.owner_id} label={MESSAGE_OWNER_LABEL} />}
                 // owner 的成軍／結案（`FE-J04`）。成功後的三個副作用互相獨立（design D6）：先同步 replace，再各自啟動列表重取（只有成軍：案子離開 recruiting 清單）與門重取。
                 ownerActions={({ project, replace }) => (
                   <OwnerActions
@@ -234,16 +239,9 @@ function ProjectBoard() {
                         // 門重取失敗只影響走廊（既有 stale 規則）；不回滾詳情、不擋列表
                       }
                     }}
-                    // 草稿已在剪貼簿：關看板、開收件匣**清單**（不進對話、不帶草稿 —— design D4）。跟 `SendMessageButton` 同一種交接，只是停在清單；
+                    // 草稿已在剪貼簿：開收件匣**清單**（不進對話、不帶草稿 —— design D4），看板由協調者讓位（`FE-X16-S13`）。跟 `SendMessageButton` 同一種交接，只是停在清單；
                     // 沒有收件匣就不給這顆按鈕。`openList(null)`：沒有開啟者，收件匣關閉時焦點回世界錨（provider 既有的 fallback，`FE-X06-S13`）
-                    onSendToTeam={
-                      inbox
-                        ? () => {
-                            closePanel()
-                            inbox.openList(null)
-                          }
-                        : undefined
-                    }
+                    onSendToTeam={inbox ? () => void inbox.openList(null) : undefined}
                   />
                 )}
               />

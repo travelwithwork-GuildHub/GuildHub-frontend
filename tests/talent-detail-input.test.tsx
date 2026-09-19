@@ -5,6 +5,7 @@ import { Vector3 } from 'three'
 import { InteractionProvider } from '@/world/interaction/InteractionProvider'
 import { LocalPlayer } from '@/world/player/LocalPlayer'
 import { ListPanelProvider, useListPanel } from '@/list-panel/ListPanelProvider'
+import { useRegisterBlockingPanel } from '@/panel/BlockingPanelCoordinator'
 
 // 規格：openspec/changes/fe-b04-talent-directory/specs/talent-directory/spec.md
 //   Requirement: 詳情層的鍵盤不驅動世界，Escape 照今天的全域契約 —— S13／S14
@@ -17,6 +18,15 @@ import { ListPanelProvider, useListPanel } from '@/list-panel/ListPanelProvider'
 // ⚠️ 詳情層的 Escape 是「關整個面板」（今天的 `FE-B01-S16`）。`FE-X06` 改變全域契約的那天，
 // `S14` 跟著改 —— 這裡不預先寫一條今天到不了的分支。
 
+/** 殼的替身（同 `list-panel-input-lock.test.tsx`）：鎖跟著殼的掛載走（`FE-X16`），R3F 掛不了 DOM 的殼，這裡在 `open` 時登記同一筆。 */
+function ShellStandIn() {
+  useRegisterBlockingPanel({ id: 'list-panel', canYield: () => true, onYield: () => {} })
+  return null
+}
+function Shell() {
+  const { open } = useListPanel()
+  return open === null ? null : <ShellStandIn />
+}
 const grabbed: { panel: ReturnType<typeof useListPanel> | null } = { panel: null }
 function Grab() {
   const value = useListPanel()
@@ -36,6 +46,7 @@ async function mounted() {
     <InteractionProvider>
       <ListPanelProvider>
         <Grab />
+        <Shell />
         <LocalPlayer targetRef={{ current: new Vector3() }} poseRef={poseRef} />
       </ListPanelProvider>
     </InteractionProvider>,

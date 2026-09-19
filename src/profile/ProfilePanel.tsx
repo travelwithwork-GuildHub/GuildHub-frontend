@@ -78,6 +78,8 @@ function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
       title={PROFILE_PANEL_LABELS.title}
       closeLabel={PROFILE_PANEL_LABELS.close}
       testId="profile-panel"
+      // 登記身分；provider 從協調者推導「開不開」與讓位規則在 `--flow-yield`（`FE-X16-S13` 名片那兩段、`S14`）
+      panel={{ id: 'profile-panel', canYield: () => true, onYield: () => {} }}
       onCloseRequest={onCloseRequest}
     >
       {/* 只是捲動容器與初始焦點，不是第二個 landmark（殼的 section 已經叫「我的名片」）。 */}

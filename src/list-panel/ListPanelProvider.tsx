@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { BlockingPanelCoordinator, useActivePanel, useBlockingPanelOpen, useBlockingPanels } from '@/panel/BlockingPanelCoordinator'
 import { useInteraction } from '@/world/interaction/InteractionProvider'
 import type { ListKind } from './paging'
 import { CLOSED, parsePanelUrl, type PanelUrlState } from './urlState'
@@ -14,6 +15,9 @@ import { CLOSED, parsePanelUrl, type PanelUrlState } from './urlState'
 // ⚠️ **必須在 `<InteractionProvider>` 底下。** 面板開著的時候要鎖住世界的移動輸入
 // （`S18`），而那把鎖在互動層；沒有那一層的話這裡直接炸，不會靜默變成「面板開了人還在走」。
 //
+// ⚠️ **「開不開」不在這裡**（`FE-X16`）：協調者持有 `active`，`open` ＝ `active === 'list-panel'` 時的 `route.panel`；開＝ `requestOpen()`（被拒回 `false`）、
+// 關＝ `requestClose()`、讓位＝ `onYield`（關的副作用、不還焦點）。鎖跟著**殼的掛載**走（持有者是這裡，`InteractionProvider` 在這一層）—— 沒掛成的請求什麼都不留。
+//
 // ⚠️ **起始狀態從網址來**（`FE-B09-S01`～`S05`）：這個 provider 只在 `ssr: false` 的世界裡掛，
 // 掛載那一刻就知道網址。之後網址 → 狀態（popstate）與狀態 → 網址在 `PanelUrlSync`（`WorldUrlSync`）；
 // 這裡只持有狀態，不碰 `history`。
@@ -24,15 +28,18 @@ interface ListPanelValue {
   selected: string | null
   /** 清單畫面上呈現的頁次（0-based）。 */
   page: number
-  openPanel: (kind: ListKind) => void
+  /** 回 `false` = 現在開著的面板拒絕讓位（送出中、有未儲存的修改），什麼都沒變。 */
+  openPanel: (kind: ListKind) => boolean
   closePanel: () => void
+  /** 被協調者讓位：關的副作用、不還焦點（`PanelShell` 的 `onYield`）。 */
+  yieldPanel: () => void
   /** 只在人才面板下有效。 */
   selectProfile: (id: string | null) => void
   /** 只在案件面板下有效（`FE-B03`）。 */
   selectProject: (id: string | null) => void
   reportPage: (page: number) => void
-  /** 網址說現在開著哪一層（掛載後的 popstate）：整份套上，鎖與焦點跟著走。 */
-  restore: (route: PanelUrlState) => void
+  /** 網址說現在開著哪一層（掛載後的 popstate）：整份套上。回 `false` = 要開但被拒（`FE-X16-S17`：呼叫端把那一筆改回實際狀態）。 */
+  restore: (route: PanelUrlState) => boolean
 }
 
 const ListPanelContext = createContext<ListPanelValue | null>(null)
@@ -47,46 +54,51 @@ function initialRoute(): PanelUrlState {
   return typeof window === 'undefined' ? CLOSED : parsePanelUrl(window.location.search)
 }
 
-export function ListPanelProvider({ children }: { children: ReactNode }) {
+const ID = 'list-panel'
+
+export const ListPanelProvider = ({ children }: { children: ReactNode }) => (
+  <BlockingPanelCoordinator>
+    <ListPanelState>{children}</ListPanelState>
+  </BlockingPanelCoordinator>
+)
+
+function ListPanelState({ children }: { children: ReactNode }) {
   const { holdInputLock } = useInteraction()
-  const [route, setRoute] = useState<PanelUrlState>(initialRoute)
-  /** 面板開著時持有的那一把；`null` = 沒持有。 */
-  const releaseRef = useRef<(() => void) | null>(null)
+  const { requestOpen, requestClose } = useBlockingPanels()
+  // 網址帶著面板進來（深連結）：**在初始化時**就向協調者要（那時 `active` 是空的，一定成功；重複呼叫是 no-op）——
+  // 第一次繪製 `open` 就要是對的，不然 `WorldUrlSync` 的 effect 會先看到「關著」而把網址退掉（子 effect 先跑）。
+  const [route, setRoute] = useState<PanelUrlState>(() => {
+    const initial = initialRoute()
+    if (initial.panel !== null) requestOpen(ID)
+    return initial
+  })
+  // 「開著」從協調者推導；子狀態（kind／page／selected）留在這裡。不是我的時候整份當關著（`selected` 才不會冒出來）。
+  const mine = useActivePanel() === ID
+  const panel = mine ? route : CLOSED
+  const open = panel.panel
 
-  // 鎖跟著開關走，**同步持有**，不等 effect —— 開面板的那個 E 之後的第一個方向鍵就該被擋。
-  // 面板已經開著時再開（換一塊看板）：不再持有第二把，那一把還在。
-  const hold = useCallback(() => {
-    releaseRef.current ??= holdInputLock('list-panel')
-  }, [holdInputLock])
-  const release = useCallback(() => {
-    // ⚠️ **這一行是 `FE-B01-S17`。** 少了它，關掉面板之後人走不動，要用滑鼠點一下畫面
-    // —— 而只驗 `S18` 的話，「開了就永遠鎖住」是全綠的。
-    // 釋放的是**自己那一把**：輸入框還有焦點時它的那一把還在（`FE-X06-S10`）。
-    releaseRef.current?.()
-    releaseRef.current = null
-    // 面板是按 E 開的，沒有 DOM 的開啟控制可以回去：焦點放到世界焦點錨（`FE-X06-S13`），
-    // 不留在 `body`、不跑去標題列。錨是什麼元素不是這裡決定的 —— 用語意標記找。
-    document.querySelector<HTMLElement>('[data-focus-anchor="world"]')?.focus()
-  }, [])
-
-  // 網址帶著面板進來（深連結）：掛載時沒有人按 E，鎖在這裡補上。
-  const openedAtMount = route.panel !== null
-  useEffect(() => {
-    if (openedAtMount) hold()
-  }, [openedAtMount, hold])
+  // 鎖跟著殼的掛載走：殼登記了才持、卸載了才放（`FE-B01-S17`／`S18`；深連結掛載時沒有人按 E，也是這裡）。
+  // ⚠️ 少了 cleanup 關掉面板之後人走不動，要用滑鼠點一下畫面 —— 只驗 `S18` 的話「開了就永遠鎖住」是全綠的。
+  const shellMounted = useBlockingPanelOpen() && mine
+  useEffect(() => (shellMounted ? holdInputLock(ID) : undefined), [shellMounted, holdInputLock])
 
   const openPanel = useCallback(
     (kind: ListKind) => {
-      hold()
-      // 同一塊看板再按一次 E：什麼都不變（頁碼、詳情都留著）。換一塊：從第 0 頁重新開。
+      if (!requestOpen(ID)) return false
+      // 同一塊看板再按一次 E：什麼都不變（頁碼、詳情都留著）。換一塊、或剛被讓位過：從第 0 頁重新開。
       setRoute((r) => (r.panel === kind ? r : { panel: kind, profile: null, project: null, page: 0 }))
+      return true
     },
-    [hold],
+    [requestOpen],
   )
   const closePanel = useCallback(() => {
-    release()
+    requestClose(ID)
     setRoute(CLOSED)
-  }, [release])
+    // 面板是按 E 開的，沒有 DOM 的開啟控制可以回去：焦點放到世界焦點錨（`FE-X06-S13`），
+    // 不留在 `body`、不跑去標題列。錨是什麼元素不是這裡決定的 —— 用語意標記找。
+    document.querySelector<HTMLElement>('[data-focus-anchor="world"]')?.focus()
+  }, [requestClose])
+  const yieldPanel = useCallback(() => setRoute(CLOSED), [])
   const selectProfile = useCallback((id: string | null) => {
     setRoute((r) => (r.panel !== 'profiles' || r.profile === id ? r : { ...r, profile: id }))
   }, [])
@@ -98,36 +110,29 @@ export function ListPanelProvider({ children }: { children: ReactNode }) {
   }, [])
   const restore = useCallback(
     (next: PanelUrlState) => {
-      if (next.panel === null) release()
-      else hold()
+      if (next.panel === null) requestClose(ID)
+      else if (!requestOpen(ID)) return false
       setRoute(next)
+      return true
     },
-    [hold, release],
-  )
-
-  // 這一層開著的時候被卸載（例如路由切走）：不還的話世界回來時人走不動。
-  useEffect(
-    () => () => {
-      releaseRef.current?.()
-      releaseRef.current = null
-    },
-    [],
+    [requestOpen, requestClose],
   )
 
   const value = useMemo(
     () => ({
-      open: route.panel,
+      open,
       // 三種面板狀態各自分支：關著時一定是 null（`restore` 拿到錯位的組合也不會冒出一個選中）
-      selected: route.panel === 'projects' ? route.project : route.panel === 'profiles' ? route.profile : null,
-      page: route.page,
+      selected: panel.panel === 'projects' ? panel.project : panel.panel === 'profiles' ? panel.profile : null,
+      page: panel.page,
       openPanel,
       closePanel,
+      yieldPanel,
       selectProfile,
       selectProject,
       reportPage,
       restore,
     }),
-    [route, openPanel, closePanel, selectProfile, selectProject, reportPage, restore],
+    [panel, open, openPanel, closePanel, yieldPanel, selectProfile, selectProject, reportPage, restore],
   )
   return <ListPanelContext.Provider value={value}>{children}</ListPanelContext.Provider>
 }

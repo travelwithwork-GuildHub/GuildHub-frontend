@@ -5,6 +5,7 @@ import { Vector3 } from 'three'
 import { InteractionProvider } from '@/world/interaction/InteractionProvider'
 import { LocalPlayer } from '@/world/player/LocalPlayer'
 import { ListPanelProvider, useListPanel } from '@/list-panel/ListPanelProvider'
+import { useRegisterBlockingPanel } from '@/panel/BlockingPanelCoordinator'
 
 // 規格：openspec/changes/fe-b01-list-container/specs/list-panel/spec.md
 //   Requirement: Escape 關閉面板，並把世界的輸入還回去 —— S17／S18
@@ -15,6 +16,15 @@ import { ListPanelProvider, useListPanel } from '@/list-panel/ListPanelProvider'
 //
 // ⚠️ **`S17` 與 `S18` 要成對。** 只有 `S18` 的話，「開了面板就永遠鎖住輸入」是全綠的。
 
+/** 殼的替身：鎖跟著殼的掛載走（`FE-X16`），而 R3F 的 test renderer 掛不了 DOM 的 `PanelShell` —— 這裡在 `open` 時登記同一筆，鎖仍由真的 provider 持、放。 */
+function ShellStandIn() {
+  useRegisterBlockingPanel({ id: 'list-panel', canYield: () => true, onYield: () => {} })
+  return null
+}
+function Shell() {
+  const { open } = useListPanel()
+  return open === null ? null : <ShellStandIn />
+}
 /** 從 provider 裡把開關拿出來給測試用。**不渲染任何東西。** */
 const grabbed: { panel: ReturnType<typeof useListPanel> | null } = { panel: null }
 function Grab() {
@@ -36,6 +46,7 @@ async function mounted() {
     <InteractionProvider>
       <ListPanelProvider>
         <Grab />
+        <Shell />
         <LocalPlayer targetRef={targetRef} poseRef={poseRef} />
       </ListPanelProvider>
     </InteractionProvider>,
