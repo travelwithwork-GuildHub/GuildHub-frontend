@@ -88,6 +88,13 @@
     outline-offset: 2px;
   }
 
+  /* 按下去的切換（`aria-pressed="true"`：登入頁的分頁、看板的視圖）：邊界加粗到 ink，**不填色** —— `FE-X16-S10` 的次要級不能有填色，
+     而 hover 也是 ink 邊界，所以用 inset 的第二圈把「現在在這一頁」跟「滑過去」分開（`ui-ux-pro-max`：pressed 狀態要跟看得見的標籤一致）。 */
+  button[aria-pressed='true'] {
+    border-color: var(--color-ink);
+    box-shadow: inset 0 0 0 1px var(--color-ink);
+  }
+
   /* 減少動態：過渡與動畫**全部**歸零（S12）。`!important` 是刻意的 —— 它要贏過每一個 utility。 */
   @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after { transition-duration: 0s !important; animation-duration: 0s !important; }
