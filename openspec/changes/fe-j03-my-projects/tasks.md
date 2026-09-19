@@ -21,10 +21,10 @@
 
 ## 4. `--board`：工具列切換、詳情接合、真瀏覽器（〈入口〉〈卡片與詳情共用〉〈真瀏覽器〉；design D4／D5）
 
-- [ ] 4.1 判準先紅：`tests/my-projects-board.test.tsx` 的 `S01`（訪客沒有；第 2 頁切過去、切回來 `page=0`）、`S04`（點開詳情、成軍回來已成軍且掃描請求數不變、結案回來已結案仍在）；e2e `tests/e2e/my-projects.mjs` 的 `S06`
-- [ ] 4.2 `BoardPanel`：工具列 `role="group"` 兩顆 `aria-pressed`（`ui-ux-pro-max` 先問）、`view=mine` 時 `body={<MyProjects …/>}`、`onReplaced` 加 `patchMine`、發案成功在 `view=mine` 下重掃
-- [ ] 4.3 突變：切換不換 `body` → `S01` 紅；成軍回來不 `patchMine` → `S04` 紅；成軍回來重掃 → `S04` 紅（請求數）；訪客也長切換 → `S01` 紅
-- [ ] 4.4 e2e 對 `next start`＋`internal` 跑過（`my-projects`、`form-team`、`board-panel`、`deep-link`、`dom-visual` 的 S09 那一段：工具列一個主要）；截圖貼 PR
+- [x] 4.1（`my-projects-board.test.tsx` 4 條：S01、S07 畫面半邊、S04、S05 看板半邊；e2e `my-projects.mjs` 15 綠。量尺坑：「返回」是 `history.go(-1)`，popstate 會打到下一條測試 → 每個返回後等網址落地）判準先紅：`tests/my-projects-board.test.tsx` 的 `S01`（訪客沒有；第 2 頁切過去、切回來 `page=0`）、`S04`（點開詳情、成軍回來已成軍且掃描請求數不變、結案回來已結案仍在）；e2e `tests/e2e/my-projects.mjs` 的 `S06`
+- [x] 4.2（`view=mine` 就換 body、身分未問完也先換 —— 不然直達會先送一次 `page=0`；`aria-pressed` 加了看得見的按下狀態：邊界加粗、不填色，S10 才不紅）`BoardPanel`：工具列 `role="group"` 兩顆 `aria-pressed`（`ui-ux-pro-max` 先問）、`view=mine` 時 `body={<MyProjects …/>}`、`onReplaced` 加 `patchMine`、發案成功在 `view=mine` 下重掃
+- [x] 4.3（5 個 5 紅：不換 body → S01/S07/S04/S05；不 patch → S04；回來重掃 → S04；訪客也長切換 → S01；body 等身分才換 → S07）突變：切換不換 `body` → `S01` 紅；成軍回來不 `patchMine` → `S04` 紅；成軍回來重掃 → `S04` 紅（請求數）；訪客也長切換 → `S01` 紅
+- [x] 4.4（`my-projects` 15、`form-team` 13、`create-project` 18、`board-panel` 36、`control-contrast` 15、`dom-visual` 535 全綠；截圖 `docs/evidence/fe-j03/`）e2e 對 `next start`＋`internal` 跑過（`my-projects`、`form-team`、`board-panel`、`deep-link`、`dom-visual` 的 S09 那一段：工具列一個主要）；截圖貼 PR
 
 ## 5. 收尾
 
