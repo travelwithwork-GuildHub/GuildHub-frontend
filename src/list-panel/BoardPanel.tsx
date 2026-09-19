@@ -8,6 +8,7 @@ import { toUiError } from '@/errors/uiError'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { DiscardConfirm } from '@/profile/DiscardConfirm'
 import { CreateProjectForm } from '@/projects/CreateProjectForm'
+import type { CloseIntent } from '@/profile/ProfileForm'
 import { ProjectCard } from '@/projects/ProjectCard'
 import { OwnerActions } from '@/projects/OwnerActions'
 import { ProjectDetail } from '@/projects/ProjectDetail'
@@ -140,7 +141,7 @@ function ProjectBoard() {
     lastOpenedRef.current = null
     document.querySelector<HTMLElement>(`[data-testid="project-card"][data-project-id="${id}"]`)?.focus()
   }, [selected])
-  const closeIntentRef = useRef<(() => void) | null>(null)
+  const closeIntentRef = useRef<CloseIntent | null>(null)
   const focusBeforeConfirm = useRef<HTMLElement | null>(null)
   // 表單開著時身分不再是 signed-in（登出、問不到）：入口沒了，表單跟著收（推導，不另設狀態）。
   // 詳情開著時也沒有表單（overlay 一次只放一個）—— 而且**表單狀態要真的收掉**，不是只藏起來：
@@ -159,12 +160,12 @@ function ProjectBoard() {
 
   const onClose = () => {
     if (actionBusy.current) return
-    const requestClose = closeIntentRef.current
-    if (requestClose) requestClose()
+    const intent = closeIntentRef.current
+    if (intent) intent.requestClose()
     else closePanel()
   }
-  // 讓位協定：成軍／結案送出中不讓；發案表單（送出中、dirty）的判斷在 `--flow-yield`（`FE-X16-S14`）
-  const canYield = () => !actionBusy.current
+  // 讓位協定（`FE-X16-S14`）：成軍／結案送出中、發案表單送出中或 dirty → 不讓
+  const canYield = () => !actionBusy.current && (closeIntentRef.current?.canYield() ?? true)
   const closeForm = () => {
     setConfirming(false)
     setComposing(false)

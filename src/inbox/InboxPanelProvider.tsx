@@ -66,6 +66,8 @@ export interface InboxValue {
   send: (withId: string, body: string) => Promise<boolean>
   /** 送出中的對方（任何一封在送，所有寄信表單都先不能再送）。 */
   sendingTo: string | null
+  /** 同步版：現在有沒有一封在送（讓位協定用；`sendingTo` 是晚一格的 UI 狀態）。 */
+  sending: () => boolean
 }
 
 const InboxContext = createContext<InboxValue | null>(null)
@@ -266,6 +268,7 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
 
   /** provider 層的 guard（同步 ref）：`sendingTo` 是 UI 狀態，擋不住同一批次的第二次。 */
   const sendInFlightRef = useRef(false)
+  const sending = useCallback(() => sendInFlightRef.current, [])
   const send = useCallback(
     async (withId: string, body: string) => {
       if (sendInFlightRef.current) return false
@@ -329,8 +332,9 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
       resolveNames,
       send,
       sendingTo,
+      sending,
     }),
-    [view, openList, openThreadFromTalent, enterThread, backToList, closePanel, yieldPanel, me, messages, threads, loading, loadError, moreError, pagesLoaded, exhausted, fetching, blocked, loadMore, retryFirst, names, resolveNames, send, sendingTo],
+    [view, openList, openThreadFromTalent, enterThread, backToList, closePanel, yieldPanel, me, messages, threads, loading, loadError, moreError, pagesLoaded, exhausted, fetching, blocked, loadMore, retryFirst, names, resolveNames, send, sendingTo, sending],
   )
   return <InboxContext value={value}>{children}</InboxContext>
 }
