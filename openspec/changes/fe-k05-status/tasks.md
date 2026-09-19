@@ -9,9 +9,9 @@
 
 ## 2. `--store`：送出的口、重送、回聲（〈設定狀態〉的傳輸半邊、〈重送〉；design D1／D2／D4）
 
-- [ ] 2.1 判準先紅：`tests/status-store.test.ts`（`S01` 的 payload 與 pending→回聲；`S02` 的 12 可送／13 不送／清除送 `""`；`S03` 沒 attach 不送且回錯；`S04` attach 時非空重送一次、空不送、detach 後不送）；`tests/remote-world-status.test.tsx`（`RemoteWorld` 每條連線 attach 一次、`status` 的 `id === me` 交給 store 不進名單）
-- [ ] 2.2 `src/realtime/statusStore.ts`（`createStatusStore`、`StatusPort`）、`src/realtime/StatusProvider.tsx`（`useStatus`／`useStatusPortIfProvided`）、`RemoteWorld` 多 `status?: StatusPort` prop 與回聲分流、`WorldCanvas` 傳 port、`page.tsx` 掛 provider
-- [ ] 2.3 突變：13 字照送 → `S02` 紅；attach 不重送 → `S04` 紅；回聲前就 confirm → `S01` 紅；自己的回聲進名單 → `S01` 紅
+- [x] 2.1（`status-store.test.ts` 6 條、`remote-world-status.test.tsx` 3 條）判準先紅：`tests/status-store.test.ts`（`S01` 的 payload 與 pending→回聲；`S02` 的 12 可送／13 不送／清除送 `""`；`S03` 沒 attach 不送且回錯；`S04` attach 時非空重送一次、空不送、detach 後不送）；`tests/remote-world-status.test.tsx`（`RemoteWorld` 每條連線 attach 一次、`status` 的 `id === me` 交給 store 不進名單）
+- [x] 2.2 `src/realtime/statusStore.ts`（`createStatusStore`、`StatusPort`）、`src/realtime/StatusProvider.tsx`（`useStatus`／`useStatusPortIfProvided`）、`RemoteWorld` 多 `status?: StatusPort` prop 與回聲分流、`WorldCanvas` 傳 port、`page.tsx` 掛 provider
+- [x] 2.3（6 個 6 紅：13 字照送、attach 不重送、回聲前 confirm、舊連線 confirm 也算、ready 前 attach、自己的回聲不交 store）突變：13 字照送 → `S02` 紅；attach 不重送 → `S04` 紅；回聲前就 confirm → `S01` 紅；自己的回聲進名單 → `S01` 紅
 
 ## 3. `--hud`：「狀態」控制與名字牌的狀態段（〈設定狀態〉的畫面半邊、〈名字牌上的狀態〉；design D3／D5）
 
