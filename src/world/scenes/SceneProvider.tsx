@@ -70,6 +70,16 @@ export interface SceneValue {
   readonly showGateNotice: (projectId: string) => void
   /** `RemoteWorld` 回報連線事件（帶著它連的 scene 參數）。**身分穩定**：它在 `RemoteWorld` 的 effect 依賴裡。 */
   readonly reportConnection: (event: ConnectionEvent, wsScene: string) => void
+  /**
+   * `ready` 之後意外斷線、正在自動重連（`FE-R12`，design D4）。**推導的**：`RemoteWorld` 真的排下重連時發 `recovering`，
+   * 這裡記的是哪個 wsScene；顯示 ＝ 那個場景還是目前的、而且沒有過場進行中 —— 按門開始過場、場景換了就自然不顯示，那個場景 `ready` 就清。
+   */
+  readonly recovering: boolean
+  /**
+   * 重連排程到點那一刻 `RemoteWorld` 問的：這條連線（`wsScene`）還是目前場景的、而且沒有過場進行中嗎（`FE-R12-S10`）。
+   * 讀 ref、身分穩定 —— 它在 `RemoteWorld` 的 effect 依賴裡。
+   */
+  readonly canReconnect: (wsScene: string) => boolean
 }
 
 export interface EnterOptions {
@@ -83,6 +93,8 @@ export type ConnectionEvent =
   | { readonly kind: 'connecting' }
   | { readonly kind: 'ready' }
   | { readonly kind: 'closed'; readonly opened: boolean }
+  /** `ready` 之後意外斷線、**已經排下**一次重連（`FE-R12`）。沒 ready 過的失敗不會發這個。 */
+  | { readonly kind: 'recovering' }
 
 export const TRANSITION_TIMEOUT_MS = 10_000
 
@@ -109,6 +121,8 @@ const DEFAULT: SceneValue = {
   gateNotice: null,
   showGateNotice: () => {},
   reportConnection: () => {},
+  recovering: false,
+  canReconnect: () => true,
 }
 const Ctx = createContext<SceneValue>(DEFAULT)
 
@@ -147,6 +161,14 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
   const [notice, setNotice] = useState<SceneValue['notice']>(null)
   const [gateNotice, setGateNotice] = useState<string | null>(null)
   const [transitionSeq, setTransitionSeq] = useState(0)
+  // 哪個 wsScene 正在自動重連（`FE-R12`）；顯示與否見下面的推導。
+  const [recoveringScene, setRecoveringScene] = useState<string | null>(null)
+  // 新的願望（進房、回大廳、popstate、失敗回大廳）：過場代號 +1，而且**正在重連的紀錄作廢** —— 那條連線的 effect 會被換掉、
+  // 排程被取消，留著的話過場失敗退回同一個場景而它連不上時，會顯示一則沒有人在重連的「正在重新連線」。
+  const newWish = useCallback(() => {
+    setTransitionSeq((n) => n + 1)
+    setRecoveringScene(null)
+  }, [])
   const identity = useIdentity()
   // `undefined`：還沒問完；`null`：問完了，沒有身分（匿名進不了房間：票的持有人比對對不上任何一張）。
   const profileId =
@@ -155,23 +177,26 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
   const enterRoom = useCallback(
     (projectId: string, { mode = 'push', title }: EnterOptions = {}) => {
       setDesired({ ref: { id: 'room', projectId }, mode, forProfile: profileId, title })
-      setTransitionSeq((n) => n + 1)
+      newWish()
       setGateNotice(null)
     },
-    [profileId],
+    [profileId, newWish],
   )
-  const returnToHall = useCallback((mode: UrlMode = 'push') => {
-    setDesired({ ref: HALL, mode, forProfile: undefined })
-    setTransitionSeq((n) => n + 1)
-    setGateNotice(null)
-  }, [])
+  const returnToHall = useCallback(
+    (mode: UrlMode = 'push') => {
+      setDesired({ ref: HALL, mode, forProfile: undefined })
+      newWish()
+      setGateNotice(null)
+    },
+    [newWish],
+  )
   const applyUrl = useCallback(
     (room: string | null) => {
       setDesired({ ref: refOf(room), mode: 'replace', forProfile: profileId })
-      setTransitionSeq((n) => n + 1)
+      newWish()
       setGateNotice(null)
     },
-    [profileId],
+    [profileId, newWish],
   )
   const dismissNotice = useCallback(() => setNotice(null), [])
   // 門禁的說明也是「下一則通知」：取代還留著的失敗通知（`S07`），不並排兩則。
@@ -222,13 +247,13 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
     if (target.id === 'room') {
       // 握手被拒／逾時：回大廳（replace，不多一層）、通知、**票留著**（連不上跟票失效分不出來）。
       setDesired({ ref: HALL, mode: 'replace', forProfile: profileId, auto: true })
-      setTransitionSeq((n) => n + 1)
+      newWish()
       setNotice(title === undefined ? { kind: 'failed', room: target.projectId } : { kind: 'failed', room: target.projectId, title })
       return
     }
     // 回大廳也連不上：過場仍然結束，交給大廳既有的呈現；不再建第三條（`S16`）。
     setCommitted(HALL)
-  }, [])
+  }, [newWish])
   // 逾時計時器。**從 `connect()` 那一刻起算**（等舊 socket 的 close 那 ≤1 秒不算，`S06`），帶著當時的代號；
   // 提交或失敗就清掉 —— 清掉只是省事，防禦在 `fail()` 的代號比對（`S15`：舊 callback 被硬叫也不算數）。
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -240,7 +265,14 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
   const reportConnection = useCallback(
     (event: ConnectionEvent, wsScene: string) => {
       const { transition, scene, auto, seq } = latest.current
-      if (transition === null || sceneOf(scene).wsScene !== wsScene) return
+      const current = sceneOf(scene).wsScene
+      // `FE-R12`：只認 `RemoteWorld` 真的排下重連那一刻發的事件，不從 `closed.opened` 推（沒 ready 過的第一次失敗會留下永不消失的通知）。
+      if (event.kind === 'recovering') {
+        if (current === wsScene) setRecoveringScene(wsScene)
+        return
+      }
+      if (event.kind === 'ready' && current === wsScene) setRecoveringScene(null)
+      if (transition === null || current !== wsScene) return
       if (event.kind === 'connecting') {
         clearTimer()
         const target = scene
@@ -260,6 +292,11 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
     },
     [fail, timeoutMs],
   )
+  const canReconnect = useCallback((wsScene: string) => {
+    const { transition, scene } = latest.current
+    return transition === null && sceneOf(scene).wsScene === wsScene
+  }, [])
+  const recovering = recoveringScene !== null && transition === null && recoveringScene === sceneOf(resolved.scene).wsScene
 
   const value = useMemo<SceneValue>(
     () => ({
@@ -276,8 +313,10 @@ export function SceneProvider({ children, timeoutMs = TRANSITION_TIMEOUT_MS }: {
       gateNotice,
       showGateNotice,
       reportConnection,
+      recovering,
+      canReconnect,
     }),
-    [resolved, enterRoom, returnToHall, applyUrl, settleDenied, transition, transitionSeq, desired.title, notice, dismissNotice, gateNotice, showGateNotice, reportConnection],
+    [resolved, enterRoom, returnToHall, applyUrl, settleDenied, transition, transitionSeq, desired.title, notice, dismissNotice, gateNotice, showGateNotice, reportConnection, recovering, canReconnect],
   )
 
   return (

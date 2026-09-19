@@ -407,10 +407,11 @@ describe('單一迴圈；停得下來；不搶過場的活', () => {
     await flush()
     const room = w.last()
     expect(room.scene).toBe(`room:${ROOM}`)
-    await tick(60_000)
+    // 過場逾時是 10 秒；在窗內推進退避可能的區間（≤30 秒的 jitter，這裡 r=0.5 → 大廳重連若有會在 0.5 秒冒出來）
+    await tick(5_000)
     expect(w.lobbySockets(), '不對大廳再連').toHaveLength(1)
     expect(w.notice()).toBeNull()
-    // 過場照舊：ready 就提交
+    // 過場照舊：ready 就提交（趕在 10 秒逾時之前）
     await act(async () => room.ready(['u-5']))
     await flush()
     expect(w.probe().scene).toEqual({ id: 'room', projectId: ROOM })

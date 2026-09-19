@@ -317,6 +317,15 @@ export class RealtimeClient {
   }
 
   #handleClose(info: CloseInfo): void {
+    // 不是我們關的（伺服器關、網路斷）。**listener 在這裡就拆掉**：之後這個 socket 遲到的 `message`／`open`／`close`
+    // 不准再改這個 client 的狀態、也不准再交出去 —— `FE-R12` 的重連會在同一個容器上建**新的** client，
+    // 舊的還在聽的話，遲到的 snapshot 會蓋掉新名單（規格 `FE-R12-S05`）。`#close()` 那條路（自己關）本來就拆。
+    const socket = this.#socket
+    if (socket !== null) {
+      socket.removeEventListener('open', this.#onOpen)
+      socket.removeEventListener('message', this.#onMessage)
+      socket.removeEventListener('close', this.#onClose)
+    }
     this.#socket = null
     this.#setState('closed')
     this.#emitClosed(info)
