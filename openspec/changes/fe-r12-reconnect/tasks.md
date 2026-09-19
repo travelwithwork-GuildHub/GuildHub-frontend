@@ -5,13 +5,13 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-r12-reconnect` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-r12-reconnect --strict` 通過且 PR 已合併
+- [x] 1.1（#566 合併）規格已在 PR 上談定（`spec/fe-r12-reconnect` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-r12-reconnect --strict` 通過且 PR 已合併
 
 ## 2. `--backoff`：退避與排程（〈指數退避加 full jitter〉；design D1／D5）
 
-- [ ] 2.1 判準先紅：`tests/reconnect-schedule.test.ts`（`S03` 的區間與歸零；`S04` 的「一次只存在一個排程」；`S06` 重複 schedule 不加；`S07` cancel 後跑完計時器不執行）
-- [ ] 2.2 `src/realtime/reconnect.ts`：`backoffDelay(attempt, base, cap, random)`、`createReconnectSchedule(...)`；常數 `RECONNECT_BASE_MS = 1000`、`RECONNECT_CAP_MS = 30_000`
-- [ ] 2.3 突變：沒有 cap → `S03` 紅；沒有 jitter（固定 `base × 2^n`）→ `S03` 紅；成功不歸零 → `S03` 紅；schedule 疊加 → `S06` 紅
+- [x] 2.1（6 條）判準先紅：`tests/reconnect-schedule.test.ts`（`S03` 的區間與歸零；`S04` 的「一次只存在一個排程」；`S06` 重複 schedule 不加；`S07` cancel 後跑完計時器不執行）
+- [x] 2.2 `src/realtime/reconnect.ts`：`backoffDelay(attempt, base, cap, random)`、`createReconnectSchedule(...)`；常數 `RECONNECT_BASE_MS = 1000`、`RECONNECT_CAP_MS = 30_000`
+- [x] 2.3（5 個 5 紅：沒 cap → S03／S04；沒 jitter → S03／S04／S06；reset 不歸零 → S03；schedule 疊加 → S06；cancel 不清 → S07）突變：沒有 cap → `S03` 紅；沒有 jitter（固定 `base × 2^n`）→ `S03` 紅；成功不歸零 → `S03` 紅；schedule 疊加 → `S06` 紅
 
 ## 3. `--loop`：迴圈、清鬼影、通知（〈`ready` 之後意外斷線〉〈重連之後接回來〉〈單一迴圈〉；design D1～D4）
 
