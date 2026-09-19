@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { SECONDARY } from '@/design/controls'
 import type { PanelRegistration } from '@/panel/BlockingPanelCoordinator'
 import { PanelShell } from '@/panel/PanelShell'
@@ -54,6 +54,11 @@ export interface ListPanelProps<K extends ListKind> {
   subScreen?: { title: string; back: { label: string; onBack: () => void } }
   /** 列表上方的動作（例如「發案」，`FE-J01`）。跟列表一起在內容區，overlay 開著時一樣 `inert`。 */
   toolbar?: ReactNode
+  /**
+   * 換掉分頁列表的內容（`FE-J03` 的「我的案件」，design D2）：有它時內容區畫它、**不畫列表與翻頁、分頁的 hook 不掛**（零個 `page=` 請求）；
+   * 標題列、工具列、overlay、inert、關閉、讓位都照舊。overlay 拿到的 `reload` 這時是 no-op（沒有分頁清單可重取）。
+   */
+  body?: ReactNode
   onClose: () => void
   /** 讓位協定（`FE-X16-S14`）：`canYield` 送出中、有未儲存的修改 → `false`；`onYield` 是被讓位時的收尾。沒給（單獨掛的測試）＝隨時可以、什麼都不做。 */
   panel?: Pick<PanelRegistration, 'canYield' | 'onYield'>
@@ -73,30 +78,22 @@ export function ListPanel<K extends ListKind>({
   overlay,
   subScreen,
   toolbar,
+  body,
   onClose,
   panel,
   page,
   onShownPage,
 }: ListPanelProps<K>) {
-  const { state, next, retry, reload } = useListPage(kind, { page, onShownPage })
+  // 分頁的 `reload` 由子元件掛載後交上來（state 不用 ref：overlay 的工廠在 render 期間拿它）；有 `body` 時子元件不掛，這裡就是 no-op。
+  const [reload, setReload] = useState<() => void>(() => () => {})
+  const onReloadReady = useCallback((fn: () => void) => setReload(() => fn), [])
   const overlayNode = typeof overlay === 'function' ? overlay({ reload }) : overlay
-  const edge = edgeState(state)
-  const items = state.shown?.items ?? []
-  const fetchedAt = state.shown?.at ?? 0
-  // 沒有項目時列表不佔空間，狀態節點（首次無資料、權限阻擋⋯⋯）從上面開始，
-  // 不是躲在一個空白大框的底下。列表仍然在（`aria-busy` 與 `role="list"` 的判準要找得到它）。
-  const hasItems = items.length > 0
-  const list = useRef<HTMLUListElement>(null)
-
-  // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——（容器是程式化取焦：`outline-none`，鍵盤開面板時不該整個列表亮一圈，`FE-X16-S10` 的焦點環只給控制項）
-  // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
-  // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，
-  // 下一個 Tab 跑去標題列 —— 真瀏覽器的 e2e 抓到的。呼叫端可以再覆蓋（`BoardPanel` 把焦點放回那張卡）。
-  // **這不是 `FE-B01-S18` 的防禦** —— 那把鎖在 `InteractionProvider`，就算焦點被搶走，人也不會走。
   const overlayOpen = overlayNode !== undefined && overlayNode !== null
+  // `body` 的容器：overlay 關掉時焦點還回內容（跟列表同一條，見 `PagedList`）。
+  const bodyRoot = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!overlayOpen) list.current?.focus()
-  }, [overlayOpen])
+    if (!overlayOpen && body !== undefined) bodyRoot.current?.focus()
+  }, [overlayOpen, body])
 
   return (
     <PanelShell
@@ -112,6 +109,54 @@ export function ListPanel<K extends ListKind>({
       onCloseRequest={onClose}
     >
       {toolbar}
+      {body !== undefined ? (
+        <div ref={bodyRoot} tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
+          {body}
+        </div>
+      ) : (
+        <PagedList kind={kind} labels={labels} renderItem={renderItem} empty={empty} exhausted={exhausted} error={error} page={page} onShownPage={onShownPage} overlayOpen={overlayOpen} onReloadReady={onReloadReady} />
+      )}
+    </PanelShell>
+  )
+}
+
+/** 分頁的那一半：`useListPage` 住在這裡，所以 `body` 開著時它根本不掛（不打第 0 頁、不佔狀態）。 */
+function PagedList<K extends ListKind>({
+  kind,
+  labels,
+  renderItem,
+  empty,
+  exhausted,
+  error,
+  page,
+  onShownPage,
+  overlayOpen,
+  onReloadReady,
+}: Pick<ListPanelProps<K>, 'kind' | 'labels' | 'renderItem' | 'empty' | 'exhausted' | 'error' | 'page' | 'onShownPage'> & { overlayOpen: boolean; onReloadReady: (reload: () => void) => void }) {
+  const { state, next, retry, reload } = useListPage(kind, { page, onShownPage })
+  useEffect(() => {
+    onReloadReady(reload)
+    return () => onReloadReady(() => {})
+  }, [onReloadReady, reload])
+  const edge = edgeState(state)
+  const items = state.shown?.items ?? []
+  const fetchedAt = state.shown?.at ?? 0
+  // 沒有項目時列表不佔空間，狀態節點（首次無資料、權限阻擋⋯⋯）從上面開始，
+  // 不是躲在一個空白大框的底下。列表仍然在（`aria-busy` 與 `role="list"` 的判準要找得到它）。
+  const hasItems = items.length > 0
+  const list = useRef<HTMLUListElement>(null)
+
+  // 焦點進**列表**：之後的方向鍵捲的是它。焦點要落在那個真的會捲動的元素上 ——（容器是程式化取焦：`outline-none`，鍵盤開面板時不該整個列表亮一圈，`FE-X16-S10` 的焦點環只給控制項）
+  // 落在外層 `<section>` 的話，瀏覽器捲的是頁面不是清單。
+  // 詳情（overlay）關掉的時候也要把焦點還給列表：不還的話鍵盤使用者的焦點掉到 body，
+  // 下一個 Tab 跑去標題列 —— 真瀏覽器的 e2e 抓到的。呼叫端可以再覆蓋（`BoardPanel` 把焦點放回那張卡）。
+  // **這不是 `FE-B01-S18` 的防禦** —— 那把鎖在 `InteractionProvider`，就算焦點被搶走，人也不會走。
+  useEffect(() => {
+    if (!overlayOpen) list.current?.focus()
+  }, [overlayOpen])
+
+  return (
+    <>
       <ul
         ref={list}
         tabIndex={-1}
@@ -145,6 +190,6 @@ export function ListPanel<K extends ListKind>({
           </button>
         )}
       </footer>
-    </PanelShell>
+    </>
   )
 }
