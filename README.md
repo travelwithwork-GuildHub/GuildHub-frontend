@@ -36,19 +36,28 @@
 
 ## 現在的狀態
 
-**W1 尚未開始。** 這個 repo 目前只有開發流程的骨架 ——
-`package.json` 的四個 script 是刻意會失敗的佔位，CI 是紅的，
-要在 W1 建立 Next.js 專案時一併設好。
+**這一節不寫進度，因為寫下來的那一刻就開始漂。** 要知道現在做到哪裡，
+跑下面第一個指令 —— 它讀 `docs/WBS.md` 與 `openspec/changes/`，
+印出每一項各自在什麼狀態。
+
+> ⚠️ **這一節自己漂了 19 天。** 2026-08-31 寫下「W1 尚未開始、這個 repo
+> 目前只有開發流程的骨架、`package.json` 的四個 script 是刻意會失敗的佔位」
+> 之後就沒有人再動它。到 2026-09-19 為止 repo 有 527 個 commit，
+> `lint` / `typecheck` / `test` / `build` 四個 script 全是真的。
+> 下面那行註解也一起漂了：它寫死「161 項」，而實際已經是 178 項。
+> 同一種失敗在 `docs/DECISIONS.md`〈認不得的東西要露出來，不能靜靜消失〉
+> 量過一次 —— 整組項目從畫面上消失，**而計數仍然是 161**。
+> 所以這裡不再寫第二次，數字一律交給指令。
 
 ```bash
-bash .github/scripts/progress.sh --all       # 161 項各自在什麼狀態
+bash .github/scripts/progress.sh --all       # 每一項各自在什麼狀態
 bash .github/scripts/progress.sh --blocked   # 不在自己手上的，以及誰依賴它
 bash .github/scripts/progress.sh --check     # 改了 docs/WBS.md 就跑（CI 也在跑）
 bash .github/scripts/wbs-page.sh --open      # 整份計畫的網頁版
 ```
 
 **前三個是每天用的**（現在做到哪裡、改完有沒有壞），
-**後兩個是 review 時用的**（整份計畫長什麼樣）。
+**最後一個是 review 時用的**（整份計畫長什麼樣）。
 全部從 `docs/WBS.md` 算出來，沒有人手動維護 —— 所以不會漂。
 `--check` 守的東西見下面那一節。
 網頁版的產物 `docs/wbs.html` **不進版控**，改了 WBS 就重跑一次。
