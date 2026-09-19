@@ -106,7 +106,8 @@ export function KeyHandoff({ identity, onDone, clipboard = browserClipboard() }:
         沒有把它帶走、又清掉瀏覽器資料的話，這個身分就回不來了。
       </p>
 
-      <button type="button" {...SECONDARY} onClick={() => void copy(key)}>
+      {/* 主要動作跟著狀態走（`FE-X16-S09`）：還沒帶走 → 推薦的下一步是「複製鑰匙」；帶走了 → 是「進入世界」，複製退成次要 */}
+      <button type="button" {...(done ? SECONDARY : PRIMARY)} onClick={() => void copy(key)}>
         複製鑰匙
       </button>
 
@@ -149,7 +150,7 @@ export function KeyHandoff({ identity, onDone, clipboard = browserClipboard() }:
         </p>
       )}
 
-      <button type="button" {...PRIMARY} disabled={!done} onClick={() => onDone(identity)}>
+      <button type="button" {...(done ? PRIMARY : SECONDARY)} disabled={!done} onClick={() => onDone(identity)}>
         進入世界
       </button>
     </section>

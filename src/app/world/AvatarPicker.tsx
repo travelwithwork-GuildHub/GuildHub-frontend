@@ -117,7 +117,8 @@ export function AvatarPicker() {
           // —— 散在各處的 z-index 會互相打架，而症狀是「有時候被蓋住」。
           style={{ zIndex: layer('panel') }}
           // `max-w-full`＋選項 `flex-wrap`：八款在 1024 寬也放得下（`FE-A05-S23`）
-          className="bg-surface-raised border-control-edge absolute top-full left-0 mt-2 flex max-w-full flex-col gap-gutter rounded border p-gutter"
+          // 入口在標題列靠右那一組（`FE-X16-S19`），彈出層靠標題列的右緣；定位基準仍是整條標題列（`max-w-full` 才放得下八款）
+          className="bg-surface-raised border-control-edge absolute top-full right-gutter mt-2 flex max-w-full flex-col gap-gutter rounded border p-gutter"
         >
           {/* 開著才在 Escape 的堆疊裡；面板開著時它在下面（但會先因失焦而關）。 */}
           <EscapeLayer onEscape={dismiss} element={popover} />

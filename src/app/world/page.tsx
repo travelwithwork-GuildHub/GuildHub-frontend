@@ -1,22 +1,18 @@
-import { IdentityBadge } from '@/identity/IdentityBadge'
 import { IdentityProvider } from '@/identity/IdentityProvider'
 import { AvatarDraftProvider } from '@/identity/AvatarDraftProvider'
-import { InboxButton } from '@/inbox/InboxButton'
 import { InboxPanelProvider } from '@/inbox/InboxPanelProvider'
 import { BlockingPanelCoordinator } from '@/panel/BlockingPanelCoordinator'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { RealtimeGenerationProvider } from '@/realtime/RealtimeGenerationProvider'
-import { ReturnToHallButton } from '@/world/scenes/ReturnToHallButton'
 import { RoomEntryGateProvider } from '@/world/scenes/RoomEntryGate'
 import { SceneChatProvider } from '@/realtime/SceneChatProvider'
 import { SceneNotices } from '@/world/scenes/SceneNotices'
 import { SceneProvider } from '@/world/scenes/SceneProvider'
-import { AvatarPicker } from './AvatarPicker'
+import { AppHeader } from './AppHeader'
 import { FirstEntryNotice } from './FirstEntryNotice'
 import { OtherTabNotice } from './OtherTabNotice'
 import { WorldGate } from './WorldGate'
 import { WorldBoundary } from './WorldBoundary'
-import { TITLE } from '@/design/controls'
 
 // 規格 FE-X01-S03。**這個元件刻意保持同步**（不是 async Server Component）——
 // Vitest 目前不支援 async Server Component，非同步的話這條 Scenario
@@ -43,22 +39,10 @@ export default function WorldPage() {
         <SceneChatProvider>
         <WorldGate>
           <main className="flex h-dvh flex-col">
-            {/* ⚠️ **`IdentityBadge` 是 client component，這一頁仍然是同步的
-                Server Component** —— 上面那段註解說的限制沒有改變。
-                身分的查詢在瀏覽器端發生，因為它要帶 cookie。 */}
-            {/* ⚠️ **`relative` 是換角色面板 `absolute` 的定位基準。**
-                少了它，面板會相對於整個視窗定位。 */}
-            <div data-testid="app-header" className="p-gutter relative flex shrink-0 items-center gap-gutter">
-              <h1 {...TITLE}>GuildHub</h1>
-              <IdentityBadge />
-              {/* 收件匣入口（`FE-K01`）：只在已登入時出現。 */}
-              <InboxButton />
-              {/* ⚠️ **入口一直都在**（規格 `FE-A05-S11`）。它在標題列裡，
-                  也就是 `<Canvas>` 的兄弟 —— 所以天生不會被 3D 畫面蓋住。 */}
-              <AvatarPicker />
-              {/* 「回到 Guild Hall」（`FE-V01-S13`）：只在房間裡出現；在標題列，不被 Canvas 蓋住。 */}
-              <ReturnToHallButton />
-            </div>
+            {/* ⚠️ 標題列裡的 `IdentityBadge` 是 client component，這一頁仍然是同步的
+                Server Component —— 上面那段註解說的限制沒有改變。身分的查詢在瀏覽器端發生，因為它要帶 cookie。 */}
+            {/* 標題列（`FE-X16-S19`）：品牌左、身分與入口靠右一組；`<Canvas>` 的兄弟、在世界區上方，所以不被 3D 畫面與面板蓋住。 */}
+            <AppHeader />
             <OtherTabNotice />
             {/* 進不去的通知、沒票的說明（`FE-V01-S07`／`S14`）。 */}
             <SceneNotices />

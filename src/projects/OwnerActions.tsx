@@ -173,8 +173,9 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
   const registered = form.register('password')
   return (
     <div data-testid="owner-actions-body" className="flex flex-col gap-gutter">
+      {/* 單獨一顆的鈕不拉滿整欄（截圖對出來的：拉滿的邊框鈕看起來像一條分隔線） */}
       {project.status === 'recruiting' && !composing && (
-        <button type="button" {...PRIMARY} onClick={() => setComposing(true)}>
+        <button type="button" {...withClass(PRIMARY, 'self-start')} onClick={() => setComposing(true)}>
           {OWNER_ACTION_LABELS.formTeam}
         </button>
       )}
@@ -230,7 +231,8 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
           </p>
           <p {...withClass(CAPTION, 'text-ink-muted')}>{OWNER_ACTION_LABELS.revealHint}</p>
           <div className="flex flex-wrap gap-gutter">
-            <button type="button" {...SECONDARY} aria-disabled={writingNow} onClick={() => void copy()}>
+            {/* 密碼呈現中推薦的下一步是把密碼帶走（`FE-X16-S09`）：「複製密碼」主要、「寄給隊員」次要、下面的「結案」也退成次要 */}
+            <button type="button" {...PRIMARY} aria-disabled={writingNow} onClick={() => void copy()}>
               {OWNER_ACTION_LABELS.copy}
             </button>
             {onSendToTeam && (
@@ -258,7 +260,7 @@ export function OwnerActions({ project, onReplaced, onSendToTeam, onBusyChange, 
       )}
 
       {project.status === 'active' && !confirming && (
-        <button ref={closeButton} type="button" {...SECONDARY} onClick={() => setConfirming(true)}>
+        <button ref={closeButton} type="button" {...withClass(revealed === null ? PRIMARY : SECONDARY, 'self-start')} onClick={() => setConfirming(true)}>
           {OWNER_ACTION_LABELS.close}
         </button>
       )}

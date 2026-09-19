@@ -6,7 +6,7 @@ import { useWatch, type FieldPath, type FieldValues } from 'react-hook-form'
 import { z } from 'zod'
 import { registerAccount, signInWithNickname, signInWithPassword, signInWithRecoveryKey } from '@/identity/session'
 import { CredentialsRejectedError, LoginIdTakenError, NicknameLengthError, RecoveryKeyRejectedError, type Identity } from '@/identity/types'
-import { CAPTION, CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, TITLE, withClass } from '@/design/controls'
+import { CAPTION, CHECK_ROW, FIELD, FIELD_LABEL, FORM, HEADING, PRIMARY, SECONDARY, TITLE, withClass } from '@/design/controls'
 import type { ClipboardPort } from '@/identity/clipboard'
 import { KeyHandoff } from '@/first-entry/KeyHandoff'
 import { markFirstEntryDone } from '@/first-entry/seen'
@@ -212,7 +212,8 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
       </form>
 
       <form className={FORM} aria-labelledby="resume-heading" onSubmit={recovery.onSubmit} noValidate>
-        <h2 id="resume-heading" {...TITLE}>
+        {/* 後兩個區塊的標題是條目層級（`FE-X16-S09`／design D4）：三個表單各自有主要動作，暱稱那條靠版面順序與標題層次領先，不靠降級別人的按鈕 */}
+        <h2 id="resume-heading" {...HEADING}>
           已經有身分了？
         </h2>
         {/* `S17`：手上有金鑰的人，在一台全新的裝置上回得去 */}
@@ -221,14 +222,14 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
           <input {...FIELD} {...recovery.form.register('key')} />
         </label>
         <SubmitError message={recovery.submitError} />
-        <button type="submit" {...SECONDARY} disabled={anyBusy || !recovery.canSubmit}>
+        <button type="submit" {...PRIMARY} disabled={anyBusy || !recovery.canSubmit}>
           用金鑰回來
         </button>
       </form>
 
       {/* 第三塊：帳號密碼（`FE-A08`）。這是三種入場方式裡唯一在驗證身分的那一種；匿名路仍是第一個表單、仍是主路。 */}
       <section className={FORM} aria-labelledby="account-heading" data-testid="account-section">
-        <h2 id="account-heading" {...TITLE}>
+        <h2 id="account-heading" {...HEADING}>
           {ACCOUNT_LABELS.heading}
         </h2>
         <div role="group" aria-label={ACCOUNT_LABELS.heading} className="flex gap-gutter">
