@@ -144,7 +144,11 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
   // 走廊要生成哪些門（`FE-W12`）。**在 Canvas 外面呼叫** ——
   // 門畫在 3D 裡，而狀態與標籤是 DOM，兩邊要看到同一份資料。
   // 只有大廳有走廊：房間裡**不打、不輪詢** `GET /api/rooms`（`FE-V01-S03`）。
-  const rooms = useRooms(CORRIDOR_SLOTS.length, hall)
+  //
+  // ⚠️ **`&& ready`：房間清單不阻塞首個可操作畫面（`FE-X15-S07`；ADR 0014）。** Canvas ready
+  // 之前 `enabled=false`，一次 `GET /api/rooms` 都不打；ready 之後 `false→true`，`useRooms`
+  // 立即請求（見它的 `enabled` 說明）。它進行中或失敗都不影響世界已可操作 —— 世界不等它。
+  const rooms = useRooms(CORRIDOR_SLOTS.length, hall && ready)
   // 標籤的 DOM 節點。**身分穩定，不進 React** —— 位置每幀由投影元件直接寫進 style。
   const labelNodesRef = useLabelNodes()
   // 工位錨點的 DOM 節點（`FE-W16-S06`）：同樣不進 React，位置由 Canvas 裡的投影器每幀寫。
@@ -201,10 +205,18 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
               castShadow
               shadow-mapSize={[1024, 1024]}
             />
-            {/* ⚠️ **`key` 是換場景的機制**（`FE-V01`，design D3）：`wsScene` 變了，這整棵子樹卸載再掛 ——
+            {/* ⚠️ **世界子樹在 Canvas ready 之後才掛載（`FE-X15-S03`；ADR 0014）。**
+                `onCreated`（renderer 建好）之前這裡是空的 —— 於是 WS 連線（`RemoteWorld` 的
+                掛載 effect）與 Rapier 的 `import('@dimforge/rapier3d-compat')`（`LocalPlayer` 的
+                掛載 effect）在 ready 之前**根本不存在**，不可能提早觸發。`onCreated` 是 renderer
+                層級的 callback，不依賴 scene children —— 空 Canvas 一樣會 fire、翻 `ready`，下一個
+                commit 才掛這棵子樹（不會 chicken-and-egg；codex／Gemini 覆核一致）。相機與光是
+                Canvas 本身的常駐設定，不 gate。 */}
+            {ready && (
+            /* ⚠️ **`key` 是換場景的機制**（`FE-V01`，design D3）：`wsScene` 變了，這整棵子樹卸載再掛 ——
                 物理世界（在 `LocalPlayer` 的 effect 裡建）連同碰撞體全拆全建、`LocalPlayer` 在掛載時讀一次的
                 `spawn`／`layout` 拿到新的、`RemoteWorld` 的 cleanup 關掉舊連線。**`<Canvas>` 在外面，不重掛**
-                （`FE-B09-S12`）。少了這個 key，畫面會換成房間、玩家卻還撞著大廳的牆。 */}
+                （`FE-B09-S12`）。少了這個 key，畫面會換成房間、玩家卻還撞著大廳的牆。 */
             <Suspense fallback={null} key={def.wsScene}>
               <WorldShell layout={def.layout} />
               <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} spawn={def.spawn} layout={def.layout} />
@@ -239,6 +251,7 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
               />
               <SpatialInteraction poseRef={localPose} />
             </Suspense>
+            )}
           </Canvas>
 
           {/* 規格 FE-W01-S05：ready 之後等待狀態消失 */}
