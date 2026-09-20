@@ -3,7 +3,7 @@ import { FACING } from '@/world/coords'
 import { directionFromKeys } from '@/world/player/input'
 import { displacement, normalize, speedOf } from '@/world/player/movement'
 import { advancePhase, animationStateFor, poseAt } from '@/world/player/animation'
-import { nextFacing } from '@/world/player/facing'
+import { FACING_ROTATION, nextFacing } from '@/world/player/facing'
 
 // ⚠️ import 的是**正式碼**。
 
@@ -91,6 +91,23 @@ describe('朝向用既有的那一份對映', () => {
     for (const previous of [FACING.down, FACING.left, FACING.right, FACING.up]) {
       expect(nextFacing({ x: 0, z: 0 }, previous)).toBe(previous)
     }
+  })
+
+  it('[FE-W03-S08] 朝向的旋轉讓正面指向該朝向的螢幕方向，不是相反', () => {
+    // `ChibiPlayer` 的正面（眼睛）預設在 **+Z 面**（見該檔註解）。套 `FACING_ROTATION[facing]` 繞 Y 轉之後，
+    // 正面向量 (0,0,1) → (sinθ, 0, cosθ)。相機在 +Z 側俯視（player.test 檔頭：螢幕上=−Z、螢幕下=+Z）：
+    //   +X = 螢幕右、−X = 螢幕左、+Z = 螢幕下、−Z = 螢幕上。
+    // ⚠️ **這一條釘的是「正面在螢幕上朝哪」**，coords 那份只釘語意（left=−X）。少了這條，
+    // `FACING_ROTATION` 的 left/right 正負號寫反時**四條語意測試照樣綠**、只有畫面上頭轉反邊 —— 實測就反了（左右相反）。
+    const front = (facing: (typeof FACING)[keyof typeof FACING]) => {
+      const t = FACING_ROTATION[facing]
+      const r = (n: number) => Math.round(n)
+      return { x: r(Math.sin(t)), z: r(Math.cos(t)) }
+    }
+    expect(front(FACING.down), '朝下：正面朝螢幕下（+Z，正對相機）').toEqual({ x: 0, z: 1 })
+    expect(front(FACING.up), '朝上：正面朝螢幕上（−Z）').toEqual({ x: 0, z: -1 })
+    expect(front(FACING.left), '朝左：正面朝螢幕左（−X）').toEqual({ x: -1, z: 0 })
+    expect(front(FACING.right), '朝右：正面朝螢幕右（+X）').toEqual({ x: 1, z: 0 })
   })
 })
 
