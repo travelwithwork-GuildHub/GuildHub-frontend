@@ -94,6 +94,20 @@ describe('WebGL2 不可用時不留白畫面', () => {
     expect(screen.queryByTestId('world-webgl-unavailable')).not.toBeInTheDocument()
     expect(screen.getByTestId('world-canvas-container')).toBeInTheDocument()
   })
+
+  it('[FE-X15-S01] WebGL2 不可用時也回報 onReady —— 讓 WorldBoundary 的連續載入層讓位給不支援提示，不永久覆蓋', () => {
+    // archive-review（codex）抓到：WebGL2 不可用時 `WorldCanvas` 直接回 `WebGLUnavailable`、
+    // **不會有 Canvas 的 `onCreated`**，於是 `WorldBoundary` 的 `world-load-sequence`（只在 `onReady` 撤）
+    // 永遠蓋著那段 `role="alert"` 提示 —— 違反「載入層讓位、不接管」。修法：WebGL2 不可用是一個
+    // **終局可顯示狀態**，`WorldCanvas` 要照樣回報 `onReady`，載入層才撤、提示才看得到。
+    stubWebGL2(false)
+    const onReady = vi.fn()
+
+    render(<WorldCanvas onReady={onReady} />)
+
+    expect(screen.getByTestId('world-webgl-unavailable')).toBeInTheDocument()
+    expect(onReady, 'WebGL2 不可用時要回報 ready，否則邊界載入層永遠覆蓋提示').toHaveBeenCalled()
+  })
 })
 
 describe('3D 內容載入中的呈現', () => {
