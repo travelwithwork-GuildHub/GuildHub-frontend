@@ -2,14 +2,19 @@
 
 import dynamic from 'next/dynamic'
 import { catchError, type ErrorInfo } from 'next/error'
+import { useState } from 'react'
 import { layer } from '@/design/layers'
+import { useIdentity } from '@/identity/IdentityProvider'
+import { WorldLoadSequence } from './WorldLoadSequence'
 
 // 規格 FE-X01-S03 / S04：World 的 client 邊界。
 //
 // `ssr: false` 的 `next/dynamic` **不能寫在 Server Component 裡**，
 // 所以這一層是薄殼，唯一的工作是把 World 的內容關進瀏覽器端。
 // 內容是誰由 FE-W01 決定，這個檔案不需要因此改動。
-const WorldContent = dynamic(() => import('@/world/WorldCanvas'), { ssr: false })
+const WorldContent = dynamic<{ onReady?: () => void }>(() => import('@/world/WorldCanvas'), {
+  ssr: false,
+})
 
 // 用 `catchError` 而不是 `error.tsx`：`error.tsx` 是整個路由段的邊界，
 // 會把**整頁**換掉，而規格 S04 明確要求「頁面的其餘部分仍然可用」。
@@ -54,10 +59,25 @@ export const WorldErrorBoundary = catchError((_props: unknown, _info: ErrorInfo)
   </div>
 ))
 
+// 規格 FE-X15-S01／S02／S05（load-order；ADR 0014、design D1／D2）：
+//
+// 1. **身分先於 3D chunk**：身分 `unknown`（還沒問到）時**不建立** `WorldContent` ——
+//    也就是不抓 3D chunk。`guest`／`signed-in`／`unavailable` 都算 settled，放行。
+//    `WorldGate` 對 `unknown` 的放行（lease 那一層）是刻意的、不動它；載入**次序**是另一回事，放在這裡。
+//    只 gate 世界內容，不 gate 標題列 —— 標題列在 `page.tsx`、本來就在這個邊界外面。
+//
+// 2. **一個連續的載入層**：`WorldLoadSequence` 覆蓋「chunk 抓取（WorldContent 還沒掛載）」與
+//    「chunk 到了、Canvas 還沒 ready」兩段空窗。它與 `WorldContent` 是**同一個邊界的 children** ——
+//    所以 chunk 抓取失敗（`WorldContent` 拋錯）時，整批被 fallback 取代，載入層自然讓位給錯誤（S05）。
+//    `ready` 只在 `onReady`（Canvas `onCreated`）時翻真 —— 載入層在那之前一直是同一個元素，不卸載重掛。
 export function WorldBoundary() {
+  const identity = useIdentity()
+  const settled = identity.state !== 'unknown'
+  const [ready, setReady] = useState(false)
   return (
     <WorldErrorBoundary>
-      <WorldContent />
+      {settled && <WorldContent onReady={() => setReady(true)} />}
+      {!ready && <WorldLoadSequence />}
     </WorldErrorBoundary>
   )
 }
