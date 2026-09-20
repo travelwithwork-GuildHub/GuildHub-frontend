@@ -78,7 +78,10 @@ function WebGLUnavailable() {
   )
 }
 
-export default function WorldCanvas() {
+// `onReady`（FE-X15-S01／S03；ADR 0014）：Canvas `onCreated` 時往上回報，讓 `WorldBoundary`
+// 的連續載入層知道何時撤掉、下游（WS）知道 Canvas 已 ready。內部的 `ready`／`LoadingOverlay`
+// 仍是 `FE-W01-S04／S05` 的等待態，維持不變。
+export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) {
   // 偵測只做一次。每次 render 都建一個 canvas 去問的話，
   // 會一直吃掉瀏覽器對同時存在的 WebGL context 的配額。
   const [webgl2] = useState(isWebGL2Available)
@@ -183,7 +186,10 @@ export default function WorldCanvas() {
             // 去畫同一個畫面。`2` 不是量出來的最佳值 —— 真正的數字等 FE-O12，
             // 而那時要改的是 Requirement，不是這一行。
             dpr={[1, 2]}
-            onCreated={() => setReady(true)}
+            onCreated={() => {
+              setReady(true)
+              onReady?.()
+            }}
           >
             {/* 相機由 FE-W05 提供。FE-W01 當時那個 perspective 相機是暫時的 ——
                 CONTEXT.md 訂的是固定的 Orthographic Elevated 相機。 */}

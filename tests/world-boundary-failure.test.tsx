@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { WorldErrorBoundary } from '@/app/world/WorldBoundary'
+import { WorldLoadSequence } from '@/app/world/WorldLoadSequence'
 
 // ⚠️ 這裡 import 的是 **src/app/world/WorldBoundary.tsx 匯出的那一個**邊界。
 //
@@ -52,5 +53,20 @@ describe('World 區域的 client 邊界（失敗路徑）', () => {
     screen.getByRole('button', { name: '重試' }).click()
 
     expect(reload).toHaveBeenCalledOnce()
+  })
+
+  // FE-X15-S05：連續載入層是邊界的 child，跟世界內容並列 —— 世界內容出錯（chunk 抓取失敗）時，
+  // 整批 children 被 fallback 取代，載入層自然消失、換成可重試的錯誤。防的是「載入層與錯誤同時出現、
+  // 或永遠停在載入層」。
+  it('[FE-X15-S05] chunk 抓取失敗時載入層讓位給錯誤，不會兩者並存', () => {
+    render(
+      <WorldErrorBoundary>
+        <Boom />
+        <WorldLoadSequence />
+      </WorldErrorBoundary>,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent('世界載入失敗')
+    expect(screen.queryByTestId('world-load-sequence')).not.toBeInTheDocument()
   })
 })
