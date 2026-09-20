@@ -353,8 +353,9 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(notice()).toBeVisible()
     await type(within(notice()).getByLabelText('在世界裡顯示的名字'), '打到一半')
     pressE()
-    await screen.findByTestId('list-panel') // 看板內容 lazy（FE-X15 --panel-board）：等內容到；提示讓位（下一行）綁開啟意圖、比內容早
+    // 提示讓位綁「開啟意圖」（`active`）：內容 chunk 抵達**前**就隱藏（同步斷言）—— `FirstEntryNotice` 改讀 `active`（非殼登記）的守門。
     expect(notice()).not.toBeVisible()
+    await screen.findByTestId('list-panel') // 等內容到（下面 escape 靠看板內容的 Escape 層關面板；FE-X15 --panel-board）
     escape()
     expect(notice()).toBeVisible()
     expect((within(notice()).getByLabelText('在世界裡顯示的名字') as HTMLInputElement).value, '讓位不重設提示裡的狀態').toBe('打到一半')
@@ -392,13 +393,15 @@ describe('同一時間只有一個阻斷式面板', () => {
     receive(0)
     expect(screen.getAllByTestId('chat-row')).toHaveLength(1)
     pressE()
-    // 聊天框收合綁「開啟意圖」（`active`），內容 chunk 前就成立；但等一下 Escape 要靠看板內容的 Escape 層關面板，先等內容到（FE-X15 --panel-board）。
-    await screen.findByTestId('list-panel')
+    // 收合綁「開啟意圖」（`active`）：內容 chunk 抵達**前**就收合（同步斷言）—— 這是 `SceneChatHud` 改讀 `active`（非殼登記）的守門，
+    // 退回 `useBlockingPanelOpen` 會讓載入視窗仍展開、仍有輸入框（世界已鎖卻能打字）→ 這裡紅。
     const hud = screen.getByTestId('scene-chat')
     expect(within(hud).queryByTestId('chat-feed')).toBeNull()
     expect(within(hud).queryByRole('textbox')).toBeNull()
     for (let i = 1; i <= 3; i += 1) receive(i)
     expect(hud.textContent).toContain('3')
+    // Escape 要靠看板內容的 Escape 層關面板，到這裡才等內容到（FE-X15 --panel-board）。
+    await screen.findByTestId('list-panel')
     escape()
     expect(g().lock.current, '面板關了、聊天框收起狀態沒有留下鎖').toBe(false)
     expect(screen.getAllByTestId('chat-row')).toHaveLength(4)
