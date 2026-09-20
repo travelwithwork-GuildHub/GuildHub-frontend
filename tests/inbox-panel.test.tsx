@@ -486,7 +486,8 @@ describe('對話詳情與寄信', SLOW, () => {
     server.replyFor('/api/messages', 200, [msg(B, ME, '10:00')], { after: new Promise<void>((r) => (release = r)) })
     server.replyFor(`/api/profiles/${A}`, 200, profile(A, '阿福')) // 收件匣自己解析名字（跟 TalentDetail 的那次是兩件事）
     click(screen.getByTestId('send-message'))
-    const thread = screen.getByTestId('inbox-thread')
+    // 內容 lazy（`FE-X15`）：等對話殼到（開啟意圖已把 `loading` 設真，第 0 頁被 `release` 壓著、還在 busy）。
+    const thread = await screen.findByTestId('inbox-thread')
     expect(thread.getAttribute('aria-busy')).toBe('true')
     expect(thread.querySelector('[data-empty-state="first-empty"]'), '載入中不該說是空的').toBeNull()
     await waitFor(() => expect(within(thread).getByTestId('inbox-thread-name').textContent).toBe('阿福'))

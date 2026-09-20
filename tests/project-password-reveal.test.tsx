@@ -125,7 +125,7 @@ describe('密碼只在這一次詳情裡呈現，可複製、可寄給隊員，�
     await act(async () => release())
     await waitFor(() => expect(screen.queryByTestId('list-panel')).toBeNull())
     expect(clipboardWrite).toHaveBeenLastCalledWith(draft())
-    const inbox = screen.getByTestId('inbox-panel')
+    const inbox = await screen.findByTestId('inbox-panel') // 收件匣內容 lazy（FE-X15 --panel-inbox）
     expect(screen.queryByTestId('inbox-thread'), '開的是對話不是清單').toBeNull()
     expect(screen.getByTestId('inbox-list')).not.toBeNull()
     expect(inbox.contains(document.activeElement), '焦點不在收件匣').toBe(true)

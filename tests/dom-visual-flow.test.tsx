@@ -254,6 +254,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     willOpenInbox()
     click(inboxButton())
     expect(listPanel()).toBeNull()
+    await screen.findByTestId('inbox-panel') // 收件匣內容 lazy（FE-X15 --panel-inbox）
     expect(inboxPanel()).not.toBeNull()
     expect(blockingPanels()).toHaveLength(1)
     expect(inboxPanel()!.contains(document.activeElement)).toBe(true)
@@ -269,6 +270,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     willOpenInbox()
     click(inboxButton())
     expect(profilePanel()).toBeNull()
+    await screen.findByTestId('inbox-panel') // 收件匣內容 lazy（FE-X15 --panel-inbox）
     expect(inboxPanel()).not.toBeNull()
     expect(blockingPanels()).toHaveLength(1)
     escape()
@@ -316,6 +318,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     willOpenInbox()
     click(inboxButton())
     expect(listPanel()).toBeNull()
+    await screen.findByTestId('inbox-panel') // 收件匣內容 lazy（FE-X15 --panel-inbox）
     expect(inboxPanel()).not.toBeNull()
     escape()
 
@@ -460,6 +463,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     willOpenInbox()
     click(inboxButton())
     expect(picker()).toBeNull()
+    await screen.findByTestId('inbox-panel') // 收件匣內容 lazy（FE-X15 --panel-inbox）
     expect(inboxPanel()).not.toBeNull()
   })
 
