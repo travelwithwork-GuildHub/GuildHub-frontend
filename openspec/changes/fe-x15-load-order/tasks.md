@@ -35,9 +35,9 @@
 
 ### 3b. `--panel-profile`：名片經 PanelHost，鎖與焦點接管上移
 
-- [ ] 3b.1 判準先紅：名片以 `PanelHost` 掛載 —— 開啟前不 import `OpenProfilePanel`；開啟意圖當下（chunk 前）`holdInputLock('profile-panel')` 已呼叫、載入殼在（S04）；`FE-A04` 既有焦點／讓位／編輯（`S01`～`S03`）行為不變（既有 profile 測試迴歸）
-- [ ] 3b.2 實作：抽 `OpenProfilePanel` 成獨立可 lazy 模組；`ProfilePanel` 改用 `PanelHost`，`lock` 注入 `() => holdInputLock('profile-panel')`（在 `WorldCanvas`／`InteractionProvider` 底下取得）；面板本體不再自持鎖
-- [ ] 3b.3 突變：鎖留在面板本體（chunk 抵達前不鎖）→ S04「開啟當下已鎖」紅；host 改 eager import 名片 → S04 紅
+- [x] 3b.1 判準先紅：名片以 `PanelHost` 掛載 —— 開啟前不 import `OpenProfilePanel`；開啟意圖當下（chunk 前）`holdInputLock('profile-panel')` 已呼叫、載入殼在（S04）；`FE-A04` 既有焦點／讓位／編輯（`S01`～`S03`）行為不變（既有 profile 測試迴歸）
+- [x] 3b.2 實作：抽 `OpenProfilePanel` 成獨立可 lazy 模組；`ProfilePanel` 改用 `PanelHost`，`lock` 注入 `() => holdInputLock('profile-panel')`（在 `WorldCanvas`／`InteractionProvider` 底下取得）；面板本體不再自持鎖
+- [x] 3b.3 突變：鎖留在面板本體（chunk 抵達前不鎖）→ S04「開啟當下已鎖」紅；host 改 eager import 名片 → S04 紅
 
 ### 3c. `--panel-board`：看板經 PanelHost
 

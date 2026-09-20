@@ -1,120 +1,48 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import type { ProfileOut } from '@/api/contract/rest'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useIdentity } from '@/identity/IdentityProvider'
-import { SECONDARY, withClass } from '@/design/controls'
-import { PanelShell } from '@/panel/PanelShell'
-import { TalentFacts } from '@/talent/TalentFacts'
-import { useInteraction } from '@/world/interaction/InteractionProvider'
-import { DiscardConfirm } from './DiscardConfirm'
-import { ProfileForm, type CloseIntent } from './ProfileForm'
-import { useProfilePanel, useProfilePanelIfProvided } from './ProfilePanelProvider'
+import { PanelHost } from '@/panel/PanelHost'
+import { useInteractionIfProvided } from '@/world/interaction/InteractionProvider'
+import { useProfilePanelIfProvided } from './ProfilePanelProvider'
 
-// 「我的名片」面板。規格 `FE-A04`〈名字是入口，面板是阻斷式的〉、〈顯示我的名片，用同一個呈現元件〉、〈編輯四欄⋯⋯〉、〈未儲存就關要確認⋯⋯〉。
+// 「我的名片」面板的**掛載點**。規格 `FE-A04`；`FE-X15` --panel-profile（design D3）：
+// 改用 `PanelHost` lazy 載入內容（`OpenProfilePanel`）、**世界輸入鎖上移到 host**。
 //
-// 兩個模式：顯示（`TalentFacts` ＋ 編輯鈕）、編輯（`ProfileForm`）。按「編輯」在**同一個面板原地**切成表單；成功、丟棄、乾淨的取消都回到顯示。
-// 殼的關閉意圖（Escape、關閉鈕）在編輯模式交給表單裁決（送出中無效、dirty 先問）；顯示模式直接關。
-//
-// 渲染在 `WorldCanvas` 裡（跟 `BoardPanel` 同一個位置：`InteractionProvider` 底下、`data-focus-anchor` 那個 div 裡 —— 同一個定位基準）。
-// 開關狀態在 `ProfilePanelProvider`（標題列的按鈕在 `WorldCanvas` 外面，所以 provider 在更上面）。
-//
-// ⚠️ **鎖在這裡持有**（design `D1` 修正）：掛載時 `holdInputLock`、卸載釋放。晚一個 effect 沒關係 —— 面板是滑鼠點標題列開的，
-// 不是世界裡的鍵，沒有「下一個方向鍵要立刻被擋」的問題。
-//
-// ⚠️ **內容來自 `IdentityProvider` 手上那份 `ProfileOut`**，同步可得，不打 `GET /api/profiles/{id}`（`S03`）。
-// 身分不是 `signed-in` 時入口按鈕本來就不存在，所以這裡沒有「載入失敗」那條路；萬一面板開著時身分變了（登出、問不到），面板就消失。
-
-export const PROFILE_PANEL_LABELS = { title: '我的名片', close: '關閉', edit: '編輯' }
-
-function OpenProfilePanel({ profile }: { profile: ProfileOut }) {
-  const { closePanel, yieldPanel } = useProfilePanel()
-  const { holdInputLock } = useInteraction()
-  const root = useRef<HTMLDivElement>(null)
-  const [mode, setMode] = useState<'view' | 'edit'>('view')
-  const [confirming, setConfirming] = useState(false)
-  // 表單掛上來的「關閉意圖」處理（送出中無效、dirty 先問、否則回顯示）。顯示模式沒有表單：直接關面板。
-  const closeIntentRef = useRef<CloseIntent | null>(null)
-  // 確認層走 `PanelDialog`（表單所在的內容區變 inert）；「繼續編輯」之後焦點要回到剛剛在的地方（視窗卸載時焦點會掉到 body）。
-  const focusBeforeConfirm = useRef<HTMLElement | null>(null)
-
-  // 世界輸入鎖：面板開著人不能走（`S01`）；關了要放（`S02`）。
-  useEffect(() => holdInputLock('profile-panel'), [holdInputLock])
-  // 焦點進面板（`S01`）：Tab 從這裡開始在面板內循環。
-  useEffect(() => {
-    root.current?.focus()
-  }, [])
-
-  const onCloseRequest = () => {
-    if (mode === 'edit') closeIntentRef.current?.requestClose()
-    else closePanel()
-  }
-  // 讓位協定（`FE-X16-S14`）：顯示模式隨時可以；編輯中問表單（送出中、dirty → 不行，**不**替使用者按「放棄修改」）。
-  const panel = { id: 'profile-panel' as const, canYield: () => mode !== 'edit' || (closeIntentRef.current?.canYield() ?? true), onYield: yieldPanel }
-  const editButton = useRef<HTMLButtonElement>(null)
-  const backToView = () => {
-    setConfirming(false)
-    setMode('view')
-  }
-  // 回到顯示（成功、丟棄、取消）：焦點到「編輯」鈕 —— 表單卸載了，不接的話焦點掉到 body（審查抓到的）。
-  // **只在 edit → view 時**：初次打開的焦點策略是面板根節點（上面那個 effect），不被這裡搶走。
-  const wasEditing = useRef(false)
-  useEffect(() => {
-    if (mode === 'view' && wasEditing.current) editButton.current?.focus()
-    wasEditing.current = mode === 'edit'
-  }, [mode])
-  const askDiscard = () => {
-    focusBeforeConfirm.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    setConfirming(true)
-  }
-  const keepEditing = () => {
-    setConfirming(false)
-    const back = focusBeforeConfirm.current
-    focusBeforeConfirm.current = null
-    // 視窗卸載、inert 拿掉之後再還焦點（同一個 commit 之後）。
-    queueMicrotask(() => back?.focus())
-  }
-
-  return (
-    <PanelShell
-      title={PROFILE_PANEL_LABELS.title}
-      closeLabel={PROFILE_PANEL_LABELS.close}
-      testId="profile-panel"
-      panel={panel}
-      onCloseRequest={onCloseRequest}
-    >
-      {/* 只是捲動容器與初始焦點，不是第二個 landmark（殼的 section 已經叫「我的名片」）。 */}
-      <div ref={root} tabIndex={-1} data-mode={mode} className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto outline-none">
-        {mode === 'view' ? (
-          <>
-            <TalentFacts profile={profile} />
-            {/* 編輯鈕在面板層，不在 `TalentFacts`（design `D2`）：別人的名片走 `BoardPanel`，那裡沒有它（`S03`）。 */}
-            <button ref={editButton} type="button" {...withClass(SECONDARY, 'self-start')} onClick={() => setMode('edit')}>
-              {PROFILE_PANEL_LABELS.edit}
-            </button>
-          </>
-        ) : (
-          <ProfileForm profile={profile} onDone={backToView} closeIntentRef={closeIntentRef} askDiscard={askDiscard} />
-        )}
-      </div>
-      {/* 放棄修改確認：`PanelDialog` 把它掛到內容區上（遮罩＋內容區 inert），不是子畫面的 overlay 槽（`FE-X16-S06`）。 */}
-      {confirming && <DiscardConfirm onDiscard={backToView} onKeep={keepEditing} />}
-    </PanelShell>
-  )
-}
+// 渲染在 `WorldCanvas` 裡（`InteractionProvider` 底下）—— host 的世界輸入鎖從這裡拿。
+// 「開不開」在協調者（`useProfilePanelIfProvided().open`）；名片重模組在開啟意圖成立後才 import（S04）。
+// 沒有 provider（`WorldCanvas` 單獨渲染的既有測試）：沒有入口，面板不存在。
 
 export function ProfilePanel() {
-  // 沒有 provider（`WorldCanvas` 單獨渲染）：沒有開啟按鈕，面板不存在。
   const panel = useProfilePanelIfProvided()
   const identity = useIdentity()
-  const open = panel?.open ?? false
+  const interaction = useInteractionIfProvided()
   const signedIn = identity.state === 'signed-in'
+  const panelOpen = panel?.open ?? false
   const closePanel = panel?.closePanel
-  // 面板開著時身分不再是 signed-in（登出、問不到）：關掉，鎖跟著卸載一起放。
+
+  // 面板開著時登出／問不到：關掉協調者的 active（host 的 open 會因 signedIn=false 而 false、鎖跟著釋放）。
   useEffect(() => {
-    if (open && !signedIn) closePanel?.()
-  }, [open, signedIn, closePanel])
-  // 關著的時候整個不掛：Escape 層與鎖都跟著掛載走。
-  if (!open || identity.state !== 'signed-in') return null
-  return <OpenProfilePanel profile={identity.profile} />
+    if (panelOpen && !signedIn) closePanel?.()
+  }, [panelOpen, signedIn, closePanel])
+
+  // 注入給 host 的世界輸入鎖：open 當下 host 呼叫 `acquire()`（chunk 抵達前就鎖，S04）。
+  // 真的要鎖卻沒有 `InteractionProvider` 時在 acquire 當下炸（不靜默）—— 但只有「開啟」才會走到，關著不炸。
+  const lock = useMemo(
+    () => ({
+      acquire: () => {
+        if (interaction === null) throw new Error('名片面板要在 <InteractionProvider> 底下才能鎖世界輸入。')
+        return interaction.holdInputLock('profile-panel')
+      },
+    }),
+    [interaction],
+  )
+  // 穩定的 loader（`import()` 直接指到 lazy 模組、不經 barrel）：不 memo 的話每次 render 都是新函式，host 的載入 effect 會反覆重跑。
+  const load = useCallback(() => import('./OpenProfilePanel'), [])
+  const onExit = useCallback(() => closePanel?.(), [closePanel])
+
+  if (panel === null) return null
+  return (
+    <PanelHost open={panelOpen && signedIn} panelId="profile-panel" title="我的名片" load={load} lock={lock} onExit={onExit} />
+  )
 }

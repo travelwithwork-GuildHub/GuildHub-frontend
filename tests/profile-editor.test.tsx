@@ -83,6 +83,7 @@ async function openEditor(profile = ME) {
     </IdentityProvider>,
   )
   click(await screen.findByRole('button', { name: /^我的名片/ }))
+  await screen.findByTestId('profile-panel') // 內容（OpenProfilePanel）是 lazy 的（FE-X15 --panel-profile），等它到再按編輯
   click(button('編輯'))
   expect(screen.getByTestId('profile-form')).toBeDefined()
 }

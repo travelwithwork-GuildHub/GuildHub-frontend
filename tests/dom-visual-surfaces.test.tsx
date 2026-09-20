@@ -182,6 +182,7 @@ describe('每個操作區至多一個主要動作，列出的狀態裡它是那�
       </IdentityProvider>,
     )
     click(await screen.findByRole('button', { name: /^我的名片/ }))
+    await screen.findByTestId('profile-panel') // 名片內容 lazy（FE-X15 --panel-profile）
     const panel = () => screen.getByTestId('profile-panel')
     expect(primaries(panel())).toEqual([])
     click(button(panel(), '編輯'))

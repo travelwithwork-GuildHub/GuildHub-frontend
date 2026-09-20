@@ -66,6 +66,15 @@ export function useInputLockRef(): RefObject<boolean> {
   return useContext(InteractionContext)?.inputLockRef ?? UNLOCKED
 }
 
+/**
+ * 面板的**掛載點**用（例如 `ProfilePanel`：面板 lazy 之後，殼在協調者外面、每次 render 都要算 `lock`）：
+ * 拿得到就拿、拿不到回 `null`（不像 `useInteraction` 直接炸）。
+ * 「要鎖卻沒有 provider」的錯留到真的**開啟時 acquire** 才炸 —— 面板關著、或單獨渲染不開它的測試不必為它包一層。
+ */
+export function useInteractionIfProvided(): InteractionValue | null {
+  return useContext(InteractionContext)
+}
+
 export function useInteraction(): InteractionValue {
   const value = useContext(InteractionContext)
   if (value === null) {
