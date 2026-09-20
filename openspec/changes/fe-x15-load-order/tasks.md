@@ -8,13 +8,13 @@
 
 ## 1. 規格
 
-- [ ] 1.1 規格已在 PR 上談定（`spec/fe-x15-load-order` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-x15-load-order --strict` 通過且 PR 已合併
+- [x] 1.1 規格已在 PR 上談定（`spec/fe-x15-load-order` 合併進 `main`）。驗證：`pnpm exec openspec validate fe-x15-load-order --strict` 通過且 PR 已合併（#575，d499a04）
 
 ## 2. `--loader`：身分 gate ＋ 連續載入層（Req「首屏以固定次序載入」S01／S02／S05；design D1／D2）
 
-- [ ] 2.1 判準先紅：`WorldBoundary` 的元件測試 —— 身分 `unknown` 時不建立 `WorldContent`（S02）、標題列與載入層仍在（S01）；`guest`／`signed-in`／`unavailable` 三種都建立；載入層帶 `role="status"` 且到 `onCreated` ready 前不卸載重掛（S01）；3D chunk 抓取失敗時載入層讓位給 `role="alert"` 可重試錯誤（S05）
-- [ ] 2.2 實作：`WorldBoundary` 依 `identity.state !== 'unknown'` 才建立 lazy `WorldContent`、只 gate 世界內容不 gate `<main>`；持有連續 loader，`WorldContent`／`WorldCanvas` 用 `onCreated` 回報 ready；新增脈動骨架載入層元件（`role="status"`、動畫，過 `ui-ux-pro-max`）
-- [ ] 2.3 突變：gate 改成連 `unknown` 也建立 → S02 紅；載入層在 chunk 到達時卸載重掛（改回兩段各一個 fallback）→ S01 紅；chunk 失敗不讓位錯誤（永遠停在載入層）→ S05 紅
+- [x] 2.1 判準先紅：`WorldBoundary` 的元件測試 —— 身分 `unknown` 時不建立 `WorldContent`（S02）、標題列與載入層仍在（S01）；`guest`／`signed-in`／`unavailable` 三種都建立；載入層帶 `role="status"` 且到 `onCreated` ready 前不卸載重掛（S01）；3D chunk 抓取失敗時載入層讓位給 `role="alert"` 可重試錯誤（S05）。`tests/world-boundary-loader.test.tsx`（S01／S02／S05 render 真 `WorldBoundary`）＋`tests/world-boundary-failure.test.tsx`（S05 邊界替換）
+- [x] 2.2 實作：`WorldBoundary` 依 `identity.state !== 'unknown'` 才建立 lazy `WorldContent`、只 gate 世界內容不 gate `<main>`；持有連續 loader，`WorldContent`／`WorldCanvas` 用 `onCreated` 回報 ready；新增脈動骨架載入層元件 `WorldLoadSequence`（`role="status"`／`aria-busy`、`motion-safe:animate-pulse` 動畫）
+- [x] 2.3 突變：gate 改成連 `unknown` 也建立 → S02＋S01 紅；載入層綁 `!settled`（chunk 到就撤）→ S01 phase-B 紅；載入層搬到邊界外（chunk 失敗不讓位）→ S05 紅。**M3 第一次跑抓到缺口**：舊 S05 自構樹只驗 `catchError`，補一條 render 真 `WorldBoundary` 的 S05（`throwOnRender` mock）後 M3 才紅
 
 ## 3. `--panels`：面板 lazy host、名片鎖上移、收件匣 provider 拆分（Req「面板按開啟意圖才載入」S04／S06；design D3／D4）
 
