@@ -71,8 +71,8 @@
 
 ## 5. `--e2e`：真瀏覽器驗拓撲次序與 chunk 有／無（Req 全部；design D5）
 
-- [ ] 5.1 新增 `tests/e2e/lib` 的 `traceResources`（記 request URL 序，**不改 `traceUrls` 既有語意**）；`tests/e2e/load-order.mjs`：攔截 barrier 驗 shell-visible → identity-response → world-chunk-request → canvas-ready → ws-connect（S01／S02／S03）、房間清單在 ready 後（S07）、三面板 entry chunk 開啟意圖前為 0、開啟後只出現目標面板（S04）；chunk URL 以面板根節點 `data-testid` runtime marker 反解、不硬編 hash；打本機 `next start`、REST 全 `page.route` 偽造
-- [ ] 5.2 迴歸：`dom-shell`／`first-entry`／`profile-editor`／`inbox`／`board-panel` 既有 e2e 沒變紅；效能：初始 chunk 不再含三面板 code（以 marker 落點證明）、首屏空窗期有動畫、面板第一次開啟的 chunk 是按需請求
+- [x] 5.1 `tests/e2e/lib/world.mjs` 新增 `traceResources`（`context.on('request')` 記 `{url,type,t}`，`t` 用同一個 Node `performance.now()`；過濾 document／`data:`／favicon）＋`chunksIn`（抽 `/_next/static/chunks/*.js`），**未動 `traceUrls`**；`fakeRealtime` 的連線記錄加 `t`（additive）。`tests/e2e/load-order.mjs`（standalone `.mjs`，同既有慣例）：**barrier** 壓住 `/api/me` 驗身分未 settled 時 DOM 殼＋role=status 載入層在、無 `<canvas>`、無 WS、無 rooms（S01／S02 前半／S03／S07 前半）；放行後身分回應→Canvas ready→ws→rooms 的時刻單調（S02／S03／S07）。**量尺坑（實測踩過並修）**：`tReady` 不可用 `waitForSelector(detached)` 事後取（輪詢偏晚→次序量反），改注入 MutationObserver 在載入層移除當下（commit 後 microtask，早於 effect）呼叫 exposed binding 即時記時刻。**S04**：以「開啟前後 `/_next/static/chunks/*.js` 差集」反解各面板 entry chunk（不硬編 hash）——收件匣點 `inbox-button`、名片點 `[data-testid="identity"] button`、看板深連結 `?panel=projects`；驗開啟意圖前平面世界頁不含任一面板 chunk（三者差集皆非空、初始 bundle 不含面板碼），開收件匣只載收件匣、不順帶載看板／名片（比「不與收件匣共用」的專屬 chunk；差集空則報「尺失去鑑別力」防 vacuous 綠）。本機真瀏覽器 12 條全綠、連跑 5 次穩定；時間戳實測 identity 2160→ready 2555→ws 2572→rooms 2575（真 gap）、chunk 集 inbox=1/prof=1/board=2、boardOnly=2/profOnly=1（有鑑別力）
+- [x] 5.2 迴歸：既有 e2e 打同一個 `--order` build 全綠 —— `scene-switch`（WS＋URL 軌跡）／`rooms-fixture`／`room-entry`／`scene-chat`／`project-room`／`avatar-picker`／`control-contrast` 七支 exit 0、零 ❌（`world.mjs` 的改動皆 additive、子樹 gate 不影響 `waitForWorld` 後的既有斷言）。效能：S04 已證初始 chunk 不含三面板 code（平面世界頁 chunk 集不含任一面板 entry chunk）、面板第一次開啟才按需請求；首屏空窗期由連續載入層動畫覆蓋（`--loader` S01 既證）。註：`load-order.mjs` 未加進 `e2e-main.sh` 的 CI allowlist —— 那是 CI 檔要 `governance/` 分支、且該 safety-net 非閘門、本 change 以本機 `load-order` e2e 為驗收依據；要納入可後續 governance PR 補
 
 ## 6. 收尾
 

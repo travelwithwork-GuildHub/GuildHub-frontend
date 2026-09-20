@@ -43,7 +43,8 @@ export function fakeRealtime(context, sockets, { refuse = () => false, others = 
     const url = new URL(ws.url())
     const scene = url.searchParams.get('scene')
     // `ws`：之後要「伺服器主動送」的腳本（chat）從這裡拿；`sent`：頁面送給伺服器的 frame（`move` 就是角色自己回報的位置）。只讀 scene／token 的腳本不受影響。
-    const record = { scene, token: url.searchParams.get('token'), ws, sent: [] }
+    // `t`：這條連線建立的時刻（`performance.now()`，跟 `traceResources`／route 用同一個時鐘）。`FE-X15` 驗「WS 排在 Canvas ready 之後」用；其餘腳本忽略它。
+    const record = { scene, token: url.searchParams.get('token'), ws, sent: [], t: performance.now() }
     ws.onMessage((message) => record.sent.push(String(message)))
     sockets.push(record)
     if (refuse(scene)) {
@@ -156,6 +157,29 @@ export async function traceUrls(context, urls) {
   })
   context.on('page', (page) => page.on('framenavigated', (frame) => urls.push(frame.url())))
 }
+
+/**
+ * 網路資源請求的**順序與時間**（`FE-X15` 首屏載入次序）。跟 `traceUrls` 是兩件事、刻意分開：
+ * `traceUrls` 記的是 document／history 的網址寫入（票外洩、push/replace 次序）；這裡記的是
+ * **實際發出的網路請求**（`/_next/static/chunks/*.js`、`/api/*`⋯），用來驗「什麼先被請求、什麼延後」
+ * 與「開一個面板不順帶載另兩個」。
+ *
+ * 每筆 `{ url, type, t }`（`t` 是 Node 端單調時鐘，跟 `/api/*` route 與 fake socket 用同一個時鐘，
+ * 次序才比得出來）。過濾掉 document 導覽、`data:`、favicon —— 跟 `scene-chat.mjs` 的收集範圍一致。
+ * `chunksIn(requests)` 抽出 `/_next/static/chunks/*.js` 的 URL 集合（反解面板 chunk 用）。
+ */
+export function traceResources(context, requests, clock = () => performance.now()) {
+  context.on('request', (request) => {
+    const url = new URL(request.url())
+    if (request.resourceType() === 'document') return
+    if (url.protocol === 'data:') return
+    if (url.pathname === '/favicon.ico') return
+    requests.push({ url: request.url(), type: request.resourceType(), t: clock() })
+  })
+}
+/** `requests`（`traceResources` 收的）裡所有 JS chunk 的 URL 集合。 */
+export const chunksIn = (requests) =>
+  new Set(requests.filter((r) => /\/_next\/static\/chunks\/.*\.js(\?|$)/.test(r.url)).map((r) => r.url))
 
 /**
  * 「仍然連在 DOM 上」是**整段序列期間從沒斷開**，不只是每一步量的那一刻。MutationObserver 看 `removedNodes`；
