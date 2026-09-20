@@ -78,5 +78,10 @@
 
 - [ ] 6.1 每片：`pnpm exec eslint .`、`pnpm exec tsc --noEmit`、`pnpm test` 全綠；每片 PR 回報效能影響（初始 chunk 大小變化、空窗期是否有動畫）
 - [ ] 6.2 合併後從乾淨 worktree `vercel deploy --prod`；閘道一次人工 smoke（正式站全站 CORS 仍未修時記**條件式放行**，功能驗收依據為本機真瀏覽器 `load-order` e2e）
-- [ ] 6.3 tasks 全勾後、archive 前：`archive-review.sh fe-x15-load-order`；需修正修完 `--rereview` 一次、每條 `--judge`；rc 非 0（含 exit 3）當輪回報不往下走
+- [~] 6.3 archive-review 第 1 輪已跑（2026-09-21，使用者手動跑；rc 0、codex／gemini 皆 ok:true rc:0，**沒被擋、沒 exit 3**）。findings 與處置：
+  - **B（已修，本 PR）**：WebGL2 不可用時 `WorldCanvas` 提前 return `WebGLUnavailable`、不呼叫 `onReady` → `WorldBoundary` 的 `WorldLoadSequence` 永久覆蓋提示。修：WebGL2 不可用是終局可顯示狀態，`WorldCanvas` 照樣回報 `onReady`（`useEffect(() => { if (!webgl2) onReady?.() })`），載入層讓位。判準 `world-canvas.test.tsx [FE-X15-S01]`。
+  - **A＋C（已驗證，demo 後修）**：A＝看板 chunk 失敗時鎖不釋放（`ListPanelProvider` 鎖綁 `open!==null`、失敗時 open 仍非空，違背 frozen S06「鎖被釋放」）；C＝`SceneChatHud`／`FirstEntryNotice` 讀 `active`（開啟意圖）→ 名片/收件匣 chunk 失敗時 host 已釋放鎖（世界可動）但 chat 仍收合。**同根：失敗態下「開啟意圖」與「實際持鎖」背離。** 兩模型（codex＋gemini）一致修法：board 把鎖注入 `PanelHost`（移除 provider 的 `holdInputLock` effect，S04 保住、無 churn）＋新增 reactive `useIsInputLocked()` 選擇器（反映實際 acquire/release）、`SceneChatHud`／`FirstEntryNotice` 改讀它；retry 要重新取鎖、cleanup idempotent。**動到核心移動鎖＋4 檔、修的是 demo 不會觸發的失敗路徑 → 使用者裁定 demo 後再修**（2026-09-21）。因此 **X15 demo 前不封存**（功能全可用、只差失敗路徑一致性）。
+  - **D（誤報，codex 自標誤報候選）**：`load-order.mjs` S02 用 chunk 總數比較、未指認世界 chunk；產品確實以 `WorldBoundary` render-gate 阻擋（正確），count-increase＋identity-hold 是有效但較粗的因果代理。判誤報，未改。
+  - **待辦**：demo 後修 A/C → 合併 → `--rereview` 一次 → 每條 `--judge`（B 已修／A・C 已修／D 誤報）→ 才 archive。
+- [ ] 6.3b（demo 後）實作 A/C 修正、`--rereview`、`--judge`、archive
 - [ ] 6.4 Sheet `FE-X15` → Done（瀏覽器層由本機真瀏覽器 `load-order` e2e 驗過之後才打）

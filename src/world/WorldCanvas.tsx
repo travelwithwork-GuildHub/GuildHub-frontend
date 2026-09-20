@@ -1,7 +1,7 @@
 'use client'
 
 import { Canvas } from '@react-three/fiber'
-import { Suspense, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { layer } from '@/design/layers'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { shownAvatar } from '@/identity/avatarDraft'
@@ -153,6 +153,14 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
   const labelNodesRef = useLabelNodes()
   // 工位錨點的 DOM 節點（`FE-W16-S06`）：同樣不進 React，位置由 Canvas 裡的投影器每幀寫。
   const seatNodesRef = useSeatAnchorNodes()
+
+  // WebGL2 不可用是一個**終局可顯示狀態**：照樣回報 `onReady`，讓 `WorldBoundary` 的連續載入層
+  // （`WorldLoadSequence`，只在 `onReady` 撤）讓位給下面的 `WebGLUnavailable` 提示。否則這裡永遠不會
+  // 有 Canvas／`onCreated`，載入層會**永久覆蓋**那段 `role="alert"`（archive-review／codex 抓到，違反
+  // 「載入層讓位、不接管」）。`webgl2` 由 `useState` 建、穩定，effect 只跑一次。
+  useEffect(() => {
+    if (!webgl2) onReady?.()
+  }, [webgl2, onReady])
 
   if (!webgl2) return <WebGLUnavailable />
 
