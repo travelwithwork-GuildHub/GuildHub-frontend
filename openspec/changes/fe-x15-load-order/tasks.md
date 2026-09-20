@@ -52,9 +52,16 @@
 
 ### 3d. `--panel-inbox`：收件匣 provider 拆 eager／lazy
 
-- [ ] 3d.1 判準先紅：收件匣以 `PanelHost` 掛載 —— 開啟前不 import 訊息 API（`getProfile`／`listMessages`／`sendMessage`）與面板 UI（S04）；talent「寄信給他」＝開啟意圖（`requestCompose`→inbox active→殼＋鎖＋焦點→engine 載入後消化 pending compose），非背景送信；chunk 失敗釋放鎖與焦點（S06）；既有 inbox 行為（分頁世代、201 合併 `S12`、名字跨開關 `S04`、401 清空）迴歸不變
-- [ ] 3d.2 實作：`InboxPanelProvider` 拆 eager（唯一對外 `InboxContext`：協調、open/view/focus、未讀數安全快照、`requestOpen`／`requestCompose`／`close`）＋ lazy `InboxDataEngine`（generation／dataGeneration／inFlight／pendingFirst／names／sendGuard／API／副作用**整塊**搬入，首次開啟後常駐、bridge 回報 snapshot）；engine 未載入時 data command 只成 eager intent、未讀數語意明確（非假裝已同步的 0）
-- [ ] 3d.3 突變：把競態機器（generation／sendGuard）拆到 eager 那側 → S12／迴歸紅；engine 隨關閉卸載 → 名字跨開關／送出中合併紅；talent 背景直接送信（不經 requestCompose）→ S04「開啟前零 import」紅
+> **eager/lazy 邊界定案（codex 覆核；gemini/agy 因 xattr 被擋不可達，單模型）**：選 **B ＋同步 eager open-intent**。
+> 決定性理由：**單一 lazy 模組邊界** —— 操作邏輯＋面板 UI 同在 `OpenInboxPanel`（`PanelHost` 內容），chunk 失敗／重試／釋放鎖／還焦點全走已驗證的 `PanelHost` 路徑；不做兩個獨立會失敗的 chunk（A 案的坑：UI 到了但 engine 掛了 → 有畫面沒資料，且 engine 失敗不會轉成 host 的錯誤殼）。
+> - **狀態常駐在 eager**（不是 lazy engine）：`InboxState`（以 `me` 為 key）持有資料 useState ＋競態機器 `race`（純物件，欄位只用方法改 → 避開 `react-hooks/immutability`；lazy 內容經 `store.race` 驅動）。in-flight closure 捕捉常駐 `store`／`race` —— 送出中關面板、內容卸載，201 照併（`S12`）；`me` 換了整棵重掛、舊 closure 落在已卸載元件成 no-op（帳號隔離）。`useInbox()` 保持有資料欄位（`S16` 讀 `pagesLoaded` 不動）。
+> - **同步 `beginOpenIntent`**（codex 修正：純 `useActivePanel` edge effect 不忠實 —— `S11` 會閃空、`S01` 重開要重抓）：`openList`／`openThreadFromTalent` 同步 generation＋1、`loading`＝true、`openNonce`＋1；lazy 內容掛好以 `openNonce` 為 dep drain 第 0 頁（API 仍只在內容 chunk）。
+> - 動作（send／loadMore／retryFirst／resolveNames）走 UI-local `useInboxOps()`（只有內容 UI 用得到）、不進 `useInbox()`、不 bridge。世界輸入鎖上移到 host（注入，如名片 3b）。talent「寄信給他」＝ `openThreadFromTalent`（設 view=thread 的開啟意圖），非背景送信。
+> - 「未讀數安全快照」：`BE-G06` 沒有 `read_at` 寫端點、收件匣不顯示未讀數（`InboxButton`），故無此欄位，不引入。
+
+- [x] 3d.1 判準先紅：`inbox-panel.test.tsx` 新增兩條 `[FE-X15-S04]` —— 按收件匣的當下（內容 chunk 前）`inbox-panel-loading`（`role="status"`）在、`inbox-panel`（內容）還沒、世界輸入已鎖，內容到後載入殼讓位、鎖連續持有；「寄信給他」＝開啟意圖（載入殼＋鎖、`posts()`＝0，非背景送信），內容到後進對話仍未送。chunk 失敗釋放鎖與焦點（S06）由 `panel-host.test.tsx` 通用判準守（＋此處守鎖接上 host）
+- [x] 3d.2 實作：`InboxPanelProvider`＝eager 協調＋常駐狀態／`race`（不 import 訊息 API）；`OpenInboxPanel`＝lazy 內容（操作邏輯 import `getProfile`／`listMessages`／`sendMessage`＋面板 UI、`useInboxOps`、掛好 drain 第 0 頁）；`InboxPanel` 改薄殼包 `PanelHost`（注入世界輸入鎖）。測試調適：`inbox-panel` S11／`dom-visual-flow`（4 處）／`project-password-reveal` 開啟後 `await` 內容（lazy 邊界）
+- [x] 3d.3 突變（三條、均確認紅後還原）：① 拿掉 host 注入的鎖 → S04「開啟意圖當下就要鎖」紅（證明鎖上移到 host）；② neuter 開啟意圖→內容 drain（`openNonce`→`fetchPage`）→ S01「第 0 頁」紅（證明 `beginOpenIntent`→drain 交握）；③ 拿掉 `send` 裡的 `dataGeneration` 舊世代 guard → S06「401 之後舊世代的 201 寫回」紅（證明競態機器隨拆分搬進內容仍成立）。「lazy 才有載入殼」已由 3d.1 的 RED（對 eager 舊碼紅）直接證明。「只載目標、不順帶載另兩面板」是跨 chunk 網路事實，留 --e2e（task 5.1）
 
 ## 4. `--order`：Rapier／WS／房間清單排在 Canvas ready 之後（Req「首屏以固定次序載入」S03／S07；design D2）
 
