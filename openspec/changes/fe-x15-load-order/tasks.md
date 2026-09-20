@@ -29,9 +29,9 @@
 
 ### 3a. `--panel-host`：通用 PanelHost ＋ 面板形載入殼／錯誤殼
 
-- [ ] 3a.1 判準先紅：`PanelHost` 元件測試（合成 lazy 面板、可控 resolve/reject）—— `open===false` 不呼叫 `load`（S04）；`open===true` 立即呼叫 `load`、且在 resolve 前已鎖（注入的 `acquire` 被呼叫）、已出現面板形 `role="status"`／`aria-busy` 載入殼並取得焦點（S04）；resolve 後換成內容、載入殼消失；`load` reject 時顯示 `role="alert"`、釋放鎖（`acquire` 的 cleanup 被呼叫）、焦點落在回世界的按鈕（S06）；retry 重新呼叫 `load`
-- [ ] 3a.2 實作：`src/panel/PanelHost.tsx`（讀 `open`、`load`、注入 `lock`、`onExit`；`React.lazy` 以 retry key 建立、`<Suspense>` fallback＝載入殼、局部 error boundary→錯誤殼並釋放鎖）＋ `PanelLoadingShell`／`PanelErrorShell`（沿用 `PanelShell` 的框 token；`ui-ux-pro-max`：穩定骨架同框不位移、`motion-safe:animate-pulse`、近乎瞬間別閃、失敗態明確訊息＋回世界）
-- [ ] 3a.3 突變：`open===false` 也呼叫 `load`（開啟前就載）→ S04 紅；載入殼不取焦／不鎖 → S04 紅；reject 不釋放鎖／不顯示 alert → S06 紅；retry 不換 key（重用失敗 loader）→ retry 判準紅
+- [x] 3a.1 判準先紅：`PanelHost` 元件測試（合成 lazy 面板、可控 resolve/reject）—— `open===false` 不呼叫 `load`（S04）；`open===true` 立即呼叫 `load`、且在 resolve 前已鎖（注入的 `acquire` 被呼叫）、已出現面板形 `role="status"`／`aria-busy` 載入殼並取得焦點（S04）；resolve 後換成內容、載入殼消失；`load` reject 時顯示 `role="alert"`、釋放鎖（`acquire` 的 cleanup 被呼叫）、焦點落在回世界的按鈕（S06）；retry 重新呼叫 `load`
+- [x] 3a.2 實作：`src/panel/PanelHost.tsx`（讀 `open`、`load`、注入 `lock`、`onExit`）。**自己管 `import()` 而非 `React.lazy`**：`lazy()` 寫在 render 被 `react-hooks/static-components` 擋、且會永久快取 rejected 的 promise（重試永遠失敗）；改用 effect 內 `load()` ＋衍生狀態（結果帶 `attempt`，`attempt` 一變舊結果失效→回載入態，setState 只在 async 回呼、不在 effect 本體）。載入態＝`PanelLoadingShell`、`catch`→`PanelErrorShell`、鎖只依 `open && !errored`（載入到就緒連續持有）。兩個殼沿用 `PanelShell` 的框 token；`ui-ux-pro-max`：穩定骨架同框不位移、`motion-safe:animate-pulse`、`role=status`／`alert`、失敗態明確訊息＋回世界
+- [x] 3a.3 突變：`open===false` 也呼叫 `load`（開啟前就載）→ S04 紅；載入殼不取焦／不鎖 → S04 紅；reject 不釋放鎖／不顯示 alert → S06 紅；retry 不換 key（重用失敗 loader）→ retry 判準紅
 
 ### 3b. `--panel-profile`：名片經 PanelHost，鎖與焦點接管上移
 
