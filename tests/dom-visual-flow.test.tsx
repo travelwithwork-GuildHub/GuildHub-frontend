@@ -263,6 +263,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     await waitFor(() => expect(url()).toBe('/world'))
     click(badge())
     expect(inboxPanel()).toBeNull()
+    await screen.findByTestId('profile-panel') // 名片內容 lazy（FE-X15 --panel-profile）
     expect(profilePanel()).not.toBeNull()
     expect(blockingPanels()).toHaveLength(1)
     willOpenInbox()
@@ -319,6 +320,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     escape()
 
     click(badge())
+    await screen.findByTestId('profile-panel') // 名片內容 lazy（FE-X15 --panel-profile）
     click(within(profilePanel()!).getByRole('button', { name: '編輯' }))
     const name = within(profilePanel()!).getByLabelText('在世界裡顯示的名字') as HTMLInputElement
     await type(name, '改了名字')

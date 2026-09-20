@@ -104,17 +104,33 @@ describe('名字是入口，面板是阻斷式的', () => {
 
     click(button)
 
-    const panel = screen.getByTestId('profile-panel')
+    // 鎖在 chunk 抵達前就成立（鎖上移到 eager host，同步）——不必等內容 lazy 載入。
     expect(locked(), '面板開著，世界的輸入沒有被鎖住').toBe(true)
+    // 內容（`OpenProfilePanel`）是 lazy 的（FE-X15 --panel-profile），等它到。
+    const panel = await screen.findByTestId('profile-panel')
     expect(panel.contains(document.activeElement), '焦點不在面板內').toBe(true)
     // 初次打開的焦點在面板的內容根節點（Tab 從頭開始），不是被「編輯」鈕搶走（審查抓到 effect 在掛載時也跑）。
     expect(document.activeElement?.getAttribute('data-mode')).toBe('view')
   })
 
+  it('[FE-X15-S04] 名片內容 lazy：開啟意圖當下先鎖＋出現載入殼，內容隨後才到', async () => {
+    const button = await mountSignedIn()
+    click(button)
+
+    // chunk 抵達前：載入殼在、名片內容還沒、但世界輸入已鎖（鎖上移到 host 的直接證據）。
+    expect(screen.getByTestId('profile-panel-loading')).not.toBeNull()
+    expect(screen.queryByTestId('profile-panel'), 'chunk 抵達前不該有內容').toBeNull()
+    expect(locked(), '開啟意圖當下就要鎖，不是等內容 chunk 到').toBe(true)
+
+    // 內容到達：載入殼讓位給名片。
+    await screen.findByTestId('profile-panel')
+    expect(screen.queryByTestId('profile-panel-loading'), '內容到了載入殼還在').toBeNull()
+  })
+
   it('[FE-A04-S02] Escape 關面板：面板不再顯示、鎖放開、焦點回按鈕', async () => {
     const button = await mountSignedIn()
     click(button)
-    expect(screen.queryByTestId('profile-panel')).not.toBeNull()
+    await screen.findByTestId('profile-panel')
 
     escape()
 
@@ -126,6 +142,7 @@ describe('名字是入口，面板是阻斷式的', () => {
   it('面板殼的關閉鈕也一樣：關、放鎖、焦點回按鈕', async () => {
     const button = await mountSignedIn()
     click(button)
+    await screen.findByTestId('profile-panel')
     click(screen.getByRole('button', { name: '關閉' }))
     expect(screen.queryByTestId('profile-panel')).toBeNull()
     expect(locked()).toBe(false)
@@ -139,6 +156,7 @@ describe('顯示我的名片', () => {
     // 「沒有請求」不能靠等幾十毫秒：直接看 fetch 有沒有被叫（審查抓到恆真）。
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     click(button)
+    await screen.findByTestId('profile-panel') // 內容 lazy，等它到（開面板本身不該打任何請求）
     const facts = screen.getByTestId('talent-facts')
     expect(facts.dataset.profileId).toBe(ME.id)
     expect(facts.textContent).toContain('阿福')
