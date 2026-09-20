@@ -65,9 +65,9 @@
 
 ## 4. `--order`：Rapier／WS／房間清單排在 Canvas ready 之後（Req「首屏以固定次序載入」S03／S07；design D2）
 
-- [ ] 4.1 判準先紅：WS 只在 Canvas ready 後 connect、Rapier chunk 在 ready 前不請求（S03）；`useRooms` 的 `GET /api/rooms` 排在 ready 後（S07）——以既有單元／整合測試能觀測的層級斷言（真正的網路次序在第 5 片 e2e 驗）
-- [ ] 4.2 實作：把 WS 連線、Rapier 初始化、房間清單載入都接在 Canvas ready 的訊號之後（多為既有觸發點的微調與守衛）
-- [ ] 4.3 突變：房間清單改回掛載即打 → S07 紅；WS 改回 ready 前 connect → S03 紅
+- [x] 4.1 判準先紅：`world-load-order.test.tsx` 掛整個 `WorldCanvas`（`RemoteWorld→RealtimeClient→WebSocket`、`useRooms→listRooms`、`LocalPlayer` 掛載全是正式碼），Canvas 替身**捕捉 `onCreated` 由測試主動呼叫**以觀測 ready 前/後。觀測點：`FakeSocket.instances`（WS，S03）、`listRooms`（房間，S07）、`LocalPlayer` 掛載次數（Rapier `import()` 在真 `LocalPlayer` 的掛載 effect 裡＝單元層代理，S03）。對現行未 gate 的碼：ready 前 WS 已連、`listRooms` 已打 → 紅
+- [x] 4.2 實作（**Option A；codex＋Gemini 覆核一致**）：世界子樹以 `{ready && …}` 延到 `onCreated` 之後才掛（`WorldShell`／`LocalPlayer`／`RemoteWorld`／`SceneObjects`／`SpatialInteraction`），房間清單以 `useRooms(cap, hall && ready)` 同樣延後。ready 前 WS 與 Rapier 的擁有者根本不存在、`useRooms` 停用 → 三者不可能提早觸發。**兩模型結論**：A 勝過 B（傳 `ready` prop 個別守 effect）—— B 把 `ready` 塞進 `RemoteWorld` 的 connect-effect deps 會跟既有 scene/generation/token 依賴糾纏（多次連線/過早重連風險），且 `LocalPlayer` 的 `useFrame` 會在物理未請求前空轉；A 是單一結構性 gate、未來新增子元件不會漏守。**無 chicken-and-egg**（雙方高信心）：`onCreated` 是 renderer 層級 callback、不依賴 scene children，空 Canvas 一樣 fire、翻 `ready`，下個 commit 才掛子樹。既有 16 個全掛 `WorldCanvas` 測試不受影響（Canvas 替身同步呼叫 `onCreated`，子樹同 act 內即掛；Explore 盤點）
+- [x] 4.3 突變（兩條、均確認紅後 `git checkout` 還原）：① `useRooms(cap, hall && ready)`→`useRooms(cap, hall)`（房間改回掛載即打）→ S07 紅（`listRooms` 在 ready 前被呼叫）、S03 仍綠；② 移除 `{ready && …}` 子樹 gate（改 `{true && …}`，WS/Rapier 改回 ready 前掛）→ S03 紅（`FakeSocket` 與 `LocalPlayer` 掛載在 ready 前發生）、S07 仍綠（rooms gate 還在）。「只載目標、不順帶載另兩面板」與真正的 chunk/WS 網路次序留 --e2e（task 5.1）
 
 ## 5. `--e2e`：真瀏覽器驗拓撲次序與 chunk 有／無（Req 全部；design D5）
 
