@@ -202,6 +202,52 @@ describe('收件匣是阻斷式面板', SLOW, () => {
   })
 })
 
+// 規格：openspec/changes/fe-x15-load-order/specs/load-order/spec.md
+//   Requirement: 面板按開啟意圖才載入，載入殼立即接管 —— FE-X15-S04
+//
+// 收件匣重模組（操作邏輯＋面板 UI）改由 `PanelHost` lazy 載入；世界輸入鎖上移到 host（開啟意圖當下就鎖，chunk 前）。
+// 開啟前不 import 訊息 API 與面板 UI（跨 chunk 的網路事實在真瀏覽器 `tests/e2e/load-order.mjs` 驗）；
+// 這裡驗 jsdom 觀測得到的那一半：開啟意圖當下（內容 chunk 前）先鎖＋出現載入殼，內容隨後才到。
+// chunk 失敗釋放鎖與焦點（S06）由 `panel-host.test.tsx` 的通用判準守；這裡守收件匣把鎖接上 host。
+describe('收件匣按開啟意圖才載入，載入殼立即接管（FE-X15）', SLOW, () => {
+  it('[FE-X15-S04] 按收件匣的當下（內容 chunk 前）先鎖＋出現載入殼，收件匣內容隨後才到', async () => {
+    const button = await mount()
+    expect(screen.queryByTestId('inbox-panel-loading'), '還沒開就有載入殼').toBeNull()
+    expect(locked()).toBe(false)
+    server.replyFor('/api/messages', 200, [])
+    click(button)
+
+    // 內容 chunk 抵達前：面板形載入殼在（role=status）、收件匣內容（`inbox-panel`）還沒、但世界輸入已鎖。
+    // 鎖上移到 host、綁開啟意圖 —— 不是等內容殼（`PanelShell`）掛載才鎖，這是 S04 的直接證據。
+    const loading = screen.getByTestId('inbox-panel-loading')
+    expect(loading.getAttribute('role'), '載入殼不是 role=status').toBe('status')
+    expect(screen.queryByTestId('inbox-panel'), '內容 chunk 抵達前不該有收件匣內容').toBeNull()
+    expect(locked(), '開啟意圖當下就要鎖，不是等內容 chunk 到').toBe(true)
+
+    // 內容到達：載入殼讓位給收件匣，鎖連續持有。
+    await screen.findByTestId('inbox-panel')
+    expect(screen.queryByTestId('inbox-panel-loading'), '內容到了載入殼還在').toBeNull()
+    expect(locked(), '內容到了鎖卻掉了').toBe(true)
+  })
+
+  it('[FE-X15-S04] 從人才詳情「寄信給他」＝開啟意圖（載入殼＋鎖），不是背景送信', async () => {
+    await mount()
+    await openTalent(A, '阿福')
+    server.replyFor('/api/messages', 200, [])
+    click(screen.getByTestId('send-message'))
+
+    // 開啟意圖當下：載入殼在、世界已鎖、而且還沒送出任何信（compose 意圖，不是背景 POST）。
+    expect(screen.getByTestId('inbox-panel-loading').getAttribute('role')).toBe('status')
+    expect(locked(), '開啟意圖當下就要鎖').toBe(true)
+    expect(posts(), '「寄信給他」變成了背景送信').toHaveLength(0)
+
+    // 內容到達：直接進與那個人的對話、仍未送信（要人打字＋送出才寄）。
+    const thread = await screen.findByTestId('inbox-thread')
+    expect(thread.dataset.with).toBe(A)
+    expect(posts()).toHaveLength(0)
+  })
+})
+
 describe('清單是對話', SLOW, () => {
   it('[FE-K01-S04] 名字、摘要、時間；解析失敗顯示縮短 id 不擋、各打一次；重開再試失敗的、成功的不再打', async () => {
     const button = await mount()
@@ -440,7 +486,8 @@ describe('對話詳情與寄信', SLOW, () => {
     server.replyFor('/api/messages', 200, [msg(B, ME, '10:00')], { after: new Promise<void>((r) => (release = r)) })
     server.replyFor(`/api/profiles/${A}`, 200, profile(A, '阿福')) // 收件匣自己解析名字（跟 TalentDetail 的那次是兩件事）
     click(screen.getByTestId('send-message'))
-    const thread = screen.getByTestId('inbox-thread')
+    // 內容 lazy（`FE-X15`）：等對話殼到（開啟意圖已把 `loading` 設真，第 0 頁被 `release` 壓著、還在 busy）。
+    const thread = await screen.findByTestId('inbox-thread')
     expect(thread.getAttribute('aria-busy')).toBe('true')
     expect(thread.querySelector('[data-empty-state="first-empty"]'), '載入中不該說是空的').toBeNull()
     await waitFor(() => expect(within(thread).getByTestId('inbox-thread-name').textContent).toBe('阿福'))
