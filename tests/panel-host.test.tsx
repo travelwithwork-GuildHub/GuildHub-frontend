@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentType } from 'react'
 import { PanelHost } from '@/panel/PanelHost'
@@ -18,7 +18,7 @@ describe('PanelHost：開啟意圖才載、載入殼立即接管、失敗釋放�
   let acquireCalls: number
   let releaseCalls: number
   let lock: { acquire: () => () => void }
-  let onExit: ReturnType<typeof vi.fn>
+  let onExit: Mock<() => void>
 
   beforeEach(() => {
     loadCalls = 0
@@ -37,9 +37,16 @@ describe('PanelHost：開啟意圖才載、載入殼立即接管、失敗釋放�
         }
       },
     }
-    onExit = vi.fn()
+    onExit = vi.fn<() => void>()
   })
   afterEach(() => vi.clearAllMocks())
+
+  /** 最近一次 `load` 的控制器（沒有就直接爆，不讓 undefined 靜默過）。 */
+  const ctl = (i = 0) => {
+    const c = controllers[i]
+    if (c === undefined) throw new Error(`load[${i}] 還沒被呼叫`)
+    return c
+  }
 
   it('[FE-X15-S04] open=false：不呼叫 load、沒有載入殼、沒有鎖', () => {
     render(<PanelHost open={false} panelId="demo" title="示範" load={makeLoad} lock={lock} onExit={onExit} />)
@@ -63,7 +70,7 @@ describe('PanelHost：開啟意圖才載、載入殼立即接管、失敗釋放�
   it('[FE-X15-S04] chunk resolve 後原位換成內容、載入殼消失', async () => {
     render(<PanelHost open panelId="demo" title="示範" load={makeLoad} lock={lock} onExit={onExit} />)
     await act(async () => {
-      controllers[0].resolve({ default: SyntheticPanel })
+      ctl().resolve({ default: SyntheticPanel })
     })
     expect(await screen.findByTestId('synthetic-content')).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
@@ -72,7 +79,7 @@ describe('PanelHost：開啟意圖才載、載入殼立即接管、失敗釋放�
   it('[FE-X15-S06] chunk 抓取失敗：role=alert、釋放鎖、焦點在錯誤殼、可回世界', async () => {
     render(<PanelHost open panelId="demo" title="示範" load={makeLoad} lock={lock} onExit={onExit} />)
     await act(async () => {
-      controllers[0].reject(new Error('chunk load failed'))
+      ctl().reject(new Error('chunk load failed'))
     })
     const alert = await screen.findByRole('alert')
     expect(alert).toBeInTheDocument()
@@ -86,7 +93,7 @@ describe('PanelHost：開啟意圖才載、載入殼立即接管、失敗釋放�
   it('[FE-X15-S06] 重試建立新的 loader：重新呼叫 load、回到載入殼並重新鎖', async () => {
     render(<PanelHost open panelId="demo" title="示範" load={makeLoad} lock={lock} onExit={onExit} />)
     await act(async () => {
-      controllers[0].reject(new Error('x'))
+      ctl().reject(new Error('x'))
     })
     await screen.findByRole('alert')
     expect(loadCalls).toBe(1)
@@ -99,8 +106,8 @@ describe('PanelHost：開啟意圖才載、載入殼立即接管、失敗釋放�
   })
 
   it('[FE-X15-S04] 只有 open 的那個 host 呼叫 load，另外兩個關著的不順帶載入', () => {
-    const loads = [0, 0, 0]
-    const mk = (i: number) => () => {
+    const loads: [number, number, number] = [0, 0, 0]
+    const mk = (i: 0 | 1 | 2) => () => {
       loads[i] += 1
       return new Promise<{ default: ComponentType }>(() => {})
     }
