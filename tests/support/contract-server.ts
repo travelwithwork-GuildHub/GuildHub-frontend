@@ -160,6 +160,13 @@ export async function startContractServer(): Promise<ContractServer> {
     replyFor(pathname, status, body, options) {
       byPath.set(pathname, [...(byPath.get(pathname) ?? []), { status, body, ...options }])
     },
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.close(() => resolve())
+        // 強制關閉滯留的 keep-alive 連線再回來。被丟棄的請求會留下 idle socket —— 例如面板內容 lazy 後
+        // （`FE-X15`），`InboxPanelProvider` 以 me 為 key 重掛時，第一份看板內容的 fetch 被中途取消，
+        // 那條 keep-alive socket 會讓優雅 `close()` 空等 idle-timeout（Node 預設 ~5s／次）。測試結束強制關掉是對的。
+        server.closeAllConnections?.()
+      }),
   }
 }

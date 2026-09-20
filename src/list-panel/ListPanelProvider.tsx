@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { BlockingPanelCoordinator, useActivePanel, useBlockingPanelOpen, useBlockingPanels } from '@/panel/BlockingPanelCoordinator'
+import { BlockingPanelCoordinator, useActivePanel, useBlockingPanels } from '@/panel/BlockingPanelCoordinator'
 import { useInteraction } from '@/world/interaction/InteractionProvider'
 import type { ListKind } from './paging'
 import { CLOSED, parsePanelUrl, type PanelUrlState } from './urlState'
@@ -16,7 +16,7 @@ import { CLOSED, parsePanelUrl, type PanelUrlState } from './urlState'
 // （`S18`），而那把鎖在互動層；沒有那一層的話這裡直接炸，不會靜默變成「面板開了人還在走」。
 //
 // ⚠️ **「開不開」不在這裡**（`FE-X16`）：協調者持有 `active`，`open` ＝ `active === 'list-panel'` 時的 `route.panel`；開＝ `requestOpen()`（被拒回 `false`）、
-// 關＝ `requestClose()`、讓位＝ `onYield`（關的副作用、不還焦點）。鎖跟著**殼的掛載**走（持有者是這裡，`InteractionProvider` 在這一層）—— 沒掛成的請求什麼都不留。
+// 關＝ `requestClose()`、讓位＝ `onYield`（關的副作用、不還焦點）。鎖跟著**開啟意圖**走（持有者是這裡，`InteractionProvider` 在這一層）—— 看板內容 lazy 後鎖要早於 chunk（`FE-X15-S04`）。
 //
 // ⚠️ **起始狀態從網址來**（`FE-B09-S01`～`S05`）：這個 provider 只在 `ssr: false` 的世界裡掛，
 // 掛載那一刻就知道網址。之後網址 → 狀態（popstate）與狀態 → 網址在 `PanelUrlSync`（`WorldUrlSync`）；
@@ -81,10 +81,12 @@ function ListPanelState({ children }: { children: ReactNode }) {
   const panel = mine ? route : CLOSED
   const open = panel.panel
 
-  // 鎖跟著殼的掛載走：殼登記了才持、卸載了才放（`FE-B01-S17`／`S18`；深連結掛載時沒有人按 E，也是這裡）。
-  // ⚠️ 少了 cleanup 關掉面板之後人走不動，要用滑鼠點一下畫面 —— 只驗 `S18` 的話「開了就永遠鎖住」是全綠的。
-  const shellMounted = useBlockingPanelOpen() && mine
-  useEffect(() => (shellMounted ? holdInputLock(ID) : undefined), [shellMounted, holdInputLock])
+  // 鎖綁「開啟意圖」（`active===list-panel` 且 route 有面板，＝ `open !== null`），**不綁「內容殼掛載」**：看板內容改由 `PanelHost` lazy 載入後，
+  // 載入殼不是 `PanelShell`、不會登記到協調者（`useBlockingPanelOpen()` 要等 chunk 到才 true）—— 若還綁殼掛載，鎖會延遲到 chunk 抵達才成立（違反 `FE-X15-S04`：鎖要在 chunk 前）。
+  // 用 boolean 消除切換看板種類（projects↔profiles）時 `open` 值變動造成的鎖 churn（值變、`boardOpen` 續為 true → 不 release+re-acquire）。
+  // ⚠️ 少了 cleanup 關掉面板之後人走不動（`FE-B01-S17`／`S18`）；深連結掛載時沒有人按 E，`open` 從初始網址就非空，也是這裡。
+  const boardOpen = open !== null
+  useEffect(() => (boardOpen ? holdInputLock(ID) : undefined), [boardOpen, holdInputLock])
 
   const openPanel = useCallback(
     (kind: ListKind) => {

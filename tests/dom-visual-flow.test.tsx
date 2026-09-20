@@ -215,7 +215,7 @@ function gate() {
 }
 /** 案件詳情裡把成軍表單送出、壓著不回（`FE-J04-S04` 的「送出中」）。 */
 async function holdFormTeam(p: ProjectOut) {
-  const detail = screen.getByTestId('project-detail')
+  const detail = await screen.findByTestId('project-detail') // 看板內容 lazy（FE-X15 --panel-board）：等內容 chunk 到才有詳情
   await waitFor(() => expect(detail.dataset.phase).toBe('ready'))
   await waitFor(() => expect(screen.getByTestId('owner-card').dataset.phase).toBe('ready'))
   click(within(detail).getByRole('button', { name: '成軍', hidden: true }))
@@ -245,7 +245,7 @@ describe('同一時間只有一個阻斷式面板', () => {
   it('[FE-X16-S13] 看板→收件匣→名片→收件匣：後開的取代先開的、焦點在新面板內、不經開啟者與 body、網址退；人才詳情寄信也一樣', SLOW, async () => {
     await mount()
     pressE()
-    expect(listPanel()?.dataset.kind).toBe('profiles')
+    expect((await screen.findByTestId('list-panel')).dataset.kind).toBe('profiles')
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
     const focusins: string[] = []
     const onFocusIn = (e: FocusEvent) => focusins.push((e.target as HTMLElement).dataset.testid ?? (e.target as HTMLElement).tagName)
@@ -295,7 +295,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     escape()
     expect(blockingPanels()).toHaveLength(0)
     pressE()
-    expect(listPanel()?.dataset.kind).toBe('profiles')
+    expect((await screen.findByTestId('list-panel')).dataset.kind).toBe('profiles')
     expect(screen.queryByTestId('talent-detail'), '讓位沒有走關閉路徑：上一次的詳情還在').toBeNull()
     await waitFor(() => expect(url()).toBe('/world?panel=profiles'))
     escape()
@@ -353,7 +353,7 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(notice()).toBeVisible()
     await type(within(notice()).getByLabelText('在世界裡顯示的名字'), '打到一半')
     pressE()
-    expect(listPanel()).not.toBeNull()
+    await screen.findByTestId('list-panel') // 看板內容 lazy（FE-X15 --panel-board）：等內容到；提示讓位（下一行）綁開啟意圖、比內容早
     expect(notice()).not.toBeVisible()
     escape()
     expect(notice()).toBeVisible()
@@ -392,6 +392,8 @@ describe('同一時間只有一個阻斷式面板', () => {
     receive(0)
     expect(screen.getAllByTestId('chat-row')).toHaveLength(1)
     pressE()
+    // 聊天框收合綁「開啟意圖」（`active`），內容 chunk 前就成立；但等一下 Escape 要靠看板內容的 Escape 層關面板，先等內容到（FE-X15 --panel-board）。
+    await screen.findByTestId('list-panel')
     const hud = screen.getByTestId('scene-chat')
     expect(within(hud).queryByTestId('chat-feed')).toBeNull()
     expect(within(hud).queryByRole('textbox')).toBeNull()

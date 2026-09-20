@@ -6,7 +6,7 @@ import { FirstEntryFlow } from '@/first-entry/FirstEntryFlow'
 import { firstEntryDone, markFirstEntryDone } from '@/first-entry/seen'
 import { useAdoptIdentity, useIdentity } from '@/identity/IdentityProvider'
 import { layer } from '@/design/layers'
-import { useBlockingPanelOpen } from '@/panel/BlockingPanelCoordinator'
+import { useActivePanel } from '@/panel/BlockingPanelCoordinator'
 
 // 世界裡給訪客看的引導。規格 `FE-A06-S04`／`S05`／`S06`。
 //
@@ -30,7 +30,9 @@ export function FirstEntryNotice() {
   // 導向還沒發生 —— 畫面會閃一下
   const [alreadyDone] = useState(firstEntryDone)
   // 阻斷式面板開著時讓位（`FE-X16-S15`）：用 `hidden`、不卸載 —— `dismissed` 與打到一半的名字都留著，面板關了原樣回來。
-  const yielding = useBlockingPanelOpen()
+  // ⚠️ 讀「開啟意圖」（`active`）而非「殼已登記」（`useBlockingPanelOpen`）：面板內容 lazy（`FE-X15`）後，載入殼還沒登記的空窗也要讓位
+  // —— 否則世界已鎖、載入殼已接管焦點時提示還浮在上面。`active` 對「幽靈 active」敏感，但這是純顯示讓位、可自我修正（隱了又回來），可容忍。
+  const yielding = useActivePanel() !== null
 
   if (identity.state !== 'guest' || dismissed || alreadyDone) return null
 

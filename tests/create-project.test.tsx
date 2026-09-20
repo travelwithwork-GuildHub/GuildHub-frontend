@@ -44,6 +44,7 @@ const noErrorOn = (label: string) => expect(field(label).getAttribute('aria-inva
 /** 開表單（已登入）。 */
 async function openForm(page = 0, items = [project(1, '舊案子')]) {
   mountBoard(server, { identity: 'signed-in', page, items })
+  await screen.findByTestId('list-panel') // 看板內容 lazy（FE-X15 --panel-board）：等內容 chunk 到才有 `list-panel`
   click(await within(panel()).findByRole('button', { name: '發案' }))
   return form()
 }
@@ -55,6 +56,7 @@ async function fill(values: Partial<Record<keyof typeof VALID, string>> = {}) {
 describe('發案的入口只給已登入的人，而且只有後端有的欄位', () => {
   it('[FE-J01-S01] 已登入的專案看板有「發案」，而且在列表上方；人才看板沒有', async () => {
     mountBoard(server, { identity: 'signed-in' })
+    await screen.findByTestId('list-panel') // 看板內容 lazy：等內容到才有 `list-panel`
     const create = await within(panel()).findByRole('button', { name: '發案' })
     await waitFor(() => expect(within(list()).getByText('舊案子')).toBeDefined())
     expect(create.compareDocumentPosition(list()) & Node.DOCUMENT_POSITION_FOLLOWING, '「發案」不在列表上方').toBeTruthy()
