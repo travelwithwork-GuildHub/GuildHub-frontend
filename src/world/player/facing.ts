@@ -27,7 +27,11 @@ export function nextFacing(dir: Direction, previous: Facing): Facing {
  */
 export const FACING_ROTATION: Record<Facing, number> = {
   [FACING.down]: 0,
-  [FACING.left]: Math.PI / 2,
-  [FACING.right]: -Math.PI / 2,
+  // ⚠️ **left = −90°、right = +90°**（不是相反）。模型正面（眼睛）預設在 +Z 面（`ChibiPlayer`）：
+  // 繞 Y 轉 +90° 會把 +Z 轉到 +X（螢幕右），所以「朝左」要 **−90°** 才讓正面朝 −X（螢幕左）。
+  // 原本兩個值寫反了 —— 語意測試（coords）看不出來，只有畫面上「按左頭卻朝右」。`player.test` 的
+  // 〈朝向的旋轉讓正面指向該朝向的螢幕方向〉釘住這一條。
+  [FACING.left]: -Math.PI / 2,
+  [FACING.right]: Math.PI / 2,
   [FACING.up]: Math.PI,
 }
