@@ -18,9 +18,38 @@
 
 ## 3. `--panels`：面板 lazy host、名片鎖上移、收件匣 provider 拆分（Req「面板按開啟意圖才載入」S04／S06；design D3／D4）
 
-- [ ] 3.1 判準先紅：`PanelHost` 元件測試 —— `open===false` 不觸發重模組 import（用可觀測的 lazy import spy／mock）、`open===true` 才觸發（S04）；開啟意圖成立當下（chunk 抵達前）世界輸入已鎖、焦點已接管、出現面板形 `role="status"` 載入殼（S04）；chunk 抓取失敗時顯示 `role="alert"`、釋放鎖與焦點（S06）；名片鎖上移後 `FE-A04` 焦點／讓位既有行為不變（既有 profile 測試迴歸）
-- [ ] 3.2 實作：三個面板各包 eager 輕量 `PanelHost`（讀協調者 active panel；`open` 才 `React.lazy` import）；名片世界輸入鎖與焦點接管從 `ProfilePanel` 本體上移到 host；`InboxPanelProvider` 拆 eager（開關／對象／焦點）＋ lazy（訊息資料、分頁、寄送、表單、UI）
-- [ ] 3.3 突變：host 改成 eager import 面板（開啟前就載）→ S04 紅；鎖留在面板本體（chunk 抵達前不鎖）→ S04「開啟當下已鎖」紅；chunk 失敗不釋放鎖 → S06 紅
+> **重切（2026-09-20）**：原本一片 `--panels` 估 400–500+ 產品行、塞不進 250 上限。依 `pr-size.sh`〈按 Scenario 切〉與模型審查（codex）重切成四小片：`--panel-host`（通用機制＋合成判準）→ `--panel-profile`（名片，含鎖上移）→ `--panel-board`（看板）→ `--panel-inbox`（收件匣拆分）。每片各自 ≤250 產品行、判準與實作同片、可單獨審。
+>
+> **`PanelHost` 介面契約（3a 定死，服務三個面板；codex 審查要點）**：
+> - production 介面就是 `load: () => Promise<{ default: ComponentType }>`（不另做 test-only importer；這個 prop 本身即可測的縫，不可經 barrel 間接 eager import）。
+> - 鎖所有權**用注入**（`lock?: { acquire: () => () => void }`）：名片＝host 持鎖、看板＝provider 已持鎖（不傳 lock）、收件匣＝host 持鎖。不寫死「host 一律持鎖」。
+> - 三個可替換狀態：載入殼（`role="status"`／`aria-busy`，焦點先落這）／錯誤（`role="alert"`，釋放鎖與焦點、可回世界、可 retry）／內容（內容自己接焦點）。
+> - retry 建**新的 lazy loader key**（只重繪不會重抓失敗的 chunk）。
+> - idempotent cleanup：過期 promise resolve 後不得搶回焦點或重鎖世界；`open→false`／卸載即釋放鎖。
+
+### 3a. `--panel-host`：通用 PanelHost ＋ 面板形載入殼／錯誤殼
+
+- [ ] 3a.1 判準先紅：`PanelHost` 元件測試（合成 lazy 面板、可控 resolve/reject）—— `open===false` 不呼叫 `load`（S04）；`open===true` 立即呼叫 `load`、且在 resolve 前已鎖（注入的 `acquire` 被呼叫）、已出現面板形 `role="status"`／`aria-busy` 載入殼並取得焦點（S04）；resolve 後換成內容、載入殼消失；`load` reject 時顯示 `role="alert"`、釋放鎖（`acquire` 的 cleanup 被呼叫）、焦點落在回世界的按鈕（S06）；retry 重新呼叫 `load`
+- [ ] 3a.2 實作：`src/panel/PanelHost.tsx`（讀 `open`、`load`、注入 `lock`、`onExit`；`React.lazy` 以 retry key 建立、`<Suspense>` fallback＝載入殼、局部 error boundary→錯誤殼並釋放鎖）＋ `PanelLoadingShell`／`PanelErrorShell`（沿用 `PanelShell` 的框 token；`ui-ux-pro-max`：穩定骨架同框不位移、`motion-safe:animate-pulse`、近乎瞬間別閃、失敗態明確訊息＋回世界）
+- [ ] 3a.3 突變：`open===false` 也呼叫 `load`（開啟前就載）→ S04 紅；載入殼不取焦／不鎖 → S04 紅；reject 不釋放鎖／不顯示 alert → S06 紅；retry 不換 key（重用失敗 loader）→ retry 判準紅
+
+### 3b. `--panel-profile`：名片經 PanelHost，鎖與焦點接管上移
+
+- [ ] 3b.1 判準先紅：名片以 `PanelHost` 掛載 —— 開啟前不 import `OpenProfilePanel`；開啟意圖當下（chunk 前）`holdInputLock('profile-panel')` 已呼叫、載入殼在（S04）；`FE-A04` 既有焦點／讓位／編輯（`S01`～`S03`）行為不變（既有 profile 測試迴歸）
+- [ ] 3b.2 實作：抽 `OpenProfilePanel` 成獨立可 lazy 模組；`ProfilePanel` 改用 `PanelHost`，`lock` 注入 `() => holdInputLock('profile-panel')`（在 `WorldCanvas`／`InteractionProvider` 底下取得）；面板本體不再自持鎖
+- [ ] 3b.3 突變：鎖留在面板本體（chunk 抵達前不鎖）→ S04「開啟當下已鎖」紅；host 改 eager import 名片 → S04 紅
+
+### 3c. `--panel-board`：看板經 PanelHost
+
+- [ ] 3c.1 判準先紅：看板 `BoardPanel` 以 `PanelHost` 掛載 —— 開啟意圖（走近按 E／深連結）前不 import 看板重模組；開啟只載看板、不順帶載名片／收件匣（S04）；看板鎖仍由 `ListPanelProvider`（eager）持有、不經 host
+- [ ] 3c.2 實作：`BoardPanel` 包 `PanelHost`（不傳 `lock`）；抽看板內容成可 lazy 模組
+- [ ] 3c.3 突變：host 改 eager import 看板 → S04 紅；開看板順帶 import 另兩個 → S04「只載目標」紅
+
+### 3d. `--panel-inbox`：收件匣 provider 拆 eager／lazy
+
+- [ ] 3d.1 判準先紅：收件匣以 `PanelHost` 掛載 —— 開啟前不 import 訊息 API（`getProfile`／`listMessages`／`sendMessage`）與面板 UI（S04）；talent「寄信給他」＝開啟意圖（`requestCompose`→inbox active→殼＋鎖＋焦點→engine 載入後消化 pending compose），非背景送信；chunk 失敗釋放鎖與焦點（S06）；既有 inbox 行為（分頁世代、201 合併 `S12`、名字跨開關 `S04`、401 清空）迴歸不變
+- [ ] 3d.2 實作：`InboxPanelProvider` 拆 eager（唯一對外 `InboxContext`：協調、open/view/focus、未讀數安全快照、`requestOpen`／`requestCompose`／`close`）＋ lazy `InboxDataEngine`（generation／dataGeneration／inFlight／pendingFirst／names／sendGuard／API／副作用**整塊**搬入，首次開啟後常駐、bridge 回報 snapshot）；engine 未載入時 data command 只成 eager intent、未讀數語意明確（非假裝已同步的 0）
+- [ ] 3d.3 突變：把競態機器（generation／sendGuard）拆到 eager 那側 → S12／迴歸紅；engine 隨關閉卸載 → 名字跨開關／送出中合併紅；talent 背景直接送信（不經 requestCompose）→ S04「開啟前零 import」紅
 
 ## 4. `--order`：Rapier／WS／房間清單排在 Canvas ready 之後（Req「首屏以固定次序載入」S03／S07；design D2）
 
