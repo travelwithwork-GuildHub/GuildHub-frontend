@@ -207,24 +207,24 @@ function InboxState({ me, children }: { me: string | null; children: ReactNode }
     [race],
   )
 
-  // 給 lazy 內容的穩定把手（成員都是穩定的 setters／refs，所以 `store` 本身也穩定）。
-  const store = useMemo<InboxStore>(
-    () => ({
-      setMessages,
-      setPagesLoaded,
-      setExhausted,
-      setLoading,
-      setFetching,
-      setLoadError,
-      setMoreError,
-      setBlocked,
-      setNames,
-      setSendingTo,
-      race,
-      clearForUnauthorized,
-    }),
-    [clearForUnauthorized, race],
-  )
+  // 給 lazy 內容的把手。**必須是「保證穩定」的參照，不能用 `useMemo`**：`useMemo` 是效能提示、
+  // React 允許在記憶體壓力下丟掉快取重算（官方明文），一旦 `store` 換了參照，內容裡 `fetchPage`（deps `[store]`）
+  // 跟著換，`openNonce` 的 drain effect（deps `[openNonce, fetchPage]`）就會誤觸、多打一次第 0 頁（違反 S01；Gemini 覆核抓到）。
+  // 成員（useState 的 setters、`race`、`clearForUnauthorized`）都是終身穩定的，用 `useState` 初始化器建一次就對。
+  const [store] = useState<InboxStore>(() => ({
+    setMessages,
+    setPagesLoaded,
+    setExhausted,
+    setLoading,
+    setFetching,
+    setLoadError,
+    setMoreError,
+    setBlocked,
+    setNames,
+    setSendingTo,
+    race,
+    clearForUnauthorized,
+  }))
 
   /** 從關閉打開（同步、不 import API）：新世代、`loading` 立刻為真、`openNonce`＋1 讓內容重取第 0 頁。舊資料仍可見。 */
   const beginOpenIntent = useCallback(() => {
