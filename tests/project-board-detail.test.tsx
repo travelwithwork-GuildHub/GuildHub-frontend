@@ -70,6 +70,9 @@ async function mount(items: ProjectOut[], page = 0) {
   server.replyFor(LIST, 200, items)
   server.replyFor(LIST, 200, items)
   window.history.replaceState(null, '', `/world?panel=projects${page > 0 ? `&page=${page}` : ''}`)
+  // 看板內容 lazy（FE-X15 --panel-board）：先預熱 chunk，讓 `PanelHost` 的 `import()` 命中快取、以 microtask 完成
+  // —— 內容才能在 `/api/me`（HTTP）回來前掛好、如 eager 時一樣，`InboxPanelProvider` 以 me 為 key 的重掛才穩定抓兩次列表（否則 import vs HTTP 的時序會 flake）。
+  await import('@/list-panel/BoardPanelContent')
   render(
     <IdentityProvider>
       <InboxPanelProvider>

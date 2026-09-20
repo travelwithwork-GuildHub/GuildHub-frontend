@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import { startContractServer, type ContractServer } from './support/contract-server'
 import { button, click, field, mountBoard, panel, type } from './support/project-board'
 
@@ -31,6 +31,7 @@ afterEach(async () => {
 describe('座位數的上限是推導的，不是寫死的', () => {
   it('[FE-J01-S03] 表單：7 紅、6 不紅，訊息裡的數字是 6', async () => {
     mountBoard(server, { identity: 'signed-in' })
+    await screen.findByTestId('list-panel') // 看板內容 lazy（FE-X15 --panel-board）：等內容到才有 `list-panel`
     click(await within(panel()).findByRole('button', { name: '發案' }))
     await type(field('座位數'), '7')
     const seat = field('座位數')

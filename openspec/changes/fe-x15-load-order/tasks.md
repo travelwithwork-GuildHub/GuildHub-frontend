@@ -41,9 +41,14 @@
 
 ### 3c. `--panel-board`：看板經 PanelHost
 
-- [ ] 3c.1 判準先紅：看板 `BoardPanel` 以 `PanelHost` 掛載 —— 開啟意圖（走近按 E／深連結）前不 import 看板重模組；開啟只載看板、不順帶載名片／收件匣（S04）；看板鎖仍由 `ListPanelProvider`（eager）持有、不經 host
-- [ ] 3c.2 實作：`BoardPanel` 包 `PanelHost`（不傳 `lock`）；抽看板內容成可 lazy 模組
-- [ ] 3c.3 突變：host 改 eager import 看板 → S04 紅；開看板順帶 import 另兩個 → S04「只載目標」紅
+> **看板鎖與內容耦合的發現（3c 定案，codex 覆核）**：看板鎖原本綁 `useBlockingPanelOpen() && mine`（＝內容裡的 `PanelShell` 已登記到協調者）。
+> 內容 lazy 後載入殼不是 `PanelShell`、不登記，鎖會延遲到 chunk 抵達才成立（違反 S04）。修法：鎖**留在 eager 的 `ListPanelProvider`**（不搬去 host、符合原設計意圖），但觸發改綁 `open !== null`（開啟意圖，早於 chunk）；用 boolean 消除切換看板種類的鎖 churn。chunk 失敗時錯誤殼的「回到世界」＝ `closePanel` → `requestClose`＋清 route → 鎖釋放（阻斷式面板：錯誤殼顯示中世界仍鎖，與名片「失敗釋放鎖」是刻意差異）。
+>
+> **非阻斷表面也改綁開啟意圖（codex 覆核，選 A）**：`SceneChatHud`（收合）、`FirstEntryNotice`（讓位）原讀 `useBlockingPanelOpen`（殼已登記）。lazy 後載入視窗（世界已鎖、焦點已接管、chunk 未到）這兩個表面不反應 → 聊天仍可打字（矛盾）。改讀 `useActivePanel() !== null`（開啟意圖）。協調者刻意用「殼已登記」防「幽靈 active」，但對純顯示、可自我修正的收合／隱藏可容忍瞬時幽靈（鎖與焦點才不容許，那些仍走協調者）。
+
+- [x] 3c.1 判準先紅：`board-panel-wiring.test.tsx` 新增 `[FE-X15-S04]` —— 按 E 當下（內容 chunk 前）`list-panel-loading`（`role="status"`）在、`list-panel`（內容）還沒、世界輸入鎖已持有；內容到後載入殼讓位、鎖連續持有。「只載目標、不順帶載另兩個」是跨 chunk 網路事實，在 --e2e（task 5.1）驗
+- [x] 3c.2 實作：抽 `BoardPanelContent`（`TalentBoard`／`ProjectBoard`＋重 import）成 lazy 模組；`BoardPanel` 改薄殼包 `PanelHost`（`open={open!==null}`、`panelId="list-panel"`、**不傳 `lock`**、`onExit=closePanel`）。`ListPanelProvider` 鎖觸發 `shellMounted`→`open`。`SceneChatHud`／`FirstEntryNotice` 改讀 `active`。`contract-server.close()` 加 `closeAllConnections`（被丟棄的 lazy 內容 fetch 留下的 keep-alive socket 不再讓優雅 close 空等 idle-timeout；~4s→~1ms）
+- [x] 3c.3 突變：① host 改 eager 靜態 import 看板（繞過 PanelHost）→ S04「載入殼」紅；② 鎖退回 `useBlockingPanelOpen() && mine` → S04「開啟意圖當下就要鎖」紅（證明 re-key 必要）；③ 兩個非阻斷表面退回 `useBlockingPanelOpen` → S15／S16 紅（載入視窗不反應）。「只載目標」突變 jsdom 觀測不到跨 chunk import，留 --e2e。測試調適：`create-project`(-limits)／`deep-link`／`dom-visual-flow` 開啟後 await 內容；`project-board-detail`／`project-lifecycle`（`InboxPanelProvider` 以 me 為 key 重掛）預熱 chunk 讓時序穩定各兩份回應
 
 ### 3d. `--panel-inbox`：收件匣 provider 拆 eager／lazy
 

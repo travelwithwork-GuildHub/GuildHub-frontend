@@ -54,6 +54,9 @@ export async function mountDetail(server: ContractServer, p: ProjectOut, { me = 
     server.replyFor(`/api/profiles/${p.owner_id}`, 200, p.owner_id === ME.id ? ME : OTHER)
   }
   window.history.replaceState(null, '', `/world?panel=projects&project=${p.id}${page > 0 ? `&page=${page}` : ''}`)
+  // 看板內容 lazy（FE-X15 --panel-board）：先預熱 chunk，讓 `PanelHost` 的 `import()` 命中快取、以 microtask 完成，
+  // 內容在 `/api/me`（HTTP）回來前掛好，`InboxPanelProvider` 以 me 為 key 的重掛才穩定各兩份回應（否則 import vs HTTP 的時序會 flake）。
+  await import('@/list-panel/BoardPanelContent')
   render(
     <RoomsRefreshProvider refresh={refreshRooms}>
       <IdentityProvider>

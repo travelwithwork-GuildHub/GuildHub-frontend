@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CAPTION, SECONDARY, withClass } from '@/design/controls'
 import { layer } from '@/design/layers'
-import { useBlockingPanelOpen } from '@/panel/BlockingPanelCoordinator'
+import { useActivePanel } from '@/panel/BlockingPanelCoordinator'
 import { useSceneChatIfProvided } from '@/realtime/SceneChatProvider'
 import { SceneChatComposer } from './SceneChatComposer'
 import { SceneChatFeed } from './SceneChatFeed'
@@ -50,7 +50,10 @@ export function SceneChatHud() {
   const lastScrollTop = useRef(0)
 
   // 收起：記下那一刻的 log 長度（「上一次繪製的值」模式，繪製期間 setState，不等 effect）
-  const blocking = useBlockingPanelOpen()
+  // ⚠️ 讀「開啟意圖」（`active`）而非「殼已登記」（`useBlockingPanelOpen`）：面板內容 lazy（`FE-X15`）後，
+  // 載入殼還沒登記到協調者的那段空窗，世界已鎖、焦點已被接管，聊天框也該同步收合（否則會出現「世界鎖住但聊天還能打字」的矛盾）。
+  // `active` 會對「幽靈 active」（provider 在 commit 前卸載）敏感，但對這種純顯示、可自我修正的收合是可容忍的瞬時視覺（收了又展開）；鎖與焦點才不容許幽靈。
+  const blocking = useActivePanel() !== null
   const [collapsedFrom, setCollapsedFrom] = useState<number | null>(null)
   if (log !== undefined) {
     if (blocking && collapsedFrom === null) setCollapsedFrom(log.length)
