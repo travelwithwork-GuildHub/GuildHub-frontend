@@ -178,3 +178,32 @@ describe('Escape → 面板關閉 → 鎖還回去', () => {
     expect(grabbed().lock.current).toBe(false)
   })
 })
+
+// 規格：openspec/changes/fe-x15-load-order/specs/load-order/spec.md
+//   Requirement: 面板按開啟意圖才載入，載入殼立即接管 —— FE-X15-S04
+//
+// 看板重模組（`BoardPanelContent`）改由 `PanelHost` lazy 載入。鎖仍由 eager 的 `ListPanelProvider` 持有（不經 host），
+// 但觸發從「殼掛載」改成「開啟意圖」—— 否則載入殼不是 `PanelShell`、不登記，鎖會延遲到 chunk 抵達才成立（違反 S04）。
+// 「只載目標、不順帶載另兩個面板」是跨 chunk 的網路事實，在真瀏覽器 `tests/e2e/load-order.mjs`（--e2e）驗；
+// 這裡驗 jsdom 觀測得到的那一半：開啟意圖當下（內容 chunk 前）先鎖＋出現載入殼。
+describe('看板按開啟意圖才載入，載入殼立即接管（FE-X15）', () => {
+  it('[FE-X15-S04] 按 E 的當下（內容 chunk 前）先鎖＋出現載入殼，看板內容隨後才到', async () => {
+    const { grabbed, pressE } = mount()
+    expect(screen.queryByTestId('list-panel-loading'), '還沒按 E 就有載入殼').toBeNull()
+    expect(grabbed().lock.current).toBe(false)
+
+    pressE(boardId('projectBoard'))
+
+    // 內容 chunk 抵達前：面板形載入殼在、看板內容（`list-panel`）還沒、但世界輸入已鎖。
+    // 鎖綁開啟意圖（`ListPanelProvider` 的 eager 效果）、不綁內容殼掛載 —— 這是 S04 的直接證據。
+    const loading = screen.getByTestId('list-panel-loading')
+    expect(loading.getAttribute('role'), '載入殼不是 role=status').toBe('status')
+    expect(screen.queryByTestId('list-panel'), '內容 chunk 抵達前不該有看板內容').toBeNull()
+    expect(grabbed().lock.current, '開啟意圖當下就要鎖，不是等內容 chunk 到').toBe(true)
+
+    // 內容到達：載入殼讓位給看板，鎖連續持有。
+    await screen.findByTestId('list-panel')
+    expect(screen.queryByTestId('list-panel-loading'), '內容到了載入殼還在').toBeNull()
+    expect(grabbed().lock.current, '內容到了鎖卻掉了').toBe(true)
+  })
+})
