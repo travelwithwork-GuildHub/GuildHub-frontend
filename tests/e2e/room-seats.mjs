@@ -44,6 +44,10 @@ const feedback = (page) => page.$eval('[data-testid="seat-feedback"]', (n) => ({
 // 站位座標，對齊 `projectRoomLayout` 的 `STATION`（`stanceX=2.5`、`firstZ=5`、`pitchZ=4`；0–3 在西側 x=-2.5）。這支只用得到 0／1 號、都在西。
 const STANCE = { stanceX: 2.5, firstZ: 5, pitchZ: 4 }
 const stanceOf = (i) => ({ x: -STANCE.stanceX, z: STANCE.firstZ - (i % 4) * STANCE.pitchZ })
+/** 某人角色現在回報的世界位置（`FE-J13-S08` 就位驗證用）。 */
+const posOf = (who) => lastReportedPosition(who.sockets[who.sockets.length - 1])
+/** 位置到某站位的距離。 */
+const distTo = (p, i) => (p === null ? Infinity : Math.hypot(p.x - stanceOf(i).x, p.z - stanceOf(i).z))
 
 await mkdir(OUT, { recursive: true })
 // ⚠️ **兩個人各開一個瀏覽器（兩個 process）**，不是同一個瀏覽器兩個 context：同站的兩頁共用一個 renderer，後開的那頁拿走焦點、
@@ -230,16 +234,25 @@ try {
   check('[S02] A 只是走近、還沒按 E：沒有送出任何 POST seats', A.posts, 0)
 
   // A 連按兩次 E → 只送一個 POST、201、0 號變自己的
+  const aBefore = posOf(A) // 按 E 前站在哪（走近時停下的位置，不是站位中心）
   const aPosted = await pressSit(A, room, { presses: 2 })
   const aRes = await aPosted
   check('[S05] A 按 E 送出的 POST seats 是 201', aRes.status(), 201)
   check('[S02] A 連按兩次 E 只送出一個 POST', A.posts, 1)
   await A.page.waitForSelector('[data-testid="seat-marker"][data-seat-index="0"][data-mine="true"]', { timeout: 10_000 })
   check('[S05] A 的 0 號標成自己的、有自己的名字', (await markerText(A.page, 0))?.includes(A_NAME) && (await isMine(A.page, 0)), true)
+  // [S08] 入座成功後角色就位到站位：回報位置就是 0 號站位（不是走近時停下的位置），且明顯有移動
+  await A.page.waitForTimeout(400) // 讓就位那一幀＋回報到位
+  const aSat = posOf(A)
+  const aJump = aBefore === null || aSat === null ? Infinity : Math.hypot(aSat.x - aBefore.x, aSat.z - aBefore.z)
+  check(`[S08] A 入座後就位到 0 號站位（(${aSat?.x.toFixed(2)},${aSat?.z.toFixed(2)}) ≈ 站位 (${stanceOf(0).x},${stanceOf(0).z})，Δ${distTo(aSat, 0).toFixed(2)}）`, distTo(aSat, 0) < 0.15, true)
+  console.log(`   [S08] A 就位跳躍距離 ${aJump.toFixed(2)}（按 E 前 (${aBefore?.x.toFixed(2)},${aBefore?.z.toFixed(2)}) → 站位）`)
   await A.page.screenshot({ path: path.join(OUT, '2-a-seated.png') })
 
   // A 已有座位：走到 1 號空位不再有「入座」提示（一人一格，不換座）
   check('[S05] A 已有座位：走到 1 號空位沒有入座提示', (await walkToStance(A, 1))?.includes(CLAIM) ?? false, false)
+  // [S08] 就位不鎖移動：A 剛才能從站位 0 走到 1 號附近，代表就位後 WASD 仍有效（走離了站位 0）
+  check('[S08] A 就位後仍可自由移動（已走離站位 0）', distTo(posOf(A), 0) > 0.3, true)
 
   // B 的畫面還是舊的（沒等輪詢）：走到 0 號站位仍看到「入座」，按 E 搶 0 號 → 409 → 重取
   check('[S05] B 走到 0 號站位（畫面還是舊的）仍看到「入座」', (await walkToStance(B, 0))?.includes(CLAIM), true)
@@ -260,6 +273,9 @@ try {
   check('[S05] B 坐 1 號的 POST seats 是 201', (await bPosted1).status(), 201)
   await B.page.waitForSelector('[data-testid="seat-marker"][data-seat-index="1"][data-mine="true"]', { timeout: 10_000 })
   check('[S05] B 的 1 號是自己的', (await markerText(B.page, 1))?.includes(B_NAME), true)
+  // [S08] B 也就位到自己那格（1 號站位）—— 就位是每個入座者各自的
+  await B.page.waitForTimeout(400)
+  check(`[S08] B 入座後就位到 1 號站位（Δ${distTo(posOf(B), 1).toFixed(2)}）`, distTo(posOf(B), 1) < 0.15, true)
 
   // A 在 30 秒內（輪詢）看到 1 號是 B
   const t0 = Date.now()
