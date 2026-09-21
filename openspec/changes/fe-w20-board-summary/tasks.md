@@ -6,10 +6,10 @@
 - [ ] 1.3 規格 PR 合併到 main
 
 ## 2. 實作：常駐資料 hook（feat/fe-w20-board-summary--data）
-- [ ] 2.1 `useBoardSummary(kind)`：抓 page 0、每 30 秒輪詢、分頁隱藏停／可見立即重取、單飛 `AbortController`、失敗保留 stale —— 照 `useRooms`
-- [ ] 2.2 回 `{ status: 'loading'|'ready'|'stale'|'failed', items: 前 4 筆, error }`（三態＋stale；page 0、N=4 是內部常數）
-- [ ] 2.3 跟面板 `useListPage` 各自獨立（不共享 fetch／cache）；離開 Guild Hall 場景 abort
-- [ ] 2.4 單元測試：進場抓一次、30 秒輪詢、隱藏停／可見重取、離場 abort、舊回應不蓋新的、失敗保留 stale（`S07`／`S05` 的 stale）
+- [x] 2.1 `useBoardSummary(kind)`：抓 page 0、每 30 秒輪詢、分頁隱藏停／可見立即重取、單飛 `AbortController`、失敗保留 stale —— 照 `useRooms`
+- [x] 2.2 回 `{ status: 'loading'|'ready'|'stale'|'failed', items: 前 4 筆, error }`（三態＋stale；page 0、N=4 是內部常數）
+- [x] 2.3 跟面板 `useListPage` 各自獨立（不共享 fetch／cache）；離開 Guild Hall 場景 abort
+- [x] 2.4 單元測試：進場抓一次、30 秒輪詢、隱藏停／可見重取、離場 abort、舊回應不蓋新的、失敗保留 stale（`S07`／`S05` 的 stale）
 
 ## 3. 實作：看板面上的摘要與投影（feat/fe-w20-board-summary--render）
 - [ ] 3.1 `BoardSummary`（DOM，Canvas 外）：兩塊看板各一組卡槽節點登記表（`Map<boardId, HTMLElement>`，不進 React state）；掛在 `WorldCanvas` 的 overlay 層（跟 `DoorLabels`／`RoomSeats` 同層，hall 場景才掛）

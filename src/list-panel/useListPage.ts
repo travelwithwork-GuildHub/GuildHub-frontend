@@ -19,6 +19,15 @@ const FETCH: { [K in ListKind]: (page: number, signal: AbortSignal) => Promise<L
   profiles: (page, signal) => listProfiles({ page, signal }),
 }
 
+/**
+ * 依種類取一頁清單。**種類 → 端點的對應只有這一份**（`FETCH`）——
+ * 面板（`useListPage`）與世界看板摘要（`useBoardSummary`，`FE-W20`）都走它，
+ * 不各自寫一份 `kind` 判斷，否則兩邊會漂。
+ */
+export function fetchListPage<K extends ListKind>(kind: K, page: number, signal: AbortSignal): Promise<ListItemOf[K][]> {
+  return FETCH[kind](page, signal)
+}
+
 export interface ListPage<K extends ListKind> {
   state: PagingState<ListItemOf[K]>
   next: () => void
