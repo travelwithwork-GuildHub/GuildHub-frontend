@@ -67,11 +67,13 @@ export function BoardSummary({ nodesRef, enabled }: { nodesRef: RefObject<BoardS
 
 /** 板面上的一塊摘要卡：不透明、對比高，遠處也讀得出「有東西／沒東西／讀不到／載入中」。 */
 function BoardSummaryCard({ view }: { view: BoardView }) {
-  const card = 'bg-surface-raised border-line text-ink shadow-panel rounded-panel border px-3 py-2'
+  // 邊框顏色是四態從出生點分辨的**粗略訊號之一**（`S09`）：empty 是中性 `line`、failed 是 `danger`
+  // ——沿用全站錯誤語彙（`PanelErrorShell`／表單都是 `border-danger`＋`text-danger`），讓「讀不到」跟「空的」在讀不到字的距離也分得開。
+  const card = 'bg-surface-raised text-ink shadow-panel rounded-panel border px-3 py-2'
   // 載入中：骨架卡，填住卡槽、不先畫空位（`S06`）。
   if (view.status === 'loading') {
     return (
-      <div data-testid="board-summary" data-state="loading" role="status" aria-label="載入中" className={card}>
+      <div data-testid="board-summary" data-state="loading" role="status" aria-label="載入中" className={`${card} border-line`}>
         <ul className="flex flex-col gap-1.5">
           {Array.from({ length: BOARD_SUMMARY_COUNT }, (_, i) => (
             <li key={i} className="h-4 rounded bg-line motion-safe:animate-pulse" />
@@ -84,7 +86,7 @@ function BoardSummaryCard({ view }: { view: BoardView }) {
   if (view.labels.length > 0) {
     const empties = Math.max(0, BOARD_SUMMARY_COUNT - view.labels.length)
     return (
-      <div data-testid="board-summary" data-state={view.status === 'stale' ? 'stale' : 'ready'} className={card}>
+      <div data-testid="board-summary" data-state={view.status === 'stale' ? 'stale' : 'ready'} className={`${card} border-line`}>
         <ul className="flex flex-col gap-1.5">
           {view.labels.map((label, i) => (
             <li key={`item-${i}`} data-testid="board-summary-item" title={label} {...withClass(CAPTION, 'truncate leading-4 text-ink')}>
@@ -99,16 +101,17 @@ function BoardSummaryCard({ view }: { view: BoardView }) {
     )
   }
   // 讀不到：環境化錯誤，`role="status"`、**無 retry**（`S05`）。語彙走 `FE-X03`，不回顯後端字串。
+  // `border-danger`＋`text-danger`＝從出生點就看得出「讀不到」不同於「空的」的粗略訊號（`S09`），但仍 `role="status"`＋無動作（不奪焦，D3）。
   if (view.status === 'failed') {
     return (
-      <div data-testid="board-summary" data-state="failed" role="status" className={card}>
-        <p {...withClass(CAPTION, 'text-ink-muted')}>{toUiError(view.error).message}</p>
+      <div data-testid="board-summary" data-state="failed" role="status" className={`${card} border-danger`}>
+        <p {...withClass(CAPTION, 'text-danger')}>{toUiError(view.error).message}</p>
       </div>
     )
   }
-  // 空的：`FE-X04` 的「這裡還沒有東西。」看板版，`role="status"`（`S04`）。
+  // 空的：`FE-X04` 的「這裡還沒有東西。」看板版，`role="status"`（`S04`）——中性色，跟 failed 的 danger 色分得開。
   return (
-    <div data-testid="board-summary" data-state="empty" role="status" className={card}>
+    <div data-testid="board-summary" data-state="empty" role="status" className={`${card} border-line`}>
       <p {...withClass(CAPTION, 'text-ink-muted')}>{EMPTY_STATE_COPY['first-empty']}</p>
     </div>
   )
