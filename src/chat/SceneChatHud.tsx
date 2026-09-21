@@ -116,7 +116,7 @@ export function SceneChatHud() {
   if (chat === null) return null
   if (collapsedFrom !== null) {
     return (
-      <section aria-label={CHAT_HUD_LABELS.region} data-testid="scene-chat" data-collapsed="" style={{ zIndex: layer('hud') }} className="bg-surface/90 border-line text-ink absolute bottom-gutter left-gutter w-[min(20rem,30vw)] rounded border p-2 backdrop-blur-sm">
+      <section aria-label={CHAT_HUD_LABELS.region} data-testid="scene-chat" data-collapsed="" style={{ zIndex: layer('hud') }} className="bg-surface/70 border-line text-ink shadow-panel absolute bottom-gutter left-gutter w-[min(20rem,30vw)] rounded-panel border p-2 backdrop-blur-md">
         <p {...withClass(CAPTION, 'text-ink-muted')}>
           {CHAT_HUD_LABELS.region} · {CHAT_HUD_LABELS.newWhileCollapsed(chat.log.length - collapsedFrom)}
         </p>
@@ -142,7 +142,7 @@ export function SceneChatHud() {
       aria-label={CHAT_HUD_LABELS.region}
       data-testid="scene-chat"
       style={{ zIndex: layer('hud') }}
-      className="bg-surface/90 border-line text-ink absolute bottom-gutter left-gutter flex w-[min(20rem,30vw)] max-h-[50vh] min-h-0 flex-col gap-2 rounded border p-2 backdrop-blur-sm"
+      className="bg-surface/70 border-line text-ink shadow-panel absolute bottom-gutter left-gutter flex w-[min(20rem,30vw)] max-h-[50vh] min-h-0 flex-col gap-2 rounded-panel border p-2 backdrop-blur-md"
     >
       {/* 兩層 flex：外層 `flex-1 min-h-0` 吃掉剩下的高度，內層再 `flex-1 min-h-0 overflow-y-auto` 才會真的捲（百分比 max-height 在 flex 子項裡不可靠）。 */}
       <div className="flex min-h-0 flex-1 flex-col">
