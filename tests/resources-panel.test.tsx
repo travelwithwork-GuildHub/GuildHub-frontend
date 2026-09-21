@@ -3,7 +3,6 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { act, useEffect, type RefObject } from 'react'
 import type { ProjectOut, ProjectResourceOut, ProjectStatus, ResourceType } from '@/api/contract/rest'
 import { HttpError } from '@/api/transport'
-import { VOCABULARY } from '@/errors/uiError'
 import { IdentityProvider, useIdentity } from '@/identity/IdentityProvider'
 import { ResourcesPanel } from '@/resources/ResourcesPanel'
 import { ResourcesProvider, useResourcesPanel } from '@/resources/ResourcesProvider'
@@ -26,12 +25,34 @@ import { InteractionProvider, useInteraction } from '@/world/interaction/Interac
 const listResources = vi.hoisted(() => vi.fn())
 const getProject = vi.hoisted(() => vi.fn())
 const getMyProfile = vi.hoisted(() => vi.fn())
+// 三個寫入操作也換掉：`S09` 要量的是「整個過程沒有 POST／PATCH／DELETE」——
+// 只看 DOM 裡沒有按鈕的話，一個在 effect 裡送出的寫入照樣全綠。
+const createResource = vi.hoisted(() => vi.fn())
+const updateResource = vi.hoisted(() => vi.fn())
+const deleteResource = vi.hoisted(() => vi.fn())
 vi.mock('@/api/operations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/operations')>()),
   listResources,
   getProject,
   getMyProfile,
+  createResource,
+  updateResource,
+  deleteResource,
 }))
+
+/**
+ * `FE-X03` 語彙表裡那三句，**逐字抄在這裡**。
+ *
+ * ⚠️ **不要 `import { VOCABULARY }`**：那樣 expected 跟實作同一個來源，文案寫錯時
+ * 期望值會跟著錯，這條斷言就恆真了（`docs/DECISIONS.md`〈訊息用字統一，可能讓測試變恆真〉
+ * 是同一種病）。這裡釘的是「面板把**對應那個 kind** 的那一句原封端出來」，
+ * 不是「面板端出 `VOCABULARY[kind]`」——後者連「三個 kind 都印同一句」都抓不到。
+ */
+const COPY = {
+  'authentication-required': '要先登入才看得到這裡。',
+  'permission-denied': '你沒有權限做這件事。',
+  'not-found': '找不到這個東西 —— 它可能已經被移除了。',
+} as const
 
 const PID = '22222222-2222-4222-8222-222222222222'
 const OWNER = '11111111-1111-1111-1111-111111111111'
@@ -59,12 +80,22 @@ const resource = (label: string, type: ResourceType, url: string, at: string): P
   url,
   created_at: at,
 })
-/** 三筆，`created_at` T1＜T2＜T3，type 依序 github／meeting／figma（S01 逐字）。 */
+/**
+ * 三筆，`created_at` T1＜T2＜T3，type 依序 github／meeting／figma（S01 逐字）。
+ * 第一筆的 host 有大寫、第三筆沒有 path —— 兩者正規化後都跟原值不同。
+ */
 const three = () => [
-  resource('原始碼', 'github', 'https://github.com/guildhub/app', '2026-09-10T01:00:00Z'),
+  resource('原始碼', 'github', 'https://GitHub.com/guildhub/app', '2026-09-10T01:00:00Z'),
   resource('每週同步', 'meeting', 'https://meet.example.com/abc', '2026-09-10T02:00:00Z'),
-  resource('設計稿', 'figma', 'https://figma.com/file/xyz', '2026-09-10T03:00:00Z'),
+  resource('設計稿', 'figma', 'https://figma.com', '2026-09-10T03:00:00Z'),
 ]
+/**
+ * `three()` 三筆**放行後的 href，逐字寫死**。
+ *
+ * ⚠️ **不要寫 `new URL(item.url).href`**：那是 `safeHref` 自己那一行的公式，
+ * 期望值跟實作同源 —— 正規化寫錯（或整個不做）時期望值會跟著錯。
+ */
+const THREE_HREFS = ['https://github.com/guildhub/app', 'https://meet.example.com/abc', 'https://figma.com/'] as const
 const http = (status: number) => new HttpError('listResources', status, null)
 
 function deferred<T>() {
@@ -156,6 +187,9 @@ beforeEach(() => {
   listResources.mockReset()
   getProject.mockReset()
   getMyProfile.mockReset()
+  createResource.mockReset()
+  updateResource.mockReset()
+  deleteResource.mockReset()
 })
 afterEach(() => {
   cleanup()
@@ -181,7 +215,7 @@ describe('面板依伺服器順序列出資源', () => {
       // 網址：`safeHref` 放行 → 另開分頁的連結，`rel` 兩個都要在（`SafeExternalLink` 的既定形狀）
       const link = within(row).getByTestId('safe-link') as HTMLAnchorElement
       expect(link.tagName).toBe('A')
-      expect(link.getAttribute('href')).toBe(new URL(item.url).href)
+      expect(link.getAttribute('href'), `第 ${i + 1} 列的 href 不是放行後的那個值`).toBe(THREE_HREFS[i])
       expect(link.getAttribute('target')).toBe('_blank')
       expect(link.getAttribute('rel')).toContain('noopener')
       expect(link.getAttribute('rel')).toContain('noreferrer')
@@ -293,7 +327,32 @@ describe('結案與權限失敗：畫面', () => {
 
     expect(screen.queryByTestId('resources-closed'), '專案還活著，卻說已結案').toBeNull()
     expect(screen.getByTestId('empty-state').dataset.emptyState).toBe('permission-blocked')
-    expect(screen.getByTestId('empty-state').textContent).toContain(VOCABULARY['permission-denied'])
+    expect(screen.getByTestId('empty-state').textContent, '沒有把 403 的那一句原封端出來').toContain(COPY['permission-denied'])
+  })
+
+  it('[FE-J14-S06] 確認自己回 401／404：畫面逐字是那兩句，不是原本那個 403 的', async () => {
+    // 這兩種結果在 store 那一片只量到 `kind`。`kind` 對而畫面印錯（或三種都印同一句）
+    // 在那裡看不出來 —— 使用者看到的是這裡這一句。
+    for (const c of [
+      { name: '確認回 401', status: 401, copy: COPY['authentication-required'], retry: false },
+      { name: '確認回 404', status: 404, copy: COPY['not-found'], retry: true },
+    ]) {
+      listResources.mockReset()
+      getProject.mockReset()
+      getMyProfile.mockReset()
+      listResources.mockRejectedValue(http(403))
+      getProject.mockRejectedValue(http(c.status))
+      await openPanelAs(OTHER, project('active'))
+      await settled()
+
+      const empty = screen.getByTestId('empty-state')
+      expect(empty.textContent, `${c.name}：畫面上不是那一句`).toContain(c.copy)
+      expect(empty.textContent, `${c.name}：還印著原本那個 403 的話`).not.toContain(COPY['permission-denied'])
+      expect(screen.queryByTestId('resources-closed'), `${c.name}：確認沒說 closed，卻說已結案`).toBeNull()
+      // 401 是權限阻擋（沒有重試），404 不是（`FE-X04` 的分流）
+      expect(Boolean(screen.queryByRole('button', { name: '再試一次' })), `${c.name}：重試按鈕在不在不對`).toBe(c.retry)
+      cleanup()
+    }
   })
 
   it('[FE-J14-S09] 開面板時專案已是 closed：owner 讀得到清單，但一開始就沒有寫入控制', async () => {
@@ -306,6 +365,11 @@ describe('結案與權限失敗：畫面', () => {
     expect(screen.queryAllByTestId('resource-edit')).toHaveLength(0)
     expect(screen.queryAllByTestId('resource-delete')).toHaveLength(0)
     expect(getProject.mock.calls.length, '讀得到就不該去確認狀態').toBe(0)
+    // 「沒有寫入」不是「畫面上沒有寫入按鈕」——量送出去的那一邊
+    expect(
+      [...createResource.mock.calls, ...updateResource.mock.calls, ...deleteResource.mock.calls],
+      '開一個已結案的面板卻送出了寫入請求',
+    ).toHaveLength(0)
   })
 })
 
