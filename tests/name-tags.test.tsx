@@ -6,7 +6,9 @@ import type { RemoteIdentity, RemoteMotion } from '@/realtime/remotePlayers'
 import { RENDER_DELAY_MS, appendSample, createTrack } from '@/realtime/interpolation'
 import { cameraOffset } from '@/world/camera'
 import { NameTags, type NameTagNodes } from '@/world/NameTags'
-import { NAME_TAG_ANCHOR_Y, NAME_TAG_SIZE, hasName } from '@/world/player/nameTag'
+import { StatusProvider } from '@/realtime/StatusProvider'
+import { createStatusStore } from '@/realtime/statusStore'
+import { NAME_TAG_ANCHOR_Y, NAME_TAG_SIZE, SELF_TAG_ID, hasName } from '@/world/player/nameTag'
 import { RemotePlayers } from '@/world/RemotePlayers'
 import { screenPixelFor } from '@/world/rooms/labelProjection'
 
@@ -91,6 +93,48 @@ describe('名單半邊：誰有牌子', () => {
     expect(screen.queryByText('小玉')).toBeNull()
     expect(screen.getByText('阿明')).toBeDefined()
     expect([...nodesRef.current.keys()]).toEqual(['u2'])
+  })
+
+  it('[FE-X17-S01] 自己頭上也有一塊寫著自己名字的牌子，而且標示為自己（`FE-W08` 反轉）', () => {
+    const nodesRef = nodesFor()
+    render(<NameTags roster={rosterOf([['u1', '小玉']])} nodesRef={nodesRef} self={{ name: 'Fergus' }} />)
+    // 遠端名牌的枚舉只看到名單 —— 自己不污染（獨立 testid）
+    expect(screen.getAllByTestId('name-tag').map((t) => t.textContent), '遠端枚舉只有名單').toEqual(['小玉'])
+    const selfTag = screen.getByTestId('self-name-tag')
+    expect(selfTag.textContent).toBe('Fergus')
+    expect(selfTag.dataset.player, '自己登記在 SELF_TAG_ID 下').toBe(SELF_TAG_ID)
+    expect(selfTag.dataset.self).toBe('true')
+    expect(nodesRef.current.has(SELF_TAG_ID), '自己的牌子節點登記了，LocalPlayer 才寫得到位置').toBe(true)
+    // 自己與遠端可區分：名字盒的邊界，自己用 accent
+    const selfName = screen.getByTestId('self-name-tag-name')
+    expect(selfName.className, '自己的名字盒邊界用 accent').toContain('border-accent')
+  })
+
+  it('[FE-X17-S01b] 訪客（自己沒有名字）就沒有自己的牌子', () => {
+    const nodesRef = nodesFor()
+    render(<NameTags roster={rosterOf([['u1', '小玉']])} nodesRef={nodesRef} self={{ name: '' }} />)
+    expect(screen.queryByTestId('self-name-tag'), '沒名字就沒有自己的牌子').toBeNull()
+    expect(nodesRef.current.has(SELF_TAG_ID), '沒名字就不登記自己的節點').toBe(false)
+  })
+
+  it('[FE-X17-S02] 自己的狀態顯示在自己的牌子上；清空就沒有那一段', async () => {
+    const { act } = await import('@testing-library/react')
+    const store = createStatusStore()
+    store.port.attach(() => {}) // online：`set` 才會記成 pending
+    store.set('休息一下')
+    const nodesRef = nodesFor()
+    render(
+      <StatusProvider store={store}>
+        <NameTags roster={new Map()} nodesRef={nodesRef} self={{ name: 'Fergus' }} />
+      </StatusProvider>,
+    )
+    expect(screen.getByTestId('self-name-tag-status').textContent, '自己的狀態顯示在牌子上').toBe('休息一下')
+
+    // 清空 → 狀態那一段不在（跟遠端「狀態空就不顯示」同一條）
+    await act(async () => {
+      store.set('')
+    })
+    expect(screen.queryByTestId('self-name-tag-status'), '清空後沒有狀態那一段').toBeNull()
   })
 
   it('[FE-W08-S03] 名字空白或不是字串就沒有牌子，也沒有任何替代字', () => {

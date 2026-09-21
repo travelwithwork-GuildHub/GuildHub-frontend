@@ -5,12 +5,15 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { Group, Object3D } from 'three'
 import { FACING, type Facing } from '@/world/coords'
-import type { MutableVector3 } from '@/world/camera'
+import { cameraOffset, type MutableVector3 } from '@/world/camera'
 import type { LocalPose } from '@/world/PositionSync'
+import type { NameTagNodes } from '@/world/NameTags'
+import { screenPixelFor } from '@/world/rooms/labelProjection'
 import { CHIBI_PARTS, ChibiPlayer, type ChibiPart } from './ChibiPlayer'
 import { advancePhase, animationStateFor, poseAt, type AnimationState } from './animation'
 import { MOVEMENT_KEYS, directionFromKeys } from './input'
 import { FACING_ROTATION, nextFacing } from './facing'
+import { NAME_TAG_ANCHOR_Y, SELF_TAG_ID } from './nameTag'
 import { displacement, speedOf } from './movement'
 import { advanceRenderMotion, createRenderMotion } from './renderMotion'
 import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/world/physics/world'
@@ -18,6 +21,12 @@ import { staticBoxesFor } from '@/world/layout/geometry'
 import { LAYOUT as HALL_LAYOUT, SPAWN as HALL_SPAWN } from '@/world/layout/guildHallLayout'
 import type { LayoutItem } from '@/world/layout/types'
 import { useInputLockRef } from '@/world/interaction/InteractionProvider'
+
+// 自己名字牌的投影（`FE-X17`）：跟 `RemotePlayer` **同一份** `screenPixelFor` 與相機偏移 —— 規格〈自己與遠端走同一套投影〉。
+// 兩個暫存物件共用一份（render loop 單執行緒、當場讀完），不每幀配置。
+const CAMERA_OFFSET = cameraOffset()
+const SELF_TAG_ANCHOR = { x: 0, y: NAME_TAG_ANCHOR_Y, z: 0 }
+const SELF_TAG_TARGET = { x: 0, z: 0 }
 
 // 本地玩家。
 //
@@ -53,9 +62,15 @@ export interface LocalPlayerProps {
    */
   spawn?: { readonly x: number; readonly z: number }
   layout?: readonly LayoutItem[]
+  /**
+   * 名字牌節點的登記（`NameTags`，Canvas 外的 DOM）。規格 `name-tag`（`FE-X17-S01`／`S02`）。
+   * 自己的牌子登記在 `SELF_TAG_ID` 下；這裡每幀把頭頂錨點投影成螢幕像素、寫進那個節點 ——
+   * 跟 `RemotePlayer` 對遠端牌子做的**完全同一套**。沒傳（舊測試）就不投影，不報錯。
+   */
+  tagNodesRef?: RefObject<NameTagNodes>
 }
 
-export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout = HALL_LAYOUT }: LocalPlayerProps) {
+export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout = HALL_LAYOUT, tagNodesRef }: LocalPlayerProps) {
   const rootRef = useRef<Group>(null)
   const bodyRef = useRef<Group>(null)
   /** 子部位查一次就快取。查不到的話動畫會靜默停止 —— 見 partsRef 的初始化。 */
@@ -155,7 +170,7 @@ export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout
     }
   }, [inputLockRef])
 
-  useFrame((_, dt) => {
+  useFrame((state, dt) => {
     const root = rootRef.current
     if (!root) return
 
@@ -199,6 +214,24 @@ export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout
     // 朝向用 world-coordinates 的那一份，站著不動時保留前一個
     facing.current = nextFacing(dir, facing.current)
     root.rotation.y = FACING_ROTATION[facing.current]
+
+    // 自己的名字牌（`FE-X17-S01`／`S02`）：頭頂錨點 → CSS 像素，**跟 `RemotePlayer` 同一份投影**。
+    // 相機焦點＝相機位置減固定偏移（跟 `WorldCamera`／`RemotePlayer` 同一份）。點在畫面內就寫位置＋visible，不在就 hidden。
+    // 沒登記節點（沒傳 `tagNodesRef`、或身分沒名字所以 `NameTags` 沒渲染自己那塊）就跳過 —— 不報錯（DOM 不在、不動）。
+    const selfTag = tagNodesRef?.current.get(SELF_TAG_ID)
+    if (selfTag !== undefined) {
+      SELF_TAG_TARGET.x = state.camera.position.x - CAMERA_OFFSET.x
+      SELF_TAG_TARGET.z = state.camera.position.z - CAMERA_OFFSET.z
+      SELF_TAG_ANCHOR.x = root.position.x
+      SELF_TAG_ANCHOR.z = root.position.z
+      const px = screenPixelFor(SELF_TAG_ANCHOR, SELF_TAG_TARGET, state.size)
+      if (!px.inside) {
+        selfTag.style.visibility = 'hidden'
+      } else {
+        selfTag.style.transform = `translate3d(${px.x}px, ${px.y}px, 0)`
+        selfTag.style.visibility = 'visible'
+      }
+    }
 
     // 相位是累積的，切換 Idle／Walk 時不重置 —— 重置的話手腳會跳
     animState.current = animationStateFor(speedOf(dir))
