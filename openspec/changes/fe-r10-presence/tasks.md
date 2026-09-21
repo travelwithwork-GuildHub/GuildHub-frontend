@@ -50,11 +50,65 @@
 
 ## 4. 雙瀏覽器姓名驗收
 
-- [ ] 4.1 確認 `FE-W08` 的姓名渲染能力已合併；以 main 上的規格與產品碼能在遠端角色旁顯示 `RemoteIdentity.name` 為證據，未滿足時本節維持未完成
-- [ ] 4.2 為 `FE-R10-S10` 建立兩個隔離 cookie 的 browser context，測試只啟動並連到當次 loopback 前端、可拋棄後端與測試資料庫，不使用團隊共用環境
-- [ ] 4.3 跑 `FE-R10-S10`：兩個瀏覽器各建立不同姓名並進入同一 scene，雙方都在對方角色旁看到正確姓名；保存可重跑的 E2E 與驗證輸出
+- [x] 4.1 確認 `FE-W08` 的姓名渲染能力已合併；以 main 上的規格與產品碼能在遠端角色旁顯示 `RemoteIdentity.name` 為證據，未滿足時本節維持未完成
+      —— **已解除阻塞**：`c9d3835`（實作 #523）與 `e23f5b8`（archive #525）都在 main，`openspec/specs/name-tag/spec.md`
+      與 `src/world/NameTags.tsx`／`src/world/player/nameTag.ts` 在 main 上。牌子的文字**就是**協定的 `name`
+      （不 trim、不改寫、**沒有替代字**），走的是 `RemoteWorld` 的 `onRosterChange` → 同一份 `RemoteIdentity`。
+      在本 change 的建置上重跑 W08 自己的真瀏覽器判準 `tests/e2e/name-tags.mjs` → **全部通過**（渲染能力沒有退化）
+- [x] 4.2 為 `FE-R10-S10` 建立兩個隔離 cookie 的 browser context，測試只啟動並連到當次 loopback 前端、可拋棄後端與測試資料庫，不使用團隊共用環境
+      —— `tests/e2e/two-browsers-names.mjs`。兩個 `browser.newContext()`（不是兩個分頁），各自打同源的
+      `POST /api/login` 拿自己的簽章 session cookie。後端是**本地的**：`NEXT_PUBLIC_DATA_ADAPTER=internal` 的
+      Route Handlers ＋ 即時層替身（`scripts/realtime-stub.ts`，`FE-O03`，照 `protocol.py` 寫、解 cookie 後**查名片表**才知道名字），
+      資料庫是**只為這次建、跑完可以直接 drop** 的 `guildhub_r10_s10`（`scripts/db.mjs reset --init` 的三道守門：
+      非 loopback 不連、沒有 `_guildhub_disposable` 標記不動、有表就不准 `--init`）。
+      `assertLoopback` ＋ `guardLoopback` 保證整支腳本一個請求都沒有打出本機。**沒有碰任何團隊共用環境。**
+      ⚠️ 名字帶**這次執行才產生的亂數尾碼**：寫死的名字會在殘留的資料庫上假綠
+- [x] 4.3 跑 `FE-R10-S10`：兩個瀏覽器各建立不同姓名並進入同一 scene，雙方都在對方角色旁看到正確姓名；保存可重跑的 E2E 與驗證輸出
+      —— 12 條全綠（輸出見 PR）。每一邊各驗五件事：看得到對方的名字牌、不是共用 fallback（`訪客`／`未命名`／`Guest`…）、
+      沒有看到自己的名字、**恰有一塊**牌子、而且那塊牌子**真的看得見**（`visibility: visible`、176×28 px、整塊在視窗內）
+      —— 「在 DOM 裡」不算數。截圖 `docs/evidence/fe-r10/two-browsers-{jia,yi}.png`：兩邊都同時拍到對方的名字牌與「2 人在線」。
+      ⚠️ **另外補了一條 `assertOwnSession`**：跑完之後用該 context 當下的 cookie 打 `GET /api/me`，回來的名片要是自己。
+      理由是突變量到的 —— 見 5.2 的第四個突變
 
 ## 5. 收尾驗證
 
-- [ ] 5.1 執行 lint、typecheck、完整單元測試與適用的 integration／E2E；記錄通過數量，並逐條對照 `FE-R10-S01`–`S11` 都有非恆真的證據
-- [ ] 5.2 對狀態更新、在線人數與姓名驗收各做至少一個反向突變，確認對應測試真的變紅；還原後重跑相關測試為綠
+- [x] 5.1 執行 lint、typecheck、完整單元測試與適用的 integration／E2E；記錄通過數量，並逐條對照 `FE-R10-S01`–`S11` 都有非恆真的證據
+      —— `eslint` exit 0、`tsc --noEmit` exit 0。全套 `vitest run`：**1313 綠、7 skip、16 紅**（174 檔中 8 檔）——
+      那 16 條是這台 Windows 開發機的既有基線（`contract-drift`、`leak-coverage`、`typecheck-negative`、`design-tokens`、
+      `dom-token-scan`、`deploy-build-gate`、`rehearsal-report`、`scene-chat-memory`；路徑分隔符與 CRLF，CI 的 Linux 上是綠的），
+      **與本分支無關**：本分支一行產品碼都沒有改（diff 只有測試、tasks 與證據）。R10 直接相關的兩個檔單獨跑 **31 綠**。
+      真瀏覽器：`tests/e2e/two-browsers-names.mjs` **12 綠**、`tests/e2e/name-tags.mjs`（`FE-W08` 的渲染能力）**全綠**。
+      `tests/**/*.itest.ts`（3 個）**不適用**：它們要真的 Python 後端在 `:8000`，而且沒有任何一條掛 `FE-R10` 的 Scenario ID
+      —— 那是 `FE-R01`／`R07`／`R08` 的 live 檢查，不在本 change 的義務內（這裡寫出來，不是靜悄悄跳過）。
+
+      | Scenario | 非恆真的證據 |
+      |---|---|
+      | `S01`／`S02` | `remote-players.test.ts`；突變：`snapshot`／`join` 做 trim、`identityOf` 丟掉 `st` → 紅 |
+      | `S03` | `remote-players.test.ts`（3 處）；**本節突變 6**：`status` 一律不更新 → 紅 |
+      | `S04` | `remote-players.test.ts`；突變：未知 id 建立新的人、清空所有人樣本 → 紅 |
+      | `S05`／`S06` | `remote-players.test.ts`；突變：`leave` 不移除名單項目、`snapshot` 合併舊 `st` → 紅 |
+      | `S07`／`S08`／`S09` | `online-count.test.tsx`（掛整個 `WorldCanvas`，`RemoteWorld → RealtimeClient → WebSocket` 是正式碼）；**本節突變 5** → 8 條紅 |
+      | `S10` | `tests/e2e/two-browsers-names.mjs`（真瀏覽器、兩個隔離 cookie、本地後端、可拋棄資料庫）；**本節突變 1～4** |
+      | `S11` | `remote-players.test.ts`（2 處）；**本節突變 7**：重複 join 不刷新 `st` → 紅 |
+- [x] 5.2 對狀態更新、在線人數與姓名驗收各做至少一個反向突變，確認對應測試真的變紅；還原後重跑相關測試為綠
+      —— 七個突變，每一個都單獨做、量完立刻 `git checkout` 還原（`S10` 那四個各重 build 一次）：
+
+      | # | 面向 | 突變 | 結果 |
+      |---|---|---|---|
+      | 1 | 姓名 | `identityOf` 的 `name: p.name` → `name: ''` | `S10` **4 紅**（兩邊都「畫面上的牌子：[]」） |
+      | 2 | 姓名 | `identityOf` 的 `name: p.name` → `name: '訪客'`（重演 `BE-G02` 那一整片「訪客」） | `S10` **4 紅**，其中兩條正是「有 fallback 名字」 |
+      | 3 | 姓名 | `snapshot` 的 `if (p.id === selfId) continue` → `if (false) continue`（自己也進名單） | `S10` **4 紅**（「在牌子上看到自己的名字」「有 2 塊名字牌」） |
+      | 4 | 姓名（**判準本身**） | 兩個 context 改成同一個 context 的兩個分頁 | ⚠️ **原本全部照樣綠** —— 見下 |
+      | 5 | 在線人數 | `onlineCountOf` 的 `roster.size + 1` → `roster.size` | `remote-players`＋`online-count` **8 紅** |
+      | 6 | 狀態更新 | `status` 的 `if (current.st === message.text) return false` → `if (true) return false` | `[FE-R10-S03]` **紅** |
+      | 7 | 狀態更新 | 重複 join 的 `} else if (current.st !== p.st) {` → `} else if (false) {` | `[FE-R10-S11]` **紅** |
+
+      ⚠️⚠️ **突變 4 抓到的是真的漏洞，要寫清楚。** 規格明文「MUST NOT 使用共用 cookie 的兩個普通分頁冒充兩個登入身分」，
+      而腳本原本的 12 條判準**分不出來** —— 把兩個 context 換成同一個 context 的兩個分頁，**全部照樣綠**。
+      原因：第二次登入雖然把 cookie 蓋掉了，第一個分頁那條 WS 的身分是**握手當下**決定的、之後不會變，
+      所以「互相看得見對方的名字」在「兩個身分」與「一個身分加一條過期的連線」底下長得一模一樣。
+      補法：`assertOwnSession` —— 用該 context **當下**的 cookie 打 `GET /api/me`，回來的名片要是自己。
+      補完之後同一個突變 → **紅**（先登入的那一邊拿到後登入那個人的名片），正常路徑仍然 **12 綠**。
+      「兩個隔離 cookie」這個前提從此是承重的，不是註解裡的一句話。
+
+      還原後重跑：`git status` 對 `src/` 沒有任何改動；`remote-players`＋`online-count` **31 綠**、`two-browsers-names.mjs` **12 綠**。

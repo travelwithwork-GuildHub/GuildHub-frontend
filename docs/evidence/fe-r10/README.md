@@ -1,5 +1,33 @@
 # FE-R10 的瀏覽器證據
 
+**這裡有兩組，來源完全不同，不要混在一起看。**
+
+| 組 | 檔案 | 後端 | 腳本 |
+|---|---|---|---|
+| 在線人數（`S07`～`S09`） | `online-count-1280x720.png` | **全部偽造**（`page.route` ＋ `routeWebSocket`） | 一次性的，沒有進版控 |
+| 兩個瀏覽器互見姓名（`S10`） | `two-browsers-jia.png`／`two-browsers-yi.png` | **真的本地後端 ＋ 可拋棄資料庫** | `tests/e2e/two-browsers-names.mjs`，**進版控、可重跑** |
+
+## 兩個瀏覽器互見姓名（`FE-R10-S10`）
+
+`two-browsers-jia.png`／`two-browsers-yi.png` 是 `tests/e2e/two-browsers-names.mjs` 跑完時兩邊各自的畫面。
+**這一組沒有偽造任何東西**：兩個隔離 cookie 的 browser context 各自打同源的 `POST /api/login` 真的登入，
+名字存進一個**只為這次建立、跑完可以直接 drop** 的資料庫；即時層是 `scripts/realtime-stub.ts`（`FE-O03`，
+照 `protocol.py` 寫），它**解 cookie、查名片表**才知道那條連線叫什麼名字 —— 跟真後端 `auth.py` 同一條路。
+前端從頭到尾沒有機會「知道」對方叫什麼，除非那個名字真的走完 DB → WS → snapshot → roster → 名字牌。
+
+跑法與環境變數寫在腳本開頭。**名字帶每次執行才產生的亂數尾碼**，所以截圖上的名字每跑一次都不一樣 ——
+那是刻意的：寫死的名字會讓腳本在一個殘留的資料庫上假綠。
+
+**證明**：兩個真的登入身分在同一個 scene 裡，各自在對方的遠端角色頭上看到**對方的名字**（不是 fallback、不是自己的）；
+順帶拍到「2 人在線」，所以這張圖同時是 `S07` 在真後端下的旁證。
+
+**不證明**：真 GuildHub Python 後端的整合。即時層是替身（規格 design `D5` 要的是「當次本機後端與測試資料庫」，
+不是「團隊共用的那一份」）。
+
+---
+
+## 在線人數（`FE-R10-S07`～`S09`）
+
 本機 `pnpm run dev`（`NEXT_PUBLIC_APP_ENV=local`），用一次性的 Playwright 腳本拍的（沒有進版控）：
 REST 用 `page.route` 回偽造的回應（`/api/me` 401、`/api/rooms` 空清單），`/ws` 用 `page.routeWebSocket`
 偽造 —— 先送 `hello`，隔幾秒才送含自己與兩個遠端玩家的 `snapshot`。**不連任何後端，也不連任何團隊共用的位址。**
