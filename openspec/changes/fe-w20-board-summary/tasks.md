@@ -26,9 +26,9 @@
 - [x] 4.5 ui-ux-pro-max：compact label 單行截斷＋`title`、骨架 `motion-safe:animate-pulse`、不透明高對比卡；遠處可辨識在 `S09` e2e 收尾驗
 
 ## 5. 真瀏覽器 e2e（feat/fe-w20-board-summary--e2e）
-- [ ] 5.1 `tests/e2e/board-summary.mjs`：spawn 不按 E，專案看板有資料／人才看板空 → 兩種狀態訊號從 spawn 分得出來（`S09`）
-- [ ] 5.2 移動時 overlay 釘在看板上（螢幕位置跟 `screenPixelFor` 走、不游移到看板外）、畫面外移出無障礙樹（`S09` 後半）
-- [ ] 5.3 本機 build 帶 `NEXT_PUBLIC_APP_ENV=local`（見 reference_local_e2e_build_env）；跑綠
+- [x] 5.1 `tests/e2e/board-summary.mjs`：spawn 不按 E，專案看板有資料（page 0 五筆只留前 4）／人才看板空 → 兩種狀態訊號從 spawn 分得出來（`S09`）
+- [x] 5.2 移動時 overlay 跟著相機走（釘在世界不是螢幕）、內容不閃；往西走遠讓東側看板離開畫面 → overlay `visibility:hidden`（`S09` 後半）；另驗讀不到 role=status 無 retry
+- [x] 5.3 本機 build 帶 `NEXT_PUBLIC_APP_ENV=local`（見 reference_local_e2e_build_env）；跑綠（12 條全過，手動閘不在 e2e-main）
 
 ## 6. 收尾
 - [ ] 6.1 部署（`vercel --prod`）＋真機走查：進世界不按 E 就看得出兩塊看板有沒有東西
