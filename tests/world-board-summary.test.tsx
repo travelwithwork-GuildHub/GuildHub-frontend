@@ -51,6 +51,14 @@ describe('兩塊看板的配對（S01）', () => {
     const talent = board('board-talent')
     expect(within(talent).getByText('鐵砧公會長')).toBeTruthy()
   })
+
+  it('[FE-W20-S01] 每塊看板有抬頭說明「這塊在列什麼」—— 不然遠看只是一疊字（使用者回報）', () => {
+    // 抬頭在**任何狀態**都在，包括還沒有資料時（載入中／空的也要先讓人知道這塊是什麼）。
+    setBoards(view('loading'), view('ready', []))
+    mount()
+    expect(within(board('board-project')).getByTestId('board-summary-title').textContent).toBe('招募中的案子')
+    expect(within(board('board-talent')).getByTestId('board-summary-title').textContent).toBe('在找隊友的人')
+  })
 })
 
 describe('四種狀態', () => {

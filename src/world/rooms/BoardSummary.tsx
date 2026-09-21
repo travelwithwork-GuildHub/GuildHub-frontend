@@ -23,8 +23,10 @@ export function useBoardNodes(): RefObject<BoardSummaryNodes> {
   return useRef<BoardSummaryNodes>(new Map())
 }
 
-/** 一塊看板要畫的東西：狀態＋已截到前 4 筆的**單一欄位文字**（標題／名字）＋失敗原因。 */
+/** 一塊看板要畫的東西：**看板抬頭**（這塊是什麼）＋狀態＋已截到前 4 筆的**單一欄位文字**（標題／名字）＋失敗原因。 */
 interface BoardView {
+  /** 看板抬頭 —— 讓沒開面板的人一眼看出「這塊在列什麼」，不然遠看只是一疊字（使用者回報）。 */
+  readonly title: string
   readonly status: BoardSummaryStatus
   readonly labels: readonly string[]
   readonly error: unknown
@@ -35,8 +37,8 @@ export function BoardSummary({ nodesRef, enabled }: { nodesRef: RefObject<BoardS
   const projects = useBoardSummary('projects', enabled)
   const profiles = useBoardSummary('profiles', enabled)
   const views: Record<string, BoardView> = {
-    'board-project': { status: projects.status, labels: projects.items.map((p) => p.title), error: projects.error },
-    'board-talent': { status: profiles.status, labels: profiles.items.map((p) => p.display_name), error: profiles.error },
+    'board-project': { title: '招募中的案子', status: projects.status, labels: projects.items.map((p) => p.title), error: projects.error },
+    'board-talent': { title: '在找隊友的人', status: profiles.status, labels: profiles.items.map((p) => p.display_name), error: profiles.error },
   }
 
   return (
@@ -57,7 +59,7 @@ export function BoardSummary({ nodesRef, enabled }: { nodesRef: RefObject<BoardS
         >
           {/* 0×0 錨點的中心對齊投影點；卡片自己往中心的四周撐開（水平置中、垂直置中在板面上）。 */}
           <div className="absolute top-0 left-0 w-44 -translate-x-1/2 -translate-y-1/2">
-            <BoardSummaryCard view={views[anchor.id] ?? { status: 'loading', labels: [], error: null }} />
+            <BoardSummaryCard view={views[anchor.id] ?? { title: '', status: 'loading', labels: [], error: null }} />
           </div>
         </div>
       ))}
@@ -65,54 +67,53 @@ export function BoardSummary({ nodesRef, enabled }: { nodesRef: RefObject<BoardS
   )
 }
 
-/** 板面上的一塊摘要卡：不透明、對比高，遠處也讀得出「有東西／沒東西／讀不到／載入中」。 */
+/** 板面上的一塊摘要卡：**抬頭（這塊在列什麼）** ＋ 不透明、對比高的內容，遠處也讀得出「有東西／沒東西／讀不到／載入中」。 */
 function BoardSummaryCard({ view }: { view: BoardView }) {
   // 邊框顏色是四態從出生點分辨的**粗略訊號之一**（`S09`）：empty 是中性 `line`、failed 是 `danger`
   // ——沿用全站錯誤語彙（`PanelErrorShell`／表單都是 `border-danger`＋`text-danger`），讓「讀不到」跟「空的」在讀不到字的距離也分得開。
-  const card = 'bg-surface-raised text-ink shadow-panel rounded-panel border px-3 py-2'
-  // 載入中：骨架卡，填住卡槽、不先畫空位（`S06`）。
-  if (view.status === 'loading') {
-    return (
-      <div data-testid="board-summary" data-state="loading" role="status" aria-label="載入中" className={`${card} border-line`}>
+  const card = 'bg-surface-raised text-ink shadow-panel rounded-panel flex flex-col gap-1.5 border px-3 py-2'
+  const failed = view.status === 'failed'
+  const hasData = view.labels.length > 0
+  // 四態合一，抬頭永遠在（載入中也先讓人知道這塊在列什麼），內容依狀態切。
+  const state = view.status === 'loading' ? 'loading' : failed ? 'failed' : hasData ? (view.status === 'stale' ? 'stale' : 'ready') : 'empty'
+  return (
+    <div
+      data-testid="board-summary"
+      data-state={state}
+      role="status"
+      aria-label={view.status === 'loading' ? '載入中' : undefined}
+      className={`${card} ${failed ? 'border-danger' : 'border-line'}`}
+    >
+      {/* 看板抬頭 —— 沒開面板的人遠遠先讀到「招募中的案子」，再掃下面幾筆就懂了；不然只是一疊字（使用者回報）。 */}
+      <p data-testid="board-summary-title" {...withClass(CAPTION, 'truncate border-b border-line/70 pb-1 font-medium text-ink')} title={view.title}>
+        {view.title}
+      </p>
+      {view.status === 'loading' ? (
+        // 載入中：骨架卡，填住卡槽、不先畫空位（`S06`）。
         <ul className="flex flex-col gap-1.5">
           {Array.from({ length: BOARD_SUMMARY_COUNT }, (_, i) => (
             <li key={i} className="h-4 rounded bg-line motion-safe:animate-pulse" />
           ))}
         </ul>
-      </div>
-    )
-  }
-  // 有內容：填了字的卡 ＋ 其餘空槽（`S01`）。stale 也走這裡（有舊資料就畫舊的，`S05`）。
-  if (view.labels.length > 0) {
-    const empties = Math.max(0, BOARD_SUMMARY_COUNT - view.labels.length)
-    return (
-      <div data-testid="board-summary" data-state={view.status === 'stale' ? 'stale' : 'ready'} className={`${card} border-line`}>
+      ) : hasData ? (
+        // 有內容：填了字的卡 ＋ 其餘空槽（`S01`）。stale 也走這裡（有舊資料就畫舊的，`S05`）。
         <ul className="flex flex-col gap-1.5">
           {view.labels.map((label, i) => (
             <li key={`item-${i}`} data-testid="board-summary-item" title={label} {...withClass(CAPTION, 'truncate leading-4 text-ink')}>
               {label}
             </li>
           ))}
-          {Array.from({ length: empties }, (_, i) => (
+          {Array.from({ length: Math.max(0, BOARD_SUMMARY_COUNT - view.labels.length) }, (_, i) => (
             <li key={`empty-${i}`} data-testid="board-summary-slot" aria-hidden className="h-4 rounded border border-dashed border-line/60" />
           ))}
         </ul>
-      </div>
-    )
-  }
-  // 讀不到：環境化錯誤，`role="status"`、**無 retry**（`S05`）。語彙走 `FE-X03`，不回顯後端字串。
-  // `border-danger`＋`text-danger`＝從出生點就看得出「讀不到」不同於「空的」的粗略訊號（`S09`），但仍 `role="status"`＋無動作（不奪焦，D3）。
-  if (view.status === 'failed') {
-    return (
-      <div data-testid="board-summary" data-state="failed" role="status" className={`${card} border-danger`}>
+      ) : failed ? (
+        // 讀不到：環境化錯誤、`role="status"`、**無 retry**（`S05`）；語彙走 `FE-X03`，不回顯後端字串。`border-danger`＋`text-danger` 是遠看跟「空的」分得開的粗略訊號。
         <p {...withClass(CAPTION, 'text-danger')}>{toUiError(view.error).message}</p>
-      </div>
-    )
-  }
-  // 空的：`FE-X04` 的「這裡還沒有東西。」看板版，`role="status"`（`S04`）——中性色，跟 failed 的 danger 色分得開。
-  return (
-    <div data-testid="board-summary" data-state="empty" role="status" className={`${card} border-line`}>
-      <p {...withClass(CAPTION, 'text-ink-muted')}>{EMPTY_STATE_COPY['first-empty']}</p>
+      ) : (
+        // 空的：`FE-X04` 的「這裡還沒有東西。」看板版（`S04`）——中性色，跟 failed 的 danger 色分得開。
+        <p {...withClass(CAPTION, 'text-ink-muted')}>{EMPTY_STATE_COPY['first-empty']}</p>
+      )}
     </div>
   )
 }
