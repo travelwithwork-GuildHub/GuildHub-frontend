@@ -13,6 +13,9 @@ import { stopTree, treeAlive } from './support/process-tree'
 // 所以這裡量的不是「有沒有呼叫 kill」，是**子程序與孫子事後是不是真的不在了** ——
 // 前者在壞掉的實作上也會綠。
 
+/** 孫子要不要自己一組 —— 見 `spawnTree()` 的說明，兩個平台的理由相反。 */
+const DETACHED_GRANDCHILD = process.platform === 'win32'
+
 /** 這個 pid 還在嗎？正數 pid，兩個平台都有效（負數 pid 就是上面那個 bug 本身）。 */
 function alive(pid: number): boolean {
   try {
@@ -32,11 +35,23 @@ async function waitGone(pid: number, ms: number): Promise<boolean> {
   return !alive(pid)
 }
 
-/** 起一個 detached 的子程序，它自己再起一個孫子，並把孫子的 pid 印到 stdout。 */
+/**
+ * 起一個 detached 的子程序，它自己再起一個孫子，並把孫子的 pid 印到 stdout。
+ *
+ * ⚠️ **孫子只在 win32 也 detached**，兩個平台的理由剛好相反，而且都是實測出來的：
+ *
+ * - win32：不 detached 的孫子**本來就會**跟父程序一起死。那條性質是作業系統給的，
+ *   不是 `taskkill /T` 給的 —— 孫子不 detached 的話，拿掉 `/T` 的突變不會紅（判準恆綠）。
+ * - POSIX：`detached` 就是 `setsid()`，孫子會**自己成為一個 process group**。
+ *   `stopTree()` 殺的是 `-child.pid` 那一組，殺不到它 —— 正確的實作也會紅。
+ *   WSL 實測：detached 的孫子 pgid 與 child 不同，`kill -TERM -<childPgid>` 之後仍然 ALIVE；
+ *   不 detached 的孫子與 child 同一組，同一個 kill 就會一起死。
+ */
 function spawnTree(): Promise<{ child: ChildProcess; grandchild: number }> {
   const src =
     "const {spawn} = require('child_process');" +
-    "const g = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true });" +
+    `const DETACHED_GRANDCHILD = ${DETACHED_GRANDCHILD};` +
+    "const g = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: DETACHED_GRANDCHILD });" +
     'console.log(g.pid);' +
     'setInterval(() => {}, 1000);'
   const child = spawn(process.execPath, ['-e', src], { stdio: ['ignore', 'pipe', 'pipe'], detached: true, windowsHide: true })
@@ -90,7 +105,7 @@ describe('contract harness 的 teardown', () => {
     expect(await waitGone(tree.child.pid as number, 5_000), `pid ${tree.child.pid} 還活著 —— 這就是咬著 port 的孤兒`).toBe(true)
   }, 20_000)
 
-  it('stopTree() 之後，孫子也不在了（next 是 `pnpm exec` 的孫子，只關直接子程序會留孤兒）', async () => {
+  it('stopTree() 之後，孫子也不在了（只關直接子程序會留孤兒；next 日後再生工作程序就是這一條）', async () => {
     const tree = await spawnTree()
     started.push(tree)
     await stopTree(tree.child)

@@ -17,7 +17,7 @@ import type { TestProject } from 'vitest/node'
 import { reset } from '../../scripts/db.mjs'
 import { testDatabase } from '../support/test-db'
 import { RECORDING_DIR, assembleRecordings } from './golden'
-import { listenersOf, stopTree } from '../support/process-tree'
+import { listenersOf, stopAll, throwIfAnyLeft } from '../support/process-tree'
 import { assertLoopbackBase, resolveTarget } from './target'
 
 const ROOT = path.resolve(__dirname, '..', '..')
@@ -167,7 +167,8 @@ export default async function setup(project: TestProject): Promise<() => Promise
   try {
     await waitForLine(stub, () => stubLog, new RegExp(`ws://127\\.0\\.0\\.1:${stubPort}/ws`), 30_000)
   } catch (e) {
-    await stopTree(stub)
+    const left = await stopAll(stub)
+    if (left.length > 0) throw new AggregateError([e, ...left], '替身起不來，而且沒關乾淨')
     throw e
   } finally {
     stub.stdout?.off('data', collectStub)
@@ -201,8 +202,8 @@ export default async function setup(project: TestProject): Promise<() => Promise
   try {
     await waitUntilReady(child, port, 60_000, () => log)
   } catch (e) {
-    await stopTree(child)
-    await stopTree(stub)
+    const left = await stopAll(child, stub)
+    if (left.length > 0) throw new AggregateError([e, ...left], 'next start 起不來，而且沒關乾淨')
     throw e
   } finally {
     child.stdout?.off('data', collect)
@@ -227,9 +228,10 @@ export default async function setup(project: TestProject): Promise<() => Promise
   // 測試檔不能知道自己在打誰（`FE-O05-S02`），而 harness 是唯一允許認得目標的地方（`stubProbe` 的簽法同理）。
   project.provide('contractRoomGrantPrefix', 'room_grant_')
   return async () => {
-    await stopTree(child)
-    await stopTree(stub)
+    // 兩棵都要試過再報失敗 —— 依序 await 的話，第一棵丟錯會讓第二棵完全沒被清。
+    const left = await stopAll(child, stub)
     await recorded()
+    throwIfAnyLeft(left, 'contract harness teardown')
   }
 }
 
