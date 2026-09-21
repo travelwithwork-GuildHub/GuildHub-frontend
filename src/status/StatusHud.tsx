@@ -73,7 +73,7 @@ export function StatusHud() {
       className="absolute top-16 left-gutter flex w-[min(20rem,30vw)] flex-col gap-2"
     >
       {/* 收合的膠囊：目前狀態（回聲為準）；送出中另外標 */}
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} {...withClass(SECONDARY, 'bg-surface/90 text-caption w-max max-w-full overflow-hidden text-ellipsis whitespace-nowrap backdrop-blur-sm')}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} {...withClass(SECONDARY, 'bg-surface/70 text-caption shadow-panel w-max max-w-full overflow-hidden text-ellipsis whitespace-nowrap backdrop-blur-md')}>
         {toggleLabel}
         {snapshot.pending !== null && <span className="text-ink-muted ml-2">{STATUS_HUD_LABELS.pending}</span>}
       </button>
@@ -85,7 +85,7 @@ export function StatusHud() {
             if (over > 0 || draft === '') return
             submit(draft)
           }}
-          className="bg-surface/90 border-line text-ink flex flex-col gap-2 rounded border p-2 backdrop-blur-sm"
+          className="bg-surface/70 border-line text-ink shadow-panel flex flex-col gap-2 rounded-panel border p-2 backdrop-blur-md"
         >
           <div className="flex flex-wrap gap-1">
             {QUICK_STATUSES.map((q) => (
