@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { SECONDARY, withClass } from '@/design/controls'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { useRoomEntryGateIfProvided } from './RoomEntryGate'
@@ -15,7 +14,8 @@ import { useScene } from './SceneProvider'
 // 「再試一次」不是一顆按鈕：門還在走廊上，走過去再按 E 就是重試（error recovery 的下一步是看得見的門）。
 //
 // 「重新輸入密碼」（`FE-N08` design D5）：**只有使用者按了才**丟這個身分對那間房的票 → 關通知 → 開那間房的視窗；
-// 系統自己不丟票、不重試。丟票要確認（`dropRoomToken` 三態）：「還在」或「無法確認」→ 不開視窗、通知留著、多一句受控說明。
+// 系統自己不丟票、不重試。丟票一定成功（`dropRoomToken`：記憶體放墓碑、storage best-effort，`sessionStorage`
+// 刪不掉也不會被拿去撞握手）—— 所以不再有「清不掉舊票、擋著不讓重新輸入」那一步（`fe-n08-room-ticket-in-memory` 反轉）。
 // 沒有正式門禁（沒 provider）就沒有這顆按鈕 —— 那時開不了視窗。
 //
 // **沒票是 `role="status"`**：那不是失敗，是「你還沒有票」。
@@ -29,8 +29,6 @@ export const DENIED_TEXT = '這間房需要房間密碼 —— 走到走廊上�
 /** 預設門禁（`FE-N08` 還沒接上）：對著門按 E 但沒有票（`S11`）。誠實說「還沒開放」，不假裝門壞了。 */
 export const GATE_TEXT = '這間房需要房間密碼。輸入密碼的功能還沒開放。'
 export const REENTER_LABEL = '重新輸入密碼'
-/** 票丟不掉（`FE-N08-S11`）：不開視窗 —— 開了也會拿舊票去撞握手。 */
-export const DROP_FAILED_TEXT = '這個瀏覽器清不掉舊的通行證，所以還不能重新輸入密碼。'
 /** `ready` 之後意外斷線、自動重連中（`FE-R12`）。 */
 export const RECOVERING_TEXT = '連線中斷，正在重新連線⋯⋯'
 
@@ -39,16 +37,10 @@ export function SceneNotices() {
   const gate = useRoomEntryGateIfProvided()
   const identity = useIdentity()
   const profileId = identity.state === 'signed-in' ? identity.profile.id : null
-  // 那一句跟著**這一則**通知（物件同一性）：被下一則取代或關閉就不再顯示。
-  const [dropFailed, setDropFailed] = useState<object | null>(null)
   const reenter = () => {
     if (notice === null || gate === null) return
-    // 訪客沒有鍵可丟（票的鍵含身分）；有身分就要確認真的不在了。
-    const result = profileId === null ? 'dropped' : dropRoomToken(profileId, notice.room)
-    if (result !== 'dropped') {
-      setDropFailed(notice)
-      return
-    }
+    // 訪客沒有鍵可丟（票的鍵含身分）；有身分就丟票（記憶體墓碑一定成功，storage best-effort）。
+    if (profileId !== null) dropRoomToken(profileId, notice.room)
     dismissNotice()
     gate.open(notice.room, notice.title ?? null)
   }
@@ -57,7 +49,6 @@ export function SceneNotices() {
       {notice !== null && (
         <div role="alert" className="border-danger text-danger p-gutter gap-gutter flex flex-wrap items-center border">
           <p>{FAILED_TEXT}</p>
-          {dropFailed === notice && <p>{DROP_FAILED_TEXT}</p>}
           {gate !== null && (
             <button type="button" onClick={reenter} {...withClass(SECONDARY, 'min-h-11 shrink-0')}>
               {REENTER_LABEL}

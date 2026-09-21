@@ -3,7 +3,7 @@ import { useEffect, type ReactNode, type RefObject } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Identity } from '@/identity/types'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
-import { holdRoomToken, heldRoomToken } from '@/world/scenes/roomTokens'
+import { __resetRoomTokenMemory, holdRoomToken, heldRoomToken } from '@/world/scenes/roomTokens'
 import { SceneProvider, useScene, type SceneValue } from '@/world/scenes/SceneProvider'
 import { SceneNotices } from '@/world/scenes/SceneNotices'
 import { FADE_MS, OVERLAY_MIN_MS, SceneTransitionOverlay } from '@/world/scenes/SceneTransitionOverlay'
@@ -355,7 +355,9 @@ describe('深連結', () => {
     expect(window.location.href).not.toContain('T=')
     cleanup()
     FakeSocket.instances = []
+    // 「沒票」= 重整（記憶體清空）＋ storage 也沒有。只清 storage 不夠：這一場的權威在記憶體（`fe-n08-room-ticket-in-memory`）。
     window.sessionStorage.clear()
+    __resetRoomTokenMemory()
     const w2 = arriveAt(`/world?room=${ROOM}`)
     await flush()
     expect(w2.last().scene).toBe('lobby')

@@ -5,15 +5,16 @@ import type { Identity } from '@/identity/types'
 import { useRequestEntry } from '@/world/scenes/EntryGate'
 import { RoomEntryGateProvider } from '@/world/scenes/RoomEntryGate'
 import { ROOM_ENTRY_LABELS } from '@/world/scenes/RoomPasswordDialog'
-import { DROP_FAILED_TEXT, REENTER_LABEL, SceneNotices } from '@/world/scenes/SceneNotices'
+import { REENTER_LABEL, SceneNotices } from '@/world/scenes/SceneNotices'
 import { SceneProvider, useScene, type SceneValue } from '@/world/scenes/SceneProvider'
-import { holdRoomToken } from '@/world/scenes/roomTokens'
+import { __resetRoomTokenMemory, heldRoomToken, holdRoomToken } from '@/world/scenes/roomTokens'
 import { doorsFor } from '@/world/rooms/ordering'
 import { CORRIDOR_SLOTS } from '@/world/rooms/slots'
 import WorldCanvas from '@/world/WorldCanvas'
 
-// 規格：openspec/changes/fe-n08-room-entry-gate/specs/room-entry-gate/spec.md
-//   Requirement: 握手失敗後，使用者可以選擇重新輸入密碼；系統仍不丟票 —— S11
+// 規格：openspec/specs/room-entry-gate/spec.md
+//   Requirement: 成功先持有票再進房（票以記憶體為主）—— 被拒後確認才丟票重輸 S11；
+//     `removeItem` 失敗時記憶體墓碑仍令 heldRoomToken 回 null、視窗照開 S18（`fe-n08-room-ticket-in-memory` 反轉）
 //
 // 整條鏈是正式碼（同 `world-scenes-transition-ui.test.tsx`）；每條走兩趟以上，全套平行跑時預設 5 秒會逾時（實測）→ 20 秒：`SceneProvider` → `WorldCanvas` → `RemoteWorld` → `new WebSocket(url)`；
 // 通知在 Canvas 外（`page.tsx` 的形狀）、視窗在 `WorldCanvas` 裡；`RoomEntryGateProvider` 包住兩者。換掉的只有第三方邊界與 `LocalPlayer`。
@@ -84,7 +85,6 @@ class FakeSocket {
 const ROOM = 'a0000000-0000-4000-8000-00000000000a'
 const TITLE = '星際導航'
 const PROFILE = { id: 'p0000000-0000-4000-8000-00000000000p', display_name: 'P', avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-14T00:00:00Z' }
-const KEY = `guildhub.roomToken.${PROFILE.id}.${ROOM}`
 
 type Probe = { scene: SceneValue; requestEntry: (projectId: string, title: string) => void }
 function ProbeSink({ sinkRef }: { sinkRef: RefObject<Probe | null> }) {
@@ -104,6 +104,7 @@ beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_REALTIME_ADAPTER', 'guildhub')
   HTMLCanvasElement.prototype.getContext = vi.fn((id: string) => (id === 'webgl2' ? ({} as RenderingContext) : null)) as typeof realGetContext
   window.sessionStorage.clear()
+  __resetRoomTokenMemory() // 這一場的權威在記憶體；跨測試要清
   identity.current = { state: 'signed-in', profile: PROFILE }
   listRooms.mockReset()
   listRooms.mockResolvedValue([{ project_id: ROOM, title: TITLE, online_count: 1 }])
@@ -172,17 +173,17 @@ describe('被拒之後', () => {
     const first = await refusedOnce(w)
     expect(first.token).toBe('T')
     expect(alert()).not.toBeNull()
-    expect(window.sessionStorage.getItem(KEY), '系統不丟票').toBe('T')
+    expect(heldRoomToken(PROFILE.id, ROOM), '系統不丟票').toBe('T')
     expect(reenterButton()).toBeTruthy()
     expect(dialogs()).toHaveLength(0)
     // 不按：再按 E 用同一張票。
     const second = await refusedOnce(w)
     expect(second.token, '沒按就用舊票再試').toBe('T')
-    expect(window.sessionStorage.getItem(KEY)).toBe('T')
+    expect(heldRoomToken(PROFILE.id, ROOM)).toBe('T')
     expect(enterProject, '啟動之前不得呼叫 /enter').not.toHaveBeenCalled()
     expect(screen.getAllByRole('alert')).toHaveLength(1)
     act(() => reenterButton().click())
-    expect(window.sessionStorage.getItem(KEY), '按了才丟').toBeNull()
+    expect(heldRoomToken(PROFILE.id, ROOM), '按了才丟').toBeNull()
     expect(alert(), '通知關閉').toBeNull()
     expect(dialogs()).toHaveLength(1)
     expect(screen.getByRole('dialog', { name: new RegExp(TITLE) })).toBeTruthy()
@@ -190,20 +191,24 @@ describe('被拒之後', () => {
     expect(enterProject).not.toHaveBeenCalled()
   }, 20_000)
 
-  it.each<[string, () => void, string | null]>([
-    ['removeItem 拋', () => void vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('SecurityError') }), 'T'],
-    ['removeItem 靜默沒刪', () => void vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {}), 'T'],
-    ['刪完 getItem 拋', () => void vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError') }), null],
-  ])('[FE-N08-S11] %s：不開視窗、通知還在、多一句受控說明', async (_name, sabotage, keyAfter) => {
+  // 反轉（`fe-n08-room-ticket-in-memory`）：丟票靠**記憶體墓碑**（一定成功），`sessionStorage.removeItem`
+  // 刪不掉也沒關係 —— `heldRoomToken` 讀墓碑回 `null`，舊票不會被拿去撞握手。所以「storage 刪不掉就擋著
+  // 不讓重新輸入」那一步沒有了：照樣關通知、開視窗。
+  it.each<[string, () => void]>([
+    ['removeItem 拋', () => void vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('SecurityError') })],
+    ['removeItem 靜默沒刪（storage 仍殘留 T）', () => void vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {})],
+    ['刪完 getItem 拋', () => void vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError') })],
+  ])('[FE-N08-S18] %s：記憶體墓碑保證丟得掉 —— 照樣開視窗、通知關掉，之後 heldRoomToken 回 null', async (_name, sabotage) => {
     const w = await inHall()
     await refusedOnce(w)
     sabotage()
     act(() => reenterButton().click())
-    expect(dialogs()).toHaveLength(0)
-    expect(alert()).not.toBeNull()
-    expect(alert()?.textContent).toContain(DROP_FAILED_TEXT)
+    // 通知關掉、視窗開起來（不再被 storage 刪不掉擋住）
+    expect(dialogs()).toHaveLength(1)
+    expect(alert()).toBeNull()
+    // **關鍵安全性**：即使 storage 還殘留舊票，記憶體墓碑讓 heldRoomToken 回 null —— 舊票不會被拿去撞握手。
+    expect(heldRoomToken(PROFILE.id, ROOM), '記憶體墓碑後 heldRoomToken 必須回 null').toBeNull()
     vi.restoreAllMocks()
-    if (keyAfter !== null) expect(window.sessionStorage.getItem(KEY), '鍵仍是 T').toBe(keyAfter)
     expect(enterProject).not.toHaveBeenCalled()
   }, 20_000)
 
