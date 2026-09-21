@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, type ReactNode, type RefObject } from 'react'
 import { CAPTION, SECONDARY, withClass } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { toUiError } from '@/errors/uiError'
@@ -10,8 +10,10 @@ import { SEAT_INDICES, stationAt, type SeatIndex } from '../layout/projectRoomLa
 import { SEAT_ANCHORS } from './anchors'
 import { SeatAnchors, type SeatAnchorNodes } from './SeatAnchors'
 import { seatOf } from './seatRules'
+import { relocationForSeat } from './seatRelocation'
 import { useSeatNames } from './useSeatNames'
 import { useSeats, type SeatsState, type SeatsReady } from './useSeats'
+import type { RelocationRef } from '@/world/player/relocation'
 
 // 房間裡的座位標籤、入座互動與回饋（`FE-J13` 的畫面半邊；design D1／D4，`fe-j13-sit-walk-in` 修訂）。
 // 規格〈每個座位有一個標籤〉〈一鍵入座：走近空位、按 E〉〈失敗回饋〉。
@@ -47,10 +49,26 @@ export const SEAT_FEEDBACK = {
 
 const NONE: readonly string[] = []
 
-export function RoomSeats({ projectId, nodesRef }: { projectId: string; nodesRef: RefObject<SeatAnchorNodes> }) {
+export function RoomSeats({
+  projectId,
+  nodesRef,
+  relocateRef,
+}: {
+  projectId: string
+  nodesRef: RefObject<SeatAnchorNodes>
+  /** 入座成功時把角色搬到工位站位（`FE-J13-S07`）。`WorldCanvas` 持有、也傳給 `LocalPlayer` 消費；沒傳（單元測試）就不搬。 */
+  relocateRef?: RelocationRef
+}) {
   const identity = useIdentity()
   const me = identity.state === 'signed-in' ? identity.profile : null
-  const { state, claim, retry, dismissFeedback } = useSeats({ projectId, me: me?.id ?? '', active: me !== null })
+  // 入座成功 → 算站位＋朝向、寫進共享 ref；`LocalPlayer` 在下一幀原子消費。純函式 `relocationForSeat`，同格永遠同位置同朝向。
+  const onRelocate = useCallback(
+    (seatIndex: number) => {
+      if (relocateRef) relocateRef.current = relocationForSeat(seatIndex)
+    },
+    [relocateRef],
+  )
+  const { state, claim, retry, dismissFeedback } = useSeats({ projectId, me: me?.id ?? '', active: me !== null, onRelocate })
   const ready = state.phase === 'ready' ? state : null
   const names = useSeatNames(ready?.seats.map((s) => s.user_id) ?? NONE, me?.id ?? '')
 

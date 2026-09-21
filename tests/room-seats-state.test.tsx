@@ -4,6 +4,9 @@ import type { ProjectOut, SeatOut } from '@/api/contract/rest'
 import { HttpError } from '@/api/transport'
 import { SEATS_POLL_MS, canClaim, classify409 } from '@/world/seats/seatRules'
 import { useSeats } from '@/world/seats/useSeats'
+import { relocationForSeat } from '@/world/seats/seatRelocation'
+import { AISLE_CENTER_X, stationAt } from '@/world/layout/projectRoomLayout'
+import { FACING } from '@/world/coords'
 
 // 規格：openspec/changes/fe-j13-seats/specs/room-seats/spec.md
 //   Requirement: 座位以重取為準：進房、坐下後、409 後各一次，每 30 秒一次；不可見時停；晚到作廢 —— S04
@@ -282,5 +285,104 @@ describe('影子審查（codex，2026-09-20）抓到的三個時序洞', () => {
     await flush()
     expect(ready(hook).seats, '舊輪詢蓋掉了新座位').toEqual([seat(1, ME)])
     expect(canClaim({ ...ready(hook), me: ME })).toBe(false)
+  })
+})
+
+describe('入座成功發就位命令（FE-J13-S07）', () => {
+  const mount = (onRelocate: (i: number) => void, seats: SeatOut[] = []) => {
+    ops.listSeats.mockResolvedValueOnce(seats)
+    return renderHook(
+      (p: { projectId: string; me: string; active: boolean; onRelocate?: (i: number) => void }) => useSeats(p),
+      { initialProps: { projectId: ROOM, me: ME, active: true, onRelocate } },
+    )
+  }
+
+  it('[FE-J13-S07] 只有自己 claim 成功（201）才發就位；被搶/已有座位/403/500/輪詢/重整既有座位都不發', async () => {
+    // 201 成功 → onRelocate(1) 恰好一次
+    const on1 = vi.fn()
+    const h1 = mount(on1)
+    await flush()
+    ops.claimSeat.mockResolvedValueOnce(seat(1, ME))
+    ops.listSeats.mockResolvedValueOnce([seat(1, ME)])
+    await act(async () => h1.result.current.claim(1))
+    await flush()
+    expect(on1).toHaveBeenCalledTimes(1)
+    expect(on1).toHaveBeenCalledWith(1)
+    h1.unmount()
+
+    // 被搶 409 → 不發
+    const on2 = vi.fn()
+    const h2 = mount(on2)
+    await flush()
+    ops.claimSeat.mockRejectedValueOnce(http(409, '這個座位已經有人了'))
+    ops.listSeats.mockResolvedValueOnce([seat(1, OTHER)])
+    await act(async () => h2.result.current.claim(1))
+    await flush()
+    expect(on2, '被搶不是入座').not.toHaveBeenCalled()
+    h2.unmount()
+
+    // 已有座位 409 → 不發
+    const on3 = vi.fn()
+    const h3 = mount(on3)
+    await flush()
+    ops.claimSeat.mockRejectedValueOnce(http(409, '你已經在這個房間有座位了'))
+    ops.listSeats.mockResolvedValueOnce([seat(3, ME)])
+    await act(async () => h3.result.current.claim(2))
+    await flush()
+    expect(on3, '「你已經有座位了」不是剛入座').not.toHaveBeenCalled()
+    h3.unmount()
+
+    // 403 票失效 → 不發
+    const on4 = vi.fn()
+    const h4 = mount(on4)
+    await flush()
+    ops.claimSeat.mockRejectedValueOnce(http(403, '尚未通過房間密碼驗證'))
+    await act(async () => h4.result.current.claim(0))
+    await flush()
+    expect(on4).not.toHaveBeenCalled()
+    h4.unmount()
+
+    // 500 服務失敗 → 不發
+    const on5 = vi.fn()
+    const h5 = mount(on5)
+    await flush()
+    ops.claimSeat.mockRejectedValueOnce(http(500, null))
+    await act(async () => h5.result.current.claim(0))
+    await flush()
+    expect(on5).not.toHaveBeenCalled()
+    h5.unmount()
+
+    // 一般輪詢（30 秒重取）→ 不發（沒有 claim）
+    const on6 = vi.fn()
+    const h6 = mount(on6, [seat(0, OTHER)])
+    await flush()
+    ops.listSeats.mockResolvedValueOnce([seat(0, OTHER), seat(1, OTHER)])
+    await tick(30_000)
+    expect(on6, '輪詢重取不是入座').not.toHaveBeenCalled()
+    h6.unmount()
+
+    // 重整後載入到自己既有的座位 → 不發（進房就有我的座位、沒有 claim）
+    const on7 = vi.fn()
+    mount(on7, [seat(2, ME)])
+    await flush()
+    expect(on7, '重整載入既有座位不是剛入座').not.toHaveBeenCalled()
+  })
+})
+
+describe('座位就位是純函式（FE-J13-S07）', () => {
+  it('[FE-J13-S07] relocationForSeat：站位座標＋面向桌子（西 left、東 right），同格永遠一致', () => {
+    for (const i of [0, 1, 2, 3]) {
+      const r = relocationForSeat(i)
+      expect(r.f, `西側工位 ${i} 面向 left`).toBe(FACING.left)
+      expect(r.x, `西側工位 ${i} 在通道中線西側`).toBeLessThan(AISLE_CENTER_X)
+      expect(r, '純函式：同格同值').toEqual(relocationForSeat(i))
+    }
+    for (const i of [4, 5, 6, 7]) {
+      const r = relocationForSeat(i)
+      expect(r.f, `東側工位 ${i} 面向 right`).toBe(FACING.right)
+      expect(r.x, `東側工位 ${i} 在通道中線東側`).toBeGreaterThan(AISLE_CENTER_X)
+    }
+    // 座標對得上 stationAt（站位，不是桌子/椅子）
+    expect(relocationForSeat(5)).toMatchObject({ x: stationAt(5).x, z: stationAt(5).z })
   })
 })

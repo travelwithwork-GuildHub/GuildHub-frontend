@@ -177,6 +177,15 @@ export function movePlayer(pw: PhysicsWorld, desired: { x: number; z: number }):
   pw.world.step()
 }
 
+/**
+ * 一次性就位：把角色物理體**硬移**到目的地（`FE-W03-S18`）。
+ * 用 `setTranslation`（不是 `setNextKinematicTranslation`）—— 就位是把位置權威搬過去，不是逐步移動；
+ * 下一次 `movePlayer` 從這裡接著算。y 固定 0（跟 `spawn` 一致）。
+ */
+export function teleportPlayer(pw: PhysicsWorld, dest: { x: number; z: number }): void {
+  pw.player.setTranslation({ x: dest.x, y: 0, z: dest.z }, true)
+}
+
 /** 角色目前有沒有跟這個 sensor 重疊。 */
 export function isOverlapping(pw: PhysicsWorld, sensor: RAPIER.Collider): boolean {
   let hit = false
