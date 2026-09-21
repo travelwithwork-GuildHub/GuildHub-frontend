@@ -79,7 +79,7 @@ async function createAndForm(page) {
   const form = page.getByTestId('create-project-form')
   await form.getByLabel('標題').fill(TITLE)
   await form.getByLabel('內容').fill('座位 e2e 用的案子。')
-  await form.getByLabel('座位數').fill('2')
+  await form.getByLabel('座位數').fill('3')
   await form.getByRole('button', { name: '送出' }).click()
   await page.waitForSelector('[data-testid="create-project-form"]', { state: 'detached', timeout: 15_000 })
   await page.waitForFunction((t) => document.querySelector('[data-testid="list-panel-list"] li [data-testid="project-card-title"]')?.textContent?.includes(t), TITLE, { timeout: 15_000 })
@@ -207,7 +207,7 @@ try {
     { project_id: room, title: TITLE, online_count: 1 },
     { project_id: DECOY, title: '誘餌門（不存在的案子）', online_count: 0 },
   ]
-  ok(`[S05] A 發案並成軍：${room}（座位 2、密碼已知）`)
+  ok(`[S05] A 發案並成軍：${room}（座位 3、密碼已知）`)
 
   // 效能觀察（不是判準）：A 從進房到重新整理前打了哪些 /api/（design D6：進房 project＋seats 各一、每 30 秒 seats 一次、每個占用者一次 profile）
   const apiHits = []
@@ -220,7 +220,8 @@ try {
   for (const who of [A, B]) {
     check(`[S05] ${who.name}：0 號是空位`, (await markerText(who.page, 0))?.includes('空位'), true)
     check(`[S05] ${who.name}：1 號是空位`, (await markerText(who.page, 1))?.includes('空位'), true)
-    check(`[S05] ${who.name}：只有 2 個座位標籤（seat_count=2）`, await who.page.locator('[data-testid="seat-marker"]').count(), 2)
+    // 座位數 3：0／1 由 A／B 坐、2 號全程空著 —— 留一個空位，才驗得出「重整後（狀態從後端重建）A 已有座位仍不顯示入座提示」（`S05` 末條）
+    check(`[S05] ${who.name}：有 3 個座位標籤（seat_count=3）`, await who.page.locator('[data-testid="seat-marker"]').count(), 3)
   }
   await B.page.screenshot({ path: path.join(OUT, '1-both-empty.png') })
 
@@ -283,6 +284,12 @@ try {
   await A.page.screenshot({ path: path.join(OUT, '5-a-reloaded.png') })
   // 提示：桌子不是互動物件（標籤不進互動系統）
   check('[S05] 房間裡沒有互動提示指著桌子', ((await promptText(A.page)) ?? '').includes('桌'), false)
+
+  // `S05` 末條：A 重新整理後（座位狀態從後端重建、不是剛才 claim 的活狀態）走到還空著的 2 號，SHALL NOT 有入座提示（一人一格在重整後也成立）。
+  // 這條驗的是**重建**路徑，跟 A 剛坐下時（活狀態）走到空位不顯示提示（本檔前段）是兩條不同的碼路。
+  await ensureKeyboardMoves(A)
+  check('[S05] 重整後 A 已有座位：走到 2 號空位沒有入座提示', (await walkToStance(A, 2))?.includes(CLAIM) ?? false, false)
+  await A.page.screenshot({ path: path.join(OUT, '6-a-reloaded-no-prompt.png') })
 
   await A.context.close()
   await B.context.close()
