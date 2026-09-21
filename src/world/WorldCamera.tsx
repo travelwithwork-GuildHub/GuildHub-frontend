@@ -8,6 +8,12 @@ import { CAMERA_DEFAULTS, cameraOffset, damp, orthoFrustum, type MutableVector3 
 
 // 固定的 Orthographic Elevated 相機。**不提供任何旋轉或自由移動的操作** ——
 // 沒有 OrbitControls，也沒有任何接受使用者輸入去改變相機的東西。
+//
+// ⚠️ **朝向是常數，建立時 `lookAt` 一次就固定；`useFrame` 只平移、不再 `lookAt`**（`FE-W05-S11`）。
+// offset 是常數，所以「從 `target + offset` 看向 `target`」的方向永遠是 `−offset`、與 target 在哪無關。
+// 以前每幀 `lookAt(target)`：位置有阻尼、會落後 target，從落後的位置看向移動中的 target，視線就偏離
+// `−offset` —— 走速 3 u/s、半衰期 0.12 s 量到約 2.35°，起停變向反覆擺動。**只在走路時發生的非自主旋轉光流**，
+// demo 實測回報「有些人會頭暈」。代價是移動中角色暫時偏離畫面中心約半個單位，停下 ~0.5 s 收斂 —— 偏心不暈，旋轉才暈。
 
 export interface WorldCameraProps {
   /**
@@ -31,7 +37,7 @@ export function WorldCamera({ targetRef }: WorldCameraProps) {
     cameraRef.current = new OrthographicCamera()
   }
 
-  // 建立一次，接管成預設相機
+  // 建立一次，接管成預設相機。**這裡的 `lookAt` 是整個元件唯一的一次** —— 之後朝向不再變。
   useEffect(() => {
     const camera = cameraRef.current
     const offset = cameraOffset()
@@ -59,6 +65,7 @@ export function WorldCamera({ targetRef }: WorldCameraProps) {
   }, [size.width, size.height])
 
   // 跟隨。**在 useFrame 裡直接讀 ref 的當前值** —— 不經過 React。
+  // **只阻尼位置。不要在這裡 `lookAt`**（見檔頭）：矩陣由 R3F 每幀 `updateMatrixWorld`，正交投影不因位置改變而需重算。
   useFrame((_, dt) => {
     const camera = cameraRef.current
     const target = targetRef.current
@@ -70,7 +77,6 @@ export function WorldCamera({ targetRef }: WorldCameraProps) {
       damp(camera.position.y, target.y + offset.y, dt, halfLife),
       damp(camera.position.z, target.z + offset.z, dt, halfLife),
     )
-    camera.lookAt(target.x, target.y, target.z)
   })
 
   return null
