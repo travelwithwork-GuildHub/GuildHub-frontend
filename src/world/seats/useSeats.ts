@@ -67,7 +67,23 @@ async function refetchSeats(projectId: string, controller: AbortController, seq:
   }
 }
 
-export function useSeats({ projectId, me, active }: { projectId: string; me: string; active: boolean }): SeatsApi {
+export function useSeats({
+  projectId,
+  me,
+  active,
+  onRelocate,
+}: {
+  projectId: string
+  me: string
+  active: boolean
+  /** 入座成功（201 成功鏈）後以 `seat_index` 呼叫一次 —— 讓角色就位到工位（`FE-J13-S07`）。失敗／輪詢／重整既有座位都不呼叫。 */
+  onRelocate?: (seatIndex: number) => void
+}): SeatsApi {
+  // 事件處理器裡讀最新的回呼，不進 `claim` 的 deps（否則每次 render 重建 claim）。在 effect 裡更新（跟下面的 `stateRef` 同款，不在 render 期間寫 ref）。
+  const onRelocateRef = useRef(onRelocate)
+  useEffect(() => {
+    onRelocateRef.current = onRelocate
+  })
   const [stored, setStored] = useState<{ key: string; state: SeatsState } | null>(null)
   const [generation, setGeneration] = useState(0)
   const key = keyOf(projectId, me, generation)
@@ -150,6 +166,9 @@ export function useSeats({ projectId, me, active }: { projectId: string; me: str
           // 洞 1：重取回來才放開 claiming
           await refetch()
           settle((s) => s)
+          // 只有這條「自己 claim 成功（201）」的鏈才發就位命令（`FE-J13-S07`）——
+          // 非 abort 才發（離開房間中止的請求不該把人搬過去）。409／403／500／輪詢／重整既有座位都在別的分支，不會到這裡。
+          if (!dead()) onRelocateRef.current?.(seatIndex)
         },
         async (cause: unknown) => {
           if (isAbort(cause)) return settle((s) => s)

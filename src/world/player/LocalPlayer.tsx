@@ -17,6 +17,7 @@ import { NAME_TAG_ANCHOR_Y, SELF_TAG_ID } from './nameTag'
 import { displacement, speedOf } from './movement'
 import { advanceRenderMotion, createRenderMotion } from './renderMotion'
 import { PHYSICS, createPhysicsWorld, movePlayer, type PhysicsWorld } from '@/world/physics/world'
+import { consumeRelocation, type RelocationRef } from './relocation'
 import { staticBoxesFor } from '@/world/layout/geometry'
 import { LAYOUT as HALL_LAYOUT, SPAWN as HALL_SPAWN } from '@/world/layout/guildHallLayout'
 import type { LayoutItem } from '@/world/layout/types'
@@ -68,9 +69,15 @@ export interface LocalPlayerProps {
    * 跟 `RemotePlayer` 對遠端牌子做的**完全同一套**。沒傳（舊測試）就不投影，不報錯。
    */
   tagNodesRef?: RefObject<NameTagNodes>
+  /**
+   * 一次性就位命令（`FE-W03-S18`；入座成功由 `RoomSeats` 寫）。**只有這裡是位置權威** ——
+   * 每幀開頭若有命令，原子地把物理體、render 插值前後點、root、朝向、相機 target、`poseRef` 全設到目的地，然後清空。
+   * 沒傳（舊測試、大廳沒有座位）就不消費，行為不變。
+   */
+  relocateRef?: RelocationRef
 }
 
-export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout = HALL_LAYOUT, tagNodesRef }: LocalPlayerProps) {
+export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout = HALL_LAYOUT, tagNodesRef, relocateRef }: LocalPlayerProps) {
   const rootRef = useRef<Group>(null)
   const bodyRef = useRef<Group>(null)
   /** 子部位查一次就快取。查不到的話動畫會靜默停止 —— 見 partsRef 的初始化。 */
@@ -173,6 +180,18 @@ export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout
   useFrame((state, dt) => {
     const root = rootRef.current
     if (!root) return
+
+    // 一次性就位（`FE-W03-S18`）：入座成功由 `RoomSeats` 寫進 `relocateRef`。
+    // `consumeRelocation` 原子地把物理體、render 插值前後點、root、朝向、相機 target、poseRef 全設到目的地、消費後清空。
+    // **只有這裡改物理體與 poseRef**（位置權威）；prev 與 cur 同設目的地 ⇒ 下一幀不從舊位置回彈。
+    consumeRelocation(relocateRef, {
+      pw: physics.current,
+      motion: motion.current,
+      root,
+      facingRef: facing,
+      targetRef,
+      poseRef,
+    })
 
     // 按著方向鍵的時候面板開了：`keyup` 會落在鎖著的期間被正常刪掉，
     // 但在那之前角色不該繼續走 —— 所以鎖著的每一幀都把按鍵清掉。

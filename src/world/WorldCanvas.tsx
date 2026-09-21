@@ -31,6 +31,7 @@ import { RoomsRefreshProvider } from './rooms/RoomsRefreshContext'
 import { useRooms } from './rooms/useRooms'
 import { useSeatAnchorNodes } from './seats/SeatAnchors'
 import { RoomSeats } from './seats/SeatMarkers'
+import type { Relocation } from './player/relocation'
 import { sceneOf } from './scenes/registry'
 import { useSceneRef } from './scenes/SceneContext'
 import { WorldUrlSync } from '@/list-panel/PanelUrlSync'
@@ -116,6 +117,9 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
   // 給網路層的權威狀態。**跟相機的 target 分開** —— 兩者今天相同，
   // 但相機之後可能鎖定別的東西（FE-R03 的 design D1）。
   const localPose = useRef({ x: 0, z: 0, f: 0 })
+  // 一次性就位命令（`FE-W03-S18`）：入座成功由 `RoomSeats` 寫、`LocalPlayer` 每幀原子消費。
+  // **跨 Canvas 邊界當 prop 傳**（跟 `cameraTarget`／`localPose` 一樣），住在這一層讓兩邊都拿得到。
+  const relocate = useRef<Relocation | null>(null)
   // 換場景的閘門（`FE-V01-S18`）：舊子樹的 `RemoteWorld` 卸載時放進「舊 socket 關乾淨了」的 promise，
   // 新子樹的等它再連。**跨兩次掛載**，所以住在 Canvas 外面這一層。
   const closeGate = useRef<Promise<void> | null>(null)
@@ -232,7 +236,7 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
                 （`FE-B09-S12`）。少了這個 key，畫面會換成房間、玩家卻還撞著大廳的牆。 */
             <Suspense fallback={null} key={def.wsScene}>
               <WorldShell layout={def.layout} />
-              <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} spawn={def.spawn} layout={def.layout} tagNodesRef={tagNodesRef} />
+              <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} spawn={def.spawn} layout={def.layout} tagNodesRef={tagNodesRef} relocateRef={relocate} />
               {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
                   WorldCanvas 不知道即時層的存在，也不該知道；連哪個 scene 由註冊表決定（`FE-V01-S01`）。 */}
               <RemoteWorld
@@ -302,7 +306,7 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
           {hall && <RoomsNotice view={rooms} />}
           {/* 工位的投影錨點（`FE-W16-S06`）**只在房間**，裡面是座位標籤與回饋（`FE-J13`）；沒登入就只有錨點（aria-hidden、沒內容、e2e 的尺）。
               以 `projectId` 為 key：換房間名字快取從頭來。 */}
-          {scene.id === 'room' && <RoomSeats key={scene.projectId} projectId={scene.projectId} nodesRef={seatNodesRef} />}
+          {scene.id === 'room' && <RoomSeats key={scene.projectId} projectId={scene.projectId} nodesRef={seatNodesRef} relocateRef={relocate} />}
           </div>
           {/* 房間密碼視窗（`FE-N08`）：沒票的門按 E 開；同一把鎖、同一個焦點錨。開關在 page.tsx 的 RoomEntryGateProvider。在 `world-stage` 外面：遮罩蓋的是它以外的整層。 */}
           <RoomPasswordDialog rooms={rooms.all} />
