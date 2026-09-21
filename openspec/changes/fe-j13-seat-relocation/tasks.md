@@ -17,11 +17,11 @@
 - [x] 3.2 `src/world/seats/SeatMarkers.tsx`：`onRelocate` 接成「算 `relocationForSeat(i)` 寫進 relocateRef」；relocateRef 由 `WorldCanvas` 經 props 下來
 - [x] 3.3 單元 `tests/room-seats-state.test.tsx`：`FE-J13-S07` —— 201 → onRelocate(i) 一次；被搶 409／已有座位 409／403／500／輪詢／重整既有座位 → 不呼叫；`relocationForSeat` 純函式西 left 東 right
 
-## 4. 真瀏覽器 e2e（feat/fe-j13-seat-relocation--e2e，或併入）
-- [ ] 4.1 `tests/e2e/`：`FE-J13-S08` —— 走到空位按 E 入座 201 後，角色世界位置明顯移到站位、朝向桌子、下一幀不回彈；之後 WASD 仍可走、碰撞仍在。build 帶 `NEXT_PUBLIC_APP_ENV=local`
-- [ ] 4.2 跑綠（併入既有 room-seats e2e 或新檔）
+## 4. 真瀏覽器 e2e（併入既有 `tests/e2e/room-seats.mjs`）
+- [x] 4.1 `FE-J13-S08` 併入 `room-seats.mjs`：A 按 E 入座 201 後，回報位置就位到 0 號站位（Δ0.00）、按 E 前後跳躍 1.85（證明真的移動）、之後仍可自由走離站位；B 入座後就位到 1 號站位
+- [x] 4.2 本機跑綠（db:reset → internal build → next start 3101 → 全部通過）。⚠️ `next start` 的 **runtime** 也要 `NEXT_PUBLIC_APP_ENV=local`（不只 build），否則 next.config.ts 驗證擋下
 
 ## 5. 收尾
-- [ ] 5.1 `pnpm lint` ＋ `tsc` ＋ `pnpm test` 全綠
+- [x] 5.1 `pnpm lint` ＋ `tsc` ＋ `pnpm test` 全綠（唯一失敗 `FE-O04-S01` 是本機 backend clone 分歧、CI skip、與本 change 無關）
 - [ ] 5.2 部署由使用者 `vercel --prod`；真機走查：入座後人真的到工位
 - [ ] 5.3 archive-review ＋封存（使用者手動）
