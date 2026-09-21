@@ -133,7 +133,7 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
   const hall = scene.id === 'hall'
   const def = sceneOf(scene)
   // 票與連線事件的回報（`FE-V01` 的過場）。`reportConnection` 身分穩定 —— 它會進 `RemoteWorld` 的 effect 依賴。
-  const { token, reportConnection, canReconnect } = useScene()
+  const { token, reportConnection, canReconnect, returnToHall } = useScene()
   // 對著門按 E（`FE-V01-S10`）：在 Canvas 外面拿動作、當 prop 交給 Canvas 裡的門。
   const requestEntry = useRequestEntry()
   // 房間密碼視窗開著：世界區（canvas、HUD、門標籤）整層 `inert`（`FE-X16-S06` 被遮的那一層），視窗本身在這層外面
@@ -258,6 +258,8 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
                 nodesRef={labelNodesRef}
                 seatNodesRef={seatNodesRef}
                 requestEntry={requestEntry}
+                poseRef={localPose}
+                requestExit={returnToHall}
               />
               <SpatialInteraction poseRef={localPose} />
             </Suspense>

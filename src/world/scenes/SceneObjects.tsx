@@ -11,7 +11,14 @@ import type { DoorSlot } from '@/world/rooms/slots'
 import { SEAT_ANCHORS } from '@/world/seats/anchors'
 import { SeatAnchorProjector } from '@/world/seats/SeatAnchorProjector'
 import type { SeatAnchorNodes } from '@/world/seats/SeatAnchors'
+import { Interactable } from '@/world/interaction/Interactable'
+import { ENTRY } from '@/world/layout/projectRoomLayout'
+import type { LocalPose } from '@/world/PositionSync'
+import { RoomExitTrigger } from './RoomExitTrigger'
 import type { SceneRef } from './registry'
+
+/** 出口門前的互動提示（`FE-V01-S21`）。**元件常數，不是規格**（規格只寫「回到大廳」的意圖）。 */
+export const ROOM_EXIT_LABEL = '回到大廳'
 
 // Canvas 裡面、隨場景不同的物件。規格 `FE-V01-S03`。
 //
@@ -35,12 +42,28 @@ export interface SceneObjectsProps {
   seatNodesRef: RefObject<SeatAnchorNodes>
   /** 對著門按 E（`FE-V01-S10`）。從 Canvas 外面用 `useRequestEntry()` 拿、當 prop 傳進來。 */
   requestEntry?: (projectId: string, title: string) => void
+  /** 本地角色的權威狀態（`LocalPlayer` 每幀寫）。房間裡的穿門觸發器讀它（`FE-V01-S20`）。 */
+  poseRef?: RefObject<LocalPose>
+  /** 走出房間就回大廳（`FE-V01-S20`／`S21`）＝ `useScene().returnToHall`。穿門即走與門前按 E 都呼叫它。 */
+  requestExit?: () => void
 }
 
-export function SceneObjects({ scene, doors, slots, anchors, nodesRef, seatNodesRef, requestEntry }: SceneObjectsProps) {
+export function SceneObjects({ scene, doors, slots, anchors, nodesRef, seatNodesRef, requestEntry, poseRef, requestExit }: SceneObjectsProps) {
   if (scene.id === 'room') {
     // 把八個工位錨點釘在桌面中心上（`FE-W16-S06`）。**它渲染 null** —— 錨點本身是 Canvas 外面的 DOM。
-    return <SeatAnchorProjector anchors={SEAT_ANCHORS} nodesRef={seatNodesRef} />
+    // 走出房間就回大廳（`FE-V01-S20`／`S21`）：南牆門洞是出口 —— 穿門即走（`RoomExitTrigger`），門前也有「回到大廳」提示可按 E。
+    // 兩個入口都呼叫 `requestExit`（＝`returnToHall`）。`WorldCanvas` 一定會給 `poseRef`／`requestExit`；單獨渲染的測試沒給就只有工位錨點。
+    return (
+      <>
+        <SeatAnchorProjector anchors={SEAT_ANCHORS} nodesRef={seatNodesRef} />
+        {requestExit !== undefined && (
+          <>
+            {poseRef !== undefined && <RoomExitTrigger poseRef={poseRef} onExit={requestExit} />}
+            <Interactable id="room-exit" x={ENTRY.doorX} z={ENTRY.wallZ} label={ROOM_EXIT_LABEL} onInteract={requestExit} />
+          </>
+        )}
+      </>
+    )
   }
   return (
     <>
