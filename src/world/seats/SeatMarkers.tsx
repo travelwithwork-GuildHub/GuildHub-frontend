@@ -5,18 +5,23 @@ import { CAPTION, SECONDARY, withClass } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { toUiError } from '@/errors/uiError'
 import { useIdentity } from '@/identity/IdentityProvider'
-import type { SeatIndex } from '../layout/projectRoomLayout'
+import { Interactable } from '@/world/interaction/Interactable'
+import { SEAT_INDICES, stationAt, type SeatIndex } from '../layout/projectRoomLayout'
 import { SEAT_ANCHORS } from './anchors'
 import { SeatAnchors, type SeatAnchorNodes } from './SeatAnchors'
-import { canClaim, seatOf } from './seatRules'
+import { seatOf } from './seatRules'
 import { useSeatNames } from './useSeatNames'
-import { useSeats, type SeatsState } from './useSeats'
+import { useSeats, type SeatsState, type SeatsReady } from './useSeats'
 
-// 房間裡的座位標籤與回饋（`FE-J13` 的畫面半邊；design D1／D4）。規格〈每個座位有一個標籤〉〈一鍵入座〉〈失敗回饋〉。
+// 房間裡的座位標籤、入座互動與回饋（`FE-J13` 的畫面半邊；design D1／D4，`fe-j13-sit-walk-in` 修訂）。
+// 規格〈每個座位有一個標籤〉〈一鍵入座：走近空位、按 E〉〈失敗回饋〉。
 //
 // 標籤**住在錨點裡**（`SeatAnchors` 的 `render` 插槽）：位置跟著 `SeatAnchorProjector` 每幀寫的 translate 走、錨點 hidden 一起 hidden，每幀零新工作。
-// 標籤從錨點中心往下 12 px（`translate-y-3`），不動錨點的中心（`FE-W16-S08` 的尺不變）。
-// 是 DOM、在 Canvas 外面、不持世界命令鎖、不進互動系統（桌子仍不是互動物件）。
+// 標籤從錨點中心往下 12 px（`translate-y-3`），不動錨點的中心（`FE-W16-S08` 的尺不變）。**標籤是純資訊 DOM、在 Canvas 外面、不持世界命令鎖、不進互動系統。**
+//
+// ⚠️ **入座是空間互動，不是按鈕**（`fe-j13-sit-walk-in`）：可入座的空位在該工位的**站位**（`stationAt(i)`，離通道 2.5、走得到；
+// 不是桌面錨點 3.6、超出互動半徑 2）註冊一個 `Interactable`。走近＋面對 → 提示「按 E 入座」→ 按 E 送 `claim`。
+// **走近不送請求**（只有按 E 才承諾）—— 入座是有副作用、會失敗的一人一格 claim，不是穿門那種冪等導覽。自己有座位／房間非 active／票失效時**不掛**。
 //
 // 沒登入就沒有座位（訪客進不了房間；`useSeats` 不啟動、錨點照舊 aria-hidden）。座位還沒載到之前**沒有標籤** —— 先畫「空位」會是謊言（`S01`）。
 // 文案是常數、不回顯後端字串（`FE-N08` 同一條）；失敗語彙用 `toUiError().message`（`FE-X03`）。
@@ -57,12 +62,11 @@ export function RoomSeats({ projectId, nodesRef }: { projectId: string; nodesRef
     return () => clearTimeout(timer)
   }, [feedbackAt, dismissFeedback])
 
+  // 標籤是**純資訊**：名字／自己的／「空位」。入座不在這裡（改成站位上的空間互動，見 `RoomSeatInteractables`）。
   const render = (seatIndex: SeatIndex): ReactNode => {
     if (ready === null || me === null || seatIndex >= ready.seatCount) return null
     const occupant = ready.seats.find((s) => s.seat_index === seatIndex)
     const mine = occupant?.user_id === me.id
-    // 「入座」的存在：房間 active 且自己沒座位（一人一格，不等 409；closed 不給入口）。能不能按：`canClaim`（票沒失效、沒在送）
-    const showClaim = occupant === undefined && ready.status === 'active' && seatOf(ready.seats, me.id) === undefined
     const label = occupant === undefined ? SEAT_TEXT.empty : mine ? `${me.display_name}${SEAT_TEXT.you}` : (names[occupant.user_id] ?? SEAT_TEXT.someone)
     const chip = mine
       ? 'border-accent bg-accent text-white'
@@ -81,17 +85,6 @@ export function RoomSeats({ projectId, nodesRef }: { projectId: string; nodesRef
         <span title={label} {...withClass(CAPTION, `rounded-control max-w-40 overflow-hidden border px-2 leading-6 text-ellipsis whitespace-nowrap ${chip}`)}>
           {label}
         </span>
-        {showClaim && (
-          <button
-            type="button"
-            disabled={!canClaim({ ...ready, me: me.id })}
-            aria-busy={ready.claiming === seatIndex ? 'true' : undefined}
-            onClick={() => claim(seatIndex)}
-            {...withClass(SECONDARY, 'bg-surface text-caption whitespace-nowrap')}
-          >
-            {SEAT_TEXT.claim}
-          </button>
-        )}
       </div>
     )
   }
@@ -99,7 +92,31 @@ export function RoomSeats({ projectId, nodesRef }: { projectId: string; nodesRef
   return (
     <>
       <SeatAnchors anchors={SEAT_ANCHORS} nodesRef={nodesRef} render={render} />
+      {ready !== null && me !== null && <RoomSeatInteractables ready={ready} me={me.id} claim={claim} />}
       <SeatFeedbackView state={state} onRetry={retry} />
+    </>
+  )
+}
+
+/**
+ * 入座的空間互動（`fe-j13-sit-walk-in`；規格〈一鍵入座：走近空位、按 E〉）。
+ *
+ * 對**可入座的空位**在該工位的**站位**（`stationAt(i)`，離通道 2.5、走得到；不是桌面錨點 3.6、超出互動半徑）註冊 `Interactable`。
+ * 走近＋面對 → 提示「按 E 入座」→ 按 E 呼叫 `claim(i)`（`useSeats` 內部已有送出中 guard 與 409／201 之後才放開的時序）。
+ * **走近不送請求**：只有按 E（`Interactable.onInteract`）才承諾入座。
+ *
+ * 何時**不掛任何一格**（走近沒有提示）：房間非 `active`（`closed` 不給入口）、票已失效（`locked`）、或自己已經有座位（一人一格；
+ * 不做換座、不做走離開就離座 —— 後端沒有釋放座位的端點 `BE-G07`）。
+ */
+function RoomSeatInteractables({ ready, me, claim }: { ready: SeatsReady; me: string; claim: (seatIndex: number) => void }): ReactNode {
+  if (ready.status !== 'active' || ready.locked || seatOf(ready.seats, me) !== undefined) return null
+  const occupied = new Set(ready.seats.map((s) => s.seat_index))
+  return (
+    <>
+      {SEAT_INDICES.filter((i) => i < ready.seatCount && !occupied.has(i)).map((i) => {
+        const station = stationAt(i)
+        return <Interactable key={i} id={`seat-${i}`} x={station.x} z={station.z} label={SEAT_TEXT.claim} onInteract={() => claim(i)} />
+      })}
     </>
   )
 }
