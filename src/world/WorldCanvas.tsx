@@ -103,6 +103,8 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
   const identity = useIdentity()
   const { draft } = useAvatarDraft()
   const av = shownAvatar(identity, draft)
+  // 自己的名字（`FE-X17-S01`）：登入了才有名字牌 —— 訪客沒有 `display_name`，就沒有牌子（跟遠端「空名不畫」同一條規則）。
+  const myName = identity.state === 'signed-in' ? identity.profile.display_name : ''
   // ⚠️ **同樣要在 Canvas 外面讀**（context 跨不過 R3F 的邊界）。
   const { generation } = useRealtimeGeneration()
 
@@ -227,7 +229,7 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
                 （`FE-B09-S12`）。少了這個 key，畫面會換成房間、玩家卻還撞著大廳的牆。 */
             <Suspense fallback={null} key={def.wsScene}>
               <WorldShell layout={def.layout} />
-              <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} spawn={def.spawn} layout={def.layout} />
+              <LocalPlayer targetRef={cameraTarget} poseRef={localPose} av={av} spawn={def.spawn} layout={def.layout} tagNodesRef={tagNodesRef} />
               {/* 遠端玩家由 FE-R07 提供。**它自己建立連線** ——
                   WorldCanvas 不知道即時層的存在，也不該知道；連哪個 scene 由註冊表決定（`FE-V01-S01`）。 */}
               <RemoteWorld
@@ -271,7 +273,7 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
           {/* 目前 scene 的在線人數（`FE-R10-S07`～`S09`）。兩個場景都有；未就緒時不渲染。 */}
           <OnlineCount count={onlineCount} />
           {/* 遠端玩家的名字牌（`FE-W08`）：HUD，兩個場景都有；位置每幀由 Canvas 裡的 `RemotePlayer` 寫，這裡只掛節點。 */}
-          <NameTags roster={roster} nodesRef={tagNodesRef} />
+          <NameTags roster={roster} nodesRef={tagNodesRef} self={{ name: myName }} />
           {/* 場景聊天（`FE-K04`）：非阻斷的 HUD，靠左下、不遮提示；只看不鎖，輸入框有焦點才鎖（`EditableFocusLock`）。沒 provider 就不畫。 */}
           <SceneChatHud />
           {/* 自己的狀態文字（`FE-K05`）：HUD，在線數底下；只給已登入的人、沒 provider 不畫；輸入框有焦點才鎖（同一道 `EditableFocusLock`）。 */}

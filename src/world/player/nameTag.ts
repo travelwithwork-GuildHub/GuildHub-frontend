@@ -18,6 +18,13 @@ export const NAME_TAG_SIZE = { width: 176, height: 28 } as const
 export const NAME_TAG_ANCHOR_Y = 1.6
 
 /**
+ * 自己那塊名字牌的節點 key（`FE-X17`）。`NameTags` 登記在這個 key 下、`LocalPlayer` 每幀寫它的 transform ——
+ * **一份常數**，兩邊共用，不各自寫字面值（漂了就一邊登記、另一邊寫不到，牌子停在左上角）。
+ * 不會跟遠端玩家的 id 撞：遠端 id 是 UUID。
+ */
+export const SELF_TAG_ID = '__self__'
+
+/**
  * 這個人有沒有名字可以畫。**只有這一份**（design D5）：`NameTags` 用它決定要不要渲染節點，
  * `RemotePlayer` 查不到節點就跳過 —— 不在兩處各判一次。
  *
