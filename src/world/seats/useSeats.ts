@@ -45,6 +45,8 @@ export interface SeatsApi {
 }
 
 type Ready = Extract<SeatsState, { phase: 'ready' }>
+/** 房間座位「已載入」的狀態；`SeatMarkers` 決定要不要掛入座互動時讀它。 */
+export type SeatsReady = Ready
 const LOADING: SeatsState = { phase: 'loading' }
 const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError'
 const keyOf = (projectId: string, me: string, generation: number) => `${projectId}:${me}:${generation}`

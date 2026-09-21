@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProfileOut, ProjectOut, SeatOut } from '@/api/contract/rest'
 import { HttpError } from '@/api/transport'
@@ -7,7 +7,10 @@ import { VOCABULARY } from '@/errors/uiError'
 import type { Identity } from '@/identity/types'
 import { SceneRefProvider } from '@/world/scenes/SceneContext'
 import type { SceneRef } from '@/world/scenes/registry'
-import { SEAT_FEEDBACK_MS } from '@/world/seats/SeatMarkers'
+import { SEAT_FEEDBACK_MS, RoomSeats } from '@/world/seats/SeatMarkers'
+import { useSeatAnchorNodes } from '@/world/seats/SeatAnchors'
+import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
+import { stationAt } from '@/world/layout/projectRoomLayout'
 import WorldCanvas from '@/world/WorldCanvas'
 
 // 座位標籤的**畫面半邊**。規格：openspec/changes/fe-j13-seats/specs/room-seats/spec.md
@@ -69,20 +72,38 @@ const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync
 const marker = (i: number) => document.querySelector<HTMLElement>(`[data-testid="seat-marker"][data-seat-index="${i}"]`)
 const markers = () => screen.queryAllByTestId('seat-marker')
 const anchor = (i: number) => document.querySelector<HTMLElement>(`[data-testid="seat-anchor"][data-seat-index="${i}"]`)!
-// ⚠️ 不用 `getAllByRole`：錨點在被投影之前 `visibility: hidden`（這個殼沒有投影器），role 查詢會把裡面的按鈕全部當成不存在 —— 「沒有入座」會恆真
-const claimButtons = () => [...document.querySelectorAll<HTMLButtonElement>('[data-testid="seat-marker"] button')].filter((b) => b.textContent === '入座')
-const claimIn = (i: number) => {
-  const m = marker(i)
-  if (m === null) throw new Error(`座位 ${i} 沒有標籤`)
-  const button = m.querySelector('button')
-  if (button === null) throw new Error(`座位 ${i} 沒有「入座」`)
-  return button
-}
 const feedback = () => screen.queryByTestId('seat-feedback')
+
+// ⚠️ **入座是空間互動，不是按鈕**（`fe-j13-sit-walk-in`）：可入座的空位在站位註冊一個 `Interactable`，
+// 按 E → `onInteract` → `claim`。這裡直接讀真實的互動註冊表、呼叫真實的 `onInteract`（不是點一顆假按鈕）。
+let registry: ReturnType<typeof useInteraction>['registry'] | null = null
+function RegistrySpy() {
+  // registry 是穩定物件；effect 後 `entries` 已含註冊的互動（跟 world-scenes-room-exit 同一個做法，不在 render 改外部變數）
+  const value = useInteraction().registry
+  useEffect(() => {
+    registry = value
+  })
+  return null
+}
+function RoomSeatsHarness() {
+  const nodesRef = useSeatAnchorNodes()
+  return <RoomSeats projectId={ROOM_ID} nodesRef={nodesRef} />
+}
+/** 站位上「入座」互動的登記（沒有＝走近那格不會有提示）。 */
+const seatInteract = (i: number) => registry?.entries.get(`seat-${i}`)
+/** 目前哪些座位可入座（有登記互動）。 */
+const claimableSeats = () => [0, 1, 2, 3, 4, 5, 6, 7].filter((i) => seatInteract(i) !== undefined)
+/** 「走到 i 號站位、按 E」＝觸發那格互動的 `onInteract`；沒登記就是走近也沒有提示，測試該失敗。 */
+const claimByWalkingTo = (i: number) => {
+  const entry = seatInteract(i)
+  if (entry === undefined) throw new Error(`座位 ${i} 沒有入座互動（走近不會有提示）`)
+  entry.onInteract?.()
+}
 
 const realGetContext = HTMLCanvasElement.prototype.getContext
 beforeEach(() => {
   vi.useFakeTimers()
+  registry = null
   for (const fn of Object.values(ops)) fn.mockReset()
   ops.listRooms.mockResolvedValue([])
   ops.getProject.mockResolvedValue(project())
@@ -100,13 +121,29 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-/** 掛世界（房間）。`seats` 沒給就讓座位一直在飛。 */
+/** 掛世界（房間）。`seats` 沒給就讓座位一直在飛。用在標籤半邊（S01）：要真的 `WorldCanvas` 才驗得到回 hall、aria-hidden。 */
 async function mount(seats?: SeatOut[]) {
   if (seats !== undefined) ops.listSeats.mockResolvedValueOnce(seats)
   const view = render(
     <SceneRefProvider scene={ROOM}>
       <WorldCanvas />
     </SceneRefProvider>,
+  )
+  await flush()
+  return view
+}
+
+/**
+ * 只掛 `RoomSeats`（在真的 `InteractionProvider` 底下）—— 用在入座／回饋半邊（S02／S03）：
+ * 要能讀到**真實的互動註冊表**、呼叫真實的 `onInteract`。這仍走完整的產品路徑（`RoomSeats` 註冊 `Interactable`、`useSeats.claim`）。
+ */
+async function mountSeats(seats?: SeatOut[]) {
+  if (seats !== undefined) ops.listSeats.mockResolvedValueOnce(seats)
+  const view = render(
+    <InteractionProvider>
+      <RegistrySpy />
+      <RoomSeatsHarness />
+    </InteractionProvider>,
   )
   await flush()
   return view
@@ -191,21 +228,30 @@ describe('每個座位一個標籤', () => {
   })
 })
 
-describe('一鍵入座（畫面半邊）', () => {
-  it('[FE-J13-S02] 按兩次只送一個、payload 對、送出中四個都停用；201 後那格是我的、其他是空位但沒有「入座」；closed 沒有「入座」', async () => {
-    await mount([])
-    expect(claimButtons()).toHaveLength(4)
+describe('走近空位、按 E 入座（畫面半邊）', () => {
+  it('[FE-J13-S02] 空位在站位掛互動（提示「入座」、位置對）、走近不送請求；連按兩次只送一個、payload 對；201 後那格是我的、其他是空位但不再有入座互動；closed 沒有互動', async () => {
+    await mountSeats([])
+    // 四個空位各掛一個站位互動；提示指名「入座」；位置是站位（走得到），不是桌面錨點
+    expect(claimableSeats()).toEqual([0, 1, 2, 3])
+    for (const i of [0, 1, 2, 3]) {
+      const entry = seatInteract(i)!
+      expect(entry.label).toBe('入座')
+      const st = stationAt(i)
+      expect([entry.x, entry.z]).toEqual([st.x, st.z])
+    }
+    // 走近（掛了互動）但還沒按 E：SHALL NOT 送 `POST seats`
+    expect(ops.claimSeat, '走近不送請求，只有按 E 才送').not.toHaveBeenCalled()
+
     const pending = deferred<SeatOut>()
     ops.claimSeat.mockReturnValueOnce(pending.promise)
-    fireEvent.click(claimIn(1))
-    fireEvent.click(claimIn(1))
+    // 走到 1 號站位、連按 E 兩次
+    await act(async () => {
+      claimByWalkingTo(1)
+      claimByWalkingTo(1)
+    })
     await flush()
-    expect(ops.claimSeat).toHaveBeenCalledTimes(1)
+    expect(ops.claimSeat, '送出中連按只送一次').toHaveBeenCalledTimes(1)
     expect(ops.claimSeat).toHaveBeenCalledWith(ROOM_ID, { seat_index: 1, desk_template: 0 }, { signal: expect.any(AbortSignal) })
-    const buttons = claimButtons()
-    expect(buttons).toHaveLength(4)
-    for (const b of buttons) expect((b as HTMLButtonElement).disabled, '送出中每個「入座」都要停用').toBe(true)
-    expect(claimIn(1).getAttribute('aria-busy')).toBe('true')
 
     ops.listSeats.mockResolvedValueOnce([seat(1, ME)])
     await act(async () => pending.resolve(seat(1, ME)))
@@ -214,51 +260,49 @@ describe('一鍵入座（畫面半邊）', () => {
     expect(marker(1)?.dataset.mine).toBe('true')
     expect(marker(1)?.textContent).toContain('我自己')
     for (const i of [0, 2, 3]) expect(marker(i)?.textContent).toContain('空位')
-    expect(claimButtons(), '自己有座位了就不該再有「入座」').toEqual([])
+    expect(claimableSeats(), '自己有座位了就不該再有任何入座互動（一人一格、不換座）').toEqual([])
   })
 
-  it('[FE-J13-S02] closed 的房間：有人的照顯示名字，空位沒有「入座」', async () => {
+  it('[FE-J13-S02] closed 的房間：有人的照顯示名字，空位沒有入座互動', async () => {
     ops.getProject.mockResolvedValue(project('closed'))
-    await mount([seat(0, JIA)])
+    await mountSeats([seat(0, JIA)])
     expect(marker(0)?.textContent).toContain('阿甲')
     expect(marker(1)?.textContent).toContain('空位')
-    expect(claimButtons()).toEqual([])
+    expect(claimableSeats(), 'closed 不給入口').toEqual([])
   })
 })
 
 describe('失敗回饋（畫面半邊）', () => {
-  it('[FE-J13-S03] 被搶：status、那格變成占用者、其他可按；已有座位：status、自己的標出、沒有「入座」；4 秒後回饋消失', async () => {
-    await mount([])
+  it('[FE-J13-S03] 被搶：status、那格變成占用者、其他可再走近按 E；已有座位：status、自己的標出、沒有入座互動；4 秒後回饋消失', async () => {
+    await mountSeats([])
     ops.claimSeat.mockRejectedValueOnce(http('claimSeat', 409, '這個座位已經有人了'))
     ops.listSeats.mockResolvedValueOnce([seat(1, YI)])
-    fireEvent.click(claimIn(1))
+    await act(async () => claimByWalkingTo(1))
     await flush()
     let fb = feedback()
     expect(fb?.getAttribute('role')).toBe('status')
     expect(fb?.dataset.kind).toBe('seat-taken')
     expect(fb?.textContent).not.toContain('這個座位已經有人了') // 不回顯後端字串
     expect(marker(1)?.textContent).toContain('小乙')
-    const enabled = claimButtons()
-    expect(enabled.map((b) => b.closest<HTMLElement>('[data-seat-index]')?.dataset.seatIndex)).toEqual(['0', '2', '3'])
-    for (const b of enabled) expect((b as HTMLButtonElement).disabled).toBe(false)
+    expect(claimableSeats(), '其餘空位仍可走近按 E').toEqual([0, 2, 3])
 
     ops.claimSeat.mockRejectedValueOnce(http('claimSeat', 409, '你已經在這個房間有座位了'))
     ops.listSeats.mockResolvedValueOnce([seat(1, YI), seat(3, ME)])
-    fireEvent.click(claimIn(2))
+    await act(async () => claimByWalkingTo(2))
     await flush()
     fb = feedback()
     expect(fb?.getAttribute('role')).toBe('status')
     expect(fb?.dataset.kind).toBe('already-seated')
     expect(marker(3)?.dataset.mine).toBe('true')
-    expect(claimButtons()).toEqual([])
+    expect(claimableSeats()).toEqual([])
     await tick(SEAT_FEEDBACK_MS + 50)
     expect(feedback(), '回饋要自動消失').toBeNull()
   })
 
-  it('[FE-J13-S03] 票失效：alert、說要回大廳重新進房、不說密碼錯、全部「入座」停用（但還在）', async () => {
-    await mount([])
+  it('[FE-J13-S03] 票失效：alert、說要回大廳重新進房、不說密碼錯、入座互動全部停止（走近沒有提示）', async () => {
+    await mountSeats([])
     ops.claimSeat.mockRejectedValueOnce(http('claimSeat', 403, '尚未通過房間密碼驗證'))
-    fireEvent.click(claimIn(0))
+    await act(async () => claimByWalkingTo(0))
     await flush()
     const fb = feedback()
     expect(fb?.getAttribute('role')).toBe('alert')
@@ -266,27 +310,25 @@ describe('失敗回饋（畫面半邊）', () => {
     expect(fb?.textContent).toMatch(/回大廳/)
     expect(fb?.textContent).toMatch(/重新進房/)
     expect(fb?.textContent).not.toMatch(/密碼/)
-    const buttons = claimButtons()
-    expect(buttons).toHaveLength(4)
-    for (const b of buttons) expect((b as HTMLButtonElement).disabled).toBe(true)
+    expect(claimableSeats(), '票失效後按 E 入座停止有效').toEqual([])
   })
 
-  it('[FE-J13-S03] 伺服器壞了：alert、FE-X03 的語彙、那格可再按；再按回 201 正常坐下', async () => {
-    await mount([])
+  it('[FE-J13-S03] 伺服器壞了：alert、FE-X03 的語彙、那格可再走近按 E；再按回 201 正常坐下', async () => {
+    await mountSeats([])
     ops.claimSeat.mockRejectedValueOnce(http('claimSeat', 500, null))
-    fireEvent.click(claimIn(0))
+    await act(async () => claimByWalkingTo(0))
     await flush()
     const fb = feedback()
     expect(fb?.getAttribute('role')).toBe('alert')
     expect(fb?.dataset.kind).toBe('failed')
     expect(fb?.textContent).toContain(VOCABULARY['server-error'])
-    expect((claimIn(0) as HTMLButtonElement).disabled).toBe(false)
+    expect(seatInteract(0), '服務失敗後那格仍可走近按 E').toBeDefined()
     ops.claimSeat.mockResolvedValueOnce(seat(0, ME))
     ops.listSeats.mockResolvedValueOnce([seat(0, ME)])
-    fireEvent.click(claimIn(0))
+    await act(async () => claimByWalkingTo(0))
     await flush()
     expect(marker(0)?.dataset.mine).toBe('true')
-    expect(claimButtons()).toEqual([])
+    expect(claimableSeats()).toEqual([])
     expect(feedback(), '成功後上一則回饋要換掉').toBeNull()
   })
 })

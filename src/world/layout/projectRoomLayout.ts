@@ -21,7 +21,9 @@ import type { LayoutItem } from './types'
 // ⚠️ **八格固定，不讀 `seat_count`**（design D3）：這是後端 `seat_index` 的索引域，
 // 哪幾格對這個專案不開放是 `FE-J13` 的事。
 //
-// ⚠️ **桌椅不註冊互動**（design D4）：今天沒有認領行為，假的 E 提示比沒有更糟。
+// ⚠️ **桌子不是互動物件，但可入座的空位是**（原 design D4，`fe-j13-sit-walk-in` 修訂）：
+// 走近可入座的空位、按 E 入座 —— 互動掛在工位的**站位**（`Station.x/z`，走得到），由 `SeatMarkers` 註冊，不是桌面。
+// 桌子本身仍不註冊互動（沒有「檢視桌子」這種行為）。
 
 /** 內側南牆與門洞。**門洞淨寬 1.8、門造型 1.58**（跟 Guild Hall 的走廊開口同一組數字，否則門框跟牆長在一起）。 */
 export const ENTRY = {
