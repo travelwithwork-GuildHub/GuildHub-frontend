@@ -21,7 +21,7 @@ import WorldCanvas from '@/world/WorldCanvas'
 //     會不會被請求」的單元層代理（真正的 chunk 網路次序在第 5 片 e2e 驗）。
 
 const listRooms = vi.hoisted(() => vi.fn())
-vi.mock('@/api/operations', () => ({ listRooms }))
+vi.mock('@/api/operations', () => ({ listRooms, listProjects: () => Promise.resolve([]), listProfiles: () => Promise.resolve([]) }))
 
 // Canvas 替身：**捕捉** `onCreated`，不自動呼叫 —— ready 由測試用 `act` 控制。
 const canvas = vi.hoisted(() => ({ onCreated: null as (() => void) | null }))

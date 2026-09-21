@@ -30,12 +30,16 @@ export type EmptyStateKind =
   | 'load-failed'
   | 'permission-blocked'
 
-/** 前三種的字句。**只有這裡可以有這些句子。** */
-const COPY: Record<'first-empty' | 'filtered-empty' | 'exhausted', string> = {
+/**
+ * 前三種的字句。**只有這裡可以有這些句子。**
+ * 世界看板摘要（`FE-W20`）沿用「空的」那一句，走這個匯出、不抄字串（design D3）。
+ */
+export const EMPTY_STATE_COPY: Record<'first-empty' | 'filtered-empty' | 'exhausted', string> = {
   'first-empty': '這裡還沒有東西。',
   'filtered-empty': '沒有符合條件的結果 —— 放寬一點試試。',
   exhausted: '都看完了。',
 }
+const COPY = EMPTY_STATE_COPY
 
 const RETRY_LABEL = '再試一次'
 

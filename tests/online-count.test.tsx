@@ -20,7 +20,7 @@ import WorldCanvas from '@/world/WorldCanvas'
 // 算人數、何時通知、Canvas 外怎麼顯示，一行都沒被替換。
 
 const listRooms = vi.hoisted(() => vi.fn())
-vi.mock('@/api/operations', () => ({ listRooms }))
+vi.mock('@/api/operations', () => ({ listRooms, listProjects: () => Promise.resolve([]), listProfiles: () => Promise.resolve([]) }))
 vi.mock('@react-three/fiber', () => ({
   useThree: (selector?: (s: unknown) => unknown) => {
     const state = { set: () => {}, size: { width: 800, height: 600 } }

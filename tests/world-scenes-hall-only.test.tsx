@@ -22,7 +22,7 @@ import WorldCanvas from '@/world/WorldCanvas'
 // —— 跟 `world-canvas.test.tsx` 同一組第三方邊界的替身。
 
 const listRooms = vi.hoisted(() => vi.fn())
-vi.mock('@/api/operations', () => ({ listRooms }))
+vi.mock('@/api/operations', () => ({ listRooms, listProjects: () => Promise.resolve([]), listProfiles: () => Promise.resolve([]) }))
 vi.mock('@react-three/fiber', () => ({
   useThree: (selector?: (s: unknown) => unknown) => {
     const state = { set: () => {}, size: { width: 800, height: 600 } }
