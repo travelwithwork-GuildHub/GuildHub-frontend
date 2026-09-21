@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { LIMITS, LIMIT_SOURCES, UNBOUNDED } from '@/api/contract/limits'
+import { LIMITS, LIMIT_SOURCES } from '@/api/contract/limits'
 import { ChatIn, ChatOut } from '@/api/contract/ws'
 import { CHAT_BODY_BUDGET, CHAT_KEEP, EMPTY_CHAT, appendChat } from '@/realtime/sceneChat'
 import { importGraph, importSpecifiers, stripComments } from './lib/importGraph'
@@ -88,12 +88,13 @@ describe('靜態邊界', () => {
   })
 })
 
-describe('chat body 沒有後端限制', () => {
-  it('[FE-R11-S09] LIMITS.chatBody 是 {0, UNBOUNDED}、來源指向 protocol.py::ChatIn.body；ChatIn／ChatOut 的 body 沒有長度 checks；2001 字與空字串都通過', () => {
-    expect(LIMITS.chatBody).toEqual({ min: 0, max: UNBOUNDED })
-    expect(LIMIT_SOURCES.chatBody.source).toContain('protocol.py')
-    expect(LIMIT_SOURCES.chatBody.source).toContain('ChatIn.body')
-    // 自省：Zod 的長度 checks 是空的（不是拿一個有限樣本猜「無上限」）
+describe('chat body 的送出上限是 relay 的 500，不是 parse 約束', () => {
+  it('[FE-R11-S11] LIMITS.chatBody 是 {0, 500}、來源是閘道 relay 實測；ChatIn／ChatOut 的 body 沒有長度 checks；501 字與空字串仍通過 safeParse', () => {
+    expect(LIMITS.chatBody).toEqual({ min: 0, max: 500 })
+    // 來源是「閘道 relay 實測 len>500 靜默丟棄」—— 不是把 500 冒充成 wire schema / parse 的限制
+    expect(LIMIT_SOURCES.chatBody.source).toContain('relay')
+    expect(LIMIT_SOURCES.chatBody.source).toContain('500')
+    // 自省：Zod 的長度 checks 仍是空的（丟棄是 relay 政策、不是 parse 拒絕；不拿有限樣本猜）
     const checksOf = (schema: unknown) => {
       const def = (schema as { _def?: { checks?: Array<{ _zod?: { def?: { check?: string } }; kind?: string; check?: string }> } })._def
       return (def?.checks ?? []).map((c) => c._zod?.def?.check ?? c.kind ?? c.check ?? 'unknown')
@@ -107,7 +108,8 @@ describe('chat body 沒有後端限制', () => {
     }
     // 對照：自省的尺認得出 checks —— 一個有 max 的 schema 要被列出來
     expect(checksOf(ChatIn.shape.body.max(5)).some((c) => /max|length/i.test(String(c)))).toBe(true)
-    expect(ChatIn.safeParse({ t: 'chat', body: '字'.repeat(2001) }).success).toBe(true)
+    // 501 code point（超過送出上限 500）仍 SHALL 通過 parse —— 長度擋在 composer 送出守門，不在 wire schema
+    expect(ChatIn.safeParse({ t: 'chat', body: '字'.repeat(501) }).success).toBe(true)
     expect(ChatIn.safeParse({ t: 'chat', body: '' }).success).toBe(true)
     expect(ChatOut.safeParse({ t: 'chat', id: 'x', name: '', body: '' }).success).toBe(true)
   })

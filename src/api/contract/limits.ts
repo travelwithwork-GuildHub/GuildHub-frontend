@@ -87,11 +87,17 @@ export const LIMITS = {
   skillCount: { min: 0, max: UNBOUNDED },
   skillLength: { min: 1, max: UNBOUNDED },
   /**
-   * WS 聊天內文。**後端只驗「是字串」**（`protocol.py::ChatIn.body: str`）：空字串、全空白、10 MB 都收。
-   * 如實記成 `{0, UNBOUNDED}`（`FE-R11` design D5）——「全空白不送」是 `FE-K04` 的送出規則、
-   * 「單則只保留 2000 code point」是 `sceneChat.ts` 的客戶端預算，兩者都**不是**後端限制，不寫在這裡。`BE-G16` 未解。
+   * WS 聊天內文的**送出上限**。**部署後端的 relay 廣播層對 `len(body) > 500` 靜默丟棄**
+   * （2026-09-21 對正式閘道 `wss://gateway-production-3ecd.up.railway.app/ws` 實測：
+   * 499／500 code point 有回聲、501／502 無回聲、連線不關，邊界正好 500、按 code point）。
+   * 前端不擋 ＝ 使用者送出後輸入框清空、訊息人間蒸發 —— 跟 `statusText` 的 12 字同一種情境，所以一定要擋（`FE-K04-S16`）。
+   *
+   * ⚠️ 這是 **relay 政策**、不是 parse 約束：Pydantic `ChatIn.body: str` 仍 parse 任意長度、Zod schema 也不加長度 check
+   * （`FE-R11-S11`）。500 只住這裡與 composer 送出守門，不進 wire schema。
+   * ⚠️ 與**顯示記憶體預算**（`sceneChat.ts` 單則保留 2000 code point、`FE-R11-S04`）**各自獨立**：
+   * 收到別人／舊連線的長訊息照樣截到 2000 顯示，只有**自己送**不能超過 500。
    */
-  chatBody: { min: 0, max: UNBOUNDED },
+  chatBody: { min: 0, max: 500 },
 
   /**
    * `project_resources.label`（`BE-G12`）。
@@ -144,7 +150,7 @@ export const LIMIT_SOURCES: Record<keyof typeof LIMITS, { source: string; checke
   projectBody: { source: 'sql/001_schema.sql:28（沒有 check）', checkedOn: '2026-09-11' },
   skillCount: { source: 'sql/001_schema.sql skills text[]（沒有 check）', checkedOn: '2026-09-11' },
   skillLength: { source: 'sql/001_schema.sql skills text[]（沒有 check）', checkedOn: '2026-09-11' },
-  chatBody: { source: 'app/realtime/protocol.py::ChatIn.body（str，沒有長度驗證）', checkedOn: '2026-09-15' },
+  chatBody: { source: '正式部署閘道 relay 實測：len(body) > 500 靜默丟棄（不是 protocol.py::ChatIn.body，那只驗是字串；丟棄在 relay 廣播層）', checkedOn: '2026-09-21' },
   resourceLabel: { source: 'sql/001_schema.sql:97', checkedOn: '2026-09-18' },
   resourceUrl: { source: 'sql/001_schema.sql:100', checkedOn: '2026-09-18' },
   resourcesPerProject: { source: 'app/api/project_resources.py:56 MAX_RESOURCES', checkedOn: '2026-09-18' },

@@ -7,8 +7,8 @@ import { SceneChatFeed } from '@/chat/SceneChatFeed'
 import { RealtimeError } from '@/realtime/client'
 import type { ChatRecord } from '@/realtime/sceneChat'
 
-// 規格：openspec/changes/fe-k04-scene-chat-ui/specs/scene-chat-ui/spec.md
-//   Requirement: 全空白不送、非空白原值送；沒有上限；只有 transport 接受了才清空、失敗保留 —— S05、S06、S07、S14
+// 規格：openspec/specs/scene-chat-ui/spec.md（fe-k04-chat-length-guard 反轉「沒有上限」→ 送出上限 500）
+//   Requirement: 全空白不送、非空白原值送；送出上限 500 擋在送出端；只有 transport 接受了才清空、失敗保留 —— S05、S06、S16、S17、S14
 //
 // transport 是注入的假 `send`（規格：jsdom 不連服務）。S06 的「回聲」由測試把一筆塞進 log 再 rerender 來模擬 —— 列表是 `SceneChatFeed`，
 // 兩個元件一起掛，判準看的是畫面。**不連任何服務。**
@@ -58,7 +58,8 @@ describe('送出', () => {
     const hint = screen.getByTestId('chat-need-input')
     expect(hint.textContent?.trim(), '要能辨識要先輸入內容').not.toBe('')
     expect(field().getAttribute('aria-invalid')).toBe('true')
-    expect(field().getAttribute('aria-describedby')).toBe(hint.id)
+    // 欄位同時被「先輸入內容」提示與剩餘字數描述（兩個 id 都合理）
+    expect(field().getAttribute('aria-describedby')).toContain(hint.id)
     expect(alerts(), '空的不是 alert').toHaveLength(0)
     expect(document.activeElement, '焦點留在輸入框').toBe(field())
     type('  哈囉  ')
@@ -112,15 +113,47 @@ describe('送出', () => {
     expect(rows()[0]?.textContent).toContain('哈囉')
   })
 
-  it('[FE-K04-S07] 沒有 maxlength；2001 個 code point 完整送出', () => {
+  it('[FE-K04-S16] 送出上限 500：≤500 原值送出、>500（Enter／按鈕／submit）都不送、值保留、按鈕 disabled、無 maxlength', () => {
     const send = vi.fn()
     mount(send)
-    expect(field().hasAttribute('maxlength')).toBe(false)
-    const long = '😀字'.repeat(1000) + '尾'
-    expect([...long]).toHaveLength(2001)
-    type(long)
+    expect(field().hasAttribute('maxlength'), '不用原生 maxlength（它數 UTF-16 code unit）').toBe(false)
+    // 正好 500 code point：送得出去、原值不截斷
+    const ok = '字'.repeat(500)
+    type(ok)
     fireEvent.click(submitButton())
-    expect(send).toHaveBeenCalledWith({ t: 'chat', body: long })
+    expect(send).toHaveBeenCalledWith({ t: 'chat', body: ok })
+    send.mockClear()
+    // 501 code point：三種觸發（按鈕、Enter、form submit）都不送、值保留、按鈕 disabled
+    const over = '字'.repeat(501)
+    type(over)
+    expect((submitButton() as HTMLButtonElement).disabled, '超過就禁用送出').toBe(true)
+    fireEvent.click(submitButton())
+    pressEnter()
+    fireEvent.submit(field().closest('form') as HTMLFormElement)
+    expect(send, 'submit() 自己也擋，不只是禁用按鈕').not.toHaveBeenCalled()
+    expect(field().value, '值保留、不截斷不清空').toBe(over)
+  })
+
+  it('[FE-K04-S17] 剩餘字數：更新、貼上 600 保留全文＋負剩餘＋disabled＋aria-invalid（欄位級非 alert）、emoji 按 code point', () => {
+    const send = vi.fn()
+    mount(send)
+    const remaining = () => screen.getByTestId('chat-remaining')
+    // 空的：還可以輸入 500
+    expect(remaining().getAttribute('data-remaining')).toBe('500')
+    // 貼上 600 code point：保留全文、負剩餘、disabled、aria-invalid，且超長不是 alert（欄位級）
+    const big = '字'.repeat(600)
+    type(big)
+    expect(field().value, '貼上超長保留全文、不自動截斷').toBe(big)
+    expect(remaining().getAttribute('data-remaining')).toBe('-100')
+    expect((submitButton() as HTMLButtonElement).disabled).toBe(true)
+    expect(field().getAttribute('aria-invalid')).toBe('true')
+    expect(alerts(), '超長是欄位級回饋、不冒充送出失敗的 alert').toHaveLength(0)
+    expect(field().getAttribute('aria-describedby'), '剩餘字數以 aria-describedby 掛在欄位上').toContain(remaining().id)
+    // emoji 按 code point：20 個 emoji（.length=40 UTF-16 code unit）剩餘算 480、不是 460
+    const twentyEmoji = '😀'.repeat(20)
+    expect(twentyEmoji.length, 'emoji 讓 .length 跟 code point 不同').toBe(40)
+    type(twentyEmoji)
+    expect(remaining().getAttribute('data-remaining'), '按 code point 算 500-20').toBe('480')
   })
 
   it('[FE-K04-S14] Enter 送、送出控制送、Shift+Enter 換行不送、含換行的 body 原樣', () => {
