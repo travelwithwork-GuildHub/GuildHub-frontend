@@ -13,9 +13,8 @@ import { DISPLAY } from '@/design/controls'
 // 看過世界**，擋住他不會拿走任何他已經擁有的東西。
 // `/world` 那條就不一樣 —— 那裡的人已經在世界裡了，所以那邊只能提示。
 //
-// ⚠️ **已經有身分的人不能被問第二次名字**（`S03`）。「已經有身分」有兩種：
-// session 還在，以及 session 不在但手上有恢復金鑰 —— `resolveIdentity()`
-// 已經把後者的自動恢復做掉了，所以這裡只要看最後的答案。
+// ⚠️ **已經有身分的人不能被問第二次名字**（`S03`）。「已經有身分」＝ session cookie 還在
+// （`GET /api/me` 回得出名片）。恢復金鑰機制在 2026-09-21 退場後，這裡只看 `resolveIdentity()` 的最後答案。
 
 export function RootEntry() {
   const identity = useIdentity()
