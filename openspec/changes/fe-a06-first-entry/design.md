@@ -162,3 +162,33 @@ Gemini 說最後 4 個字元 —— 取中間，而且理由要寫下來：
 **這是一個真的取捨，不是誤解**：現在的行為對「想先逛逛」的訪客比較煩，
 換來的是「不會有人因為手滑點掉就再也不被提示」。
 要改的話要先改規格，而那要有人決定哪一邊比較重要 —— 記在這裡等那個決定。
+
+## D7：2026-09-21 反轉 —— 金鑰閘整段撤除，恢復金鑰機制退場
+
+**D3／D5 定下的「金鑰要真的被帶走才放行／持有證明」在 demo 前被產品負責人整段撤掉。**
+原話：「使用者怎麼會紀錄這個東西？應該設定好名稱就直接進去了，換不同瀏覽器就讓他不同使用者就好。
+我們不是有登入功能嗎？登入再去紀錄當前使用者。」
+
+這是一個**產品決定反轉了兩個外部審查者的結論**（D3／D5）。記在這裡，不假裝原設計沒存在過。
+
+**送 codex（gpt-5.6-terra）與 gemini（3.1 Pro）確認，三個問題、兩處分歧，codex 在兩處都更完整：**
+
+| | codex | gemini | 裁定（附查證） |
+|---|---|---|---|
+| 取名直接進 + 儲存 | 對；**別存 localStorage**，用後端既有的 HttpOnly SameSite session cookie | 對；localStorage 存 token 也行 | **codex**。查 `resolveIdentity()`：本來就先打 `GET /api/me`（cookie），localStorage 金鑰只是次要回退 —— 同瀏覽器持續靠 cookie 就成，localStorage 多餘 |
+| `/login` 恢復金鑰貼上路 | 移除（連自動 fallback 一起） | 移除 | 一致：移除 |
+| spec 形狀 | 刪本 change 的 ADDED 金鑰閘 **＋** 對基線 `specs/first-entry`（`fe-a06-login-entry` 封存進去的 `S13`–`S17`）加 delta | 在本 change 標 REMOVED 就好、不會漂 | **codex，gemini 漏了**。查 `openspec/specs/first-entry/spec.md` 確有 `S13`–`S17`＋恢復路 —— 基線已漂，只改未封存 change 不夠 |
+
+**互審的價值在這裡具體出現**：codex 讀了實際檔案抓到基線漂移，gemini 只拿到 change delta 沒看到基線
+（與 memory〈呼叫 agy〉記的「它引用文件時會漏掉緊接在後的但書」一致）。
+
+**最終形狀**：
+- `first-entry`（本 change delta）：ADDED 保留根路徑（`S02` 改寫成直接進）＋訪客提示，
+  新增 slim〈登入頁暱稱路直接進世界〉（`S18`）；本 change 自己 ADDED 的金鑰閘（`S07`–`S12`）直接刪除；
+  REMOVED 基線〈登入頁每條路…帶走金鑰〉（`S13`–`S17`）。
+- `identity-session`（本 change delta）：REMOVED〈恢復金鑰預設不落地〉（`S07`/`S08`/`S09`/`S10`/`S17`），
+  MODIFIED〈目前身分每次都向後端問〉讓 `S05` 去掉「且沒有可用的恢復金鑰」條件。
+- 匿名身分綁後端 session cookie；跨裝置持久身分交給帳號密碼（`FE-A08`，不動）。
+
+**副作用（好的）**：撤掉金鑰閘也消掉了原本封存的唯一阻擋項 —— 4.2「找陌生人走查他有沒有把金鑰帶走」
+的人工測試不再需要（沒有金鑰要帶走了）。這個 change 因此變得可封存。
