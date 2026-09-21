@@ -228,6 +228,53 @@ describe('結案與權限失敗：確認一次專案狀態', () => {
 })
 
 describe('晚到的回應不得覆蓋較新的結果', () => {
+  // ⚠️ 下面兩條量的是**較新的那一個還在飛的時候**：舊的先回來就不准上畫面。
+  // 「較新的已經套用之後才回來」是同一件事比較晚的一刻 —— 只驗那一刻的話，
+  // 「比已套用的新就套用」這種守衛會全綠，而它會讓舊資料閃現在畫面上。
+  it('[FE-J14-S36] 較新的讀取還在飛：較早發出的先回來也不上畫面', async () => {
+    const r1 = deferred<ProjectResourceOut[]>()
+    const r2 = deferred<ProjectResourceOut[]>()
+    listResources.mockReturnValueOnce(r1.promise).mockReturnValueOnce(r2.promise)
+    const store = createResourcesStore()
+
+    store.openRead(P) // R1
+    store.openRead(P) // R2 —— 還在飛
+    await settle()
+    expect(listCalls()).toBe(2)
+
+    r1.resolve(many(2)) // 比較早發出、帶舊資料
+    await settle()
+
+    expect(store.getState(P).phase, '較新的讀取還沒回來，舊的就把畫面變成 ready 了').toBe('loading')
+
+    r2.resolve(many(3))
+    await settle()
+    expect(itemsOf(store.getState(P))).toHaveLength(3)
+  })
+
+  it('[FE-J14-S36] 較新的狀態確認還在飛：較早發出的 active 先回來也不上畫面', async () => {
+    const c1 = deferred<ProjectOut>()
+    const c2 = deferred<ProjectOut>()
+    listResources.mockRejectedValue(http(403))
+    getProject.mockReturnValueOnce(c1.promise).mockReturnValueOnce(c2.promise)
+    const store = createResourcesStore()
+
+    store.openRead(P) // 失敗一 → C1
+    await settle()
+    store.openRead(P) // 失敗二 → C2，還在飛
+    await settle()
+    expect(confirmCalls()).toBe(2)
+
+    c1.resolve(project('active')) // 比較早發出
+    await settle()
+
+    expect(store.getState(P).phase, '較新的確認還沒回來，舊的就把畫面變成 failed 了').toBe('loading')
+
+    c2.resolve(project('closed'))
+    await settle()
+    expect(store.getState(P).phase).toBe('closed')
+  })
+
   it('[FE-J14-S36] 較早發出、較晚回來的資源讀取被丟棄', async () => {
     const r1 = deferred<ProjectResourceOut[]>()
     const r2 = deferred<ProjectResourceOut[]>()
