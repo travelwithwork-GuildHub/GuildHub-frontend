@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AVATAR_COUNT } from '@/design/avatar'
-import { registerAccount, signInWithNickname, signInWithPassword, signInWithRecoveryKey } from '@/identity/session'
+import { registerAccount, signInWithNickname, signInWithPassword } from '@/identity/session'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
 // 規格 `avatar-selection`〈首次建立身分時隨機指派一款外觀〉（change `fe-a05-avatar-variety`）：`FE-A05-S19`／`S20`／`S21`。
@@ -79,13 +79,10 @@ describe('首次建立身分隨機發一款外觀', () => {
     expect(identity.state === 'signed-in' && identity.profile.avatar_id).toBe(7)
   })
 
-  it('[FE-A05-S19] 用金鑰或帳號密碼回來的人不被改：一個 PATCH 都沒有', async () => {
-    server.replyFor('/api/login', 200, profile(5))
-    const byKey = await signInWithRecoveryKey(UUID)
+  it('[FE-A05-S19] 用帳號密碼回來的人不被改：一個 PATCH 都沒有', async () => {
     server.replyFor('/api/login', 200, profile(5))
     const byPassword = await signInWithPassword('fergus', 'correct horse battery')
     expect(patches()).toHaveLength(0)
-    expect(byKey.state === 'signed-in' && byKey.profile.avatar_id).toBe(5)
     expect(byPassword.state === 'signed-in' && byPassword.profile.avatar_id).toBe(5)
   })
 

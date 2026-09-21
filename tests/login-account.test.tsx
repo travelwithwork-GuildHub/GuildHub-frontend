@@ -3,7 +3,6 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { act } from 'react'
 import { LoginForm } from '@/app/login/LoginForm'
 import { VOCABULARY } from '@/errors/uiError'
-import { RECOVERY_KEY_STORAGE_KEY } from '@/identity/recoveryKey'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
 // 規格：openspec/changes/fe-a08-account-login/specs/account-login/spec.md
@@ -107,14 +106,6 @@ describe('登入頁有帳號密碼的入口，匿名路仍是主路', () => {
       },
     ],
     [
-      '金鑰表單',
-      async () => {
-        const form = (screen.getByRole('button', { name: '用金鑰回來' }) as HTMLButtonElement).form as HTMLFormElement
-        await type(within(form).getByLabelText('貼上你的恢復金鑰'), ME.id)
-        return form
-      },
-    ],
-    [
       '帳號登入表單',
       async () => {
         await type(field(loginForm(), '帳號'), 'alice')
@@ -134,14 +125,15 @@ describe('登入頁有帳號密碼的入口，匿名路仍是主路', () => {
     ],
   ]
   for (const [source, prepare] of PENDING_SOURCES) {
-    it(`[FE-A08-S12] ${source}送出中：當下三個送出鈕與兩個切換鈕都禁用；回來之後恢復、alert 在那個表單裡`, async () => {
+    it(`[FE-A08-S12] ${source}送出中：當下兩個送出鈕與兩個切換鈕都禁用；回來之後恢復、alert 在那個表單裡`, async () => {
       render(<LoginForm />)
       const form = await prepare()
       let release: (() => void) | null = null
       server.reply(403, { detail: '後端寫的字' }, { after: new Promise<void>((r) => (release = r)) })
       await submit(form)
       const submitButtons = () => [...document.querySelectorAll('form button[type="submit"]')] as HTMLButtonElement[]
-      expect(submitButtons()).toHaveLength(3)
+      // 暱稱路＋帳密路兩個送出鈕（恢復金鑰路已移除）
+      expect(submitButtons()).toHaveLength(2)
       for (const b of submitButtons()) expect(b.disabled, `${b.textContent} 沒鎖`).toBe(true)
       expect(tab('登入').disabled).toBe(true)
       expect(tab('註冊').disabled, '送出中還能切走').toBe(true)
@@ -161,8 +153,7 @@ describe('註冊建立一張帶帳號密碼的名片，成功即登入', () => {
     return registerForm()
   }
 
-  it('[FE-A08-S02] body 正好三鍵、大小寫原樣；成功導向 /world、不顯示金鑰畫面、舊金鑰被清掉', async () => {
-    localStorage.setItem(RECOVERY_KEY_STORAGE_KEY, '22222222-2222-2222-2222-222222222222')
+  it('[FE-A08-S02] body 正好三鍵、大小寫原樣；成功導向 /world、不顯示金鑰畫面', async () => {
     const form = openRegister()
     await type(field(form, '帳號'), 'Alice_01')
     await type(field(form, '密碼'), 'correct horse')
@@ -173,7 +164,6 @@ describe('註冊建立一張帶帳號密碼的名片，成功即登入', () => {
     expect(posts('/api/register')).toHaveLength(1)
     expect(posts('/api/register')[0]?.body).toEqual({ login_id: 'Alice_01', password: 'correct horse', nickname: '愛麗絲' })
     expect(screen.queryByTestId('recovery-key'), '有密碼的人不看金鑰畫面').toBeNull()
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY), '沒勾記住我：舊金鑰也要清掉').toBeNull()
   })
 
   it('[FE-A08-S03] 帳號已存在：alert 逐字是前端的那一句、值不變、焦點在 alert', async () => {
@@ -293,24 +283,7 @@ describe('帳號密碼登入驗證身分，錯了不透露哪一個錯', () => {
     expect(screen.queryByTestId('recovery-key')).toBeNull()
   })
 
-  it('[FE-A08-S07] 勾了記住我就落地；沒勾就清掉舊的', async () => {
-    render(<LoginForm />)
-    click(screen.getByLabelText('在這台裝置上記住我'))
-    await fill('alice', 'right-pass')
-    server.reply(200, ME)
-    await submit(loginForm())
-    await waitFor(() => expect(pushed).toEqual(['/world']))
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBe(ME.id)
-    cleanup()
-    pushed.length = 0
-    localStorage.setItem(RECOVERY_KEY_STORAGE_KEY, '22222222-2222-2222-2222-222222222222')
-    render(<LoginForm />)
-    await fill('alice', 'right-pass')
-    server.reply(200, ME)
-    await submit(loginForm())
-    await waitFor(() => expect(pushed).toEqual(['/world']))
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBeNull()
-  })
+  // ⚠️ `FE-A08-S07`（勾記住我落地／清除）已隨恢復金鑰機制退場而移除：成功即登入靠後端 session cookie，前端不落地任何金鑰。
 
   it('[FE-A08-S08] 500 與連不上：toUiError 的句子、值保留', async () => {
     render(<LoginForm />)

@@ -56,10 +56,6 @@ async function person(name, rooms) {
   await page.goto(`${FRONTEND}/login`)
   await page.fill('form[aria-labelledby="nickname-heading"] input', name)
   await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]')
-  await page.waitForSelector('[data-testid="recovery-key"]', { timeout: 30_000 })
-  await page.click('button:has-text("複製鑰匙")')
-  await page.waitForSelector('[role="status"]:has-text("已經複製")', { timeout: 15_000 })
-  await page.click('button:has-text("進入世界")')
   await page.waitForURL('**/world', { timeout: 30_000 })
   await waitForWorld(page)
   return { context, page, name, sockets }

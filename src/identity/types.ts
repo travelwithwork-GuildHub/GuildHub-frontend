@@ -13,16 +13,11 @@ import type { ProfileOut } from '@/api/contract/rest'
 
 /** 恢復金鑰為什麼沒把人帶回來。`S10` 要求這件事**看得出來**。 */
 export type GuestReason =
-  /** 沒有 session，手上也沒有金鑰。這是最普通的「第一次來」。 */
-  | 'no-session'
   /**
-   * 手上有金鑰，但後端說那張名片不存在（404）。
-   *
-   * ⚠️ **這一種 MUST NOT 被靜默改成「建一張新名片」**（`S10`）——
-   * 那樣「我回來了」與「我是新來的」在畫面上會完全一樣，
-   * 而使用者會以為自己的專案與訊息不見了。後端的註解裡逐字寫著這個顧慮。
+   * 沒有 session cookie。這是唯一的「你是訪客」（`FE-A06` 2026-09-21 反轉後）——
+   * 恢復金鑰機制退場，`GET /api/me` 回 401 就是訪客，後面不再有「拿金鑰去恢復」那一步。
    */
-  | 'recovery-key-rejected'
+  'no-session'
 
 export type Identity =
   /** 還沒問完。**不是**「未登入」。 */
@@ -77,13 +72,3 @@ export class LoginIdTakenError extends Error {
   }
 }
 
-/** 這把恢復金鑰後端找不到（404）。`S10`／`S17`。 */
-export class RecoveryKeyRejectedError extends Error {
-  override name = 'RecoveryKeyRejectedError'
-  constructor() {
-    super(
-      '這把恢復金鑰對應的名片不存在。它可能被刪掉了，或者資料庫重建過。' +
-        '不會自動改成建立一張新名片 —— 那樣你會以為自己的東西不見了。',
-    )
-  }
-}

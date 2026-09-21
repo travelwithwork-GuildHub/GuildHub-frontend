@@ -56,8 +56,7 @@ try {
   await t1.goto(`${FRONTEND}/login`)
   await t1.fill('input >> nth=0', '分頁守衛')
   await t1.click('button:has-text("進入世界")')
-  await t1.waitForSelector('[data-testid="recovery-key"]')
-  await t1.goto(`${FRONTEND}/world`)
+  await t1.waitForURL('**/world', { timeout: 30_000 })
   await t1.waitForTimeout(1500)
   check('[S02] 第一個分頁沒有被擋', await blocked(t1), false)
 

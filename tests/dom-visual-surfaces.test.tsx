@@ -64,12 +64,11 @@ const KEY = 'abc1def2-3a4b-5c6d-7e8f-9012ab34cdef'
 const PROFILE = { ...ME, id: KEY, display_name: '阿福' }
 
 describe('每個操作區至多一個主要動作，列出的狀態裡它是那一個', () => {
-  it('[FE-X16-S09] /login 三個表單各自一個主要動作：進入世界／用金鑰回來／登入或註冊（依分頁）；暱稱那條在最前、標題層次領先', async () => {
+  it('[FE-X16-S09] /login 兩個表單各自一個主要動作：進入世界／登入或註冊（依分頁）；暱稱那條在最前、標題層次領先', async () => {
+    // 恢復金鑰貼上表單（`resume-heading`／「用金鑰回來」）已隨恢復金鑰機制退場而移除。
     render(<LoginForm />)
     await type(form('nickname-heading').querySelector('input')!, '阿福')
     expect(primaries(form('nickname-heading'))).toEqual(['進入世界'])
-    await type(form('resume-heading').querySelector('input')!, KEY)
-    expect(primaries(form('resume-heading'))).toEqual(['用金鑰回來'])
     const account = screen.getByTestId('account-section')
     expect(primaries(account)).toEqual([ACCOUNT_LABELS.submitLogin])
     click(button(account, ACCOUNT_LABELS.tabRegister))
@@ -78,33 +77,10 @@ describe('每個操作區至多一個主要動作，列出的狀態裡它是那�
     const forms = [...document.querySelectorAll('form, section[data-testid="account-section"]')]
     expect(forms[0]).toBe(form('nickname-heading'))
     expect(document.getElementById('nickname-heading')?.getAttribute('data-text')).toBe('title')
-    for (const id of ['resume-heading', 'account-heading']) expect(document.getElementById(id)?.getAttribute('data-text'), id).toBe('heading')
+    expect(document.getElementById('account-heading')?.getAttribute('data-text')).toBe('heading')
   })
 
-  it('[FE-X16-S09] 金鑰交接：複製前「複製鑰匙」主要、「進入世界」鎖著；複製後「進入世界」主要、「複製鑰匙」退成次要；填回尾碼也一樣', async () => {
-    const reach = async () => {
-      server.reply(200, PROFILE)
-      render(<LoginForm clipboard={{ async write() {} }} />)
-      await type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
-      click(screen.getByRole('button', { name: '進入世界' }))
-      await waitFor(() => expect(screen.getByTestId('recovery-key').textContent).toBe(KEY))
-    }
-    await reach()
-    expect(primaries(keySection())).toEqual(['複製鑰匙'])
-    expect(button(keySection(), '進入世界').disabled).toBe(true)
-    click(button(keySection(), '複製鑰匙'))
-    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('已經複製'))
-    expect(primaries(keySection())).toEqual(['進入世界'])
-    expect(tier(button(keySection(), '複製鑰匙'))).toBe('secondary')
-
-    cleanup()
-    await reach()
-    await type(screen.getByLabelText(/最後 6 個字/), KEY.slice(-6))
-    expect(primaries(keySection())).toEqual(['進入世界'])
-    expect(tier(button(keySection(), '複製鑰匙'))).toBe('secondary')
-  })
-
-  it('[FE-X16-S09] 訪客提示：「建立我的身分」主要、「先四處看看」文字級', async () => {
+  it('[FE-X16-S09] 訪客提示：「進入世界」主要、「先四處看看」文字級', async () => {
     server.reply(401, { detail: 'no' })
     render(
       <IdentityProvider>
@@ -112,7 +88,7 @@ describe('每個操作區至多一個主要動作，列出的狀態裡它是那�
       </IdentityProvider>,
     )
     const notice = await screen.findByTestId('first-entry-notice')
-    expect(primaries(notice)).toEqual(['建立我的身分'])
+    expect(primaries(notice)).toEqual(['進入世界'])
     expect(tier(button(notice, '先四處看看'))).toBe('tertiary')
   })
 

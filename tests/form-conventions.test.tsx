@@ -264,11 +264,10 @@ describe('resolver 自己炸', () => {
 })
 
 describe('LoginForm 遷到同一套', () => {
-  it('[FE-X05-S13] 暱稱欄由 RHF 註冊：input 有 name="nickname"；金鑰欄也有 name', () => {
+  it('[FE-X05-S13] 暱稱欄由 RHF 註冊：input 有 name="nickname"', () => {
     render(<LoginForm />)
     expect((screen.getByLabelText('在世界裡顯示的名字') as HTMLInputElement).name).toBe('nickname')
-    expect((screen.getByLabelText('貼上你的恢復金鑰') as HTMLInputElement).name).toBe('key')
-    // 兩個表單、還沒失敗：沒有任何 alert（欄位提示不是 alert）。
+    // 還沒失敗：沒有任何 alert（欄位提示不是 alert）。
     expect(screen.queryAllByRole('alert')).toHaveLength(0)
   })
 })

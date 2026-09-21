@@ -36,7 +36,6 @@ describe('自己的 av 從身分來', () => {
     const notSignedIn: Identity[] = [
       { state: 'unknown' },
       { state: 'guest', reason: 'no-session' },
-      { state: 'guest', reason: 'recovery-key-rejected' },
       { state: 'unavailable', cause: new Error('後端掛了') },
     ]
     for (const identity of notSignedIn) {

@@ -59,40 +59,14 @@ const bad = (l, d) => {
 }
 
 /**
- * 走完首次進入流程，進到世界裡。
- *
- * ⚠️ **要填回金鑰尾碼才能按「進入世界」**（`FE-A06` 的設計：
- * 資訊在畫面上不等於資訊被帶走了）。
+ * 走完首次進入流程，進到世界裡。取名 → 直接進世界（2026-09-21 反轉，無金鑰儀式）。
  */
 async function enterWorld(context, name) {
   const page = await context.newPage()
   await page.goto(`${FRONTEND}/`)
-  // ⚠️ **不能用 `input` 這個選擇器** —— 那一頁上還有「記住我」的勾選框，
-  // 而 Playwright 的 strict mode 會因為配到兩個而直接丟錯。
   const TEXTBOX = 'input:not([type=checkbox])'
   await page.waitForSelector(TEXTBOX, { timeout: 30_000 })
   await page.fill(TEXTBOX, name)
-  await page.click('button:has-text("建立我的身分")')
-
-  // ⚠️ **拿不到金鑰時要說出畫面上有什麼。**
-  // 少了這一段，紅燈只會說「等 `[data-testid=recovery-key]` 逾時」——
-  // 而那句話對「後端拒絕了這個名字」「按鈕根本沒被點到」「CORS 又壞了」
-  // 是同一句。這個專案為了「證據被吞掉」繞過很多次遠路。
-  let key
-  try {
-    key = (await page.textContent('[data-testid="recovery-key"]', { timeout: 30_000 }))?.trim()
-  } catch {
-    const alert = await page.locator('[role=alert]').allTextContents()
-    const body = (await page.textContent('body'))?.replace(/\s+/g, ' ').trim().slice(0, 300)
-    throw new Error(
-      `${name} 沒有拿到恢復金鑰。\n   畫面上的警告：${alert.join(' / ') || '（沒有）'}` +
-        `\n   畫面文字：${body}`,
-    )
-  }
-  if (!key) throw new Error(`${name} 的恢復金鑰是空的`)
-  // ⚠️ **拿到金鑰之後表單整段被換掉，畫面上只剩證明框那一個 input。**
-  // 用 `nth=1` 會 timeout —— 這個坑在 `two-windows.mjs` 踩過。
-  await page.fill(TEXTBOX, key.slice(-6))
   await page.click('button:has-text("進入世界")')
 
   await page.waitForSelector('canvas', { timeout: 30_000 })

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LIMITS } from '@/api/contract/limits'
-import { RECOVERY_KEY_STORAGE_KEY, browserRecoveryKeyStore } from '@/identity/recoveryKey'
 import { nicknameProblem, signInWithNickname } from '@/identity/session'
 import { NicknameLengthError } from '@/identity/types'
 import { startContractServer, type ContractServer } from './support/contract-server'
@@ -99,52 +98,5 @@ describe('用暱稱建立身分', () => {
   })
 })
 
-describe('恢復金鑰預設不落地', () => {
-  it('[FE-A01-S07] 沒有選擇記住：持久儲存裡沒有金鑰', async () => {
-    server.reply(200, profileNamed('阿福'))
-
-    await signInWithNickname('阿福')
-
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBeNull()
-  })
-
-  it('[FE-A01-S07] 選擇記住：金鑰在持久儲存裡，而且就是名片的 id', async () => {
-    server.reply(200, profileNamed('阿福'))
-
-    await signInWithNickname('阿福', { remember: true })
-
-    // **反方向。** 少了它，一個完全沒有實作持久化的版本也會讓上一條全綠 ——
-    // 那條斷言在空集合上恆真
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBe(UUID)
-  })
-
-  it('[FE-A01-S07] 沒有選擇記住時，上一個人的金鑰要被清掉', async () => {
-    // 只「不新增」是不夠的：留在原地的話，下一次重新載入會用它
-    // 把畫面變成**另一個人**
-    localStorage.setItem(RECOVERY_KEY_STORAGE_KEY, '22222222-2222-2222-2222-222222222222')
-    server.reply(200, profileNamed('阿福'))
-
-    await signInWithNickname('阿福')
-
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBeNull()
-  })
-
-  it('[FE-A01-S07] 讀不到 localStorage 時當成沒有金鑰，而不是整個炸掉', () => {
-    // 無痕模式、關掉網站資料、某些嵌入情境下，光是碰它就會拋
-    const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      get() {
-        throw new Error('SecurityError')
-      },
-    })
-    try {
-      const store = browserRecoveryKeyStore()
-      expect(store.read()).toBeNull()
-      expect(() => store.remember('x')).not.toThrow()
-      expect(() => store.forget()).not.toThrow()
-    } finally {
-      if (original) Object.defineProperty(globalThis, 'localStorage', original)
-    }
-  })
-})
+// ⚠️〈恢復金鑰預設不落地〉整組（`FE-A01-S07`）已於 2026-09-21 隨恢復金鑰機制退場而移除
+// （`fe-a06-first-entry` 反轉、`identity-session` REMOVED delta）。前端不再把金鑰寫進 localStorage。

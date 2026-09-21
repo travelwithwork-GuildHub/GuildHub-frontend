@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { RECOVERY_KEY_STORAGE_KEY } from '@/identity/recoveryKey'
 import { registerAccount, signInWithPassword } from '@/identity/session'
 import { CredentialsRejectedError, LoginIdTakenError } from '@/identity/types'
 import { VOCABULARY, toUiError } from '@/errors/uiError'
@@ -30,8 +29,7 @@ afterEach(async () => {
 })
 
 describe('registerAccount', () => {
-  it('[FE-A08-S02] body 正好三鍵、原值原樣（大小寫、空白都不動）；沒勾記住我就把舊金鑰也清掉', async () => {
-    localStorage.setItem(RECOVERY_KEY_STORAGE_KEY, '22222222-2222-2222-2222-222222222222')
+  it('[FE-A08-S02] body 正好三鍵、原值原樣（大小寫、空白都不動）；成功即登入', async () => {
     server.reply(200, PROFILE)
     const identity = await registerAccount({ loginId: 'Alice_01 ', password: 'correct horse', nickname: '愛麗絲' })
     expect(identity.state).toBe('signed-in')
@@ -39,14 +37,10 @@ describe('registerAccount', () => {
     expect(server.calls[0]?.pathname).toBe('/api/register')
     expect(server.calls[0]?.body).toEqual({ login_id: 'Alice_01 ', password: 'correct horse', nickname: '愛麗絲' })
     expect(server.calls[0]?.contractOk).toBe(true)
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY), '沒勾記住我，舊金鑰要清掉').toBeNull()
   })
 
-  it('[FE-A08-S07] 勾了記住我：金鑰是回應的 id', async () => {
-    server.reply(200, PROFILE)
-    await registerAccount({ loginId: 'alice', password: 'correct horse', nickname: '愛麗絲' }, { remember: true })
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBe(UUID)
-  })
+  // ⚠️ `FE-A08-S07`（成功後的恢復金鑰落地／清除）已隨恢復金鑰機制退場而移除（2026-09-21）：
+  // 帳密路成功即登入靠後端 session cookie，前端不再寫任何金鑰進 localStorage。
 
   it('[FE-A08-S03] 409 → LoginIdTakenError（前端的字，不是後端的 detail）', async () => {
     server.reply(409, { detail: '後端寫的字' })
@@ -85,14 +79,11 @@ describe('signInWithPassword', () => {
     expect((b as Error).message).toBe((a as Error).message)
   })
 
-  it('[FE-A08-S07] 成功：勾了落地、沒勾清掉舊的', async () => {
+  it('[FE-A08-S07] 密碼登入成功即登入（後端 session cookie；前端不落地任何金鑰）', async () => {
     server.reply(200, PROFILE)
-    const first = await signInWithPassword('alice', 'right-pass', { remember: true })
+    const first = await signInWithPassword('alice', 'right-pass')
     expect(first.state).toBe('signed-in')
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBe(UUID)
-    server.reply(200, PROFILE)
-    await signInWithPassword('alice', 'right-pass')
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBeNull()
+    expect(first.state === 'signed-in' && first.profile.id).toBe(UUID)
   })
 
   it('[FE-A08-S08] 500 與 409 原樣拋：不是 CredentialsRejectedError', async () => {

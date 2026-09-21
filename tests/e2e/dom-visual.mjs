@@ -37,10 +37,6 @@ const SURFACES = [
   { name: '/login', guest: true, root: 'body', levels: ['display', 'body', 'caption'], open: (page) => page.goto(`${FRONTEND}/login`).then(() => page.waitForSelector('form')) },
   // S04 的 `role="alert"` 要真的量到一個：空名字送出，`SubmitError` 出現（`FE-A01-S02`）
   { name: '/login（送出失敗）', guest: true, root: 'body', open: async (page) => { await page.goto(`${FRONTEND}/login`); await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]'); await page.waitForSelector('[data-testid="submit-error"]') } },
-  {
-    name: '金鑰交接', guest: true, root: 'section[aria-labelledby="key-heading"]',
-    open: async (page) => { await page.goto(`${FRONTEND}/login`); await page.fill('form[aria-labelledby="nickname-heading"] input', '新來的'); await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]'); await page.waitForSelector('[data-testid="recovery-key"]') },
-  },
   { name: '訪客提示', guest: true, root: '[data-testid="first-entry-notice"]', levels: ['title', 'body'], open: (page) => page.goto(`${FRONTEND}/world`).then(() => waitForWorld(page)).then(() => page.waitForSelector('[data-testid="first-entry-notice"]')) },
   // 規格的「看板清單／詳情」是案件與人才兩種（名詞表）：兩邊必備的層級相同
   { name: '看板清單', root: '[data-testid="list-panel"]', levels: ['title', 'heading', 'body', 'caption'], open: async (page) => { await world(page, '?panel=projects'); await page.waitForSelector('[data-testid="project-card"]') } },

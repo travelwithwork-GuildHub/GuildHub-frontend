@@ -34,9 +34,8 @@ try {
   await page.goto(`${FRONTEND}/login`)
   await page.fill('form[aria-labelledby="nickname-heading"] input', '本地後端實測')
   await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]')
-  // 登入後停在恢復金鑰那一頁（FE-A01 的義務：金鑰要看得到）；帶著 cookie 進世界。
-  await page.waitForSelector('[data-testid="recovery-key"]', { timeout: 30_000 })
-  await page.goto(`${FRONTEND}/world`)
+  // 取名直接進世界（2026-09-21 反轉，無金鑰畫面）；帶著 session cookie。
+  await page.waitForURL('**/world', { timeout: 30_000 })
   await page.waitForSelector('[data-testid="world-loading"]', { state: 'detached', timeout: 30_000 })
   await page.waitForTimeout(1500)
   const loginCall = apiCalls.find((c) => c.startsWith('POST /api/login'))

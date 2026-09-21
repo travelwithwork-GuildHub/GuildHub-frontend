@@ -1,42 +1,32 @@
 'use client'
 
 import { useState } from 'react'
-import type { ClipboardPort } from '@/identity/clipboard'
 import { signInWithNickname } from '@/identity/session'
 import { NicknameLengthError, type Identity } from '@/identity/types'
-import { CHECK_ROW, FIELD, FIELD_LABEL, FORM, PRIMARY, TITLE } from '@/design/controls'
-import { KeyHandoff } from './KeyHandoff'
+import { FIELD, FIELD_LABEL, FORM, PRIMARY, TITLE } from '@/design/controls'
 
-// 首次進入的流程本身。規格 `FE-A06`。
+// 首次進入的流程本身。規格 `FE-A06`（`fe-a06-first-entry`，2026-09-21 反轉）。
 //
-// ⚠️ **同一個流程，三種呈現。** `/` 用它當整頁（強制走完）、`/world` 用它當可關掉的引導層；
-// `/login` 的暱稱路自己有取名字的表單，但**後半段「帶走鑰匙」是同一個 `KeyHandoff`**
-//（`fe-a06-login-entry` design D1）。**不得為任何一個入口各寫一套狀態機** ——
-// 那是封存前審查時 codex 的條件（design D1），而理由是兩套一定會漂。
-// 這個檔案只剩「取名字」那一半；閘在 `KeyHandoff.tsx`。
+// ⚠️ **只有一步：取一個名字 → 直接進世界。** 產品負責人在 demo 前撤掉了原本的「帶走恢復金鑰」閘 ——
+// 匿名使用者不該被要求記下一串 UUID 才進得了世界（規格〈網站的根路徑是一條走得完的路〉的反轉說明）。
+// 匿名身分綁在後端簽章的 session cookie（同瀏覽器重整、再訪都是同一個人；換瀏覽器就是新人）；
+// 要跨裝置的持久身分走帳號密碼（`FE-A08`）。
 //
-// ⚠️⚠️ **按鈕要看起來像按鈕，而這件事是截圖抓到的。**
-// Tailwind 的 preflight 把 `<button>` 的預設外觀清光了，所以在加上樣式之前
-// 「複製鑰匙」與「進入世界」在畫面上是**兩行漂著的字** ——
-// 18 條端到端斷言全綠，而那個 CTA 沒有人會認得出來。
-// **這是 `FE-W12`「門看不出來是門」的同一種形狀**（那次也是測試全綠、
-// 六扇門在畫面上是 10 像素的細縫）。
+// ⚠️ **同一個流程，兩種呈現。** `/` 用它當整頁（強制走完）、`/world` 用它當可關掉的引導層；
+// `/login` 的暱稱路自己有取名字的表單（`LoginForm`），成功之後同樣直接進世界。**不得為任何一個入口各寫一套狀態機。**
 
 export interface FirstEntryFlowProps {
   /**
-   * 走完了。`/` 導向世界，引導層則是關掉自己。
+   * 走完了（送出合法名字、建立身分）。`/` 導向世界，引導層則是關掉自己。
    *
    * **`identity` 一定要交出去。** 少了它，在世界裡走完流程之後標題列仍然
    * 顯示「訪客」，要重整才會變 —— 而那是端到端第一次跑就抓到的 bug。
    */
-  onDone: (identity: Identity) => void
-  clipboard?: ClipboardPort
+  onDone: (identity: Extract<Identity, { state: 'signed-in' }>) => void
 }
 
-export function FirstEntryFlow({ onDone, clipboard }: FirstEntryFlowProps) {
+export function FirstEntryFlow({ onDone }: FirstEntryFlowProps) {
   const [nickname, setNickname] = useState('')
-  const [remember, setRemember] = useState(false)
-  const [identity, setIdentity] = useState<Identity>({ state: 'unknown' })
   const [error, setError] = useState<unknown>(null)
   const [busy, setBusy] = useState(false)
 
@@ -44,16 +34,14 @@ export function FirstEntryFlow({ onDone, clipboard }: FirstEntryFlowProps) {
     setBusy(true)
     setError(null)
     try {
-      setIdentity(await signInWithNickname(nickname, { remember }))
+      const identity = await signInWithNickname(nickname)
+      // ⚠️ **成功就直接交出去** —— 沒有金鑰畫面、沒有中間步驟（規格 `FE-A06-S02`）。
+      if (identity.state === 'signed-in') onDone(identity)
     } catch (caught) {
       setError(caught)
     } finally {
       setBusy(false)
     }
-  }
-
-  if (identity.state === 'signed-in') {
-    return <KeyHandoff identity={identity} clipboard={clipboard} onDone={onDone} />
   }
 
   return (
@@ -72,16 +60,8 @@ export function FirstEntryFlow({ onDone, clipboard }: FirstEntryFlowProps) {
         在世界裡顯示的名字
         <input {...FIELD} value={nickname} onChange={(e) => setNickname(e.target.value)} />
       </label>
-      <label className={CHECK_ROW}>
-        <input
-          type="checkbox"
-          checked={remember}
-          onChange={(e) => setRemember(e.target.checked)}
-        />
-        在這台裝置上記住我
-      </label>
       <button type="submit" {...PRIMARY} disabled={busy}>
-        建立我的身分
+        進入世界
       </button>
       {error !== null && (
         <p role="alert" className="text-danger">
