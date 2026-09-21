@@ -76,16 +76,17 @@ export const CAPTION: TextStyle = { 'data-text': 'caption', className: 'text-cap
  * ⚠️⚠️ 空白的輸入框沒有任何內容，「有沒有東西在那裡」只能靠填色或邊界本身；
  * **SHALL NOT 靠 placeholder、游標或 focus ring 達標**（`FE-X13-S04`）。
  */
-export const FIELD = { className: 'border-control-edge bg-surface-raised rounded-control border px-3 py-2' } as const
+export const FIELD = { className: 'border-control-edge bg-surface-raised rounded-control w-full border px-3 py-2' } as const
 
 /** 勾選框那一列：讓框跟字之間有距離，而且整列都點得到。 */
 export const CHECK_ROW = 'flex items-center gap-2'
 
 /**
  * 一個表單的容器。**這不是「順手統一 layout」，是 `FE-X13-S06` 要求的同一份外觀。**
- * `max-w-prose` 讓輸入框不會拉滿整個視窗寬。
+ * `w-full max-w-sm` 讓表單填滿容器（窄面板裡填滿、寬登入頁封頂在 24rem），欄位再靠 `w-full` 填滿表單 ——
+ * 沒有這個上限時，欄位在寬頁上會拉太長、在窄面板裡（舊 `items-start`）又縮成固定寬、左半截像被切掉。
  */
-export const FORM = 'flex max-w-prose flex-col items-start gap-gutter'
+export const FORM = 'flex w-full max-w-sm flex-col gap-gutter'
 
 /** 一個「說明文字 ＋ 輸入框」的欄位。**上下排，不是左右排。** */
 export const FIELD_LABEL = 'flex flex-col gap-2'
