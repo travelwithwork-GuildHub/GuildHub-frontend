@@ -11,11 +11,13 @@ import { useIdentity } from '@/identity/IdentityProvider'
 import { useRequestEntry } from '@/world/scenes/EntryGate'
 import { RoomEntryGateProvider } from '@/world/scenes/RoomEntryGate'
 import { ROOM_ENTRY_LABELS, RoomPasswordDialog } from '@/world/scenes/RoomPasswordDialog'
+import { __resetRoomTokenMemory, heldRoomToken } from '@/world/scenes/roomTokens'
 import { SceneProvider } from '@/world/scenes/SceneProvider'
 
 // 規格：openspec/changes/fe-n08-room-entry-gate/specs/room-entry-gate/spec.md
 //   Requirement: 送出走既有 operation 與表單慣例 —— S04
-//   Requirement: 成功先存票再進房；票存不進去就不算成功 —— S06（順序）、S14、S15
+//   Requirement: 成功先持有票再進房（票以記憶體為主，storage 寫入失敗仍進得去）—— S06（順序）、S17（storage 失敗照進／空 token 才擋）、S15
+//   （`fe-n08-room-ticket-in-memory` 反轉：舊 S14「存不進就失敗」退役，反轉行為改 S17）
 //   Requirement: 失敗回饋可恢復、不猜原因、不回顯後端字串 —— S08、S09、S10
 //
 // 接法同 `room-entry-modal.test.tsx`。`enterProject` 是假的（每次由測試決定何時、回什麼）；`enterRoom` 與 `holdRoomToken` 包一層記錄呼叫順序、
@@ -81,7 +83,8 @@ const B = { projectId: 'b0000000-0000-4000-8000-00000000000b', title: '噪音地
 const profile = (id: string) => ({ id, display_name: id, avatar_id: 0, skills: [], hours_per_week: null, bio: null, updated_at: '2026-09-14T00:00:00Z' })
 const P: Identity = { state: 'signed-in', profile: profile('p0000000-0000-4000-8000-00000000000p') }
 const Q: Identity = { state: 'signed-in', profile: profile('q0000000-0000-4000-8000-00000000000q') }
-const keyOf = (who: Identity, room: { projectId: string }) => `guildhub.roomToken.${who.state === 'signed-in' ? who.profile.id : '?'}.${room.projectId}`
+const idOf = (who: Identity) => (who.state === 'signed-in' ? who.profile.id : '?')
+const keyOf = (who: Identity, room: { projectId: string }) => `guildhub.roomToken.${idOf(who)}.${room.projectId}`
 
 type Grabbed = { lock: RefObject<boolean>; requestEntry: (projectId: string, title: string) => void }
 function Grab({ sinkRef }: { sinkRef: RefObject<Grabbed | null> }) {
@@ -145,6 +148,7 @@ const identityChange = (next: Identity) => act(() => identity.set(next))
 
 beforeEach(() => {
   window.sessionStorage.clear()
+  __resetRoomTokenMemory() // 記憶體是模組級的，跨測試要清；不清的話前一條的票會漏到下一條
   calls.length = 0
   identity.set(P)
   window.history.replaceState(null, '', '/world')
@@ -188,7 +192,7 @@ describe('送出', () => {
     expect(enterProject).toHaveBeenLastCalledWith(A.projectId, { password: '' })
   })
 
-  it('[FE-N08-S06] 密碼對了：holdRoomToken 在 enterRoom 之前；sessionStorage 裡 P＋R 是 T；視窗關閉', async () => {
+  it('[FE-N08-S06] 密碼對了：holdRoomToken 在 enterRoom 之前；heldRoomToken 回 T；視窗關閉', async () => {
     const { pressE } = mountWorld()
     pressE()
     enterProject.mockResolvedValueOnce({ room_token: 'T' })
@@ -196,17 +200,19 @@ describe('送出', () => {
     await submit()
     await waitFor(() => expect(dialogs()).toHaveLength(0))
     expect(calls, '先存票、再進房，各一次').toEqual(['hold:T', `enter:${A.projectId}`])
-    expect(window.sessionStorage.getItem(keyOf(P, A))).toBe('T')
+    expect(heldRoomToken(idOf(P), A.projectId), '票的權威在記憶體').toBe('T')
     expect(window.location.href).not.toContain('T=')
     expect(document.activeElement).toBe(screen.getByTestId('world-canvas-container'))
   })
 
+  // 反轉（`fe-n08-room-ticket-in-memory`）：`sessionStorage` 存不進**不再**擋在門口 ——
+  // 記憶體帶著這一次的票 T 照樣進房。只有空的 `room_token` 才失敗（下一條）。
   it.each<[string, () => void, string | null]>([
     ['setItem 拋', () => void vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError') }), null],
     ['setItem 靜默沒寫、getItem 回 null', () => void vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {}), null],
-    ['舊票 OLD 殘留、setItem 失敗、getItem 仍回 OLD', () => void vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {}), 'OLD'],
-    ['setItem 成功但 getItem 拋', () => void vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError') }), null],
-  ])('[FE-N08-S14] %s：不進房、視窗留著、alert 不說密碼、T 不進 DOM', async (_name, sabotage, old) => {
+    ['舊票 OLD 殘留、setItem 失敗（storage 仍是 OLD）', () => void vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {}), 'OLD'],
+    ['getItem 拋', () => void vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError') }), null],
+  ])('[FE-N08-S17] %s：storage 存不進也照樣進房（記憶體帶票）、無 alert、票不進網址', async (_name, sabotage, old) => {
     const { pressE } = mountWorld()
     pressE()
     if (old !== null) window.sessionStorage.setItem(keyOf(P, A), old)
@@ -214,17 +220,20 @@ describe('送出', () => {
     enterProject.mockResolvedValueOnce({ room_token: 'T' })
     type('guild1234')
     await submit()
-    await waitFor(() => expect(alerts()).toHaveLength(1))
-    expect(calls.filter((c) => c.startsWith('enter:')), '票沒存住就不能進房').toEqual([])
-    expect(dialogs()).toHaveLength(1)
-    expect(alertText()).not.toContain('密碼')
-    expect(document.body.textContent).not.toContain('T')
-    expect(document.activeElement).toBe(screen.getByRole('alert'))
-    expect(screen.getByRole('alert').compareDocumentPosition(submitButton()) & Node.DOCUMENT_POSITION_FOLLOWING, 'alert 要在送出控制之前').toBeTruthy()
-    expect(window.location.pathname).toBe('/world')
+    // 進房了：視窗關閉、先存票再進房各一次
+    await waitFor(() => expect(dialogs()).toHaveLength(0))
+    expect(calls, '先存票、再進房，各一次').toEqual(['hold:T', `enter:${A.projectId}`])
+    // 沒有 alert —— storage 失敗不再是失敗
+    expect(alerts()).toHaveLength(0)
+    // 記憶體帶著這一次的票 T（就算 storage 殘留 OLD，讀回的也是 T，不是 OLD）
+    vi.restoreAllMocks()
+    const pid = P.state === 'signed-in' ? P.profile.id : ''
+    expect(heldRoomToken(pid, A.projectId), 'storage 存不進，票仍在記憶體且是這一次的 T').toBe('T')
+    // 票不進網址
+    expect(window.location.href).not.toContain('T=')
   })
 
-  it('[FE-N08-S14] room_token 是空字串：視同失敗、不把空字串存成票', async () => {
+  it('[FE-N08-S17] room_token 是空字串：視同失敗、不把空字串存成票', async () => {
     const { pressE } = mountWorld()
     pressE()
     enterProject.mockResolvedValueOnce({ room_token: '' })
@@ -271,8 +280,8 @@ describe('送出', () => {
     await submit()
     expect(submitButton().disabled).toBe(true)
     await pb().ok('TB')
-    expect(window.sessionStorage.getItem(keyOf(P, B))).toBeNull()
-    expect(window.sessionStorage.getItem(keyOf(Q, B))).toBeNull()
+    expect(heldRoomToken(idOf(P), B.projectId), 'P＋B 不採用').toBeNull()
+    expect(heldRoomToken(idOf(Q), B.projectId), 'Q＋B 不採用').toBeNull()
     expect(calls).toEqual([])
     expect(alerts()).toHaveLength(0)
     expect(dialogs()).toHaveLength(1)

@@ -44,14 +44,18 @@ export const ROOM_ENTRY_LABELS = {
   rejected: '密碼不對，再試一次。',
   /** 404：不猜是不存在、還沒成軍還是關了。 */
   unavailable: '這間房目前進不了。',
-  /** 票存不進這個瀏覽器（design D10）：不是密碼的問題。 */
-  notHeld: '這個瀏覽器存不了通行證，所以還進不去 —— 換一個瀏覽器或分頁再試。',
+  /**
+   * 拿不到有效的通行證（後端回空的 `room_token`）：不是密碼的問題、也**不是**瀏覽器存不存得住的問題
+   *（`fe-n08-room-ticket-in-memory` 之後票以記憶體為主，storage 被擋也照樣進得去；這句只剩「後端沒給票」這個異常）。
+   */
+  notHeld: '這間房目前拿不到通行證，請稍後再試一次。',
 }
 
 /** 密碼沒有格式規則（design D6）：空字串也照送，後端回 403。 */
 const PasswordSchema = z.object({ password: z.string() })
 
-/** 票拿到了卻存不住／讀回不是它／是空字串（`S14`）。前端自己的領域錯誤，文案由 `describeError` 給。 */
+/** 後端回空的 `room_token`（`S14`）—— 拿不到有效的票。前端自己的領域錯誤，文案由 `describeError` 給。
+ *  （票存不進 storage 已**不再**走這裡：`fe-n08-room-ticket-in-memory` 之後以記憶體為主、照樣進房。） */
 class TicketNotHeldError extends Error {}
 
 function describeEntryError(cause: unknown): string | null {
