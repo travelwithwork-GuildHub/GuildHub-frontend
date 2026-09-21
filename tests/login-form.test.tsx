@@ -2,18 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { LoginForm } from '@/app/login/LoginForm'
-import { RECOVERY_KEY_STORAGE_KEY } from '@/identity/recoveryKey'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
-// `LoginForm` 有 `useRouter()`（帳號密碼成功 `push('/world')`、恢復金鑰成功 `replace('/world')`）；測試環境沒有 Next 的 app router context ——
-// 只換掉導航。`S17` 要看的是「回得去」，所以 `replace` 記下去哪裡；push 這裡用不到。
+// `LoginForm` 有 `useRouter()`（暱稱／帳密成功導向 `/world`）；測試環境沒有 Next 的 app router context —— 只換掉導航。
+// 暱稱路成功 `replace('/world')`，所以 `replace` 記下去哪裡；push 這裡用不到。
 const replaced: string[] = []
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {}, replace: (href: string) => replaced.push(href) }) }))
 
 
-// 規格：openspec/changes/fe-a01-login/specs/identity-session/spec.md
+// 規格：openspec/specs/identity-session/spec.md、openspec/specs/first-entry/spec.md
 //   Requirement: 匿名暱稱登入建立一個身分 —— S01 / S02 / S03
-//   Requirement: 恢復金鑰預設不落地，而且使用者知道它等同於身分 —— S07 / S09 / S17
+//   Requirement: 登入頁的暱稱路直接進世界（`FE-A06-S18`，2026-09-21 反轉）
+//
+// ⚠️ 恢復金鑰相關（`FE-A01-S07`／`S09`／`S10`／`S17`）已隨機制退場而移除：暱稱路成功直接進世界，沒有金鑰畫面。
 //
 // ⚠️ **受測的是真的 `LoginForm` ＋ 真的 `src/identity/` ＋ 真的 HTTP server。**
 // 沒有 mock 掉 `signInWithNickname` —— mock 掉的話，這個檔案驗的是
@@ -64,14 +65,14 @@ function submit(button: HTMLElement) {
 }
 
 describe('登入畫面', () => {
-  it('[FE-A01-S01] 輸入暱稱送出之後，畫面顯示的是那個名字', async () => {
+  it('[FE-A01-S01] 輸入暱稱送出之後，送出的是那個名字，並直接進世界', async () => {
     server.reply(200, profileNamed('阿福'))
     render(<LoginForm />)
 
     type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
     submit(screen.getByRole('button', { name: '進入世界' }))
 
-    await waitFor(() => expect(screen.getByText('阿福')).toBeDefined())
+    await waitFor(() => expect(replaced).toEqual(['/world']))
     expect(server.calls[0]?.body).toEqual({ nickname: '阿福' })
   })
 
@@ -99,72 +100,20 @@ describe('登入畫面', () => {
 
     server.reply(200, profileNamed('阿福'))
     submit(screen.getByRole('button', { name: '進入世界' }))
-    await waitFor(() => expect(screen.getByText('阿福')).toBeDefined())
-  })
-
-  it('[FE-A01-S09] 建立身分之後，金鑰看得到，而且兩句話都說了', async () => {
-    server.reply(200, profileNamed('阿福'))
-    render(<LoginForm />)
-
-    type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
-    submit(screen.getByRole('button', { name: '進入世界' }))
-
-    // 金鑰本身 —— 沒勾記住的人也要拿得到
-    await waitFor(() => expect(screen.getByTestId('recovery-key').textContent).toBe(ME))
-    // 「取得金鑰的人就能成為你」
-    expect(screen.getByText(/就能成為你/)).toBeDefined()
-    // 「沒有備份、又清掉瀏覽器資料的話，這個身分回不來」
-    expect(screen.getByText(/回不來/)).toBeDefined()
-  })
-
-  it('[FE-A01-S07] 記住我預設不勾，而且不勾就不落地', async () => {
-    server.reply(200, profileNamed('阿福'))
-    render(<LoginForm />)
-
-    const remember = screen.getByLabelText('在這台裝置上記住我') as HTMLInputElement
-    expect(remember.checked, '「記住我」預設是勾起來的').toBe(false)
-
-    type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
-    submit(screen.getByRole('button', { name: '進入世界' }))
-
-    await waitFor(() => expect(screen.getByTestId('recovery-key')).toBeDefined())
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBeNull()
-  })
-
-  it('[FE-A01-S07] 勾了就落地', async () => {
-    server.reply(200, profileNamed('阿福'))
-    render(<LoginForm />)
-
-    submit(screen.getByLabelText('在這台裝置上記住我'))
-    type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
-    submit(screen.getByRole('button', { name: '進入世界' }))
-
-    await waitFor(() => expect(screen.getByTestId('recovery-key')).toBeDefined())
-    expect(localStorage.getItem(RECOVERY_KEY_STORAGE_KEY)).toBe(ME)
-  })
-
-  it('[FE-A01-S17] 貼上一把金鑰就回得去', async () => {
-    server.reply(200, profileNamed('阿福'))
-    render(<LoginForm />)
-
-    type(screen.getByLabelText('貼上你的恢復金鑰'), ME)
-    submit(screen.getByRole('button', { name: '用金鑰回來' }))
-
-    // 回得去＝到達世界（`fe-a06-login-entry` 之後金鑰路不再重新顯示金鑰，直接取代成 `/world`）。
     await waitFor(() => expect(replaced).toEqual(['/world']))
-    // **送出去的是 resume_token。** 只看網址的話，一個改送 nickname 的
-    // 實作會建一張同名的新名片，而網址長得一模一樣 —— 這一條是「同一張名片」的證據，不得刪
-    expect(server.calls[0]?.body).toEqual({ resume_token: ME })
   })
 
-  it('[FE-A01-S10] 金鑰無效時，畫面說它無效，不是靜默進去', async () => {
-    server.reply(404, { detail: '名片不存在' })
+  it('[FE-A06-S18] 暱稱路送出後直接進世界，畫面上沒有金鑰', async () => {
+    server.reply(200, profileNamed('阿福'))
     render(<LoginForm />)
 
-    type(screen.getByLabelText('貼上你的恢復金鑰'), '22222222-2222-2222-2222-222222222222')
-    submit(screen.getByRole('button', { name: '用金鑰回來' }))
+    type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
+    submit(screen.getByRole('button', { name: '進入世界' }))
 
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('不存在'))
-    expect(screen.queryByTestId('recovery-key'), '無效的金鑰讓人進去了').toBeNull()
+    await waitFor(() => expect(replaced).toEqual(['/world']))
+    // 恢復金鑰退場：不再顯示金鑰、也沒有「記住我」勾選框、沒有「貼上恢復金鑰」入口
+    expect(screen.queryByTestId('recovery-key')).toBeNull()
+    expect(screen.queryByLabelText('在這台裝置上記住我')).toBeNull()
+    expect(screen.queryByLabelText('貼上你的恢復金鑰')).toBeNull()
   })
 })

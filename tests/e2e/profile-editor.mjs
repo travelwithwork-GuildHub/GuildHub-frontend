@@ -51,8 +51,7 @@ try {
   await page.goto(`${FRONTEND}/login`)
   await page.fill('form[aria-labelledby="nickname-heading"] input', NICK)
   await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]')
-  await page.waitForSelector('[data-testid="recovery-key"]', { timeout: 30_000 })
-  await page.goto(`${FRONTEND}/world`)
+  await page.waitForURL('**/world', { timeout: 30_000 })
   await page.waitForSelector('[data-testid="world-loading"]', { state: 'detached', timeout: 30_000 })
   await page.waitForTimeout(1000)
 

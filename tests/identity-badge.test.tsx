@@ -4,7 +4,6 @@ import LoginPage from '@/app/login/page'
 import { IdentityBadge } from '@/identity/IdentityBadge'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { IdentityProvider } from '@/identity/IdentityProvider'
-import { RECOVERY_KEY_STORAGE_KEY } from '@/identity/recoveryKey'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
 // `LoginForm` 在 `FE-A08` 之後有 `useRouter()`（帳號密碼成功導向 `/world`）；測試環境沒有 Next 的 app router context —— 只換掉導航。
@@ -140,7 +139,7 @@ describe('訪客找得到入口', () => {
   })
 
   it('[FE-A01-S16] 已登入的人不會看到「建立你的身分」', async () => {
-    localStorage.setItem(RECOVERY_KEY_STORAGE_KEY, ME)
+    // 已登入＝`GET /api/me` 回得出名片（session cookie）。恢復金鑰退場後不再靠 localStorage。
     server.reply(200, profileNamed('阿福'))
     mount()
 

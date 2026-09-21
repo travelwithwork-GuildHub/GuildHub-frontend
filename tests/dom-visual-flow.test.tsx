@@ -374,15 +374,9 @@ describe('同一時間只有一個阻斷式面板', () => {
     const notice = screen.getByTestId('first-entry-notice')
     server.replyFor('/api/login', 200, ME)
     server.replyFor('/api/profiles/me', 200, ME)
+    // 取名直接進世界（2026-09-21 反轉，無金鑰儀式）：送出名字 → 提示自己關掉。
     await type(within(notice).getByLabelText('在世界裡顯示的名字'), '阿福')
-    click(within(notice).getByRole('button', { name: '建立我的身分' }))
-    await screen.findByTestId('recovery-key')
-    await act(async () => {
-      Object.assign(navigator, { clipboard: { writeText: async () => {} } })
-      screen.getByRole('button', { name: '複製鑰匙' }).click()
-    })
-    await screen.findByText(/已經複製了/)
-    click(screen.getByRole('button', { name: '進入世界' }))
+    click(within(notice).getByRole('button', { name: '進入世界' }))
     await waitFor(() => expect(screen.queryByTestId('first-entry-notice')).toBeNull())
     pressE()
     escape()

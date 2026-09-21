@@ -4,11 +4,9 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useWatch, type FieldPath, type FieldValues } from 'react-hook-form'
 import { z } from 'zod'
-import { registerAccount, signInWithNickname, signInWithPassword, signInWithRecoveryKey } from '@/identity/session'
-import { CredentialsRejectedError, LoginIdTakenError, NicknameLengthError, RecoveryKeyRejectedError, type Identity } from '@/identity/types'
+import { registerAccount, signInWithNickname, signInWithPassword } from '@/identity/session'
+import { CredentialsRejectedError, LoginIdTakenError, NicknameLengthError } from '@/identity/types'
 import { CAPTION, CHECK_ROW, FIELD, FIELD_LABEL, FORM, HEADING, PRIMARY, SECONDARY, TITLE, withClass } from '@/design/controls'
-import type { ClipboardPort } from '@/identity/clipboard'
-import { KeyHandoff } from '@/first-entry/KeyHandoff'
 import { markFirstEntryDone } from '@/first-entry/seen'
 import { LIMITS, remaining, violates } from '@/api/contract/limits'
 import { useForm, type FormApi } from '@/forms/useForm'
@@ -50,7 +48,6 @@ import { SubmitError } from '@/forms/SubmitError'
 function describeDomainError(cause: unknown): string | null {
   if (
     cause instanceof NicknameLengthError ||
-    cause instanceof RecoveryKeyRejectedError ||
     cause instanceof CredentialsRejectedError ||
     cause instanceof LoginIdTakenError
   )
@@ -61,9 +58,7 @@ function describeDomainError(cause: unknown): string | null {
 const NicknameSchema = z.object({
   // 只有上限：超過即時擋（`FE-O06-S06`）。太短交給 `nicknameProblem`（見檔頭）。
   nickname: z.string().max(LIMITS.displayName.max, { error: `暱稱最多 ${LIMITS.displayName.max} 個字。` }),
-  remember: z.boolean(),
 })
-const RecoveryKeySchema = z.object({ key: z.string() })
 
 // 帳號密碼（`FE-A08`）：限制一律 `LIMITS`；`password` 只有下限、**沒有上限**（前端不自加）。太短是 too_small（送出才說）、超過上限即時。
 // 三欄**原值原樣**送：不 trim、不折疊大小寫（後端沒有這些規則，前端加了會讓註冊與登入對不上）。
@@ -94,22 +89,20 @@ export const ACCOUNT_LABELS = {
   submitRegister: '建立帳號',
 }
 
-export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
-  const [identity, setIdentity] = useState<Identity>({ state: 'unknown' })
+export function LoginForm() {
   const router = useRouter()
+  // 暱稱路：送出合法名字 → 直接進世界（`FE-A06-S18`，2026-09-21 反轉）。沒有金鑰畫面、沒有「記住我」。
+  // `markFirstEntryDone()`：走完了才記（跟 `/`、`/world` 引導層同一個約定）。
+  const enterWorld = () => {
+    markFirstEntryDone()
+    router.replace('/world')
+  }
   const nick = useForm({
     schema: NicknameSchema,
-    defaultValues: { nickname: '', remember: false },
-    onSubmit: async ({ nickname, remember }) => setIdentity(await signInWithNickname(nickname, { remember })),
-    describeError: describeDomainError,
-  })
-  const recovery = useForm({
-    schema: RecoveryKeySchema,
-    defaultValues: { key: '' },
-    // 「記住我」只有一個勾選框，兩個表單共用；金鑰那邊在送出的當下讀它。
-    onSubmit: async ({ key }) => {
-      await signInWithRecoveryKey(key, { remember: nick.form.getValues('remember') })
-      router.replace('/world')
+    defaultValues: { nickname: '' },
+    onSubmit: async ({ nickname }) => {
+      await signInWithNickname(nickname)
+      enterWorld()
     },
     describeError: describeDomainError,
   })
@@ -122,7 +115,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
     schema: AccountLoginSchema,
     defaultValues: { login_id: '', password: '' },
     onSubmit: async ({ login_id, password }) => {
-      await signInWithPassword(login_id, password, { remember: nick.form.getValues('remember') })
+      await signInWithPassword(login_id, password)
       router.push('/world')
     },
     describeError: describeDomainError,
@@ -131,7 +124,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
     schema: RegisterSchema,
     defaultValues: { login_id: '', password: '', nickname: '' },
     onSubmit: async ({ login_id, password, nickname }) => {
-      await registerAccount({ loginId: login_id, password, nickname }, { remember: nick.form.getValues('remember') })
+      await registerAccount({ loginId: login_id, password, nickname })
       router.push('/world')
     },
     describeError: describeDomainError,
@@ -158,20 +151,7 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
   const nicknameRemaining = remaining(LIMITS.displayName, nickname)
   const nicknameViolation = violates(LIMITS.displayName, nickname)
   // 任一入場表單在送，別的都不能按（一個人一次只建立一個身分）；切換鈕也鎖（`FE-A08-S12`）。
-  const anyBusy = nick.busy || recovery.busy || account.busy || signup.busy
-
-  if (identity.state === 'signed-in') {
-    return (
-      <KeyHandoff
-        identity={identity}
-        clipboard={clipboard}
-        onDone={() => {
-          markFirstEntryDone()
-          router.replace('/world')
-        }}
-      />
-    )
-  }
+  const anyBusy = nick.busy || account.busy || signup.busy
 
   return (
     <div className="flex flex-col gap-section">
@@ -193,15 +173,6 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
         <p id="nickname-remaining" data-testid="nickname-remaining" data-remaining={nicknameRemaining} {...withClass(CAPTION, 'text-ink-muted')}>
           {nicknameRemaining !== null && nicknameRemaining < 0 ? `超過 ${-nicknameRemaining} 字` : `還可以輸入 ${nicknameRemaining ?? '—'} 字`}
         </p>
-        <label className={CHECK_ROW}>
-          <input type="checkbox" {...nick.form.register('remember')} />
-          在這台裝置上記住我
-        </label>
-        {/* **預設不勾，而且要說出代價。** 規格：使用者要知道「沒有備份、
-            又清掉瀏覽器資料的話，這個身分回不來」 */}
-        <p {...withClass(CAPTION, 'text-ink-muted')}>
-          不勾的話，這台裝置不會留下任何東西 —— 換裝置或清掉資料就要靠恢復金鑰回來。
-        </p>
         <SubmitError message={nick.submitError} />
         {/* 只在**超過上限**時禁用；太短（含空）照 `FE-A01-S02` 按下去讓 alert 說出長度問題（兩位審查者一致）。
             `canSubmit` 已含 schema 的 too_big，但 RHF 的驗證晚一個 microtask；`violates` 是同一份 `LIMITS` 的同步判斷，
@@ -211,21 +182,6 @@ export function LoginForm({ clipboard }: { clipboard?: ClipboardPort } = {}) {
         </button>
       </form>
 
-      <form className={FORM} aria-labelledby="resume-heading" onSubmit={recovery.onSubmit} noValidate>
-        {/* 後兩個區塊的標題是條目層級（`FE-X16-S09`／design D4）：三個表單各自有主要動作，暱稱那條靠版面順序與標題層次領先，不靠降級別人的按鈕 */}
-        <h2 id="resume-heading" {...HEADING}>
-          已經有身分了？
-        </h2>
-        {/* `S17`：手上有金鑰的人，在一台全新的裝置上回得去 */}
-        <label className={FIELD_LABEL}>
-          貼上你的恢復金鑰
-          <input {...FIELD} {...recovery.form.register('key')} />
-        </label>
-        <SubmitError message={recovery.submitError} />
-        <button type="submit" {...PRIMARY} disabled={anyBusy || !recovery.canSubmit}>
-          用金鑰回來
-        </button>
-      </form>
 
       {/* 第三塊：帳號密碼（`FE-A08`）。這是三種入場方式裡唯一在驗證身分的那一種；匿名路仍是第一個表單、仍是主路。 */}
       <section className={FORM} aria-labelledby="account-heading" data-testid="account-section">

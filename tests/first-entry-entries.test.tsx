@@ -125,18 +125,8 @@ describe('走完流程之後，身分立刻反映在畫面上', () => {
     )
     await waitFor(() => expect(screen.getByTestId('identity').textContent).toContain('訪客'))
 
+    // 取名直接進世界（2026-09-21 反轉，無金鑰儀式）：送出名字 → 身分交給同一個 provider，標題列立刻變。
     type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
-    click(screen.getByRole('button', { name: '建立我的身分' }))
-    await waitFor(() => expect(screen.getByTestId('recovery-key')).toBeDefined())
-    type(screen.getByLabelText(/最後 6 個字/), PROFILE.id.slice(-6))
-    // ⚠️ **等按鈕真的被啟用再按。** 少了這一步這條判準會**不穩定** ——
-    // 本機夠快所以綠，CI 慢一點就會在 React 還沒把 `disabled` 拿掉的時候
-    // 按下去，而按一個 disabled 的按鈕什麼都不會發生。
-    await waitFor(() =>
-      expect((screen.getByRole('button', { name: '進入世界' }) as HTMLButtonElement).disabled).toBe(
-        false,
-      ),
-    )
     click(screen.getByRole('button', { name: '進入世界' }))
 
     await waitFor(() => expect(screen.getByTestId('identity').textContent).toContain('阿福'))

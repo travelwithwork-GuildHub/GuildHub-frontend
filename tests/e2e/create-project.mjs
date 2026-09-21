@@ -37,17 +37,12 @@ const PAYLOAD_KEYS = ['title', 'body', 'needed_skills', 'seat_count']
 
 const check = (label, actual, wanted) => (actual === wanted ? ok(label) : bad(label, `要 ${JSON.stringify(wanted)}，是 ${JSON.stringify(actual)}`))
 
-/** 在 `/login` 用暱稱建立身分、帶走金鑰（`KeyHandoff`）、進世界。**兩個 context 各走一次** —— 兩個全新的儲存空間。 */
+/** 在 `/login` 用暱稱建立身分、直接進世界（2026-09-21 反轉，無金鑰儀式）。**兩個 context 各走一次** —— 兩個全新的儲存空間。 */
 async function signUpAndEnter(context, nickname) {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: FRONTEND })
   const page = await context.newPage()
   await page.goto(`${FRONTEND}/login`)
   await page.fill('form[aria-labelledby="nickname-heading"] input', nickname)
   await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]')
-  await page.waitForSelector('[data-testid="recovery-key"]', { timeout: 30_000 })
-  await page.click('button:has-text("複製鑰匙")')
-  await page.waitForSelector('[role="status"]:has-text("已經複製")', { timeout: 15_000 })
-  await page.click('button:has-text("進入世界")')
   await page.waitForURL('**/world', { timeout: 30_000 })
   await waitForWorld(page)
   return page

@@ -37,18 +37,11 @@ function watch(page) {
 const whoAmI = async (page) => { const r = await page.request.get(`${API}/api/me`); return r.ok() ? r.json() : { error: r.status() } }
 const validBody = (b) => b !== null && typeof b === 'object' && Object.keys(b).join() === 'avatar_id' && Number.isInteger(b.avatar_id) && b.avatar_id >= 0 && b.avatar_id < AVATAR_COUNT
 
-/** 走首次進入流程到拿到金鑰（還沒進世界）。 */
+/** 首次進入：取名 → 直接進世界（2026-09-21 反轉，無金鑰儀式）。 */
 async function createByNickname(page, name) {
   await page.goto(`${FRONTEND}/`)
   await page.waitForSelector('text=在世界裡顯示的名字', { timeout: 15_000 })
   await page.fill('input >> nth=0', name)
-  await page.click('button:has-text("建立我的身分")')
-  await page.waitForSelector('[data-testid="recovery-key"]', { timeout: 15_000 })
-  return (await page.textContent('[data-testid="recovery-key"]')).trim()
-}
-async function enterWorld(page) {
-  await page.click('button:has-text("複製鑰匙")')
-  await page.waitForSelector('text=已經複製了', { timeout: 15_000 })
   await page.click('button:has-text("進入世界")')
   await page.waitForURL('**/world', { timeout: 15_000 })
   await page.waitForFunction(() => { const el = document.querySelector('[data-testid="identity"]'); return el !== null && !el.textContent.includes('確認身分中') }, null, { timeout: 15_000 })
@@ -75,28 +68,14 @@ try {
   await c1.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: FRONTEND })
   const p1 = await c1.newPage()
   const l1 = watch(p1)
-  const key = await createByNickname(p1, '隨機外觀的人')
-  if (l1.patches.length === 1) ok('[S17] 建立身分的那一步就送了 PATCH（拿到金鑰時已經存好）')
-  else bad('[S17] 拿到金鑰時 PATCH 次數不是 1', String(l1.patches.length))
-  await enterWorld(p1)
-  const assigned = await assertAssigned('S17', p1, l1)
+  await createByNickname(p1, '隨機外觀的人')
+  // PATCH 在 `signInWithNickname` 裡（進世界之前）送出。
+  if (l1.patches.length === 1) ok('[S17] 建立身分的那一步就送了 PATCH')
+  else bad('[S17] PATCH 次數不是 1', String(l1.patches.length))
+  await assertAssigned('S17', p1, l1)
   await p1.screenshot({ path: 'docs/evidence/fe-a05-variety/assigned.png' }).catch(() => {})
 
-  // ── S19：用金鑰回來 —— 零次 PATCH、外觀是原本那一款 ──
-  const c2 = await browser.newContext()
-  const p2 = await c2.newPage()
-  const l2 = watch(p2)
-  await p2.goto(`${FRONTEND}/login`)
-  await p2.fill('input >> nth=2', key)
-  await p2.click('button:has-text("用金鑰回來")')
-  await p2.waitForURL('**/world', { timeout: 15_000 })
-  await p2.waitForTimeout(1500)
-  if (l2.patches.length === 0) ok('[S19] 金鑰回來：一個 PATCH 都沒有')
-  else bad('[S19] 金鑰回來卻送了 PATCH', JSON.stringify(l2.patches.map((p) => p.body)))
-  const me2 = await whoAmI(p2)
-  if (me2.avatar_id === assigned) ok(`[S19] 外觀還是原本那一款（${me2.avatar_id}）`)
-  else bad('[S19] 外觀被改了', JSON.stringify({ me2, assigned }))
-  await c2.close()
+  // ⚠️ S19「回來的人不被改」的金鑰路已隨恢復金鑰退場而移除；改由下面帳號密碼登入既有名片那一半（S19 第二半）驗。
 
   // ── S18：註冊帳號 ──
   const c3 = await browser.newContext()

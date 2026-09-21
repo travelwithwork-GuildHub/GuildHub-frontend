@@ -39,11 +39,14 @@ async function login(context, nickname) {
   await page.goto(`${FRONTEND}/login`)
   await page.fill('form[aria-labelledby="nickname-heading"] input', nickname)
   await page.click('form[aria-labelledby="nickname-heading"] button[type="submit"]')
-  await page.waitForSelector('[data-testid="recovery-key"]', { timeout: 30_000 })
-  const id = await page.$eval('[data-testid="recovery-key"]', (n) => n.textContent ?? '')
-  await page.goto(`${FRONTEND}/world`)
+  await page.waitForURL('**/world', { timeout: 30_000 })
   await page.waitForSelector('[data-testid="world-loading"]', { state: 'detached', timeout: 30_000 })
   await page.waitForTimeout(1500)
+  // 恢復金鑰畫面已移除：名片 id 改從 `GET /api/me`（帶 session cookie）拿。
+  // ⚠️ 這個 `fetch` 在 `page.evaluate` 裡跑 —— 是**瀏覽器內**的請求（要走 `fakeRest` 的 `page.route` 攔截），
+  // 不是元件裡的 `fetch`。`no-restricted-globals` 那條規則守的是 `src/` 元件，這裡是 e2e 瀏覽器碼。
+  // eslint-disable-next-line no-restricted-globals
+  const id = await page.evaluate(async () => (await (await fetch('/api/me')).json()).id)
   return { page, id }
 }
 
