@@ -275,6 +275,27 @@ describe('晚到的回應不得覆蓋較新的結果', () => {
     expect(store.getState(P).phase).toBe('closed')
   })
 
+  it('[FE-J14-S36] 較新的讀取還在飛：較早發出的那一次**失敗**也不上畫面、也不去確認狀態', async () => {
+    // 成功與失敗是兩條路徑，各有各的守衛。只驗成功那條的話，「舊的讀取失敗了」仍然會
+    // 蓋掉 loading——403 的話還會多送一次 `GET /api/projects/{id}`（S05 數的就是那個次數）。
+    let reject1!: (cause: unknown) => void
+    const pending1 = new Promise<ProjectResourceOut[]>((_, rej) => {
+      reject1 = rej
+    })
+    listResources.mockReturnValueOnce(pending1).mockReturnValueOnce(deferred<ProjectResourceOut[]>().promise)
+    const store = createResourcesStore()
+
+    store.openRead(P) // R1
+    store.openRead(P) // R2 —— 還在飛
+    await settle()
+
+    reject1(http(403)) // 比較早發出、失敗了
+    await settle()
+
+    expect(store.getState(P).phase, '較新的讀取還沒回來，舊的失敗就把畫面變成 failed 了').toBe('loading')
+    expect(confirmCalls(), '為一個已經過期的失敗去確認專案狀態').toBe(0)
+  })
+
   it('[FE-J14-S36] 較早發出、較晚回來的資源讀取被丟棄', async () => {
     const r1 = deferred<ProjectResourceOut[]>()
     const r2 = deferred<ProjectResourceOut[]>()
