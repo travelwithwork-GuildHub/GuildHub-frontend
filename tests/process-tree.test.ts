@@ -36,7 +36,7 @@ async function waitGone(pid: number, ms: number): Promise<boolean> {
 function spawnTree(): Promise<{ child: ChildProcess; grandchild: number }> {
   const src =
     "const {spawn} = require('child_process');" +
-    "const g = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });" +
+    "const g = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true });" +
     'console.log(g.pid);' +
     'setInterval(() => {}, 1000);'
   const child = spawn(process.execPath, ['-e', src], { stdio: ['ignore', 'pipe', 'pipe'], detached: true, windowsHide: true })
