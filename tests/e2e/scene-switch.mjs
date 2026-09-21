@@ -28,7 +28,7 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
-import { assertLoopback, bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, guardLoopback, ok, overlaysSeen, profile, traceUrls, uuid, waitForTransition, waitForWorld, walker, watchCanvas } from './lib/world.mjs'
+import { assertLoopback, bad, countOverlays, expectUrl, failureCount, fakeRealtime, fakeRest, guardLoopback, hold, ok, overlaysSeen, profile, traceUrls, uuid, waitForTransition, waitForWorld, walker, watchCanvas } from './lib/world.mjs'
 
 const FRONTEND = process.env.FRONTEND ?? 'http://localhost:3100'
 const OUT = process.env.OUT ?? 'docs/evidence/fe-v01'
@@ -179,6 +179,50 @@ try {
     else bad('[S14] Q 沒有票卻出現過場覆蓋層', '')
     await expectNoToken(page, urls, '換成 Q 之後（整條軌跡）')
     await page.screenshot({ path: path.join(OUT, 'denied-without-ticket.png') })
+    await context.close()
+  }
+
+  // ── S20：進房之後往南穿過門洞，自動回大廳（不按 E、不點按鈕）──
+  // 房間裡沒有門標籤當里程計，改讀房間 socket 的 `move` frame 位置；一路按住 ArrowDown（+z＝往南）穿過門洞，
+  // 直到出現新的 `scene=lobby` socket（＝穿門觸發了回大廳）。這一段驗的是 jsdom 驗不了的：碰撞真的讓角色穿得過門、走得到觸發區。
+  {
+    const sockets = []
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+    guardLoopback(context)
+    await context.addInitScript(([key, token]) => sessionStorage.setItem(key, token), [tokenKey(P.id), TOKEN])
+    await countOverlays(context)
+    await fakeRealtime(context, sockets)
+    const page = await context.newPage()
+    await fakeRest(page, { current: P }, ROOMS)
+
+    await page.goto(`${FRONTEND}/world`)
+    await waitForWorld(page)
+    await approachDoor(page)
+    let since = await overlaysSeen(page)
+    await page.keyboard.press('KeyE')
+    await waitForTransition(page, 'S20 進房間', since)
+    const roomSocket = sockets[sockets.length - 1]
+    if (roomSocket?.scene === `room:${ROOM}`) ok('[S20] 進了房間，準備往南走出去')
+    else bad('[S20] 沒進房間', JSON.stringify(sockets.map((s) => s.scene)))
+
+    // 焦點放進世界（兩個 context 時焦點不一定在 canvas），一路往南穿門
+    await page.click('[data-testid="world-canvas-container"]').catch(() => {})
+    await page.bringToFront()
+    const roomIndex = sockets.indexOf(roomSocket)
+    since = await overlaysSeen(page)
+    let exited = false
+    for (let i = 0; i < 40 && !exited; i++) {
+      await hold(page, 'ArrowDown', 200)
+      exited = sockets.slice(roomIndex + 1).some((s) => s.scene === 'lobby')
+    }
+    if (exited) ok('[S20] 往南穿過門洞：自動回大廳（沒按 E、沒點「回到 Guild Hall」），新 socket 是 scene=lobby')
+    else bad('[S20] 穿門走了 40 步還沒回大廳', JSON.stringify(sockets.map((s) => s.scene)))
+    await waitForTransition(page, 'S20 回大廳', since).catch(() => {})
+    await expectUrl(page, '[S20] 穿門回大廳，網址是 /world', '/world')
+    const kept = await page.evaluate((k) => sessionStorage.getItem(k), tokenKey(P.id))
+    if (kept === TOKEN) ok('[S20] 穿門回大廳，票仍在（沒被丟掉）')
+    else bad('[S20] 穿門回大廳票掉了', String(kept))
+    await page.screenshot({ path: path.join(OUT, 'walked-out.png') })
     await context.close()
   }
 } finally {

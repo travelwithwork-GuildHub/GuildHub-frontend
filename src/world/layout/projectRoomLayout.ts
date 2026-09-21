@@ -35,6 +35,15 @@ export const ENTRY = {
 /** 出生點：門洞內側往北 3 —— 相機在南方 12、高 12，視線在牆處的高度是 `0.5 + 11.5·d/12`，d 要 > 1.57 才越得過 2 高的牆。 */
 export const ROOM_SPAWN = { x: ENTRY.doorX, z: ENTRY.wallZ - 3 } as const
 
+/**
+ * 穿門即走的觸發區（`FE-V01-S20`：走出房間就回大廳）。門在 `ENTRY.wallZ`(9.75)、出生點在 `ROOM_SPAWN`(z=6.75)、外層邊界 `WORLD_HALF_EXTENT`(12)。
+ *
+ * `z`：門洞**以南** 0.75（= 10.5）—— 角色要刻意往南**穿過**門洞、進到門廊才觸發；房間裡正常走動（z < 10.5）不誤觸。
+ * 從 `ENTRY.wallZ` 推導：門移了門檻跟著動，不會漂（跟 `ROOM_SPAWN` 同一個做法）。
+ * `halfX`：門洞半寬是 `gapWidth/2`(0.9)，這裡收到 0.75 —— 要人**在門洞裡**穿過去，不是貼著南牆邊緣擦過。
+ */
+export const EXIT_TRIGGER = { z: ENTRY.wallZ + 0.75, halfX: 0.75 } as const
+
 /** 通道的中線。工位左右對稱地排在它兩側。 */
 export const AISLE_CENTER_X = 0
 
