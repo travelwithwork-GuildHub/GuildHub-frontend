@@ -3,8 +3,8 @@
 - **Status**: Accepted
 - **Date**: 2026-09-21
 - **Deciders**: 寫 `FE-W20` 看板摘要規格的那個 session；codex（gpt-5.6）＋gemini（3.1 Pro）各問一次、互審
-- **邊界狀態**: 待強制
-- **證據**: （實作 PR 補：`tests/board-summary.test.tsx`、`tests/e2e/board-summary.mjs`、`src/world/rooms/BoardSummary*.tsx`、`src/world/rooms/useBoardSummary.ts`）
+- **邊界狀態**: 已強制
+- **證據**: `tests/world-board-summary.test.tsx`（四態＋兩塊配對＋讀不到 vs 空的的非文字色差，`S01`／`S02`／`S04`／`S05`／`S06`）、`tests/world-board-summary-data.test.tsx`（`useBoardSummary` 常駐輪詢生命週期、單飛 abort、失敗保留 stale，`S07`）、`tests/world-board-summary-consistency.test.tsx`（跟面板最終一致，`S08`）、`tests/e2e/board-summary.mjs`（真瀏覽器：spawn 分得出有內容／空／讀不到、移動 overlay 釘在看板、離屏 hidden，`S03`／`S09`）；`src/world/rooms/BoardSummary.tsx`（overlay＋節點登記表）、`src/world/rooms/BoardSummaryProjector.tsx`（Canvas 內 `useFrame` 投影）、`src/world/rooms/useBoardSummary.ts`、`src/world/rooms/boardAnchors.ts`（`BOARD_FACE_Y`／`BOARD_ANCHORS`）
 
 > `邊界狀態` 與 `證據` 兩欄由 `bash .github/scripts/arch-view.sh` 讀。
 
