@@ -1,7 +1,8 @@
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRef } from 'react'
 import { EMPTY_STATE_COPY } from '@/empty-state/EmptyState'
+import { toUiError } from '@/errors/uiError'
 import { BoardSummary, type BoardSummaryNodes } from '@/world/rooms/BoardSummary'
 import type { BoardSummary as BoardSummaryState } from '@/world/rooms/useBoardSummary'
 
@@ -102,6 +103,26 @@ describe('四種狀態', () => {
     expect(within(project).queryByRole('button')).toBeNull()
     // 有一段可辨識的文字（語彙走 FE-X03，不在這裡斷字）
     expect(project.textContent?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it('[FE-W20-S05] 讀不到 vs 空的：粗略訊號分得開（不是只有文字不同）—— failed 是 danger 色、empty 是中性色', () => {
+    // 規格〈四種狀態各自可辨〉：狀態訊號要從出生點（讀不到字的距離）就分得出來。
+    // 讀不到與空的若只有文字不同、外框與色彩全同，遠處就分不出——這裡守住兩態的**非文字**色彩差異。
+    setBoards(view('failed', [], new Error('連不上')), view('ready', []))
+    mount()
+    const failed = board('board-project')
+    expect(failed.className).toContain('border-danger')
+    expect(within(failed).getByText(toUiError(new Error('連不上')).message).className).toContain('text-danger')
+
+    // 換成「空的」：中性色，SHALL NOT 用 danger（否則兩態同外框同色、只剩讀不到的字之別，遠處分不開）
+    cleanup()
+    useBoardSummary.mockReset()
+    setBoards(view('ready', []), view('ready', []))
+    mount()
+    const empty = board('board-project')
+    expect(empty.dataset.state).toBe('empty')
+    expect(empty.className).not.toContain('border-danger')
+    expect(within(empty).getByText(EMPTY_STATE_COPY['first-empty']).className).not.toContain('text-danger')
   })
 
   it('[FE-W20-S05] stale：曾有資料後輪詢失敗，畫舊資料、不閃空白/錯誤', () => {
