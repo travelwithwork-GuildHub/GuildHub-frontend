@@ -23,7 +23,7 @@ import WorldCanvas from '@/world/WorldCanvas'
 // 那一句由 `world-project-room-furniture.test.tsx` 的目標恆為 null ＋ `interaction-prompt.test.tsx`（`FE-W06-S13`：目標 null 就沒有提示）合起來守。
 
 const listRooms = vi.hoisted(() => vi.fn())
-vi.mock('@/api/operations', () => ({ listRooms }))
+vi.mock('@/api/operations', () => ({ listRooms, listProjects: () => Promise.resolve([]), listProfiles: () => Promise.resolve([]) }))
 vi.mock('@react-three/fiber', async () => {
   const actual = await vi.importActual<typeof import('@react-three/fiber')>('@react-three/fiber')
   return {

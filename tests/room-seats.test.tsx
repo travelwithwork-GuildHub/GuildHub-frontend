@@ -21,7 +21,7 @@ import WorldCanvas from '@/world/WorldCanvas'
 // 殼跟 `world-project-room-anchors.test.tsx` 同一組：`WorldCanvas` 在 jsdom 掛（`Canvas` stub），驗的是「標籤真的長在錨點裡、真的掛進世界」——
 // 直接掛 `RoomSeats` 的話「回 hall 沒有」與「錨點的 aria-hidden 隨內容變」都驗不到。身分用 `useIdentity` 的替身（同 `world-scenes-door.test.tsx`）。
 
-const ops = vi.hoisted(() => ({ listRooms: vi.fn(), listSeats: vi.fn(), claimSeat: vi.fn(), getProject: vi.fn(), getProfile: vi.fn() }))
+const ops = vi.hoisted(() => ({ listRooms: vi.fn(), listSeats: vi.fn(), claimSeat: vi.fn(), getProject: vi.fn(), getProfile: vi.fn(), listProjects: vi.fn(() => Promise.resolve([])), listProfiles: vi.fn(() => Promise.resolve([])) }))
 vi.mock('@/api/operations', () => ops)
 const identity = vi.hoisted(() => ({ current: { state: 'unknown' } as Identity }))
 vi.mock('@/identity/IdentityProvider', () => ({ useIdentity: () => identity.current, useAdoptIdentity: () => vi.fn() }))

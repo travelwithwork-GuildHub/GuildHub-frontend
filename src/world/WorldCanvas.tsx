@@ -23,6 +23,7 @@ import { InboxPanel } from '@/inbox/InboxPanel'
 import { ProfilePanel } from '@/profile/ProfilePanel'
 import { ListPanelProvider } from '@/list-panel/ListPanelProvider'
 import { labelAnchorsFor } from './rooms/anchors'
+import { BoardSummary, useBoardNodes } from './rooms/BoardSummary'
 import { DoorLabels, useLabelNodes } from './rooms/DoorLabels'
 import { RoomsNotice } from './rooms/RoomsNotice'
 import { CORRIDOR_SLOTS } from './rooms/slots'
@@ -155,6 +156,8 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
   const labelNodesRef = useLabelNodes()
   // 工位錨點的 DOM 節點（`FE-W16-S06`）：同樣不進 React，位置由 Canvas 裡的投影器每幀寫。
   const seatNodesRef = useSeatAnchorNodes()
+  // 看板摘要的 DOM 節點（`FE-W20`）：同樣不進 React，位置由 Canvas 裡的 `BoardSummaryProjector` 每幀寫。
+  const boardNodesRef = useBoardNodes()
 
   // WebGL2 不可用是一個**終局可顯示狀態**：照樣回報 `onReady`，讓 `WorldBoundary` 的連續載入層
   // （`WorldLoadSequence`，只在 `onReady` 撤）讓位給下面的 `WebGLUnavailable` 提示。否則這裡永遠不會
@@ -257,6 +260,7 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
                 anchors={anchors}
                 nodesRef={labelNodesRef}
                 seatNodesRef={seatNodesRef}
+                boardNodesRef={boardNodesRef}
                 requestEntry={requestEntry}
                 poseRef={localPose}
                 requestExit={returnToHall}
@@ -293,6 +297,8 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
               那已經是第二環「靠近」了。 */}
           {/* 門標籤與走廊提示也是大廳的（`FE-V01-S03`）：房間裡沒有走廊。 */}
           {hall && <DoorLabels anchors={anchors} nodesRef={labelNodesRef} />}
+          {/* 看板摘要（`FE-W20`）：沒按 E 也看得出看板有沒有東西 —— **只在 Guild Hall**。位置每幀由 `SceneObjects` 的 `BoardSummaryProjector` 寫。 */}
+          {hall && <BoardSummary nodesRef={boardNodesRef} enabled={hall && ready} />}
           {hall && <RoomsNotice view={rooms} />}
           {/* 工位的投影錨點（`FE-W16-S06`）**只在房間**，裡面是座位標籤與回饋（`FE-J13`）；沒登入就只有錨點（aria-hidden、沒內容、e2e 的尺）。
               以 `projectId` 為 key：換房間名字快取從頭來。 */}

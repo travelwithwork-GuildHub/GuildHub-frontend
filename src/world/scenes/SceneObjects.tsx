@@ -4,6 +4,8 @@ import type { RefObject } from 'react'
 import type { RoomDoorOut } from '@/api/contract/rest'
 import type { LabelAnchor } from '@/world/rooms/anchors'
 import { BoardTargets } from '@/world/rooms/BoardTargets'
+import { BoardSummaryProjector } from '@/world/rooms/BoardSummaryProjector'
+import type { BoardSummaryNodes } from '@/world/rooms/BoardSummary'
 import { DoorLabelProjector } from '@/world/rooms/DoorLabelProjector'
 import type { LabelNodes } from '@/world/rooms/DoorLabels'
 import { ProjectDoors } from '@/world/rooms/ProjectDoors'
@@ -40,6 +42,8 @@ export interface SceneObjectsProps {
   nodesRef: RefObject<LabelNodes>
   /** 工位錨點的 DOM 節點（`FE-W16-S06`）；錨點本身在 Canvas 外面（`SeatAnchors`），這裡的投影器每幀寫它們的位置。 */
   seatNodesRef: RefObject<SeatAnchorNodes>
+  /** 看板摘要的 DOM 節點（`FE-W20`）；節點在 Canvas 外面（`BoardSummary`），這裡的 `BoardSummaryProjector` 每幀寫位置。只有 Guild Hall 用。 */
+  boardNodesRef?: RefObject<BoardSummaryNodes>
   /** 對著門按 E（`FE-V01-S10`）。從 Canvas 外面用 `useRequestEntry()` 拿、當 prop 傳進來。 */
   requestEntry?: (projectId: string, title: string) => void
   /** 本地角色的權威狀態（`LocalPlayer` 每幀寫）。房間裡的穿門觸發器讀它（`FE-V01-S20`）。 */
@@ -48,7 +52,7 @@ export interface SceneObjectsProps {
   requestExit?: () => void
 }
 
-export function SceneObjects({ scene, doors, slots, anchors, nodesRef, seatNodesRef, requestEntry, poseRef, requestExit }: SceneObjectsProps) {
+export function SceneObjects({ scene, doors, slots, anchors, nodesRef, seatNodesRef, boardNodesRef, requestEntry, poseRef, requestExit }: SceneObjectsProps) {
   if (scene.id === 'room') {
     // 把八個工位錨點釘在桌面中心上（`FE-W16-S06`）。**它渲染 null** —— 錨點本身是 Canvas 外面的 DOM。
     // 走出房間就回大廳（`FE-V01-S20`／`S21`）：南牆門洞是出口 —— 穿門即走（`RoomExitTrigger`），門前也有「回到大廳」提示可按 E。
@@ -71,6 +75,8 @@ export function SceneObjects({ scene, doors, slots, anchors, nodesRef, seatNodes
       <ProjectDoors rooms={doors} slots={slots} onEnter={requestEntry} />
       {/* 兩塊看板接上互動系統（`FE-W12-S14`）；按 E 開清單面板（`FE-B01-S01`／`S02`）。 */}
       <BoardTargets />
+      {/* 把看板摘要釘在板面上（`FE-W20`）。**它渲染 null** —— 摘要本身是 Canvas 外面的 DOM（`BoardSummary`）。 */}
+      {boardNodesRef !== undefined && <BoardSummaryProjector nodesRef={boardNodesRef} />}
       {/* 把標籤釘在門上（`FE-W12-S10`）。**它渲染 null** —— 標籤本身是 Canvas 外面的 DOM。 */}
       <DoorLabelProjector anchors={anchors} nodesRef={nodesRef} />
     </>
