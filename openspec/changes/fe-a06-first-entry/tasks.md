@@ -48,3 +48,12 @@
 - [ ] 5.1 spec PR 談定（本檔＋`proposal`＋`design`＋三份 spec delta）。
 - [ ] 5.2 全套件綠、`progress.sh --check` 綠、`openspec validate` 綠。
 - [ ] 5.3 部署最新版到 Vercel（`ship.sh`），demo 走閘道網址。
+
+## 6. 實作完成後補記（2026-09-21）
+
+- [x] 1.x／2.x／3.x：src 反轉完成（取名直接進、砍 KeyHandoff／recovery-key／remember），測試遷移（fork）；vitest 綠、tsc／eslint 乾淨。實作 PR：feat/fe-a06-first-entry--direct-entry。
+- [ ] **6.1 account-login（FE-A08）規格對齊 —— 封存前必補**：`openspec/specs/account-login/spec.md` 仍綁 recovery-key：
+      〈登入頁有帳號密碼的入口〉說「兩個表單（暱稱、**恢復金鑰**）」＋busy-lock「三個送出鈕」（實作已改成「一個（暱稱）」＋兩個鈕，`FE-A08-S12` 測試已改 3→2）；
+      〈註冊〉〈登入〉的「依記住我處置金鑰」＋`FE-A08-S07`（勾記住我落地金鑰／沒勾清掉，測試已刪）。
+      要對這個 change 加 `account-login` 的 MODIFIED delta：三表單→兩表單、busy-lock 3→2、移除「記住我處置金鑰」；`S07` 因 OpenSpec 的 MODIFIED 不能丟 scenario，改寫成「登入成功後持久儲存中沒有恢復金鑰（我們根本不寫）」並補一條對應測試，或用 REMOVED＋ADDED 換掉那條 Requirement。**這是我（Claude）在 fe-a06 反轉時漏掉的 capability，fork 審出來的。**
+- [ ] 6.2 RootEntry.tsx 第 17 行過時註解（提到「session 不在但手上有恢復金鑰」）順手改掉。
