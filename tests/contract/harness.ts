@@ -17,6 +17,7 @@ import type { TestProject } from 'vitest/node'
 import { reset } from '../../scripts/db.mjs'
 import { testDatabase } from '../support/test-db'
 import { RECORDING_DIR, assembleRecordings } from './golden'
+import { listenersOf, stopAll, throwIfAnyLeft } from '../support/process-tree'
 import { assertLoopbackBase, resolveTarget } from './target'
 
 const ROOT = path.resolve(__dirname, '..', '..')
@@ -80,50 +81,8 @@ function waitUntilReady(child: ChildProcess, port: number, ms: number, log: () =
   })
 }
 
-/** 這個 process group 還有人活著？（group leader 退了、孫子還在也算活著 —— 只看 `exitCode` 會漏。） */
-function groupAlive(pgid: number): boolean {
-  try {
-    process.kill(-pgid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/** 誰在聽這個 port？回 pid 清單（`lsof` 不在就回 null，不假裝驗過）。 */
-async function listenersOf(port: number): Promise<number[] | null> {
-  try {
-    const { stdout } = await execFileAsync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'])
-    return stdout.split('\n').filter(Boolean).map(Number)
-  } catch (e) {
-    // lsof 沒東西時 exit 1；lsof 不存在時 ENOENT。
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    return []
-  }
-}
-
-/**
- * 關掉整個 process group：`pnpm exec next start` 的 Next 是孫子，只 kill `npx` 會留孤兒咬著 port（審查兩位都抓到）。
- * 「關好了」看的是 **group 裡沒人了**，不是 leader 退了（leader 先走、孫子還在的話 group 還活著）。
- */
-async function stop(child: ChildProcess): Promise<void> {
-  const pgid = child.pid
-  if (pgid === undefined) return
-  const signal = (sig: NodeJS.Signals) => {
-    try {
-      process.kill(-pgid, sig)
-    } catch {
-      /* group 已經沒人 */
-    }
-  }
-  signal('SIGTERM')
-  const deadline = Date.now() + 3_000
-  while (groupAlive(pgid) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100))
-  if (groupAlive(pgid)) {
-    signal('SIGKILL')
-    while (groupAlive(pgid)) await new Promise((r) => setTimeout(r, 50))
-  }
-}
+// 關掉子程序樹與「誰在聽這個 port」搬到 `tests/support/process-tree.ts`，
+// 因為它們需要自己的判準 —— teardown 失敗的方式是靜悄悄的，沒有測試蓋到就看不出漏。
 
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const target = resolveTarget(process.env.CONTRACT_TARGET)
@@ -208,7 +167,8 @@ export default async function setup(project: TestProject): Promise<() => Promise
   try {
     await waitForLine(stub, () => stubLog, new RegExp(`ws://127\\.0\\.0\\.1:${stubPort}/ws`), 30_000)
   } catch (e) {
-    await stop(stub)
+    const left = await stopAll(stub)
+    if (left.length > 0) throw new AggregateError([e, ...left], '替身起不來，而且沒關乾淨')
     throw e
   } finally {
     stub.stdout?.off('data', collectStub)
@@ -242,8 +202,8 @@ export default async function setup(project: TestProject): Promise<() => Promise
   try {
     await waitUntilReady(child, port, 60_000, () => log)
   } catch (e) {
-    await stop(child)
-    await stop(stub)
+    const left = await stopAll(child, stub)
+    if (left.length > 0) throw new AggregateError([e, ...left], 'next start 起不來，而且沒關乾淨')
     throw e
   } finally {
     child.stdout?.off('data', collect)
@@ -268,9 +228,10 @@ export default async function setup(project: TestProject): Promise<() => Promise
   // 測試檔不能知道自己在打誰（`FE-O05-S02`），而 harness 是唯一允許認得目標的地方（`stubProbe` 的簽法同理）。
   project.provide('contractRoomGrantPrefix', 'room_grant_')
   return async () => {
-    await stop(child)
-    await stop(stub)
+    // 兩棵都要試過再報失敗 —— 依序 await 的話，第一棵丟錯會讓第二棵完全沒被清。
+    const left = await stopAll(child, stub)
     await recorded()
+    throwIfAnyLeft(left, 'contract harness teardown')
   }
 }
 
