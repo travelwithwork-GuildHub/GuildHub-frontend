@@ -73,7 +73,7 @@ try {
     try {
       await page.goto(`${FRONTEND}/world${who.room ? `?room=${ROOM}` : ''}`)
       await waitForWorld(page)
-      if (who.room) await page.waitForSelector('button:has-text("回到 Guild Hall")', { timeout: 10_000 })
+      if (who.room) await page.waitForSelector('button[aria-label="回到 Guild Hall"]', { timeout: 10_000 })
       if (!who.guest) await page.waitForSelector('[data-testid="inbox-button"]')
       const r = await rect(page, HEADER)
       rects.push({ who: who.name, r })

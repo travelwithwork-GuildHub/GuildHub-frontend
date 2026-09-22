@@ -32,8 +32,8 @@
 
 ## 5. 情境提示膠囊＋出口鈕降級（`dom-visual-system`：`FE-X17-S05`／`S06`）— demo P0 病灶
 
-- [ ] 5.1 `InteractionPrompt`：白盒（`border-line bg-surface text-ink border`）→ 深色半透明 glass 膠囊（沿用 §3.1 的 glass token）＋圓角＋浮起；`E` 用獨立鍵帽樣式（`<kbd>` 已在，補樣式看得出是一顆鍵）；位置維持 `bottom-gutter left-1/2 -translate-x-1/2`。文字對底 `≥ 4.5:1`。
-- [ ] 5.2 `ReturnToHallButton`／`AppHeader`：房間裡不再把「回到 Guild Hall」當常駐具名文字大鈕；收進 overflow／`⋯` 選單項或 icon-only＋`aria-label`，觸發同一個 `returnToHall`。鍵盤可達、讀屏有名。大廳不受影響（大廳本來就沒這顆）。
+- [x] 5.1 `InteractionPrompt`：白盒（`border-line bg-surface text-ink border`）→ 深色半透明 glass 膠囊（`.glass-panel`，glass token 加在 `globals.css`）＋圓角＋浮起；`E` 用獨立鍵帽樣式（`kbd.keycap`）；位置維持 `bottom-gutter left-1/2 -translate-x-1/2`。（合成 alpha／對比在 §6 真瀏覽器量）
+- [x] 5.2 `ReturnToHallButton`：房間裡不再把「回到 Guild Hall」當常駐具名文字大鈕；改 icon-only＋`aria-label`（低顯著後備），觸發同一個 `returnToHall`。鍵盤可達、讀屏有名。大廳不受影響（本來就沒這顆）。e2e 選擇器（`dom-surfaces`／`room-entry`）從 `has-text` 改 `aria-label`。
 - [ ] 5.3 判準：`FE-X17-S05`（真瀏覽器量：門前提示背景合成 alpha `< 1`、有 `kbd` 鍵帽、下半部置中、對比 `≥ 4.5:1`）、`FE-X17-S06`（房間裡沒有常駐具名「回到 Guild Hall」大鈕、返回動作鍵盤可達、門前提示在）。
 - [ ] 5.4 不破 `FE-V01` 既有 e2e／判準（穿門即走、門前按 E、`returnToHall` 行為不變）。
 

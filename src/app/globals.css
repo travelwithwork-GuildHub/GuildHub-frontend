@@ -31,6 +31,13 @@
   /* 焦點環：對 surface 5.25:1、對 surface-raised 5.58:1（S10 要 3）。獨立一個 token，之後要跟 accent 分開時不用改呼叫端。 */
   --color-focus: oklch(0.52 0.16 258);
 
+  /* 世界 HUD／情境提示的毛玻璃（`FE-X17-S03`／`S04`／`S05`）：**深色半透明**，蓋在 3D 上讓世界透出來、
+     而不是不透明白盒。深到即使蓋在亮草地上、白字（`--color-glass-ink`）對它合成後仍 ≥ 4.5:1（配 `.hud-legible`
+     的 text-shadow 保險；真瀏覽器量在 `FE-X17` §6）。`--color-glass-line` 是頂邊那道微亮描邊，讓玻璃「浮起來」。 */
+  --color-glass: oklch(0.22 0.02 260 / 0.66);
+  --color-glass-ink: oklch(0.98 0.004 260);
+  --color-glass-line: oklch(1 0 0 / 0.16);
+
   /* 字級五級（S03）：內文 16px／1.5、說明 13px；面板標題 22px = 1.375 × 內文（要 ≥ 1.25）；頁面標題 32px = 2 ×（要 ≥ 1.5）。 */
   --text-caption: 0.8125rem;
   --text-caption--line-height: 1.4;
@@ -98,5 +105,38 @@
   /* 減少動態：過渡與動畫**全部**歸零（S12）。`!important` 是刻意的 —— 它要贏過每一個 utility。 */
   @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+  }
+}
+
+/* 世界 HUD 的共用外觀（`FE-X17`）。常駐 HUD 與情境提示都套 `.glass-panel`，一份定義、視覺一致。
+   放 `@layer components` 讓 utility（版面、圓角、定位）還能覆蓋它。字面值集中在這裡（`globals.css` 是 token 唯一事實源）。 */
+@layer components {
+  /* 深色半透明毛玻璃殼：蓋在 3D 上讓世界透出來、浮起（描邊＋陰影）、白字。不是不透明白盒（`FE-X17-S03`）。 */
+  .glass-panel {
+    background: var(--color-glass);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--color-glass-line);
+    box-shadow: var(--shadow-panel);
+    color: var(--color-glass-ink);
+  }
+
+  /* HUD 白字在亮世界上的保險（`FE-X17-S04`）：一道細陰影，草地再亮也讀得清。 */
+  .hud-legible { text-shadow: 0 1px 2px oklch(0 0 0 / 0.55); }
+
+  /* 情境提示裡的鍵盤鍵帽（`FE-X17-S05`）：看得出是「一顆鍵」，不是內文裡的字。 */
+  kbd.keycap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.7em;
+    padding: 0.1em 0.4em;
+    border: 1px solid var(--color-glass-line);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-control);
+    background: oklch(1 0 0 / 0.15);
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
 }

@@ -1,80 +1,36 @@
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { act, useEffect, type RefObject } from 'react'
-import { InteractionPrompt } from '@/world/interaction/InteractionPrompt'
-import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
+import { render } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
-// 規格：openspec/specs/spatial-interaction/spec.md
-//   Requirement: 提示是 DOM，不是 3D 物件 —— Scenario FE-W06-S13 / FE-W06-S14
+// 規格：openspec/changes/fe-x17-hud-immersion/specs/dom-visual-system/spec.md
+//   Requirement: 情境互動提示是世界膠囊、鍵盤鍵帽在畫面正下方，不是白盒 — S05
 //
-// ⚠️ **受測的是真的 `InteractionPrompt` 與真的 `InteractionProvider`。**
-// 測試自己的只有下面那個把 `setTarget` 交出來的小元件 ——
-// 正常路徑上呼叫它的是 `SpatialInteraction`（在 Canvas 裡，用 `useFrame`），
-// 而那條路徑由 `tests/interaction-loop.test.tsx` 驗。
+// jsdom 量不到合成 alpha／backdrop-filter（那一半在 FE-X17 §6 真瀏覽器＋截圖驗）。這裡釘可回歸的**結構**：
+// 世界膠囊（`.glass-panel`、不是 `bg-surface` 白盒）、獨立鍵帽（`kbd.keycap`）、畫面正下方中央、仍指名物件。
 
-type SetTarget = ReturnType<typeof useInteraction>['setTarget']
+const interaction = vi.hoisted(() => ({ target: { id: 'room-exit' as string | null, label: '回到大廳' } }))
+vi.mock('@/world/interaction/InteractionProvider', () => ({ useInteraction: () => interaction }))
 
-/**
- * 把 `setTarget` 交到測試手上。
- *
- * ⚠️ **用 ref 當 prop、只在 effect 裡寫。** 在 render 期間指派給外部變數會被
- * `react-hooks/globals` 擋，直接改 prop 物件會被 `react-hooks/immutability` 擋 ——
- * **兩條規則都是對的**。傳 ref 是這個 repo 既有的模式（`targetRef`、`poseRef`）。
- */
-function Handle({ handleRef }: { handleRef: RefObject<{ setTarget?: SetTarget }> }) {
-  const { setTarget } = useInteraction()
-  useEffect(() => {
-    handleRef.current.setTarget = setTarget
-  }, [handleRef, setTarget])
-  return null
-}
+import { InteractionPrompt } from '@/world/interaction/InteractionPrompt'
 
-function mount() {
-  const handleRef: RefObject<{ setTarget?: SetTarget }> = { current: {} }
-  render(
-    <InteractionProvider>
-      <Handle handleRef={handleRef} />
-      <InteractionPrompt />
-    </InteractionProvider>,
-  )
-  return (target: Parameters<SetTarget>[0]) => {
-    act(() => handleRef.current.setTarget?.(target))
-  }
-}
+describe('情境互動提示的視覺（FE-X17-S05）', () => {
+  it('[FE-X17-S05] 提示是 glass 膠囊＋獨立鍵帽、置於畫面正下方中央，不是白盒', () => {
+    const { getByTestId } = render(<InteractionPrompt />)
+    const prompt = getByTestId('interaction-prompt')
+    const cls = prompt.className
 
-describe('互動提示', () => {
-  it('[FE-W06-S13] 有目標時提示出現，而且指名是哪一個物件', () => {
-    const setTarget = mount()
-    expect(screen.queryByTestId('interaction-prompt')).toBeNull()
+    // 世界膠囊，不是網頁白盒（S05 的病灶就是 `bg-surface` 白盒）
+    expect(cls).toContain('glass-panel')
+    expect(cls).not.toContain('bg-surface')
 
-    setTarget({ id: 'board:main', label: '專案看板', distance: 1.2 })
+    // 位置維持畫面正下方中央（沿用 FE-W06 的螢幕錨定）
+    expect(cls).toContain('bottom-gutter')
+    expect(cls).toContain('left-1/2')
 
-    const prompt = screen.getByTestId('interaction-prompt')
-    // 規格的字面要求：**不能只寫「按 E」** ——
-    // 兩個物件靠很近時，那句話沒有回答「按下去會發生什麼」
-    expect(prompt.textContent).toContain('專案看板')
-    expect(prompt.textContent).toContain('E')
-  })
+    // E 是獨立鍵帽元素，不是內文裡的一個字元
+    const kbd = prompt.querySelector('kbd.keycap')
+    expect(kbd?.textContent).toBe('E')
 
-  it('[FE-W06-S14] 目標換人時，提示的內容跟著換', () => {
-    const setTarget = mount()
-    setTarget({ id: 'a', label: '專案看板', distance: 1 })
-    expect(screen.getByTestId('interaction-prompt').textContent).toContain('專案看板')
-
-    setTarget({ id: 'b', label: '人才看板', distance: 1 })
-
-    const prompt = screen.getByTestId('interaction-prompt')
-    expect(prompt.textContent).toContain('人才看板')
-    expect(prompt.textContent, '換了目標，舊的名字還留著').not.toContain('專案看板')
-  })
-
-  it('[FE-W06-S09] 沒有目標時提示消失', () => {
-    const setTarget = mount()
-    setTarget({ id: 'a', label: '專案看板', distance: 1 })
-    expect(screen.queryByTestId('interaction-prompt')).not.toBeNull()
-
-    setTarget({ id: null, label: null, distance: null })
-
-    expect(screen.queryByTestId('interaction-prompt')).toBeNull()
+    // 仍指名物件：回答「按下去會發生什麼」
+    expect(prompt.textContent).toContain('回到大廳')
   })
 })
