@@ -1,9 +1,9 @@
 # Tasks —— fe-w14-pixel-restyle
 
 ## 1. 規格（本 PR）
-- [ ] 1.1 `spec/fe-w14-pixel-restyle` 分支，只動 `openspec/changes/fe-w14-pixel-restyle/`
-- [ ] 1.2 `pnpm exec openspec validate fe-w14-pixel-restyle --strict` 綠
-- [ ] 1.3 規格 PR 合併到 main（governance 改 charter 的 #625 已先合併）
+- [x] 1.1 `spec/fe-w14-pixel-restyle` 分支，只動 `openspec/changes/fe-w14-pixel-restyle/`（新 capability `world-visual-polish`＋MODIFIED `world-canvas` 的 DPR）
+- [x] 1.2 `pnpm exec openspec validate fe-w14-pixel-restyle --strict` 綠
+- [x] 1.3 規格 PR 合併到 main（#626；governance 改 charter 的 #625 已先合併）
 
 ## 2. 實作：色票與材質貼圖（feat/fe-w14-pixel-restyle--materials）
 - [x] 2.1 `src/design/world.ts`：暖色像素調色盤定案（ground 草綠、wall／carpet 暖奶油、accent 暖金、leaf／outside 深草綠）—— 單一色票來源不變（`FE-W14-S01`）
@@ -33,6 +33,6 @@
 - [x] 6.3 效能一句話：有效 DPR 0.25 → backing store 面積約為 1/16，GPU 著色像素負擔同比降低（服務 `FE-X09` 弱裝置）；絕對數字目標歸 `FE-W13`／`FE-O12`
 
 ## 7. 收尾
-- [ ] 7.1 全套 `pnpm lint`＋`pnpm test`＋型別綠（不跟 e2e 同跑，`pnpm test` 會清 `.next`）
-- [ ] 7.2 各 slice PR CI 綠後手動合併
-- [ ] 7.3 archive：tasks 全勾 → 使用者手動跑 archive-review.sh → 綠 → `archive/fe-w14-pixel-restyle` 同步進 `openspec/specs/`
+- [x] 7.1 全套 `pnpm lint`＋`pnpm test`＋型別綠（main 8cc205f：eslint rc0、tsc rc0、vitest 1531 綠｜7 skip；兩個非本 change 的紅是環境／flake：`db-schema-copy`（本機後端 clone 過期、CI 無後端會 skip）、`server-auth`（全套並行下的計時 flake、單獨跑 8/8 綠））
+- [x] 7.2 各 slice PR CI 綠後手動合併：材質 #628、草地 #629、像素化 #630、角色 #631、e2e #632（squash＋刪分支）
+- [ ] 7.3 archive：tasks 全勾 → **使用者手動**跑 `archive-review.sh fe-w14-pixel-restyle`（rc 非 0 當輪停）→ 綠 → `archive/fe-w14-pixel-restyle` 同步進 `openspec/specs/`
