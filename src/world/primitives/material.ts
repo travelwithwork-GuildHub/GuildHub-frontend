@@ -1,6 +1,7 @@
-import { CanvasTexture, Color, MeshBasicMaterial, MeshStandardMaterial, NearestFilter, RepeatWrapping } from 'three'
+import { CanvasTexture, Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
 import type { Material, Texture } from 'three'
 import { worldColor, type WorldColorName } from '@/design/world'
+import { offscreen2d, pixelate, seedOf, shadeOf, valueNoise } from './pixelTexture'
 
 // 場景元件可用的材質。規格 `FE-W09-S04`／`S06`，像素貼圖是 `FE-W14-S02`／`S03`。
 //
@@ -51,62 +52,8 @@ export const WOOD_TEXTURE_NAME = 'world-pixel-wood'
 
 const texCache = new Map<string, Texture | null>()
 
-/**
- * 依 base 色算明暗階的十六進位字串（mul<1 變暗、>1 變亮），通道值 clamp 在 0..255。
- *
- * ⚠️ **刻意輸出 `#` 開頭、由 `${}` 插值拼出的十六進位，不用顏色函式字面。**
- * 值是**從 color token 衍生**的 canvas fillStyle（不是硬寫的顏色），但 `FE-X16-S01`
- * 的 DOM token 掃描器是純文字掃描（連註解都掃），會把源碼裡的顏色函式字面攔下來。
- * 這裡源碼裡沒有任何字面色碼，兩個掃描器（`FE-X16-S01`／`FE-W09` 的 hex 掃描）都不誤攔。
- */
-function shadeOf(base: Color, mul: number): string {
-  const channel = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255 * mul)))
-  const hex2 = (n: number) => n.toString(16).padStart(2, '0')
-  return `#${hex2(channel(base.r))}${hex2(channel(base.g))}${hex2(channel(base.b))}`
-}
-
-/**
- * 建一個 `size`×`size` 的離屏 canvas 2D context。
- *
- * 沒有 `document`（SSR）或環境不提供 canvas 2D context（jsdom 沒裝 `canvas` 套件）時回 `null`
- * —— 呼叫端據此退化為無貼圖純色（`FE-W14-S03`）。**這是唯一呼叫 `getContext` 的地方。**
- */
-function offscreen2d(size: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
-  if (typeof document === 'undefined') return null
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return null
-  return { canvas, ctx }
-}
-
-/** 把 canvas 變成最近鄰、可重複、指定 tiling 的像素貼圖。 */
-function pixelate(texture: CanvasTexture, repeat: number, name: string): CanvasTexture {
-  texture.name = name
-  texture.magFilter = NearestFilter
-  texture.minFilter = NearestFilter
-  texture.wrapS = RepeatWrapping
-  texture.wrapT = RepeatWrapping
-  texture.repeat.set(repeat, repeat)
-  return texture
-}
-
-/** 依 hex 內容導出的種子，同一個 hex 永遠一樣。 */
-function seedOf(hex: string): number {
-  let h = 2166136261
-  for (let i = 0; i < hex.length; i += 1) {
-    h = Math.imul(h ^ hex.charCodeAt(i), 16777619)
-  }
-  return h >>> 0
-}
-
-/** 依種子與座標算一個決定性的 [0,1) 值噪 —— 不依賴全域 RNG，貼圖內容可重現。 */
-function valueNoise(seed: number, x: number, y: number): number {
-  let h = Math.imul(seed ^ (x * 374761393) ^ (y * 668265263), 1274126177)
-  h = (h ^ (h >>> 15)) >>> 0
-  return h / 0x100000000
-}
+// 底層工具（`offscreen2d`／`pixelate`／`shadeOf`／`seedOf`／`valueNoise`）搬到 `pixelTexture.ts`，
+// 跟 `grass.ts` 共用 —— 同一份 SSR／jsdom 的 null 守衛與最近鄰設定，不各寫一份免得漂。
 
 /** 同色系的雜訊像素貼圖（一般 token 用）。 */
 function noiseTexture(hex: string): Texture | null {
