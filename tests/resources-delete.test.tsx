@@ -50,6 +50,7 @@ vi.mock('@/api/contract/limits', async (importOriginal) => {
 /** 逐字抄（見檔頭）。 */
 const COPY = {
   conflict: '這件事跟目前的狀態衝突了，重新整理之後再試一次。',
+  'permission-denied': '你沒有權限做這件事。',
   closed: '這個專案已經結案，資源不能再修改。',
   limitReached: (max: number) => `這個專案的資源已經有 ${max} 筆，到上限了 —— 要新增的話先刪掉一筆。`,
 } as const
@@ -269,6 +270,24 @@ describe('結案與權限失敗：刪除也走同一條確認', () => {
     expect(confirm(), '結案了確認層還在').toBeNull()
     expect(rowLabels(), '結案不該把已經讀到的清單收掉').toEqual(['A 原始碼', 'B 設計稿', 'C 筆記'])
     expect(deleteResource, '自動重送了 DELETE').toHaveBeenCalledTimes(1)
+  })
+
+  it('DELETE 回 403、確認出來專案仍 active：「沒有權限」那一句在確認層上，三種寫入控制收掉', async () => {
+    const { items } = three()
+    await openDelete(items, 1)
+    deleteResource.mockRejectedValue(http(403))
+    getProject.mockResolvedValue(project('active'))
+    click(confirmYes())
+    await flush()
+
+    expect(getProject, '刪除的 403 要確認一次專案狀態（D2）').toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('resources-closed'), '專案還活著，卻說已結案').toBeNull()
+    expect(confirm(), '403 把確認層收掉了 —— 那一句就沒有地方顯示').not.toBeNull()
+    expect(screen.getByTestId('resource-delete-confirm').textContent, '403 沒有說出 FE-X03 的那一句').toContain(COPY['permission-denied'])
+    expect(screen.queryByTestId('resource-create'), '伺服器說沒有權限，新增鈕還在 DOM 裡').toBeNull()
+    expect(deleteButtons(), '伺服器說沒有權限，刪除鈕還在 DOM 裡').toHaveLength(0)
+    expect(screen.queryAllByTestId('resource-edit'), '伺服器說沒有權限，修改鈕還在 DOM 裡').toHaveLength(0)
+    expect(rowLabels(), '403 不該把已經讀到的清單收掉').toEqual(['A 原始碼', 'B 設計稿', 'C 筆記'])
   })
 })
 
