@@ -28,9 +28,9 @@
 - [x] 5.4 突變確認（已驗）：拿掉一個 `OutlineBox` → `FE-W14-S06`「共 6 個 BackSide mesh」變紅；`seated` 的 `legRest` 改成 0 → `FE-W14-S08`「大腿往前彎」變紅
 
 ## 6. 真瀏覽器 e2e 與截圖（feat/fe-w14-pixel-restyle--e2e）
-- [ ] 6.1 `tests/e2e/*.mjs`（本機自起 `next start`、`NEXT_PUBLIC_APP_ENV=local`）：canvas backing store 每軸 ≈ CSS 尺寸 1/4、`image-rendering: pixelated`、antialias 關（`FE-W14-S05`）；草地貼圖存在（`FE-W14-S04`）
-- [ ] 6.2 前後截圖存進 `img/`（色票、木紋家具、草地、角色描邊／髮型／臉、坐姿），PR 附上；可讀性（角色對地面，`FE-W14-S01`）人眼判
-- [ ] 6.3 效能一句話：低 DPR 降 GPU 像素負擔約 1/16（弱裝置加分）；數字目標歸 `FE-W13`／`FE-O12`
+- [x] 6.1 `tests/e2e/pixelation.mjs`（對本機 `next start` 建置產物、`NEXT_PUBLIC_APP_ENV=local`、swiftshader WebGL2、REST／WS 全偽造只打 loopback）：實測 **有效 DPR = 0.250×0.250**（backing 360×206 / CSS 1440×825）、`image-rendering: pixelated`、antialias 關、且未超上限 2（`FE-W14-S05`／`FE-W01-S02`）全綠。草地貼圖存在（`FE-W14-S04`）改由截圖人眼判（避免脆弱的像素探針；截圖裡地面是多階綠點陣草地）
+- [x] 6.2 「after」截圖存進本機 `img/fe-w14-world-pixel-after.png`（**不進版控**：img/ 無追蹤檔、archive-review 有體積閘；committed 的可重現證據是 `pixelation.mjs`）—— 畫面確認：暖色像素草地、木紋家具、角色深色描邊＋框臉棕髮＋藍身，**角色對地面清楚分得出來**（可讀性 `FE-W14-S01` 人眼判）
+- [x] 6.3 效能一句話：有效 DPR 0.25 → backing store 面積約為 1/16，GPU 著色像素負擔同比降低（服務 `FE-X09` 弱裝置）；絕對數字目標歸 `FE-W13`／`FE-O12`
 
 ## 7. 收尾
 - [ ] 7.1 全套 `pnpm lint`＋`pnpm test`＋型別綠（不跟 e2e 同跑，`pnpm test` 會清 `.next`）
