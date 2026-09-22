@@ -1,8 +1,10 @@
 'use client'
 
 import { Canvas } from '@react-three/fiber'
+import type { RootState } from '@react-three/fiber'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { layer } from '@/design/layers'
+import { worldColor } from '@/design/world'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { shownAvatar } from '@/identity/avatarDraft'
 import { useAvatarDraft } from '@/identity/AvatarDraftProvider'
@@ -203,11 +205,22 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
           <div data-testid="world-stage" inert={worldDialogOpen} className="contents">
           <Canvas
             shadows
-            // 規格 FE-W01-S02：DPR 上限 2。不設限的話 3x 螢幕會用九倍的像素
-            // 去畫同一個畫面。`2` 不是量出來的最佳值 —— 真正的數字等 FE-O12，
-            // 而那時要改的是 Requirement，不是這一行。
-            dpr={[1, 2]}
-            onCreated={() => {
+            // 規格 FE-W14-S05：像素風以**固定的低有效 DPR `0.25`**、關 antialias 渲染，
+            // 再靠 canvas 的 `image-rendering: pixelated` 最近鄰放大成點陣外觀 ——
+            // 低解析度 backing store 被硬邊放大，同時把 GPU 要著色的像素數降到約 1/16
+            // （服務 FE-X09「弱裝置」）。`world-canvas` 的 DPR Requirement 已在本 change
+            // 一併 MODIFIED 放寬下限（上限 `2` 仍成立，`0.25 ≤ 2`）——「1 到 2 之間」的
+            // 下限是防高 DPR 浪費像素，跟像素風刻意降解析度同一個方向，不衝突。
+            dpr={0.25}
+            gl={{ antialias: false }}
+            onCreated={(state?: Partial<RootState>) => {
+              // 最近鄰放大：沒有這行，瀏覽器會用雙線性把 1/4 解析度的畫面**平滑**放大回來，
+              // 點陣邊緣就糊掉了 —— 那正是像素外觀要避免的。
+              // ⚠️ 這是 DOM 端的純視覺副作用。真瀏覽器一定有 `gl.domElement`；
+              // 沒有 renderer 元素的環境（jsdom 測試殼、SSR）連 `state` 都沒有，直接跳過、不炸 ——
+              // `image-rendering` 在那些環境本來就無畫面可套。真實設值由 slice 6 的真瀏覽器 e2e 驗（`FE-W14-S05`）。
+              const canvas = state?.gl?.domElement
+              if (canvas) canvas.style.imageRendering = 'pixelated'
               setReady(true)
               onReady?.()
             }}
@@ -215,10 +228,15 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
             {/* 相機由 FE-W05 提供。FE-W01 當時那個 perspective 相機是暫時的 ——
                 CONTEXT.md 訂的是固定的 Orthographic Elevated 相機。 */}
             <WorldCamera targetRef={cameraTarget} />
+            {/* 暖色背景與暖色陽光（`FE-W14-S05`／tasks 4.1）：地面外緣露出的底色配暖奶油，
+                太陽光帶暖調 —— 跟暖色像素調色盤一致，讓世界不是浮在頁面底色的空洞上。
+                顏色一律取 `worldColor()` token（不硬寫 hex）；最終色調由 slice 6 的前後截圖人眼校準。 */}
+            <color attach="background" args={[worldColor('wall')]} />
             <ambientLight intensity={0.6} />
             <directionalLight
               position={[5, 8, 3]}
               intensity={1.6}
+              color={worldColor('wall')}
               castShadow
               shadow-mapSize={[1024, 1024]}
             />

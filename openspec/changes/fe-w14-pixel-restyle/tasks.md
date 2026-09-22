@@ -18,8 +18,8 @@
 - [x] 3.3 單元測試（`tests/world-grass.test.ts`）：貼圖由 factory 產出且最近鄰／可重複／依 repeat 快取、geometry／material 快取不可變、`createsGpuResources(WorldShell)===false`（不含 `new CanvasTexture`）、factory 實例零 `dispose`（沿用 dispose 事件計數）、無 context 退化純色；`grass.ts` 登記進 leak-harness（`leak-coverage.test.ts` 機械把關 `FE-W07-S06`）
 
 ## 4. 實作：像素化渲染（feat/fe-w14-pixel-restyle--pixelate）
-- [ ] 4.1 `WorldCanvas.tsx`：`<Canvas dpr={0.25} gl={{antialias:false}}>` ＋ `onCreated` 設 `gl.domElement.style.imageRendering='pixelated'`；背景色與燈光配暖色（`FE-W14-S05`）
-- [ ] 4.2 對齊 MODIFIED 的 `world-canvas`（DPR 下限放寬）—— 確認上限 `2` 的既有判準不破（`FE-W01-S02`）
+- [x] 4.1 `WorldCanvas.tsx`：`<Canvas dpr={0.25} gl={{antialias:false}}>` ＋ `onCreated` 設 `gl.domElement.style.imageRendering='pixelated'`；背景色與燈光配暖色（`FE-W14-S05`）—— 暖背景與暖陽光都取 `worldColor('wall')` token（不硬寫 hex，過 `dom-token-scan`）；`onCreated` 的 DOM 副作用對沒有 renderer 元素的環境（jsdom 殼／SSR，`state` 為 undefined）防禦跳過、不炸（真值由 slice 6 真瀏覽器 e2e 驗）
+- [x] 4.2 對齊 MODIFIED 的 `world-canvas`（DPR 下限放寬）—— 上限 `2` 由建構保證不破：有效 DPR 現在是固定 `0.25`（`0.25 ≤ 2`），沒有任何路徑會超過 `2`；真瀏覽器的 backing store ≈ 1/4 判準在 slice 6（`FE-W01-S02`／`FE-W14-S05`）
 
 ## 5. 實作：角色像素外觀與坐姿（feat/fe-w14-pixel-restyle--character）
 - [ ] 5.1 `ChibiPlayer.tsx`：`OutlineBox`（inverted-hull、`BackSide`、深色）套在頭／軀幹／四肢；框臉髮型（頂＋瀏海＋兩側＋後腦）；臉部細節（眼／嘴／腮紅）—— 不動 `CHIBI_PARTS` 名字（`FE-W14-S06`；D5）
