@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import type { MessageOut, ProjectOut } from '@/api/contract/rest'
 import { AvatarPicker } from '@/app/world/AvatarPicker'
-import { FirstEntryNotice } from '@/app/world/FirstEntryNotice'
 import { SceneChatHud } from '@/chat/SceneChatHud'
 import { AvatarDraftProvider } from '@/identity/AvatarDraftProvider'
 import { IdentityBadge } from '@/identity/IdentityBadge'
@@ -27,11 +26,12 @@ import { SceneProvider } from '@/world/scenes/SceneProvider'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
 // 規格：openspec/changes/fe-x16-dom-visual-and-flow/specs/dom-visual-system/spec.md
-//   Requirement: 同一時間只有一個阻斷式面板；讓位有協定；非阻斷的提示讓位 —— S13、S14、S15、S16、S17、S18、S21、S22（jsdom 半邊；
+//   Requirement: 同一時間只有一個阻斷式面板；讓位有協定；非阻斷的提示讓位 —— S13、S14、S16、S17、S18、S21、S22（jsdom 半邊；
 //   `focusin` 序列、捲動位置、真瀏覽器的上一頁／下一頁在 `tests/e2e/dom-flow.mjs`）
+//   （`S15` 訪客提示讓位已於 `fe-a06-first-entry` 二次反轉退役 —— 訪客改看取代世界的取名門檻、開不了面板，讓位前提不存在。）
 //
 // 整棵樹是 `page.tsx` ＋ `WorldCanvas` 的形狀：協調者 > IdentityProvider（真的，contract-server 給 /api/me）> ProfilePanelProvider > InboxPanelProvider >
-// SceneProvider > SceneChatProvider > [ 標題列（名片、收件匣、換角色），InteractionProvider > ListPanelProvider > [ WorldUrlSync、看板、世界錨裡的三個面板與聊天框 ]，訪客提示 ]。
+// SceneProvider > SceneChatProvider > [ 標題列（名片、收件匣、換角色），InteractionProvider > ListPanelProvider > [ WorldUrlSync、看板、世界錨裡的三個面板與聊天框 ] ]。
 // 所有請求走真的 `src/api/` 到本機自己起的 HTTP server；`window.history` 是 jsdom 真的那一個。**不連任何團隊共用的位址。**
 
 vi.mock('@/realtime/RealtimeGenerationProvider', () => ({ useRealtimeGeneration: () => ({ generation: 0, rejoin: vi.fn() }) }))
@@ -120,7 +120,6 @@ function App({ world = true }: { world?: boolean }) {
                   </header>
                   <div className="relative">
                     {world && <World />}
-                    <FirstEntryNotice />
                   </div>
                 </SceneChatProvider>
               </SceneProvider>
@@ -350,38 +349,9 @@ describe('同一時間只有一個阻斷式面板', () => {
     expect(document.activeElement).toBe(inboxButton())
   })
 
-  it('[FE-X16-S15] 訪客提示讓位、關了回來、輸入中的名字沒丟；先關掉提示或走完的不回來', SLOW, async () => {
-    await mount({ guest: true })
-    const notice = () => screen.getByTestId('first-entry-notice')
-    expect(notice()).toBeVisible()
-    await type(within(notice()).getByLabelText('在世界裡顯示的名字'), '打到一半')
-    pressE()
-    // 提示讓位綁「開啟意圖」（`active`）：內容 chunk 抵達**前**就隱藏（同步斷言）—— `FirstEntryNotice` 改讀 `active`（非殼登記）的守門。
-    expect(notice()).not.toBeVisible()
-    await screen.findByTestId('list-panel') // 等內容到（下面 escape 靠看板內容的 Escape 層關面板；FE-X15 --panel-board）
-    escape()
-    expect(notice()).toBeVisible()
-    expect((within(notice()).getByLabelText('在世界裡顯示的名字') as HTMLInputElement).value, '讓位不重設提示裡的狀態').toBe('打到一半')
-    click(within(notice()).getByRole('button', { name: '先四處看看' }))
-    expect(screen.queryByTestId('first-entry-notice')).toBeNull()
-    pressE()
-    escape()
-    expect(screen.queryByTestId('first-entry-notice'), '關掉了就不回來').toBeNull()
-  })
-
-  it('[FE-X16-S15] 走完首次進入之後開看板、關看板：提示不回來', SLOW, async () => {
-    await mount({ guest: true })
-    const notice = screen.getByTestId('first-entry-notice')
-    server.replyFor('/api/login', 200, ME)
-    server.replyFor('/api/profiles/me', 200, ME)
-    // 取名直接進世界（2026-09-21 反轉，無金鑰儀式）：送出名字 → 提示自己關掉。
-    await type(within(notice).getByLabelText('在世界裡顯示的名字'), '阿福')
-    click(within(notice).getByRole('button', { name: '進入世界' }))
-    await waitFor(() => expect(screen.queryByTestId('first-entry-notice')).toBeNull())
-    pressE()
-    escape()
-    expect(screen.queryByTestId('first-entry-notice')).toBeNull()
-  })
+  // `FE-X16-S15`（訪客提示讓位）已於 `fe-a06-first-entry` 二次反轉退役（見 `dom-visual-system` 的 MODIFIED delta）：
+  // require-name 之後訪客看到的是取代世界的取名門檻，訪客不 render 世界、開不了任何阻斷式面板，讓位前提不存在。
+  // 兩條原本的 S15 測試（訪客提示讓位、走完後不回來）隨規格一併移除。
 
   it('[FE-X16-S16] 面板開著聊天框收成一行、顯示期間新到的數、不持鎖；關了展開、訊息都在', SLOW, async () => {
     await mount()

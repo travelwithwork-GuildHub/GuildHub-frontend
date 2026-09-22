@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { act } from 'react'
 import { ACCOUNT_LABELS, LoginForm } from '@/app/login/LoginForm'
 import { AppHeader } from '@/app/world/AppHeader'
-import { FirstEntryNotice } from '@/app/world/FirstEntryNotice'
+import { WorldEntryGate } from '@/app/world/WorldEntryGate'
 import { CHAT_COMPOSER_LABELS, SceneChatComposer } from '@/chat/SceneChatComposer'
 import { AvatarDraftProvider } from '@/identity/AvatarDraftProvider'
 import { IdentityProvider } from '@/identity/IdentityProvider'
@@ -80,16 +80,20 @@ describe('每個操作區至多一個主要動作，列出的狀態裡它是那�
     expect(document.getElementById('account-heading')?.getAttribute('data-text')).toBe('heading')
   })
 
-  it('[FE-X16-S09] 訪客提示：「進入世界」主要、「先四處看看」文字級', async () => {
+  it('[FE-X16-S09] 取名門檻：「進入世界」是唯一主要動作（旁觀出口已退場）', async () => {
+    // 二次反轉：訪客提示改成取代世界的取名門檻（`WorldEntryGate`）。「先四處看看」旁觀鈕拿掉了，
+    // 這個操作區只剩「進入世界」一個主要動作。
     server.reply(401, { detail: 'no' })
     render(
       <IdentityProvider>
-        <FirstEntryNotice />
+        <WorldEntryGate>
+          <div data-testid="world">世界</div>
+        </WorldEntryGate>
       </IdentityProvider>,
     )
-    const notice = await screen.findByTestId('first-entry-notice')
-    expect(primaries(notice)).toEqual(['進入世界'])
-    expect(tier(button(notice, '先四處看看'))).toBe('tertiary')
+    const gateEl = await screen.findByTestId('world-entry-gate')
+    expect(primaries(gateEl)).toEqual(['進入世界'])
+    expect(screen.queryByTestId('world'), '取名門檻底下不 render 世界').toBeNull()
   })
 
   it('[FE-X16-S09] owner 案件詳情：招募中「成軍」、表單「確定成軍」、送出中零個；密碼呈現中「複製密碼」主要、「寄給隊員」與「結案」次要', async () => {

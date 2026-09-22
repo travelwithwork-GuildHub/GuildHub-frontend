@@ -54,7 +54,7 @@ export interface UiError {
  * 拿 `message` 去畫，不自己寫。
  */
 export const VOCABULARY: Record<UiErrorKind, string> = {
-  'authentication-required': '要先登入才看得到這裡。',
+  'authentication-required': '這裡要有身分才看得到 —— 先取個名字加入。',
   'permission-denied': '你沒有權限做這件事。',
   'not-found': '找不到這個東西 —— 它可能已經被移除了。',
   conflict: '這件事跟目前的狀態衝突了，重新整理之後再試一次。',
