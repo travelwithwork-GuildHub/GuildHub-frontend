@@ -25,6 +25,14 @@ const BLADE_HEIGHT = 2
 
 export const GRASS_TEXTURE_NAME = 'world-pixel-grass'
 
+/**
+ * 像素草地 plane 疊在地面的高度（世界 y）。
+ * ⚠️ **必須落在主地板頂面（y=0）與 carpet 頂面（`carpetDefinition`：0.02）之間、且與兩者都不共面。**
+ * 共面 = z-fighting：W14 一度把草地設在 0.02，剛好等於 carpet 頂面，於是黃色地毯（走道）一直閃。
+ * 深度精度在這個相機下約 1e-4，所以 ~0.01 的間距綽綽有餘。分層由 `tests/world-ground-layers.test.ts` 釘住。
+ */
+export const GRASS_Y = 0.01
+
 /** 由 `ground` 衍生的幾階綠（深淺拉開），草葉用更深的 `leaf`。 */
 function grassShades(): { fill: string[]; blade: string } {
   const ground = new Color(worldColor('ground'))
