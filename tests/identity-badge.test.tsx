@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import LoginPage from '@/app/login/page'
 import { IdentityBadge } from '@/identity/IdentityBadge'
+import { WorldEntryGate } from '@/app/world/WorldEntryGate'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { IdentityProvider } from '@/identity/IdentityProvider'
 import { startContractServer, type ContractServer } from './support/contract-server'
@@ -107,35 +108,47 @@ describe('世界裡看得出來你是誰', () => {
 })
 
 describe('訪客找得到入口', () => {
-  it('[FE-A01-S16] 訪客看得到一個入口，它指向 /login', async () => {
+  it('[FE-A01-S16] 訪客的入口是取名門檻本身，標題列不再導去 /login，門檻顯示時不曝光帳密', async () => {
+    // 二次反轉（2026-09-22）：訪客進 `/world` 看到的是取代世界的取名門檻（`WorldEntryGate`）。
+    // 「建立身分的入口」改由門檻承擔 —— 門檻本身即可輸入送出暱稱的流程；主動線不曝光帳密（`/login` 帳密區）。
     server.reply(401, { detail: '未登入' })
-    mount()
+    render(
+      <IdentityProvider>
+        <ProfilePanelProvider>
+          <IdentityBadge />
+        </ProfilePanelProvider>
+        <WorldEntryGate>
+          <div data-testid="world">世界</div>
+        </WorldEntryGate>
+      </IdentityProvider>,
+    )
 
     await waitFor(() => expect(badge()).toContain('訪客'))
-    const entry = screen.getByRole('link', { name: '建立你的身分' })
-    expect(entry.getAttribute('href')).toBe('/login')
-  })
-
-  it('[FE-A01-S16] 那個入口的另一端，真的有可以輸入並送出暱稱的地方', () => {
-    // ⚠️ **這一條把 `/login` 那一端釘住。** 只斷言 href 的話，
-    // 一個指向死路由的連結也會通過 —— 而使用者會按下去看到 404。
-    //
-    // ⚠️ **檔案路徑與網址的對應是 Next.js 的慣例，這條測不到它**
-    //（`src/app/login/page.tsx` ↔ `/login`）。那一半由 tasks 4.4b 的人工驗證守，
-    // 而那是 `FE-W12`「門看不出來是門」的同型缺口 —— 那次只有人眼抓得到。
-    render(<LoginPage />)
-
+    // 核心保護仍在（改由門檻承擔）：訪客到得了可輸入並送出暱稱的流程。
     expect(screen.getByLabelText('在世界裡顯示的名字')).toBeDefined()
     expect(screen.getByRole('button', { name: '進入世界' })).toBeDefined()
+    // 負向驗收：訪客標題列不再有 `建立你的身分 → /login`，門檻顯示時畫面上沒有任何導向帳密表單的入口。
+    expect(screen.queryByRole('link', { name: '建立你的身分' }), '訪客還被導去 /login').toBeNull()
+    expect(document.querySelector('a[href="/login"]'), '門檻顯示時仍有導向帳密的入口').toBeNull()
   })
 
-  it('[FE-A01-S16] 問不到身分的時候，入口也還在', async () => {
-    // 後端掛掉時把入口藏起來的話，使用者連「再試一次」的路都沒有
+  it('[FE-A01-S16] 問不到身分（unavailable）時，標題列仍保留入口當安全閥，它的另一端真的有暱稱流程', async () => {
+    // 後端掛掉時訪客被放行進世界、沒有門檻擋著；把入口也藏起來的話，使用者連「取個名字」的路都沒有。
     server.reply(500, { detail: '壞掉了' })
     mount()
 
     await waitFor(() => expect(badge()).toContain('問不到'))
-    expect(screen.getByRole('link', { name: '建立你的身分' })).toBeDefined()
+    const entry = screen.getByRole('link', { name: '建立你的身分' })
+    expect(entry.getAttribute('href')).toBe('/login')
+  })
+
+  it('[FE-A01-S16] 那個安全閥入口的另一端，真的有可以輸入並送出暱稱的地方', () => {
+    // ⚠️ **這一條把 `/login` 那一端釘住。** 只斷言 href 的話，
+    // 一個指向死路由的連結也會通過 —— 而使用者會按下去看到 404。
+    render(<LoginPage />)
+
+    expect(screen.getByLabelText('在世界裡顯示的名字')).toBeDefined()
+    expect(screen.getByRole('button', { name: '進入世界' })).toBeDefined()
   })
 
   it('[FE-A01-S16] 已登入的人不會看到「建立你的身分」', async () => {
