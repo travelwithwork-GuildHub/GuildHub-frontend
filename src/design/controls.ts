@@ -82,6 +82,14 @@ export const FIELD = { className: 'border-control-edge bg-surface-raised rounded
 export const CHECK_ROW = 'flex items-center gap-2'
 
 /**
+ * 深色玻璃 HUD 上的 icon-only 控制（`FE-X17`）。標題列與世界 HUD 的入口從文字按鈕改成圖示膠囊時共用這一份，
+ * 讓它們看起來是「世界的系統選單」而不是網頁導覽列。低顯著：沒有填色、沒有邊框，hover 才浮一層極淡的亮面。
+ * **文字色是玻璃上的淺色**（深 header 上深字會看不見）；**呼叫端一定要給 `aria-label`**（icon 沒有可見文字，讀屏／鍵盤靠它）。
+ * 高度下限走 `globals.css` base 層（跟其他控制一致），所以不撐高標題列（`FE-X16-S19` 的 rect）。
+ */
+export const HUD_ICON_BUTTON = 'text-glass-ink hover:bg-glass-line rounded-control flex items-center justify-center px-2 py-2'
+
+/**
  * 一個表單的容器。**這不是「順手統一 layout」，是 `FE-X13-S06` 要求的同一份外觀。**
  * `w-full max-w-sm` 讓表單填滿容器（窄面板裡填滿、寬登入頁封頂在 24rem），欄位再靠 `w-full` 填滿表單 ——
  * 沒有這個上限時，欄位在寬頁上會拉太長、在窄面板裡（舊 `items-start`）又縮成固定寬、左半截像被切掉。

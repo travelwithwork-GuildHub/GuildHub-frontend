@@ -1,6 +1,6 @@
 'use client'
 
-import { TERTIARY } from '@/design/controls'
+import { TERTIARY, withClass } from '@/design/controls'
 import Link from 'next/link'
 import { useProfilePanel } from '@/profile/ProfilePanelProvider'
 import { useIdentity } from './IdentityProvider'
@@ -54,7 +54,7 @@ export function IdentityBadge() {
           <button
             type="button"
             aria-label={`我的名片：${identity.profile.display_name}`}
-            {...TERTIARY}
+            {...withClass(TERTIARY, 'text-glass-ink hover:bg-glass-line')}
             onClick={(e) => openPanel(e.currentTarget)}
           >
             {identity.profile.display_name}

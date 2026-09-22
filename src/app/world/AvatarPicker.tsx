@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FocusEvent } from 'react'
 import { AVATAR_COUNT, avatarLook } from '@/design/avatar'
 import { layer } from '@/design/layers'
-import { FIELD_LABEL, PRIMARY, SECONDARY, withClass } from '@/design/controls'
+import { FIELD_LABEL, HUD_ICON_BUTTON, PRIMARY, SECONDARY, withClass } from '@/design/controls'
 import { useAvatarDraft } from '@/identity/AvatarDraftProvider'
 import { useAdoptIdentity, useIdentity } from '@/identity/IdentityProvider'
 import { myAvatar } from '@/identity/myAvatar'
@@ -101,8 +101,12 @@ export function AvatarPicker() {
     <>
       {/* ⚠️ **入口在標題列裡，也就是 `<Canvas>` 的兄弟而不是它的子孫** ——
           所以它天生不會被 3D 畫面蓋住（`S13`）。 */}
-      <button ref={trigger} type="button" {...SECONDARY} onClick={() => setOpen((v) => !v)}>
-        更換角色
+      <button ref={trigger} type="button" className={HUD_ICON_BUTTON} aria-label="更換角色" onClick={() => setOpen((v) => !v)}>
+        {/* 人物半身（Heroicons「user」風）。`aria-label` 給名字。 */}
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
+        </svg>
       </button>
 
       {open && (
