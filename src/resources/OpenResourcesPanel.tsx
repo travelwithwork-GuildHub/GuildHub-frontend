@@ -155,7 +155,10 @@ export default function OpenResourcesPanel() {
         )}
         {writer && (
           <>
-            {/* `disabled` 不是權限邊界，也不是閘門：handler 自己再擋一次（測試可以直接對 disabled 的鈕發 click） */}
+            {/* `disabled` 不是權限邊界，也不是閘門：handler 自己再擋一次。
+                ⚠️ **那一行沒有判準壓著**：React 不會把 click 派送給 `disabled` 的鈕，jsdom 裡量不到它
+                （`25b2e97` 原本的註解說「測試可以直接對 disabled 的鈕發 click」—— 實測是錯的）。
+                擋下 `POST` 的是 `disabled` 本身；這一行是它被拿掉時的第二道。 */}
             <button
               ref={createButton}
               type="button"
