@@ -23,9 +23,9 @@
 
 ## 5. 實作：角色像素外觀與坐姿（feat/fe-w14-pixel-restyle--character）
 - [x] 5.1 `ChibiPlayer.tsx`：`OutlineBox`（inverted-hull、`BackSide`、`meshBasicMaterial` 深色）套在頭／軀幹／四肢；框臉髮型（頂＋瀏海＋兩側鬢角＋後腦）；臉部細節（眼／嘴／腮紅）—— 不動 `CHIBI_PARTS` 名字（`FE-W14-S06`；D5）。描邊色＝`worldColor('ink')`、髮＝新 token `hair`、腮紅＝新 token `blush`（world.ts 明訂色票集合可增長、不需改規格）；body／limb 仍由 `avatarLook(av)` 決定
-- [x] 5.2 `seated` prop：大腿往前彎（`restX` 負、+Z 方向 ~75°）、手往前擱（~17°）、整體略抬到椅面高（`position.y` +0.05）；非驅動實例（`RemotePlayer`／靜態）直接生效（`FE-W14-S08`；D6）。驅動端的「seated 時跳過每幀擺動」是給 `FE-J13` 接線的契約，本 change 無 caller 設 `seated=true`，不動 `LocalPlayer`
-- [x] 5.3 單元測試（`tests/world-character.test.tsx`，`@react-three/test-renderer` 讀真 three 場景圖）：6 個 `BackSide` 深色描邊 mesh＋框臉髮型多部件＋腮紅＋眼嘴（`FE-W14-S06`）；`av` 為 `null`／`9999`／`1.5`／字串照常渲染且 body 是預設款（不取模，`FE-W14-S07`）；`seated` 使大腿 `rotation.x < -0.5`、整體 `y > 0`，站姿回 0（`FE-W14-S08`）
-- [x] 5.4 突變確認（已驗）：拿掉一個 `OutlineBox` → `FE-W14-S06`「共 6 個 BackSide mesh」變紅；`seated` 的 `legRest` 改成 0 → `FE-W14-S08`「大腿往前彎」變紅
+- [x] 5.2 `seated` prop：大腿往前彎（`restX` 負、+Z 方向 ~75°）、手往前擱（~17°）、整體略抬到椅面高（`position.y` +0.05）；非驅動實例（`RemotePlayer`／靜態）直接生效（`FE-W14-S08`；D6）。**驅動端 `LocalPlayer` 也接 `seated`**：為真時跳過每幀對四肢 `rotation.x` 與身體 `position.y`（bounce）的寫入（否則靜態坐姿被覆蓋），並把 `seated` 傳給它的 `ChibiPlayer`；何時 `seated=true`（真的入座、面向、起身）仍歸 `FE-J13`，本 change 無 caller 設真值、站姿不變（archive-review r1 codex／gemini 指出「不能把這段契約延後」→補上機制與測試）
+- [x] 5.3 單元測試：`tests/world-character.test.tsx`（`@react-three/test-renderer` 讀真 three 場景圖）—— 6 個 `BackSide` 深色描邊 mesh＋框臉髮型多部件＋腮紅＋眼嘴（`FE-W14-S06`）；`av` 為 `null`／`9999`／`1.5`／字串照常渲染且 body 是預設款（不取模，`FE-W14-S07`）；`seated` 使大腿 `rotation.x < -0.5`、整體 `y > 0`，站姿回 0（`FE-W14-S08`）。`tests/world-local-seated.test.tsx` —— 驅動端 `LocalPlayer` `seated` 時推進 10 幀後大腿仍 `< -0.5`（沒被每幀擺動覆蓋，`FE-W14-S08`）
+- [x] 5.4 突變確認（已驗）：拿掉一個 `OutlineBox` → `FE-W14-S06`「共 6 個 BackSide mesh」變紅；`ChibiPlayer` 的 `legRest` 改成 0 → `FE-W14-S08`「大腿往前彎」變紅；`LocalPlayer` 拿掉「seated 時跳過擺動」的 `if (!seated)` → `world-local-seated` 的「大腿維持前彎」變紅
 
 ## 6. 真瀏覽器 e2e 與截圖（feat/fe-w14-pixel-restyle--e2e）
 - [x] 6.1 `tests/e2e/pixelation.mjs`（對本機 `next start` 建置產物、`NEXT_PUBLIC_APP_ENV=local`、swiftshader WebGL2、REST／WS 全偽造只打 loopback）：實測 **有效 DPR = 0.250×0.250**（backing 360×206 / CSS 1440×825）、`image-rendering: pixelated`、antialias 關、且未超上限 2（`FE-W14-S05`／`FE-W01-S02`）全綠。草地貼圖存在（`FE-W14-S04`）改由截圖人眼判（避免脆弱的像素探針；截圖裡地面是多階綠點陣草地）
