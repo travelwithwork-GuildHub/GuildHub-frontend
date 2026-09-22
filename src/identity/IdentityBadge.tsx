@@ -21,8 +21,14 @@ import { useIdentity } from './IdentityProvider'
 //
 // 已登入的名字是一個 `button`「我的名片」（`FE-A04-S01`）：按下開名片面板；關閉後焦點回這個按鈕（`S02`），
 // 所以開的時候把自己交給 provider。**必須在 `<ProfilePanelProvider>` 底下。**
+//
+// ⚠️ **訪客不再從這裡導去 `/login`（`FE-A01-S16` 二次反轉，2026-09-22）。**
+// require-name 之後訪客看到的就是取代世界的取名門檻（`WorldEntryGate`），門檻本身即暱稱流程 ——
+// 「建立身分的入口」改由門檻承擔，主動線不曝光帳密（`/login` 的帳密區）。所以 `guest` 只顯示「訪客」、不帶連結。
+// **`unavailable` 例外**：後端問不到身分時訪客被放行進世界、沒有門檻擋著，標題列保留這個入口當**安全閥**
+//（那是後端故障、不在 demo 主動線上）。
 
-/** 訪客看得到的入口。`S16`：要辨識得出來，而且到得了輸入暱稱的流程。 */
+/** 後端問不到身分時的入口（安全閥）。`FE-A01-S16`：要辨識得出來，而且到得了輸入暱稱的流程。 */
 function SignInEntry() {
   return (
     <Link href="/login" className="text-accent underline">
@@ -56,11 +62,8 @@ export function IdentityBadge() {
         </p>
       )
     case 'guest':
-      return (
-        <p data-testid="identity">
-          訪客 <SignInEntry />
-        </p>
-      )
+      // 入口由取名門檻承擔（`FE-A01-S16` 二次反轉）：只顯示「訪客」，主動線不曝光帳密。
+      return <p data-testid="identity">訪客</p>
     case 'unavailable':
       // 「現在問不到」跟「你是訪客」要分得開，而且分得開的方式是**使用者看得出來**
       return (
