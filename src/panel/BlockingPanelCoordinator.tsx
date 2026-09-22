@@ -16,7 +16,7 @@ import { layer } from '@/design/layers'
 // ⚠️ 巢狀時**內層沿用外層**（不拋錯）：`ListPanelProvider` 在 `WorldCanvas` 裡、另外兩個在 `page.tsx`，三個 provider 各自確保上面有協調者 ——
 // 頁面上只有 `page.tsx` 那一個是真的，單獨掛某個 provider 的測試才會自己長一個。兩個**不同**的協調者才是會靜默壞掉的形狀（面板互相看不見）。
 
-export type BlockingPanelId = 'list-panel' | 'inbox-panel' | 'profile-panel'
+export type BlockingPanelId = 'list-panel' | 'inbox-panel' | 'profile-panel' | 'resources-panel'
 export interface PanelRegistration {
   id: BlockingPanelId
   /** 送出中、有未儲存的修改 → `false`（同步）。 */
