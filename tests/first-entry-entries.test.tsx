@@ -2,17 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import nextConfig from '../next.config'
-import { FirstEntryNotice } from '@/app/world/FirstEntryNotice'
+import { WorldEntryGate } from '@/app/world/WorldEntryGate'
 import { RootEntry } from '@/app/RootEntry'
 import { IdentityBadge } from '@/identity/IdentityBadge'
 import { ProfilePanelProvider } from '@/profile/ProfilePanelProvider'
 import { IdentityProvider } from '@/identity/IdentityProvider'
-import { markFirstEntryDone } from '@/first-entry/seen'
 import { startContractServer, type ContractServer } from './support/contract-server'
 
-// 規格：openspec/changes/fe-a06-first-entry/specs/first-entry/spec.md
+// 規格：openspec/specs/first-entry/spec.md（fe-a06-first-entry 已合併的 delta）
 //   Requirement: 網站的根路徑是一條走得完的路 —— S01 / S02 / S03
-//   Requirement: 直接進世界的訪客會被提示，但不會被擋 —— S04 / S05 / S06
+//   Requirement: 進世界前要先有名字：訪客被導到取名，不匿名旁觀 —— S04 / S05 / S06
+//
+// ⚠️ 2026-09-22 二次反轉：`/world` 對訪客的表面從「可關掉的角落提示」變成
+// **取代世界的取名門檻**（`WorldEntryGate`：guest 時不 render 世界、改 render 取名）。
+// 下面的 `S04`／`S05`／`S06` 驗的是門檻行為，不是舊的 dismiss 提示。
 
 let server: ContractServer
 const replaced: string[] = []
@@ -110,7 +113,7 @@ describe('走完流程之後，身分立刻反映在畫面上', () => {
     // 要重整才會變。原因是 `IdentityProvider` 只在掛載時問一次後端，
     // 而流程建立的新身分沒有交給它。
     //
-    // 抓不到的理由也要寫下來：`IdentityBadge` 與 `FirstEntryNotice` 在原本的
+    // 抓不到的理由也要寫下來：`IdentityBadge` 與取名門檻在原本的
     // 判準裡是**分開掛載**的，各自有一個 provider —— 所以「一邊變了另一邊
     // 沒變」這件事在那裡不存在。**這一條把它們放進同一個 provider。**
     server.reply(401, { detail: '未登入' })
@@ -120,12 +123,14 @@ describe('走完流程之後，身分立刻反映在畫面上', () => {
         <ProfilePanelProvider>
           <IdentityBadge />
         </ProfilePanelProvider>
-        <FirstEntryNotice />
+        <WorldEntryGate>
+          <div data-testid="world">世界</div>
+        </WorldEntryGate>
       </IdentityProvider>,
     )
     await waitFor(() => expect(screen.getByTestId('identity').textContent).toContain('訪客'))
 
-    // 取名直接進世界（2026-09-21 反轉，無金鑰儀式）：送出名字 → 身分交給同一個 provider，標題列立刻變。
+    // 取名進世界（無金鑰儀式）：送出名字 → 身分交給同一個 provider，標題列立刻變、門檻讓出世界。
     type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
     click(screen.getByRole('button', { name: '進入世界' }))
 
@@ -134,59 +139,64 @@ describe('走完流程之後，身分立刻反映在畫面上', () => {
   })
 })
 
-describe('世界裡的引導層', () => {
-  it('[FE-A06-S04] 訪客看得到，而且關得掉', async () => {
+// 進世界前要先有名字：`WorldEntryGate` guest 時不 render 世界、改 render 取名門檻。
+const gated = () =>
+  wrap(
+    <WorldEntryGate>
+      <div data-testid="world">世界</div>
+    </WorldEntryGate>,
+  )
+
+describe('進世界前的取名門檻', () => {
+  it('[FE-A06-S04] 訪客看到的是取名，不是可操作的世界', async () => {
     server.reply(401, { detail: '未登入' })
-    wrap(<FirstEntryNotice />)
-    await waitFor(() => expect(screen.getByTestId('first-entry-notice')).toBeDefined())
+    gated()
 
-    click(screen.getByRole('button', { name: '先四處看看' }))
-
-    expect(screen.queryByTestId('first-entry-notice')).toBeNull()
+    await waitFor(() => expect(screen.getByTestId('world-entry-gate')).toBeDefined())
+    expect(screen.getByLabelText('在世界裡顯示的名字'), '門檻沒給取名輸入框').toBeDefined()
+    // ⚠️ **取代世界，不是蓋住世界。** 世界根本沒 render —— 沒有世界可漏 WASD（`S04` method-agnostic）。
+    expect(screen.queryByTestId('world'), '取名之前世界就 render 了').toBeNull()
   })
 
-  it('[FE-A06-S04] 已登入的人看不到它', async () => {
+  it('[FE-A06-S05] 沒有繞過取名的旁觀出口', async () => {
+    server.reply(401, { detail: '未登入' })
+    gated()
+    await screen.findByTestId('world-entry-gate')
+
+    // 反轉了前一版：不再有「先四處看看」這種關閉／略過取名而直接操作世界的控制。
+    expect(screen.queryByRole('button', { name: '先四處看看' }), '留著旁觀出口').toBeNull()
+    expect(screen.queryByTestId('world'), '有一條繞過取名去看世界的路').toBeNull()
+  })
+
+  it('[FE-A06-S06] 取名之後才進世界', async () => {
+    server.reply(401, { detail: '未登入' })
     server.reply(200, PROFILE)
-    wrap(<FirstEntryNotice />)
+    gated()
+    await screen.findByTestId('world-entry-gate')
 
-    await new Promise((r) => setTimeout(r, 60))
-    expect(screen.queryByTestId('first-entry-notice')).toBeNull()
+    type(screen.getByLabelText('在世界裡顯示的名字'), '阿福')
+    click(screen.getByRole('button', { name: '進入世界' }))
+
+    await waitFor(() => expect(screen.getByTestId('world')).toBeDefined())
+    expect(screen.queryByTestId('world-entry-gate'), '進世界了門檻還在').toBeNull()
   })
 
-  it('[FE-A06-S05] 它不吃掉世界的操作', async () => {
-    server.reply(401, { detail: '未登入' })
-    wrap(<FirstEntryNotice />)
-    const overlay = await screen.findByTestId('first-entry-notice')
+  it('[FE-A06-S06] 已經有身分的人直接進世界，不被再問一次名字', async () => {
+    // **對照方向。** 少了它，一個「對所有人都先顯示取名」的實作會擋到已具名的人。
+    server.reply(200, PROFILE)
+    gated()
 
-    // ⚠️ **這一條跟「關得掉」不能互相取代。** 上一條驗的是「關掉之後還能動」，
-    // 這一條驗的是**還沒關掉的時候就能動** —— 一個蓋住整個畫面、吃掉所有
-    // 指標事件的容器會通過上一條、在這裡紅
-    expect(overlay.className, '滿版的容器沒有放掉指標事件').toContain('pointer-events-none')
-    const card = overlay.querySelector('section')
-    expect(card?.className, '卡片自己收不到點擊').toContain('pointer-events-auto')
+    await waitFor(() => expect(screen.getByTestId('world')).toBeDefined())
+    expect(screen.queryByTestId('world-entry-gate'), '已登入還被門檻擋').toBeNull()
+    expect(screen.queryByLabelText('在世界裡顯示的名字'), '已登入還被問名字').toBeNull()
   })
 
-  it('[FE-A06-S06] 關掉不等於完成 —— 重新進來還會看到', async () => {
-    server.reply(401, { detail: '未登入' })
-    const first = wrap(<FirstEntryNotice />)
-    await waitFor(() => expect(screen.getByTestId('first-entry-notice')).toBeDefined())
-    click(screen.getByRole('button', { name: '先四處看看' }))
-    first.unmount()
+  it('[FE-A06-S06] 問不到身分（unavailable）時放行進世界，不擋在門口', async () => {
+    // 誤擋讓人完全進不去；誤放最多是他以未定身分逛，代價不對稱（沿用 `RootEntry` 的 passThrough）。
+    server.reply(500, { detail: '壞掉了' })
+    gated()
 
-    server.reply(401, { detail: '未登入' })
-    wrap(<FirstEntryNotice />)
-
-    // 把「關掉」記成「完成」的話，一個手滑點掉的人再也不會被提示
-    await waitFor(() => expect(screen.getByTestId('first-entry-notice')).toBeDefined())
-  })
-
-  it('[FE-A06-S06] 真的走完了就不再出現', async () => {
-    // **對照方向。** 少了它，一個「永遠顯示提示」的實作會通過上一條
-    markFirstEntryDone()
-    server.reply(401, { detail: '未登入' })
-    wrap(<FirstEntryNotice />)
-
-    await new Promise((r) => setTimeout(r, 60))
-    expect(screen.queryByTestId('first-entry-notice')).toBeNull()
+    await waitFor(() => expect(screen.getByTestId('world')).toBeDefined())
+    expect(screen.queryByTestId('world-entry-gate')).toBeNull()
   })
 })

@@ -10,10 +10,10 @@ import { StatusProvider } from '@/realtime/StatusProvider'
 import { SceneNotices } from '@/world/scenes/SceneNotices'
 import { SceneProvider } from '@/world/scenes/SceneProvider'
 import { AppHeader } from './AppHeader'
-import { FirstEntryNotice } from './FirstEntryNotice'
 import { OtherTabNotice } from './OtherTabNotice'
 import { WorldGate } from './WorldGate'
 import { WorldBoundary } from './WorldBoundary'
+import { WorldEntryGate } from './WorldEntryGate'
 
 // 規格 FE-X01-S03。**這個元件刻意保持同步**（不是 async Server Component）——
 // Vitest 目前不支援 async Server Component，非同步的話這條 Scenario
@@ -49,11 +49,14 @@ export default function WorldPage() {
             <OtherTabNotice />
             {/* 進不去的通知、沒票的說明（`FE-V01-S07`／`S14`）。 */}
             <SceneNotices />
-            {/* ⚠️ **`relative` 是引導層 `absolute inset-0` 的定位基準。**
-                少了它，引導層會相對於整個視窗定位 —— 蓋到標題列上。 */}
+            {/* ⚠️ **`relative` 是取名門檻 `absolute inset-0` 的定位基準。**
+                少了它，門檻會相對於整個視窗定位 —— 蓋到標題列上。 */}
+            {/* 進世界前要先有名字（`FE-A06-S04`，2026-09-22 二次反轉）：`guest` → 取名門檻（取代世界、不 render `<WorldBoundary/>`）；
+                `signed-in`／`unavailable`／`unknown` → 世界（`unknown` 由 `WorldBoundary` 顯示載入層）。 */}
             <div className="relative min-h-0 flex-1">
-              <WorldBoundary />
-              <FirstEntryNotice />
+              <WorldEntryGate>
+                <WorldBoundary />
+              </WorldEntryGate>
             </div>
           </main>
         </WorldGate>

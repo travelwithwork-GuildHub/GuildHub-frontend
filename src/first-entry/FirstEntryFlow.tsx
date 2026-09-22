@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { signInWithNickname } from '@/identity/session'
 import { NicknameLengthError, type Identity } from '@/identity/types'
 import { FIELD, FIELD_LABEL, FORM, PRIMARY, TITLE } from '@/design/controls'
@@ -23,9 +23,16 @@ export interface FirstEntryFlowProps {
    * 顯示「訪客」，要重整才會變 —— 而那是端到端第一次跑就抓到的 bug。
    */
   onDone: (identity: Extract<Identity, { state: 'signed-in' }>) => void
+  /**
+   * 標題底下的一句說明（內文）。取名門檻（`FE-A06-S04`）用它說清楚「填名字即刻加入、不是登入」；
+   * `/`、`/login` 不傳就沒有 —— 這個表面必備的層級由 `dom-visual-system` 各自規定。
+   */
+  description?: ReactNode
+  /** 掛載時把焦點放到名字框（取名門檻是首屏、焦點該落在唯一要填的欄位）。 */
+  autoFocus?: boolean
 }
 
-export function FirstEntryFlow({ onDone }: FirstEntryFlowProps) {
+export function FirstEntryFlow({ onDone, description, autoFocus }: FirstEntryFlowProps) {
   const [nickname, setNickname] = useState('')
   const [error, setError] = useState<unknown>(null)
   const [busy, setBusy] = useState(false)
@@ -56,9 +63,11 @@ export function FirstEntryFlow({ onDone }: FirstEntryFlowProps) {
       <h2 id="first-entry-heading" {...TITLE}>
         取一個名字就可以進去
       </h2>
+      {description !== undefined && <p>{description}</p>}
       <label className={FIELD_LABEL}>
         在世界裡顯示的名字
-        <input {...FIELD} value={nickname} onChange={(e) => setNickname(e.target.value)} />
+        {/* autoFocus：門檻是首屏、焦點落唯一要填的欄位；`/`、`/login` 不傳就照舊不搶焦點。 */}
+        <input {...FIELD} autoFocus={autoFocus} value={nickname} onChange={(e) => setNickname(e.target.value)} />
       </label>
       <button type="submit" {...PRIMARY} disabled={busy}>
         進入世界

@@ -67,14 +67,14 @@
 - [x] 7.2 proposal 加二次反轉段、Non-goals／已知限制對齊、Capabilities 加 `dom-visual-system`；`openspec validate fe-a06-first-entry --strict` 綠
 - [ ] 7.3 `progress.sh --check` 綠（change-id 仍對回 FE-A06）
 
-**實作（feat/ 分支）**
-- [ ] 7.4 **不在 `guest` 時 render 世界**：`/world/page.tsx` 用 client gate（`WorldEntryGate`）包 `<WorldBoundary/>` —— `guest` → 取名門檻（置中、`aria-modal`、焦點落名字框、無旁觀鈕）；`unknown` → 交給 `WorldBoundary` 的載入層（不閃取名）；`signed-in`／`unavailable` → render 世界。拿掉 `<FirstEntryNotice/>`。原因：`EditableFocusLock` 只在焦點於文字框時鎖世界，焦點到按鈕會漏 WASD，且 gate 在 `InteractionProvider` 外拿不到 `holdInputLock`；不 render 世界＝沒有世界可漏、也不抓 3D chunk
-- [ ] 7.5 文案：取名門檻的標題／說明寫成不誤導的取名說明（不用「登入」）；`uiError.ts` 的 `authentication-required`「要先登入才看得到這裡。」改成不含「登入」的說法（仍在唯一語彙表、仍與其他句不同）—— 看板那句誤導文案是經此語彙流出的，一改就修好
-- [ ] 7.6 藏帳密入口：`IdentityBadge` 的訪客／`unavailable`「建立你的身分 → /login」不再曝光；`/login` 頁與帳密表單不動
-- [ ] 7.7 測試：`FirstEntryNotice` 的 `S04`／`S05`／`S06` 改寫成 gate 行為（取代世界、無旁觀出口、取名後進、已取名不再問）；**連帶改**：`dom-visual-surfaces` 的 `FE-X16-S09` 拿掉「先四處看看是 tertiary」斷言、`dom-visual-flow` 的 `FE-X16-S15` 訪客提示讓位測試移除（規格已退役）；確認 `identity-session` 的 `FE-A01-S12`（世界元件在訪客身分下照常渲染）仍綠
-- [ ] 7.8 e2e：訪客進 `/world` → 看到取名、動不了世界 → 取名 → 進得了世界（沿用 `lib/world.mjs`）
+**實作（feat/ 分支）** —— 兩片：**gate＋文案**（feat-A，已做）／**藏帳密**（feat-B，卡 `FE-A01-S16` spec）
+- [x] 7.4 **不在 `guest` 時 render 世界**：`/world/page.tsx` 用 client gate（`WorldEntryGate`）包 `<WorldBoundary/>` —— `guest` → 取名門檻（置中、焦點落名字框、無旁觀鈕；**不用 `aria-modal`** —— 世界沒 render、它是主畫面，`aria-modal` 反而會把標題列藏掉）；`unknown`／`signed-in`／`unavailable` → 交給 `<WorldBoundary/>`（`unknown` 由它顯示載入層，不閃取名）。拿掉 `<FirstEntryNotice/>`。原因：不 render 世界＝沒有世界可漏 WASD、也不抓 3D chunk。feat-A：`feat/fe-a06-first-entry--require-name-gate`
+- [x] 7.5 文案：取名門檻用 `FirstEntryFlow`（標題「取一個名字就可以進去」＋新 `description`「填一個名字就能加入 —— 不用帳號、不用密碼…」，都不含「登入」）；`uiError.ts` 的 `authentication-required` 改成「這裡要有身分才看得到 —— 先取個名字加入。」（不含「登入」、仍在唯一語彙表、仍與其他句不同）—— 看板那句誤導文案經此語彙流出，一改就修好
+- [ ] 7.6 **（feat-B，先補 `FE-A01-S16` spec delta）** 藏帳密入口：`FE-X16-S19`＋`FE-A01-S16` 兩條 live 規格一起保證「訪客在標題列看到 → /login 的入口」；要拿掉它得先 MODIFY `identity-session` 的 `FE-A01-S16`（把「建立身分入口」的義務改由取名門檻承擔、補負向驗收「門檻顯示時不得有導向帳密表單的入口」），再改 `IdentityBadge` 訪客不帶 /login 連結＋改 S16 葉測試（codex 裁定 B、強化式）；`/login` 頁與帳密表單不動
+- [x] 7.7 測試：`first-entry-entries` 的 `S04`／`S05`／`S06` 改寫成 gate 行為（取代世界、無旁觀出口、取名後進、已取名不再問、unavailable 放行）；**連帶改**：`dom-visual-surfaces` 的 `FE-X16-S09`（訪客提示→取名門檻、拿掉「先四處看看」斷言）、`dom-visual-flow` 移除兩條 `FE-X16-S15`（規格已退役）；`identity-session` 的 `FE-A01-S12` 仍綠
+- [x] 7.8 e2e：`tests/e2e/first-entry-gate.mjs` —— 訪客進 `/world` → 看到取名門檻、世界沒 render（沒 canvas/載入層）、無旁觀出口 → 取名 → 世界載入。**真瀏覽器 4 條全綠**（`next start` local build）。未接進 CI 的 `e2e-main.sh`（那是 `.github/`＝governance，且清單是策展的，另開 governance PR）
 
 **收尾**
-- [ ] 7.9 `pnpm test` 綠、`tsc`／`lint` rc=0；前後截圖自問「進入直覺嗎、還會不會把取名誤解成登入」
+- [x] 7.9 `pnpm test` 綠、`tsc`／`lint` rc=0；e2e 真瀏覽器綠、截圖 `require-name-after.png`（feat-A 部分；feat-B 的 IdentityBadge 待做）
 - [ ] 7.10 封存前 archive-review（含前面 4.x 視覺、6.1 account-login 對齊 —— 都是封存前才擋的）請使用者手動跑
 - [ ] 7.11 **封存前人工同步 dom-visual-system 前言名詞表**：把「訪客提示」自「非阻斷的提示」清單移除、正名為「取名門檻」（`FE-X16-S03`／`S04`／`S09` 與前言的表面名一起），並清掉前一版遺留的「金鑰交接」等已移除表面的漂移 —— 這是 `archive/fe-a06-first-entry` diff 必審的跨 change 覆蓋
