@@ -5,6 +5,7 @@ import { HttpError } from '@/api/transport'
 import type { ProjectOut, ProjectResourceOut, ProjectStatus, ResourceType } from '@/api/contract/rest'
 import { IdentityProvider, useIdentity } from '@/identity/IdentityProvider'
 import { ResourcesPanel } from '@/resources/ResourcesPanel'
+import { createResourcesStore } from '@/resources/resourcesStore'
 import { ResourcesProvider, useResourcesPanel } from '@/resources/ResourcesProvider'
 import { InteractionProvider } from '@/world/interaction/InteractionProvider'
 
@@ -15,6 +16,7 @@ import { InteractionProvider } from '@/world/interaction/InteractionProvider'
 //   Requirement: 新增⋯⋯（S08 最後一句：重讀之後滿了就不能再新增）
 // openspec/changes/fe-j14-project-resources/specs/output-safety/spec.md
 //   Requirement: ⋯⋯只是文字 —— S35 的確認層那一段
+//   Requirement: 讀取的時機是封閉的；晚到的回應不得覆蓋較新的結果 —— S36 的**刪除**那一半
 // design：D1（不樂觀更新）、D2（403／409 之後確認一次專案狀態）、D9（上限住在 `LIMITS`）
 //
 // 這一支是第 7 片後半的**後一半**（`--delete`）。`D2` 的確認本身在 `--edit` 那一支驗過整條，
@@ -400,5 +402,30 @@ describe('渲染端不信任輸入：確認層也只是文字', () => {
     expect(label.textContent, '確認層的名稱不是原字串').toBe(nasty)
     expect(label.children, '確認層的名稱長出了子元素').toHaveLength(0)
     expect(layer.querySelectorAll('img, b, a[href^="javascript"]'), '確認層裡出現了可執行的元素').toHaveLength(0)
+  })
+})
+
+describe('晚到的回應不得覆蓋較新的結果（`S36` 的刪除那一半，store 層）', () => {
+  // ⚠️ 這一條走 store 而不是畫面：面板上的「更早發出、還在路上的讀取」要擺出來，
+  // 得先讓它處在 loading，而 loading 時清單本來就不顯示 —— 蓋不蓋得回來在畫面上看不出差別。
+  it('成功的刪除之後，一個更早發出、還在路上的讀取回來 MUST NOT 把那一列帶回清單', async () => {
+    const { b, items } = three()
+    listResources.mockResolvedValue(items)
+    const store = createResourcesStore()
+    store.read(PID)
+    await flush()
+
+    const slow = pending<readonly ProjectResourceOut[]>()
+    listResources.mockReturnValue(slow.promise)
+    store.read(PID) // 這一次讀取比下面那次刪除**早發出**，卻晚回來
+
+    store.removed(PID, b.id)
+    slow.settle(items) // 它看到的還是三筆 —— 沒有序號的話會把 B 蓋回來
+    await flush()
+
+    const state = store.getState(PID)
+    const ids = state.phase === 'ready' || state.phase === 'closed' ? state.items.map((item) => item.id) : []
+    expect(ids, '一個更早發出的讀取把刪掉的那一列帶回清單了').not.toContain(b.id)
+    expect(ids, '其餘兩筆不該受影響').toEqual([items[0]?.id, items[2]?.id])
   })
 })
