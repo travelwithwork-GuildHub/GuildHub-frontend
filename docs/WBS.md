@@ -84,10 +84,8 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-J01 | 已封存 | `fe-j01-create-project` |
 | FE-J03 | 已封存 | `fe-j03-my-projects` |
 | FE-J04 | 已封存 | `fe-j04-form-team` |
-| FE-J13 | 已封存 | `fe-j13-seats` |
 | FE-K01 | 已封存 | `fe-k01-inbox` |
-| FE-K04 | 已封存 | `fe-k04-scene-chat-ui` |
-| FE-N08 | 已封存 | `fe-n08-room-entry-gate` |
+| FE-K05 | 已封存 | `fe-k05-status` |
 | FE-O01 | 已封存 | `fe-o01-contract` |
 | FE-O02 | 已封存 | `fe-o02-data-access` |
 | FE-O03 | 已封存 | `fe-o03-internal-backend` |
@@ -108,14 +106,14 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-R07 | 已封存 | `fe-r07-remote-players` |
 | FE-R08 | 已封存 | `fe-r08-interpolation` |
 | FE-R09 | 已封存 | `fe-r09-browser-load` |
+| FE-R10 | 已封存 | `fe-r10-presence` |
 | FE-R11 | 已封存 | `fe-r11-realtime-chat` |
+| FE-R12 | 已封存 | `fe-r12-reconnect` |
 | FE-T06 | 已封存 | `fe-t06-output-safety` |
-| FE-V01 | 已封存 | `fe-v01-scene-switch` |
 | FE-W01 | 已封存 | `fe-w01-worldcanvas` |
 | FE-W02 | 已封存 | `fe-w02-coords` |
 | FE-W03 | 已封存 | `fe-w03-player`、`fe-w03-render-interpolation` |
 | FE-W04 | 已封存 | `fe-w04-physics` |
-| FE-W05 | 已封存 | `fe-w05-camera` |
 | FE-W06 | 已封存 | `fe-w06-spatial-interaction` |
 | FE-W07 | 已封存 | `fe-w07-resource-ownership` |
 | FE-W08 | 已封存 | `fe-w08-name-tag` |
@@ -123,6 +121,7 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-W10 | 已封存 | `fe-w10-environment-components` |
 | FE-W11 | 已封存 | `fe-w11-guild-hall` |
 | FE-W12 | 已封存 | `fe-w12-interactive-objects` |
+| FE-W14 | 已封存 | `fe-w14-pixel-restyle` |
 | FE-W16 | 已封存 | `fe-w16-project-room` |
 | FE-W19 | 已封存 | `fe-w19-avatar-appearance` |
 | FE-X01 | 已封存 | `fe-x01-appshell` |
@@ -134,12 +133,20 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-X16 | 已封存 | `fe-x16-dom-visual-and-flow` |
 | BE-G01 | 已完成 | 標記 `Done` |
 | BE-G02 | 已完成 | 標記 `Done` |
+| BE-G39 | 已完成 | 標記 `Done` |
 | FE-O10 | 已完成 | 標記 `Done` |
 | FE-X08 | 已完成 | 標記 `Done` |
 | FE-A06 | 規格已合併 | `fe-a06-first-entry`、`fe-a06-login-entry` |
+| FE-J13 | 規格已合併 | `fe-j13-seat-relocation`、`fe-j13-seats`、`fe-j13-sit-walk-in` |
 | FE-J14 | 規格已合併 | `fe-j14-project-resources` |
+| FE-K04 | 規格已合併 | `fe-k04-chat-length-guard`、`fe-k04-scene-chat-ui` |
+| FE-N08 | 規格已合併 | `fe-n08-room-entry-gate`、`fe-n08-room-ticket-in-memory` |
 | FE-R04 | 規格已合併 | `fe-r04-background-tab` |
-| FE-R10 | 規格已合併 | `fe-r10-presence` |
+| FE-V01 | 規格已合併 | `fe-v01-room-exit`、`fe-v01-scene-switch` |
+| FE-W05 | 規格已合併 | `fe-w05-camera`、`fe-w05-camera-fixed-heading` |
+| FE-W20 | 規格已合併 | `fe-w20-board-summary` |
+| FE-X15 | 規格已合併 | `fe-x15-load-order` |
+| FE-X17 | 規格已合併 | `fe-x17-hud-immersion` |
 | FE-O18 | 常態 | — |
 | BE-G04 | 待裁決 | — |
 | BE-G25 | 待裁決 | — |
@@ -237,9 +244,9 @@ Excel 的 Status 下拉選單有十個值。它們不是同一種東西：
 | FE-X12 | demo 之後 | — |
 | FE-X14 | demo 之後 | — |
 
-共 178 項：demo 之後 70、已封存 60、等外部 17、未開始 14、已取消 6、已完成 4、規格已合併 4、待裁決 2、常態 1
+共 180 項：demo 之後 70、已封存 59、等外部 17、規格已合併 11、未開始 9、已取消 6、已完成 5、待裁決 2、常態 1
 
-來源指紋 `15bde29df95e0355`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
+來源指紋 `8a10f1d6b480f15c`（這一段是從哪一份 WBS 原文產生的。不放 commit SHA —— 區塊在 commit 裡、SHA 又放進區塊的話，自我引用沒有不動點）
 
 <!-- progress:end -->
 
@@ -587,6 +594,7 @@ nickname 超過 20 字回 500 不是 422；座位 409 要分「被搶」與「�
 | BE-G28 | **沒有 logout 端點** | `grep -rn 'logout\|session.clear\|session.pop' app/` 在整個後端是空的。session 是 Starlette 簽章過的 **HttpOnly cookie**，不是 server-side store —— **前端的 JS 清不掉它**，而且沒有端點可以叫後端清。⚠️ **`FE-A02 登出` 沒有它就做不完**：能做的只有「忘掉本地的恢復金鑰」，而那不是登出 —— cookie 還在，重整回來仍然是同一個人。這一點在 `FE-A01` 的 design D4 已經寫成已知限制。**最晚 W2 結束前要答案。** **【沒答案就】**`FE-A02` 只交付「忘掉這台裝置上的金鑰」，並在 UI 明說「這不會讓你在這台電腦上登出」 | 決策≤W2 | — | | Alarm｜**`FE-A02` 的硬阻塞**。前端做不出真正的登出 |
 | BE-G29 | **`run.sh` 是 CRLF 換行，macOS／Linux 上跑不起來** | 後端 `cd2929c`（部署改走 Railway）之後 `run.sh` 變成 CRLF。`bash run.sh` 的第一個症狀是 `set: -: invalid option`，接著 `cd: .: No such file or directory`，最後 `syntax error: unexpected end of file` —— **三個症狀沒有一個指向換行符號**。2026-09-10 實測。繞法（直接叫 `uvicorn`）已經記在 `src/api/contract/GENERATED.md`。**這一項不擋任何前端工作，但它擋每一個第一次 clone 後端的人。** **【沒答案就】**照 `GENERATED.md` 的那一行直接叫 uvicorn | 決策≤W2 | — | | Alarm｜**新人第一次起後端就會撞到**，而錯誤訊息指不到原因 |
 | BE-G27 | **沒有公開活動物件** | 「某團隊正在開招募說明」「某桌在找設計師」「某人開放 portfolio review」——空間裡沒有任何**正在發生、可旁觀、可加入**的東西。**沒有這個，3D 就只是一條很貴的導覽列** —— **【沒答案就】**接受 3D 只提供品牌與情緒價值，**並且不要再宣稱它是產品機制**。 | 決策≤W3 | — | 待銜接 | Alarm｜它決定 3D 這條路成不成立 |
+| BE-G39 | ~~**沒有退位端點**~~ **後端已加（2026-09-22 P1 裁決翻案 §6.3，退**自己**的位）** | `DELETE /api/projects/{id}/seats`：只退自己那一列、冪等 204、已結案 409 `project_closed`、沒票／過期 403 `no_room_token`、專案不存在 404 `project_not_found`（⚠️ 後端回覆文件沒列、實作有）。單句 DELETE、原子（並發搶位由主鍵擋）、無換位端點（換位＝退位＋重坐）、無 WS 事件。backend `d1cf273`（merge `d2f3561`）已上線 gateway。⚠️ **前端還沒接** —— 接線在 `FE-J13`（退位／換位／兩種 409 改讀 `code`）。發起人釋放**別人**的位仍不做（`BE-G07` 維持 Cancelled，那一顆沒被翻案） | — | — | | Done｜後端 2026-09-22 上線並驗證（`d1cf273`／`d2f3561`）；前端接線見 `FE-J13` |
 ---
 
 ## FE-O 平台與交付
@@ -800,7 +808,7 @@ nickname 超過 20 字回 500 不是 422；座位 409 要分「被搶」與「�
 | | | **不做完整專案管理** —— 但沒有脈搏，Office 的 Presence 就沒有可讀內容 | W11 | 3 | | | |
 | FE-J11 | 市場有效期 | 案件到期、招募需求定期確認、人才可用狀態過期、長期未回覆降權、「目前仍在招募」重新確認 | W12 | 6 | BE-G19 `BE-拒` | Alarm＋Later｜demo 之後（2026-09-19）：要靠後端沒有的 API（BE-G19）；**「資料還有效嗎」比搜尋功能多寡更重要**，但後端排除了到期排程 | |
 | FE-J13 | 座位 | `GET`／`POST /api/projects/{id}/seats`：進房看誰坐哪、一鍵入座、Occupied（`seat_index` 0–7，一人一格）、被搶或已坐別格的 409 提示（先在 `FE-O08` 量出後端怎麼分） | W5 | 7 | | | |
-| | | 釋放座位 | — | — | BE-G07 `BE-拒` | Cancelled｜後端明文砍除，不是漏做。只有結案會整批清 | |
+| | | 退位／換位：`DELETE /api/projects/{id}/seats` 退**自己**的位（`BE-G39` 2026-09-22 P1 裁決翻案，只退自己、冪等 204）＋換位（＝退位重坐、無換位端點）＋兩種 409 改讀 `code`；發起人釋放**別人**的位仍不做（`BE-G07` 維持 Cancelled） | W5 | 3 | | | |
 | FE-J14 | 專案資源 | Project Room 的資源看板：GitHub / Figma / Notion / Drive / Meeting 外部連結，含 icon / type / URL 驗證與 External Open | W11 | 8 | BE-G12 待銜接 | | 小玉 |
 | FE-J12 | 既有後端的相容對映 | 真後端只有 `recruiting → active → closed` 三個狀態。**目標模型（招募 × 執行）要怎麼映射回去** —— 銜接時一定會撞到 | W10 | 5 | BE-G22 待銜接 | Alarm＋Later｜demo 之後（2026-09-19）：要靠後端沒有的 API（BE-G22）；不先想好，銜接那天要重做整組狀態 | |
 
