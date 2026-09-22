@@ -1,6 +1,6 @@
 'use client'
 
-import { SECONDARY } from '@/design/controls'
+import { HUD_ICON_BUTTON } from '@/design/controls'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { useInbox } from './InboxPanelProvider'
 
@@ -14,8 +14,12 @@ export function InboxButton() {
   const { openList } = useInbox()
   if (identity.state !== 'signed-in') return null
   return (
-    <button type="button" {...SECONDARY} data-testid="inbox-button" onClick={(e) => openList(e.currentTarget)}>
-      {INBOX_BUTTON_LABEL}
+    <button type="button" className={HUD_ICON_BUTTON} aria-label={INBOX_BUTTON_LABEL} data-testid="inbox-button" onClick={(e) => openList(e.currentTarget)}>
+      {/* 信封（Heroicons「envelope」風）。`aria-label` 給名字。 */}
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="m3 7 9 6 9-6" />
+      </svg>
     </button>
   )
 }

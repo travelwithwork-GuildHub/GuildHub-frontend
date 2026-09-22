@@ -15,7 +15,7 @@ import { AvatarPicker } from './AvatarPicker'
 
 export function AppHeader() {
   return (
-    <header data-testid="app-header" className="bg-surface/70 border-line p-gutter relative flex shrink-0 items-center gap-gutter border-b backdrop-blur-md">
+    <header data-testid="app-header" className="bg-glass text-glass-ink hud-legible border-glass-line p-gutter relative flex shrink-0 items-center gap-gutter border-b backdrop-blur-md">
       <h1 {...TITLE}>GuildHub</h1>
       <div data-testid="app-header-entries" className="ml-auto flex items-center gap-gutter">
         <IdentityBadge />

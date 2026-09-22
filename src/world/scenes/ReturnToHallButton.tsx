@@ -1,5 +1,6 @@
 'use client'
 
+import { HUD_ICON_BUTTON } from '@/design/controls'
 import { useScene } from './SceneProvider'
 
 // 「回到 Guild Hall」。規格 `FE-V01-S13`（動作）＋ `FE-X17-S06`（降級）。
@@ -27,7 +28,7 @@ export function ReturnToHallButton() {
       onClick={() => returnToHall()}
       aria-label={RETURN_TO_HALL_LABEL}
       data-testid="return-to-hall"
-      className="text-ink-muted hover:bg-surface-sunken hover:text-ink rounded-control flex items-center justify-center px-2 py-2"
+      className={HUD_ICON_BUTTON}
     >
       {/* 門＋往外的箭頭（Heroicons「arrow-left-on-rectangle」風）。`aria-hidden`：名字由按鈕的 `aria-label` 給。 */}
       <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
