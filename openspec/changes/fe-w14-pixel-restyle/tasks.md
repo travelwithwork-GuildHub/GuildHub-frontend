@@ -22,10 +22,10 @@
 - [x] 4.2 對齊 MODIFIED 的 `world-canvas`（DPR 下限放寬）—— 上限 `2` 由建構保證不破：有效 DPR 現在是固定 `0.25`（`0.25 ≤ 2`），沒有任何路徑會超過 `2`；真瀏覽器的 backing store ≈ 1/4 判準在 slice 6（`FE-W01-S02`／`FE-W14-S05`）
 
 ## 5. 實作：角色像素外觀與坐姿（feat/fe-w14-pixel-restyle--character）
-- [ ] 5.1 `ChibiPlayer.tsx`：`OutlineBox`（inverted-hull、`BackSide`、深色）套在頭／軀幹／四肢；框臉髮型（頂＋瀏海＋兩側＋後腦）；臉部細節（眼／嘴／腮紅）—— 不動 `CHIBI_PARTS` 名字（`FE-W14-S06`；D5）
-- [ ] 5.2 `seated` prop：大腿往前彎（restX 負、+Z 方向）、手往前擱、整體略抬到椅面高；非驅動實例直接生效（`FE-W14-S08`；D6）
-- [ ] 5.3 單元測試：頭／軀幹／四肢各有 `BackSide` 深色描邊 mesh ＋髮型部件（`FE-W14-S06`）；`av` 為 `null`／越界照常渲染（`FE-W14-S07`）；`seated` 改變四肢關節角度與整體高度（`FE-W14-S08`）
-- [ ] 5.4 突變確認：拿掉描邊 mesh → `FE-W14-S06` 要紅；`seated` 不改角度 → `FE-W14-S08` 要紅
+- [x] 5.1 `ChibiPlayer.tsx`：`OutlineBox`（inverted-hull、`BackSide`、`meshBasicMaterial` 深色）套在頭／軀幹／四肢；框臉髮型（頂＋瀏海＋兩側鬢角＋後腦）；臉部細節（眼／嘴／腮紅）—— 不動 `CHIBI_PARTS` 名字（`FE-W14-S06`；D5）。描邊色＝`worldColor('ink')`、髮＝新 token `hair`、腮紅＝新 token `blush`（world.ts 明訂色票集合可增長、不需改規格）；body／limb 仍由 `avatarLook(av)` 決定
+- [x] 5.2 `seated` prop：大腿往前彎（`restX` 負、+Z 方向 ~75°）、手往前擱（~17°）、整體略抬到椅面高（`position.y` +0.05）；非驅動實例（`RemotePlayer`／靜態）直接生效（`FE-W14-S08`；D6）。驅動端的「seated 時跳過每幀擺動」是給 `FE-J13` 接線的契約，本 change 無 caller 設 `seated=true`，不動 `LocalPlayer`
+- [x] 5.3 單元測試（`tests/world-character.test.tsx`，`@react-three/test-renderer` 讀真 three 場景圖）：6 個 `BackSide` 深色描邊 mesh＋框臉髮型多部件＋腮紅＋眼嘴（`FE-W14-S06`）；`av` 為 `null`／`9999`／`1.5`／字串照常渲染且 body 是預設款（不取模，`FE-W14-S07`）；`seated` 使大腿 `rotation.x < -0.5`、整體 `y > 0`，站姿回 0（`FE-W14-S08`）
+- [x] 5.4 突變確認（已驗）：拿掉一個 `OutlineBox` → `FE-W14-S06`「共 6 個 BackSide mesh」變紅；`seated` 的 `legRest` 改成 0 → `FE-W14-S08`「大腿往前彎」變紅
 
 ## 6. 真瀏覽器 e2e 與截圖（feat/fe-w14-pixel-restyle--e2e）
 - [ ] 6.1 `tests/e2e/*.mjs`（本機自起 `next start`、`NEXT_PUBLIC_APP_ENV=local`）：canvas backing store 每軸 ≈ CSS 尺寸 1/4、`image-rendering: pixelated`、antialias 關（`FE-W14-S05`）；草地貼圖存在（`FE-W14-S04`）
