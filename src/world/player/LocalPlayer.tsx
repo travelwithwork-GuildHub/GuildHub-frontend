@@ -75,9 +75,17 @@ export interface LocalPlayerProps {
    * 沒傳（舊測試、大廳沒有座位）就不消費，行為不變。
    */
   relocateRef?: RelocationRef
+  /**
+   * 坐姿（`FE-W14-S08`）。為真時把坐姿交給 `ChibiPlayer`，並**跳過每幀對四肢與身體起伏的寫入** ——
+   * 否則靜態坐姿（大腿前彎、整體抬到椅面）會被走路擺動每幀覆蓋掉。
+   *
+   * ⚠️ 本 change（`FE-W14`）只做這個機制。**何時 `seated=true`（真的入座、就位、面向、起身）歸 `FE-J13`**；
+   * 目前沒有呼叫端傳真值，站姿行為不變。
+   */
+  seated?: boolean
 }
 
-export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout = HALL_LAYOUT, tagNodesRef, relocateRef }: LocalPlayerProps) {
+export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout = HALL_LAYOUT, tagNodesRef, relocateRef, seated = false }: LocalPlayerProps) {
   const rootRef = useRef<Group>(null)
   const bodyRef = useRef<Group>(null)
   /** 子部位查一次就快取。查不到的話動畫會靜默停止 —— 見 partsRef 的初始化。 */
@@ -257,15 +265,20 @@ export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout
     phase.current = advancePhase(phase.current, dt, animState.current)
     const pose = poseAt(phase.current, animState.current)
 
+    // ⚠️ 坐姿（`FE-W14-S08`）：**seated 時跳過身體起伏與四肢擺動的每幀寫入**。
+    // `bodyRef`／四肢群組正是 `ChibiPlayer` 用 `seated` 擺好的靜態姿勢（整體抬到椅面、大腿前彎），
+    // 這裡每幀寫回去就會把它蓋掉。起身（seated 轉回 false）時自動恢復擺動。
     const body = bodyRef.current
-    if (body) body.position.y = pose.bounce
+    if (body && !seated) body.position.y = pose.bounce
 
     // 手腳反相：左手配右腳
     const parts = partsRef.current
-    if (parts.leftArm) parts.leftArm.rotation.x = pose.swing
-    if (parts.rightArm) parts.rightArm.rotation.x = -pose.swing
-    if (parts.leftLeg) parts.leftLeg.rotation.x = -pose.swing
-    if (parts.rightLeg) parts.rightLeg.rotation.x = pose.swing
+    if (!seated) {
+      if (parts.leftArm) parts.leftArm.rotation.x = pose.swing
+      if (parts.rightArm) parts.rightArm.rotation.x = -pose.swing
+      if (parts.leftLeg) parts.leftLeg.rotation.x = -pose.swing
+      if (parts.rightLeg) parts.rightLeg.rotation.x = pose.swing
+    }
 
     // 相機的 target：**直接寫 ref，不經過 React**。
     //
@@ -289,7 +302,7 @@ export function LocalPlayer({ targetRef, poseRef, av, spawn = HALL_SPAWN, layout
 
   return (
     <group ref={rootRef}>
-      <ChibiPlayer ref={bodyRef} av={av} />
+      <ChibiPlayer ref={bodyRef} av={av} seated={seated} />
     </group>
   )
 }

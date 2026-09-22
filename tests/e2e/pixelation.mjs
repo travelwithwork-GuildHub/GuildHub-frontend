@@ -99,10 +99,13 @@ try {
   if (!m || m.backingW === 0 || m.cssW === 0) {
     bad('拿不到 canvas 尺寸', '世界沒有畫出可量的 canvas —— 環境問題')
   } else {
-    // 有效 DPR ≈ backing store / CSS 尺寸（headless 的 devicePixelRatio 是 1）。
+    // 有效 DPR ＝ backing store / CSS 尺寸。
+    // ⚠️ **不乘 `window.devicePixelRatio`。** R3F 的 `dpr={0.25}` 是**絕對**像素比
+    //（`gl.setPixelRatio(0.25)`），backing = CSS × 0.25，跟硬體 DPR 無關 ——
+    // 乘上去會在 Retina（dpr=2）算成 0.125 誤紅（headless dpr=1 剛好遮住這個 bug）。
     // 目標 0.25；給 [0.18, 0.32] 的容忍（整數捨入＋捲軸/邊框的零頭）。
-    const ratioX = m.backingW / (m.cssW * m.dpr)
-    const ratioY = m.backingH / (m.cssH * m.dpr)
+    const ratioX = m.backingW / m.cssW
+    const ratioY = m.backingH / m.cssH
     const inband = (r) => r >= 0.18 && r <= 0.32
     if (inband(ratioX) && inband(ratioY)) {
       ok(`有效 DPR ≈ ${ratioX.toFixed(3)}×${ratioY.toFixed(3)}（目標 0.25；backing ${m.backingW}×${m.backingH} / CSS ${m.cssW}×${m.cssH}）`)
