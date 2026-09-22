@@ -6,7 +6,7 @@ import { groundOverscan } from '../layout/framing'
 import { LayoutItems } from '../layout/GuildHall'
 import { LAYOUT as HALL_LAYOUT } from '../layout/guildHallLayout'
 import type { LayoutItem } from '../layout/types'
-import { grassGeometry, grassMaterial } from '../primitives/grass'
+import { GRASS_Y, grassGeometry, grassMaterial } from '../primitives/grass'
 import { Floor } from './structural'
 
 // 世界的外殼。規格 `FE-W10-S10`／`S11`／`S12`。
@@ -56,7 +56,7 @@ export function WorldShell({ layout = HALL_LAYOUT }: { layout?: readonly LayoutI
           GPU 資源，也 MUST NOT `dispose()`（`dispose={null}`）：所有權在 factory。 */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.02, 0]}
+        position={[0, GRASS_Y, 0]}
         geometry={grassGeometry(span)}
         material={grassMaterial(grassTiles)}
         receiveShadow
