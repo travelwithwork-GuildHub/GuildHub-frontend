@@ -5,6 +5,7 @@ import { HttpError } from '@/api/transport'
 import type { ProjectOut, ProjectResourceOut, ProjectStatus, ResourceType } from '@/api/contract/rest'
 import { IdentityProvider, useIdentity } from '@/identity/IdentityProvider'
 import { ResourcesPanel } from '@/resources/ResourcesPanel'
+import { createResourcesStore } from '@/resources/resourcesStore'
 import { ResourcesProvider, useResourcesPanel } from '@/resources/ResourcesProvider'
 import { InteractionProvider } from '@/world/interaction/InteractionProvider'
 
@@ -84,6 +85,16 @@ function nth<T>(list: readonly T[], i: number, what: string): T {
   return found
 }
 const two = () => [resource('原始碼', 'github', 'https://github.com/guildhub/app'), resource('每週同步', 'meeting', 'https://meet.example.com/abc')]
+/** `S08` 的起點是 **49 筆**（重讀之後變成 50）—— 那個數字就是〈上限〉那一條要的，隨手用兩筆會把 Scenario 的集合換掉。 */
+const many = (n: number) => Array.from({ length: n }, (_, i) => resource(`第 ${i + 1} 筆`, 'drive', `https://drive.example.com/${i + 1}`))
+/** 自己決定什麼時候回來的 promise（晚到的回應要手動排順序）。 */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
 const http = (status: number) => new HttpError('writeResource', status, null)
 
 /** 把 microtask 排乾再**同步**斷言：等一個應該出現的元素會紅成 `Test timed out`，看不出原因。 */
@@ -284,8 +295,8 @@ describe('結案與權限失敗：寫入的那一次確認（D2）', () => {
     }
   })
 
-  it('[FE-J14-S08] 新增拿到 409、專案仍是 active：衝突那一句、值留著、表單留著、恰好重讀一次', async () => {
-    const items = two()
+  it('[FE-J14-S08] 49 筆時新增拿到 409、專案仍是 active：衝突那一句、值留著、表單留著、恰好重讀一次、清單變 50', async () => {
+    const items = many(49)
     createResource.mockRejectedValue(http(409))
     getProject.mockResolvedValue(project('active'))
     await openCreateFilled(items)
@@ -302,24 +313,49 @@ describe('結案與權限失敗：寫入的那一次確認（D2）', () => {
     // alert 在送出鈕**上方**（DOM 順序）
     expect(alert.compareDocumentPosition(submitButton()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(listResources.mock.calls, '409＋active 要恰好再讀一次清單').toHaveLength(1)
-    await waitFor(() => expect(rows()).toHaveLength(3))
+    await waitFor(() => expect(rows()).toHaveLength(50))
+    // ⚠️ 「重讀之後滿了就不能再新增」那一句在 `--delete`（〈上限〉`S16` 的另一半「刪一筆就恢復」要刪除才量得到）
   })
 
-  it('寫入拿到 403、確認是 active：「沒有權限」那一句在表單上，三種寫入控制項全部收掉（表單不收）', async () => {
-    createResource.mockRejectedValue(http(403))
+  it('[FE-J14-S08] PATCH 回 409、專案仍是 active 也要重讀一次（規格：「寫入的 409」不分是哪一個寫入動作）', async () => {
+    const { items } = three()
+    await openEdit(items, 1)
+    updateResource.mockRejectedValue(http(409))
     getProject.mockResolvedValue(project('active'))
-    await openCreateFilled(two())
+    listResources.mockClear()
+    listResources.mockResolvedValue(items)
+    await type('網址', 'https://www.figma.com/file/b2')
     await submit()
 
-    expect(screen.getByTestId('submit-error').textContent, '沒有把「沒有權限」那一句放在表單上').toBe(COPY['permission-denied'])
-    expect(form(), '「沒有權限」要呈現在表單上 —— 連表單一起收掉的話沒有人告訴使用者為什麼').not.toBeNull()
-    expect(screen.queryByTestId('resources-closed'), '確認是 active，不該說已結案').toBeNull()
-    expect(
-      [...screen.queryAllByTestId('resource-create'), ...editButtons(), ...screen.queryAllByTestId('resource-delete')],
-      '伺服器說沒有權限，寫入控制項卻還在 DOM 裡',
-    ).toHaveLength(0)
-    expect(getProject.mock.calls).toHaveLength(1)
+    expect(screen.getByTestId('submit-error').textContent, '沒有把「衝突」那一句原封端出來').toBe(COPY.conflict)
+    expect(form(), '衝突之後修改表單不該關掉').not.toBeNull()
+    expect(field('網址').value, '失敗要保留輸入').toBe('https://www.figma.com/file/b2')
+    expect(listResources.mock.calls, 'PATCH 的 409＋active 沒有重讀清單（規格第 80 行是「寫入的 409」，不是「新增的 409」）').toHaveLength(1)
   })
+
+  // **成對**：只驗新增的話，「修改的 403 沒接上撤除權限那條路」照樣全綠（把 `onWriteDenied` 改成只有新增才呼叫，8/8 仍綠）。
+  const denied403 = [
+    { name: '新增', start: async () => { await openCreateFilled(two()); createResource.mockRejectedValue(http(403)) } },
+    { name: '修改', start: async () => { const { items } = three(); await openEdit(items, 1); updateResource.mockRejectedValue(http(403)); await type('網址', 'https://www.figma.com/file/b2') } },
+  ] as const
+  for (const { name, start } of denied403) {
+    it(`${name}拿到 403、確認是 active：「沒有權限」那一句在表單上，寫入控制項全部收掉（表單不收，但送不出去）`, async () => {
+      getProject.mockResolvedValue(project('active'))
+      await start()
+      await submit()
+
+      expect(screen.getByTestId('submit-error').textContent, '沒有把「沒有權限」那一句放在表單上').toBe(COPY['permission-denied'])
+      expect(form(), '「沒有權限」要呈現在表單上 —— 連表單一起收掉的話沒有人告訴使用者為什麼').not.toBeNull()
+      expect(screen.queryByTestId('resources-closed'), '確認是 active，不該說已結案').toBeNull()
+      expect(
+        [...screen.queryAllByTestId('resource-create'), ...editButtons(), ...screen.queryAllByTestId('resource-delete')],
+        '伺服器說沒有權限，寫入控制項卻還在 DOM 裡',
+      ).toHaveLength(0)
+      // 送出鈕也是寫入控制項：留著的話使用者只能一再撞同一堵牆，而且每撞一次就多一次確認請求
+      expect(submitButton().disabled, '伺服器說沒有權限，送出鈕卻還按得下去').toBe(true)
+      expect(getProject.mock.calls).toHaveLength(1)
+    })
+  }
 
   it('確認本身的分支是封閉的：recruiting／401／404／500 各自的呈現，一次失敗都只確認一次', async () => {
     const cases: readonly { readonly name: string; readonly confirm: () => unknown; readonly expected: string }[] = [
@@ -345,5 +381,51 @@ describe('結案與權限失敗：寫入的那一次確認（D2）', () => {
       createResource.mockReset()
       seq = 0
     }
+  })
+})
+
+describe('晚到的回應不得覆蓋較新的結果（`S36` 的寫入那一半，store 層）', () => {
+  /** 讀一次並等它回來 —— 之後的「更早發出的讀取」才有東西可以蓋。 */
+  const seeded = async (items: readonly ProjectResourceOut[]) => {
+    listResources.mockResolvedValue(items)
+    const store = createResourcesStore()
+    store.read(PID)
+    await flush()
+    return store
+  }
+  const urlsOf = (store: ReturnType<typeof createResourcesStore>) => {
+    const state = store.getState(PID)
+    return state.phase === 'ready' || state.phase === 'closed' ? state.items.map((item) => item.url) : []
+  }
+
+  it('成功的 PATCH 之後，一個更早發出、還在路上的讀取回來 MUST NOT 把那一列蓋回舊值', async () => {
+    const { b: B, items } = three()
+    const store = await seeded(items)
+    const slow = deferred<readonly ProjectResourceOut[]>()
+    listResources.mockReturnValue(slow.promise)
+    store.read(PID) // 還在路上
+
+    const next = { ...B, url: 'https://www.figma.com/file/b2' }
+    store.updated(PID, next)
+    slow.resolve(items) // 舊的讀取現在才回來，它看到的還是舊的 B
+    await flush()
+
+    expect(urlsOf(store), '一個更早發出的讀取把修改的結果蓋回舊值了').toContain(next.url)
+    expect(urlsOf(store), '舊的 B 又回到清單裡了').not.toContain(B.url)
+  })
+
+  it('確認出來是 closed 之後，一個更早發出、還在路上的讀取回來 MUST NOT 把它改回可寫入的樣子', async () => {
+    const { items } = three()
+    const store = await seeded(items)
+    const slow = deferred<readonly ProjectResourceOut[]>()
+    listResources.mockReturnValue(slow.promise)
+    store.read(PID) // 還在路上
+
+    getProject.mockResolvedValue(project('closed'))
+    expect(await store.writeFailed(PID, http(409))).toBe('closed')
+    slow.resolve(items) // 那一次讀取比確認早發出，卻晚回來
+    await flush()
+
+    expect(store.getState(PID).phase, '一個晚到的讀取把已經確認出來的「已結案」改回可寫入的樣子了').toBe('closed')
   })
 })
