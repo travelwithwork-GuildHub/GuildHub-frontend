@@ -122,6 +122,18 @@ export function createResourcesStore() {
       set(entry, { phase: 'ready', items: entry.items })
     },
     /**
+     * 刪除成功（204）**或伺服器說它不在了（404）**：拿掉那一個 `id`，其餘順序不動。不樂觀更新（D1）——
+     * 204／404 回來才動清單。
+     *
+     * ⚠️ 跟 `created()`／`updated()` 同理推進序號：一個更早發出、還在路上的讀取 MUST NOT 把刪掉的那一列帶回來。
+     */
+    removed: (projectId: string, resourceId: string) => {
+      const entry = entryOf(projectId)
+      entry.seq += 1
+      entry.items = entry.items.filter((item) => item.id !== resourceId)
+      set(entry, { phase: 'ready', items: entry.items })
+    },
+    /**
      * 寫入被拒絕：403／409 走 D2 的那一次確認，其餘直接回原本的 `kind`。
      *
      * 回 `'closed'` 代表面板已經換成「已結案」（呼叫端不必再顯示什麼）；回 `UiError` 的話那一句由呼叫端

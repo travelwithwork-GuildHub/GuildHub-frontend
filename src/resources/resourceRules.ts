@@ -35,6 +35,16 @@ export const RESOURCE_FORM_COPY = {
   urlRequired: '要有網址。',
   urlTooLong: (max: number) => `網址最多 ${max} 個字。`,
   urlInvalid: '網址要以 http:// 或 https:// 開頭，而且不能有空白。',
+  /** `S16`：滿了不只是按不下去，還要說得出為什麼（`max` 由呼叫端從 `LIMITS` 取，不在這裡寫死）。 */
+  limitReached: (max: number) => `這個專案的資源已經有 ${max} 筆，到上限了 —— 要新增的話先刪掉一筆。`,
+} as const
+
+/** 刪除確認層的字句（`S20`：確認層要讓人辨識要刪的是哪一筆 —— 名稱由元件另外呈現）。 */
+export const RESOURCE_DELETE_COPY = {
+  title: '要刪掉這一筆資源嗎？',
+  body: '刪掉之後，進這間房的人就看不到這個連結了。',
+  confirm: '刪除',
+  cancel: '取消',
 } as const
 
 /** 寫入被伺服器拒絕，而且已經照 `D2` 確認過專案狀態：訊息是 `FE-X03` 的語彙，不是後端的字。 */

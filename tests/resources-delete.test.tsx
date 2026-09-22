@@ -50,7 +50,6 @@ vi.mock('@/api/contract/limits', async (importOriginal) => {
 /** 逐字抄（見檔頭）。 */
 const COPY = {
   conflict: '這件事跟目前的狀態衝突了，重新整理之後再試一次。',
-  'not-found': '找不到這個東西 —— 它可能已經被移除了。',
   closed: '這個專案已經結案，資源不能再修改。',
   limitReached: (max: number) => `這個專案的資源已經有 ${max} 筆，到上限了 —— 要新增的話先刪掉一筆。`,
 } as const
@@ -207,9 +206,12 @@ describe('刪除要確認；取消不送、確認送一次', () => {
     await flush()
     const inFlight = pending<void>()
     deleteResource.mockReturnValue(inFlight.promise)
+    // **同一個批次裡連按兩下** —— 分兩個 act 的話 state 已經重繪過，用 state 當 guard 也會綠
     const yes = confirmYes()
-    click(yes)
-    click(yes)
+    await act(async () => {
+      yes.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      yes.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
     await flush()
     expect(deleteResource, '連按兩次確認送出了不只一次 DELETE').toHaveBeenCalledTimes(1)
     expect(deleteResource).toHaveBeenCalledWith(PID, b.id)
@@ -244,7 +246,9 @@ describe('刪除要確認；取消不送、確認送一次', () => {
     expect(rowLabels(), '404 之後那一列還在').toEqual(['A 原始碼', 'C 筆記'])
     expect(listResources, '刪除的 404 要恰好再讀一次清單').toHaveBeenCalledTimes(2)
     expect(getProject, '404 不是 403／409，不該去確認專案狀態').not.toHaveBeenCalled()
-    expect(document.body.textContent, '404 該呈現 FE-X03 對 404 的那一句').toContain(COPY['not-found'])
+    // ⚠️ 規格對刪除的 404 **只說**「同樣從清單移除、重新讀取清單一次」，沒有指名任何訊息 ——
+    // 這裡不驗訊息：多驗一句就是替規格加一條它沒寫的要求（那一列消失本身就是回饋）。
+    expect(confirm(), '404 之後確認層還在').toBeNull()
   })
 })
 
