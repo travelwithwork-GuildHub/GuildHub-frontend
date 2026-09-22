@@ -61,8 +61,12 @@ export const WORLD_COLORS = {
   avatarLimb7: '#a94e78',
   avatarBody8: '#7fb7e6',
   avatarLimb8: '#4f8fc4',
-  /** 深色細節（眼睛、輪廓）。 */
+  /** 深色細節（眼睛、輪廓）。角色的 inverted-hull 描邊也用它（`FE-W14-S06`）。 */
   ink: '#20232e',
+  /** 角色頭髮（框臉髮型）。**像素風常數，不隨 `av` 變**（`FE-W14-S06`）。 */
+  hair: '#4a2f1c',
+  /** 角色腮紅（臉部細節）。像素風常數（`FE-W14-S06`）。 */
+  blush: '#f2a0a0',
   /** 地面。原本是 `DebugShadowScene` 的平面。 */
   ground: '#8ec46a',
   /** 強調色，用在要被看見的物件上。原本是 `DebugShadowScene` 的方塊。 */
