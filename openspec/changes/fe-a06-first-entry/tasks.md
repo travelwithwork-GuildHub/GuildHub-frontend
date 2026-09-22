@@ -62,16 +62,19 @@
 
 **規格（spec/ 分支）**
 - [x] 7.1 `specs/first-entry/spec.md`：〈直接進世界的訪客會被提示，但不會被擋〉→〈進世界前要先有名字：訪客被導到取名，不匿名旁觀〉；反轉 `S04`（訪客看到取名不是世界）／`S05`（沒有繞過取名的旁觀出口）／`S06`（取名後進、已取名不再問）
-- [x] 7.2 proposal 加二次反轉段、Non-goals／已知限制對齊；`openspec validate fe-a06-first-entry --strict` 綠
+- [x] 7.1b `S04` 的方法改成 method-agnostic：世界在取名前 SHALL NOT 收到指標／鍵盤事件，**取代世界（不 render）或蓋住並吃掉事件皆可** —— 讓「guest 不 render 世界」的實作對得上規格（`S05` 的註記一併泛化）
+- [x] 7.1c **`specs/dom-visual-system/spec.md`（新 delta，二次反轉的跨規格連帶）**：MODIFY〈同一時間只有一個阻斷式面板…非阻斷的提示讓位〉——退役 `FE-X16-S15`（訪客提示讓位）、移除「訪客提示讓位」那段 prose、軟化 `S13`…`S22` 裡對訪客提示的附帶引用；保留場景聊天框／換角色彈出層的讓位。理由：訪客不 render 世界＝開不了面板，S15 前提消失（codex 一致；gemini 配額卡）
+- [x] 7.2 proposal 加二次反轉段、Non-goals／已知限制對齊、Capabilities 加 `dom-visual-system`；`openspec validate fe-a06-first-entry --strict` 綠
 - [ ] 7.3 `progress.sh --check` 綠（change-id 仍對回 FE-A06）
 
 **實作（feat/ 分支）**
-- [ ] 7.4 `FirstEntryNotice.tsx`：`guest` → 顯示取名流程並**擋住世界**（蓋滿、吃掉世界指標／鍵盤、`aria-modal`）；拿掉「先四處看看」旁觀鈕與 `dismissed`；`signed-in`／`unavailable` 放行、`unknown` 顯示載入
-- [ ] 7.5 文案：`FirstEntryNotice` 標題「你現在是訪客」＋「取一個名字，世界裡的其他人就看得到你是誰。」重寫成不誤導的取名說明；`uiError.ts` 的 `authentication-required`「要先登入才看得到這裡。」改成不含「登入」的說法（仍在唯一語彙表、仍與其他句不同）
-- [ ] 7.6 藏帳密入口：`IdentityBadge` 的訪客「建立你的身分 → /login」不再曝光（require-name 後訪客不會在世界裡看到它，順手確認不留死連結）；`/login` 頁與帳密表單不動
-- [ ] 7.7 測試：`FirstEntryNotice` 的 `S04`（取名擋住世界、吃掉指標）／`S05`（沒有旁觀出口）／`S06`（取名後進、已取名不再問）改寫；確認 `identity-session` 的 `FE-A01-S12`（世界元件在訪客身分下照常渲染）仍綠
+- [ ] 7.4 **不在 `guest` 時 render 世界**：`/world/page.tsx` 用 client gate（`WorldEntryGate`）包 `<WorldBoundary/>` —— `guest` → 取名門檻（置中、`aria-modal`、焦點落名字框、無旁觀鈕）；`unknown` → 交給 `WorldBoundary` 的載入層（不閃取名）；`signed-in`／`unavailable` → render 世界。拿掉 `<FirstEntryNotice/>`。原因：`EditableFocusLock` 只在焦點於文字框時鎖世界，焦點到按鈕會漏 WASD，且 gate 在 `InteractionProvider` 外拿不到 `holdInputLock`；不 render 世界＝沒有世界可漏、也不抓 3D chunk
+- [ ] 7.5 文案：取名門檻的標題／說明寫成不誤導的取名說明（不用「登入」）；`uiError.ts` 的 `authentication-required`「要先登入才看得到這裡。」改成不含「登入」的說法（仍在唯一語彙表、仍與其他句不同）—— 看板那句誤導文案是經此語彙流出的，一改就修好
+- [ ] 7.6 藏帳密入口：`IdentityBadge` 的訪客／`unavailable`「建立你的身分 → /login」不再曝光；`/login` 頁與帳密表單不動
+- [ ] 7.7 測試：`FirstEntryNotice` 的 `S04`／`S05`／`S06` 改寫成 gate 行為（取代世界、無旁觀出口、取名後進、已取名不再問）；**連帶改**：`dom-visual-surfaces` 的 `FE-X16-S09` 拿掉「先四處看看是 tertiary」斷言、`dom-visual-flow` 的 `FE-X16-S15` 訪客提示讓位測試移除（規格已退役）；確認 `identity-session` 的 `FE-A01-S12`（世界元件在訪客身分下照常渲染）仍綠
 - [ ] 7.8 e2e：訪客進 `/world` → 看到取名、動不了世界 → 取名 → 進得了世界（沿用 `lib/world.mjs`）
 
 **收尾**
 - [ ] 7.9 `pnpm test` 綠、`tsc`／`lint` rc=0；前後截圖自問「進入直覺嗎、還會不會把取名誤解成登入」
 - [ ] 7.10 封存前 archive-review（含前面 4.x 視覺、6.1 account-login 對齊 —— 都是封存前才擋的）請使用者手動跑
+- [ ] 7.11 **封存前人工同步 dom-visual-system 前言名詞表**：把「訪客提示」自「非阻斷的提示」清單移除、正名為「取名門檻」（`FE-X16-S03`／`S04`／`S09` 與前言的表面名一起），並清掉前一版遺留的「金鑰交接」等已移除表面的漂移 —— 這是 `archive/fe-a06-first-entry` diff 必審的跨 change 覆蓋
