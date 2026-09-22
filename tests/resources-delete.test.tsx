@@ -287,7 +287,27 @@ describe('結案與權限失敗：刪除也走同一條確認', () => {
     expect(screen.queryByTestId('resource-create'), '伺服器說沒有權限，新增鈕還在 DOM 裡').toBeNull()
     expect(deleteButtons(), '伺服器說沒有權限，刪除鈕還在 DOM 裡').toHaveLength(0)
     expect(screen.queryAllByTestId('resource-edit'), '伺服器說沒有權限，修改鈕還在 DOM 裡').toHaveLength(0)
+    // 確認層的「刪除」也是寫入控制項：留著的話使用者只能一再撞同一堵牆，每撞一次就多一次 D2 的確認請求
+    expect((confirmYes() as HTMLButtonElement).disabled, '伺服器說沒有權限，確認層的「刪除」卻還按得下去').toBe(true)
     expect(rowLabels(), '403 不該把已經讀到的清單收掉').toEqual(['A 原始碼', 'B 設計稿', 'C 筆記'])
+  })
+
+  it('DELETE 回 409、確認出來專案仍 active：「衝突」那一句 ＋ 恰好再讀一次清單', async () => {
+    const { items } = three()
+    await openDelete(items, 1)
+    deleteResource.mockRejectedValue(http(409))
+    getProject.mockResolvedValue(project('active'))
+    click(confirmYes())
+    await flush()
+
+    expect(getProject, '刪除的 409 要確認一次專案狀態（D2）').toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('resources-closed'), '專案還活著，卻說已結案').toBeNull()
+    expect(confirm(), '409＋active 把確認層收掉了 —— 那一句就沒有地方顯示').not.toBeNull()
+    expect(screen.getByTestId('resource-delete-confirm').textContent, '409＋active 沒有說出 FE-X03「衝突」的那一句').toContain(COPY.conflict)
+    // 規格 specs/project-resources/spec.md:80 寫的是「**寫入的** 409 ⋯⋯ SHALL 重新讀取清單一次」，
+    // 不分是哪一個寫入動作（`S07` 最後一句：確認流程不分是哪一個寫入動作）。刪除也是寫入。
+    expect(listResources, '刪除的 409＋active 要恰好再讀一次清單').toHaveBeenCalledTimes(2)
+    expect(rowLabels(), '409 不該把已經讀到的清單收掉').toEqual(['A 原始碼', 'B 設計稿', 'C 筆記'])
   })
 })
 
