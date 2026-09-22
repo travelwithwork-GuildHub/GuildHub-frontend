@@ -70,7 +70,8 @@
 **實作（feat/ 分支）** —— 兩片：**gate＋文案**（feat-A，已做）／**藏帳密**（feat-B，卡 `FE-A01-S16` spec）
 - [x] 7.4 **不在 `guest` 時 render 世界**：`/world/page.tsx` 用 client gate（`WorldEntryGate`）包 `<WorldBoundary/>` —— `guest` → 取名門檻（置中、焦點落名字框、無旁觀鈕；**不用 `aria-modal`** —— 世界沒 render、它是主畫面，`aria-modal` 反而會把標題列藏掉）；`unknown`／`signed-in`／`unavailable` → 交給 `<WorldBoundary/>`（`unknown` 由它顯示載入層，不閃取名）。拿掉 `<FirstEntryNotice/>`。原因：不 render 世界＝沒有世界可漏 WASD、也不抓 3D chunk。feat-A：`feat/fe-a06-first-entry--require-name-gate`
 - [x] 7.5 文案：取名門檻用 `FirstEntryFlow`（標題「取一個名字就可以進去」＋新 `description`「填一個名字就能加入 —— 不用帳號、不用密碼…」，都不含「登入」）；`uiError.ts` 的 `authentication-required` 改成「這裡要有身分才看得到 —— 先取個名字加入。」（不含「登入」、仍在唯一語彙表、仍與其他句不同）—— 看板那句誤導文案經此語彙流出，一改就修好
-- [ ] 7.6 **（feat-B，先補 `FE-A01-S16` spec delta）** 藏帳密入口：`FE-X16-S19`＋`FE-A01-S16` 兩條 live 規格一起保證「訪客在標題列看到 → /login 的入口」；要拿掉它得先 MODIFY `identity-session` 的 `FE-A01-S16`（把「建立身分入口」的義務改由取名門檻承擔、補負向驗收「門檻顯示時不得有導向帳密表單的入口」），再改 `IdentityBadge` 訪客不帶 /login 連結＋改 S16 葉測試（codex 裁定 B、強化式）；`/login` 頁與帳密表單不動
+- [x] 7.6a **（feat-B spec）** MODIFY `identity-session` 的 `FE-A01-S16`：「建立身分入口」的義務改由取名門檻承擔（門檻本身即暱稱流程）、訪客標題列不再導去 `/login`、補負向驗收「門檻顯示時 SHALL NOT 有導向帳密表單的入口」；`unavailable` 時標題列仍保留入口當安全閥（codex 裁定 B、強化式）。背景：`FE-X16-S19`＋`FE-A01-S16` 兩條 live 規格一起把「訪客標題列看得到 /login 入口」釘死
+- [ ] 7.6b **（feat-B impl）** 改 `IdentityBadge`：`guest` 只顯示「訪客」不帶 `/login` 連結；`unavailable` 保留入口；改 `identity-badge` 的 `FE-A01-S16` 葉測試（guest 由門檻承擔、unavailable 保留、負向：門檻顯示時無帳密入口）；`/login` 頁與帳密表單不動
 - [x] 7.7 測試：`first-entry-entries` 的 `S04`／`S05`／`S06` 改寫成 gate 行為（取代世界、無旁觀出口、取名後進、已取名不再問、unavailable 放行）；**連帶改**：`dom-visual-surfaces` 的 `FE-X16-S09`（訪客提示→取名門檻、拿掉「先四處看看」斷言）、`dom-visual-flow` 移除兩條 `FE-X16-S15`（規格已退役）；`identity-session` 的 `FE-A01-S12` 仍綠
 - [x] 7.8 e2e：`tests/e2e/first-entry-gate.mjs` —— 訪客進 `/world` → 看到取名門檻、世界沒 render（沒 canvas/載入層）、無旁觀出口 → 取名 → 世界載入。**真瀏覽器 4 條全綠**（`next start` local build）。未接進 CI 的 `e2e-main.sh`（那是 `.github/`＝governance，且清單是策展的，另開 governance PR）
 
