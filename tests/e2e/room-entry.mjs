@@ -314,7 +314,7 @@ try {
     // S07：回大廳再按 E → 直接進、不問、沒有 /enter
     since = await overlaysSeen(page)
     const callsBefore = enter.calls.length
-    await page.click('button:has-text("回到 Guild Hall")')
+    await page.click('button[aria-label="回到 Guild Hall"]')
     await waitForTransition(page, '回到 Guild Hall', since, 'S07')
     await expectUrl(page, '[S07] 回到 Guild Hall', '/world')
     await approachDoor(page)
