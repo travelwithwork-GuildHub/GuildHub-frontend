@@ -109,29 +109,8 @@ export function createResourcesStore() {
       entry.items = [...entry.items, resource]
       set(entry, { phase: 'ready', items: entry.items })
     },
-    /**
-     * 寫入被拒絕：403／409 走 D2 的那一次確認，其餘直接回原本的 `kind`。
-     *
-     * 回 `'closed'` 代表面板已經換成「已結案」（呼叫端不必再顯示什麼）；回 `UiError` 的話那一句由呼叫端
-     * 放在表單上（規格：寫入的失敗呈現在表單，不是把整個清單換掉）。**每一次失敗各確認一次**，不快取 `active`。
-     */
-    writeFailed: async (projectId: string, cause: unknown): Promise<UiError | 'closed'> => {
-      const entry = entryOf(projectId)
-      const ui = toUiError(cause)
-      if (ui.kind !== 'permission-denied' && ui.kind !== 'conflict') return ui
-      const mine = (entry.seq += 1)
-      try {
-        const project = await getProject(projectId)
-        if (project.status !== 'closed') return ui
-        // 已結案：清單留著（closed 專案 owner 仍讀得到），要不要顯示是呼叫端的事
-        if (mine === entry.seq) set(entry, { phase: 'closed', items: entry.items })
-        return 'closed'
-      } catch (cause2: unknown) {
-        // 確認自己失敗：401「登入失效」與 404「專案不見了」比原本那個碼更接近事實；其餘退回原本那個 403／409，**不猜是結案**
-        const ui2 = toUiError(cause2)
-        return ui2.kind === 'authentication-required' || ui2.kind === 'not-found' ? ui2 : ui
-      }
-    },
+    // ⚠️ **寫入失敗的那一次確認（D2）在後半 `--edit-delete`**：403／409 不只有「結案」一個意思，
+    // 要打一次 `GET /api/projects/{id}`。它跟修改、刪除共用同一條路徑，判準（`S07`／`S08`）也在那一支。
     /** 面板開啟：**第一次**開啟跟看板掛載那一次共用（不多送一次，`S24`）；之後每一次開啟都重讀（`S05`）。 */
     openRead: (projectId: string) => {
       const entry = entryOf(projectId)
