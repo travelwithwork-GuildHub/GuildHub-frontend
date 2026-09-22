@@ -18,7 +18,8 @@ import type { ResourcesStore } from './resourcesStore'
 // ⚠️ **焦點進「取消」**（安全的那一顆）：確認層是為了擋住誤刪，開起來就預選「刪除」等於沒擋。
 // ⚠️ **Escape ＝ 取消**（`S20` 明文把 Escape 算成取消）：自己註冊一層，關掉它時面板還在、世界命令鎖不放。
 // ⚠️ **失敗一律先走 `store.writeFailed()`**（design D2）：403／409 不只有「結案」一個意思。
-//    只有 404 例外 —— 規格說那時「東西已經不在了」，照樣移除那一列**並重讀一次**（〈讀取的時機〉第 4 點指名的）。
+//    404 是「東西已經不在了」：照樣移除那一列**並重讀一次**；409＋active 也重讀一次
+//    （規格第 80 行是「**寫入的** 409」，不分是哪一個寫入動作）。兩者都是〈讀取的時機〉第 4 點指名的。
 // ⚠️ 名稱用文字節點呈現，不 `dangerouslySetInnerHTML`（`S35`：確認層也是渲染端，一樣不信任輸入）。
 
 export interface ResourceDeleteConfirmProps {
@@ -38,6 +39,10 @@ export function ResourceDeleteConfirm({ projectId, store, resource, onDone, onWr
   const cancel = useRef<HTMLButtonElement>(null)
   const inFlight = useRef(false)
   const [busy, setBusy] = useState(false)
+  // 伺服器說沒有權限（而且確認過專案仍不是 closed）：這一層留著讓那一句看得見，但**確認鈕收掉** ——
+  // 它也是寫入控制項（〈寫入控制項只給寫入者〉）。留著的話使用者只能一再撞同一堵牆，
+  // 而且每撞一次就多送一次 `D2` 的確認請求。跟 `ResourceForm` 的送出鈕同一條理由。
+  const [denied, setDenied] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEscapeLayer(onDone, root)
@@ -64,7 +69,13 @@ export function ResourceDeleteConfirm({ projectId, store, resource, onDone, onWr
         onDone()
         return
       }
-      if (outcome.kind === 'permission-denied') onWriteDenied()
+      // **重讀的時機是封閉列舉**（規格〈讀取的時機是封閉的〉第 4 點）：
+      // 規格第 80 行寫的是「**寫入的** 409」，不分是哪一個寫入動作（`S07` 最後一句）—— 刪除也是寫入。
+      if (outcome.kind === 'conflict') store.read(projectId)
+      if (outcome.kind === 'permission-denied') {
+        setDenied(true) // 確認鈕也是寫入控制項：見下方 `disabled`
+        onWriteDenied()
+      }
       setError(outcome.message)
     } finally {
       inFlight.current = false
@@ -97,7 +108,7 @@ export function ResourceDeleteConfirm({ projectId, store, resource, onDone, onWr
           <button ref={cancel} type="button" data-testid="resource-delete-confirm-no" {...PRIMARY} onClick={onDone} disabled={busy}>
             {RESOURCE_DELETE_COPY.cancel}
           </button>
-          <button type="button" data-testid="resource-delete-confirm-yes" {...SECONDARY} onClick={onConfirm} disabled={busy}>
+          <button type="button" data-testid="resource-delete-confirm-yes" {...SECONDARY} onClick={onConfirm} disabled={busy || denied}>
             {RESOURCE_DELETE_COPY.confirm}
           </button>
         </div>
