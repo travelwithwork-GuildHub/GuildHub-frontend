@@ -6,6 +6,7 @@ import { groundOverscan } from '../layout/framing'
 import { LayoutItems } from '../layout/GuildHall'
 import { LAYOUT as HALL_LAYOUT } from '../layout/guildHallLayout'
 import type { LayoutItem } from '../layout/types'
+import { grassGeometry, grassMaterial } from '../primitives/grass'
 import { Floor } from './structural'
 
 // 世界的外殼。規格 `FE-W10-S10`／`S11`／`S12`。
@@ -39,6 +40,8 @@ export function WorldShell({ layout = HALL_LAYOUT }: { layout?: readonly LayoutI
   // 在幾何快取裡一直留下新的地板。）
   const { width, height } = useThree((state) => state.size)
   const outside = groundOverscan(PHYSICS.halfExtent - PHYSICS.playerRadius, width / height) * 2
+  // 像素草地的 tiling 隨地面大小縮放（每單位一格草）。整數化避免拉視窗一直產生新貼圖。
+  const grassTiles = Math.round(span)
 
   return (
     <>
@@ -48,6 +51,17 @@ export function WorldShell({ layout = HALL_LAYOUT }: { layout?: readonly LayoutI
         <Floor width={outside} depth={outside} color="outside" />
       </group>
       <Floor width={span} depth={span} />
+      {/* 像素草地：疊在主地板上一點點，讓地面讀起來是草不是一塊平色（`FE-W14-S04`）。
+          貼圖與 geometry 都經 `primitives/grass` 的共用 factory 取得 —— 這裡不 `new` 任何
+          GPU 資源，也 MUST NOT `dispose()`（`dispose={null}`）：所有權在 factory。 */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.02, 0]}
+        geometry={grassGeometry(span)}
+        material={grassMaterial(grassTiles)}
+        receiveShadow
+        dispose={null}
+      />
       {/* ⚠️ **四面邊界牆已經搬進配置**（`FE-W11`；`boundary.ts`，兩個場景共用）——
           它們現在跟內牆走同一條路，視覺與碰撞吃同一份資料。
           在這裡再畫一次的話就是第二份真相。 */}

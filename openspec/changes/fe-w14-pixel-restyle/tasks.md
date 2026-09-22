@@ -13,9 +13,9 @@
 - [x] 2.5 突變確認：拿掉 `noiseTexture` 的「依 hex 快取」讓每次 new 一張 → `FE-W14-S02`「同 hex 共用同一張貼圖」測試變紅（已驗）
 
 ## 3. 實作：像素草地經共用 factory（feat/fe-w14-pixel-restyle--grass）
-- [ ] 3.1 把像素草地貼圖（16×16 多階綠＋草葉痕、`NearestFilter`／`RepeatWrapping`）搬進 `world-design-system` 的共用 resource factory —— `WorldShell` 不再直接 `new CanvasTexture`（`FE-W14-S04`；D4）
-- [ ] 3.2 草地 plane 的 geometry 也走共用 factory 的不可變快取；`WorldShell` 卸載不 `dispose`
-- [ ] 3.3 單元測試：草地貼圖由 factory 產出（`WorldShell` 不含 `new CanvasTexture`）、卸載時 factory 擁有的實例零 `dispose`（沿用 `world-design-system` 的 dispose 事件計數技術）
+- [x] 3.1 像素草地貼圖（16×16 多階綠＋草葉痕、`NearestFilter`／`RepeatWrapping`）進 `primitives/grass.ts` 共用 factory（多階綠由 `ground`／`leaf` token 衍生、決定性值噪）；共用底層 `offscreen2d`／`pixelate`／`shadeOf`／`seedOf`／`valueNoise` 抽到 `primitives/pixelTexture.ts`；`WorldShell` 改用 `<mesh geometry={grassGeometry} material={grassMaterial} dispose={null}/>`，不再 `new CanvasTexture`（`FE-W14-S04`；D4）
+- [x] 3.2 草地 plane 的 geometry（`grassGeometry`）與材質（`grassMaterial`）都走 factory 的不可變快取；`WorldShell` 用 `dispose={null}` 不釋放
+- [x] 3.3 單元測試（`tests/world-grass.test.ts`）：貼圖由 factory 產出且最近鄰／可重複／依 repeat 快取、geometry／material 快取不可變、`createsGpuResources(WorldShell)===false`（不含 `new CanvasTexture`）、factory 實例零 `dispose`（沿用 dispose 事件計數）、無 context 退化純色；`grass.ts` 登記進 leak-harness（`leak-coverage.test.ts` 機械把關 `FE-W07-S06`）
 
 ## 4. 實作：像素化渲染（feat/fe-w14-pixel-restyle--pixelate）
 - [ ] 4.1 `WorldCanvas.tsx`：`<Canvas dpr={0.25} gl={{antialias:false}}>` ＋ `onCreated` 設 `gl.domElement.style.imageRendering='pixelated'`；背景色與燈光配暖色（`FE-W14-S05`）

@@ -4,6 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { BoxGeometry, MeshStandardMaterial, type WebGLRenderer } from 'three'
 import { ChibiPlayer } from '@/world/player/ChibiPlayer'
 import { geometryFor } from '@/world/primitives/geometry'
+import { grassGeometry, grassMaterial } from '@/world/primitives/grass'
 import { materialFor } from '@/world/primitives/material'
 
 // FE-W07 洩漏偵測的量測台。規格 `openspec/specs/world-resources/`。
@@ -123,6 +124,26 @@ function SharedPrimitiveFixture() {
   )
 }
 
+/**
+ * **FE-W14 的草地 factory。** `grassGeometry`／`grassMaterial`（`primitives/grass.ts`）跟
+ * `geometryFor`／`materialFor` 一樣是模組級快取、回傳不可變、消費者 MUST NOT `dispose()`。
+ *
+ * 它 `new` 了 `PlaneGeometry`／`CanvasTexture`／`MeshStandardMaterial`，被 `FE-W07-S06`
+ * 的涵蓋率檢查抓到 —— 正確的處置是登記進來，讓這把尺證明「草地貼圖在重複進出下不成長」。
+ *
+ * ⚠️ **`dispose={null}` 不能省**（理由同 `SharedPrimitiveFixture`）。草地**有貼圖**，
+ * 所以這條同時量得到 `textures` 那一欄不成長 —— 補上 `SharedPrimitiveFixture` 量不到的那一半。
+ */
+function SharedGrassFixture() {
+  return (
+    <mesh
+      geometry={grassGeometry(20)}
+      material={grassMaterial(20)}
+      dispose={null}
+    />
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // 受測清單
 //
@@ -168,6 +189,12 @@ const SUBJECTS: readonly Subject[] = [
     source: 'src/world/primitives/material.ts',
     expect: 'clean',
     render: () => <SharedPrimitiveFixture />,
+  },
+  {
+    id: 'primitives:grass',
+    source: 'src/world/primitives/grass.ts',
+    expect: 'clean',
+    render: () => <SharedGrassFixture />,
   },
 ]
 
