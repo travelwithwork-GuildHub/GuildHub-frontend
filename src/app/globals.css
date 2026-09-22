@@ -36,6 +36,8 @@
      的 text-shadow 保險；真瀏覽器量在 `FE-X17` §6）。`--color-glass-line` 是頂邊那道微亮描邊，讓玻璃「浮起來」。 */
   --color-glass: oklch(0.22 0.02 260 / 0.66);
   --color-glass-ink: oklch(0.98 0.004 260);
+  /* 玻璃上的次要文字（時間戳、剩餘字數、空狀態）：比主字暗一階但對深玻璃仍 ≥ 4.5:1。 */
+  --color-glass-ink-muted: oklch(0.84 0.01 260);
   --color-glass-line: oklch(1 0 0 / 0.16);
 
   /* 字級五級（S03）：內文 16px／1.5、說明 13px；面板標題 22px = 1.375 × 內文（要 ≥ 1.25）；頁面標題 32px = 2 ×（要 ≥ 1.5）。 */

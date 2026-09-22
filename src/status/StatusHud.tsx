@@ -73,9 +73,9 @@ export function StatusHud() {
       className="absolute top-16 left-gutter flex w-[min(20rem,30vw)] flex-col gap-2"
     >
       {/* 收合的膠囊：目前狀態（回聲為準）；送出中另外標 */}
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} {...withClass(SECONDARY, 'bg-surface/70 text-caption shadow-panel w-max max-w-full overflow-hidden text-ellipsis whitespace-nowrap backdrop-blur-md')}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} {...withClass(SECONDARY, 'glass-panel hud-legible text-caption w-max max-w-full overflow-hidden text-ellipsis whitespace-nowrap')}>
         {toggleLabel}
-        {snapshot.pending !== null && <span className="text-ink-muted ml-2">{STATUS_HUD_LABELS.pending}</span>}
+        {snapshot.pending !== null && <span className="text-glass-ink-muted ml-2">{STATUS_HUD_LABELS.pending}</span>}
       </button>
       {open && (
         <form
@@ -85,7 +85,7 @@ export function StatusHud() {
             if (over > 0 || draft === '') return
             submit(draft)
           }}
-          className="bg-surface/70 border-line text-ink shadow-panel flex flex-col gap-2 rounded-panel border p-2 backdrop-blur-md"
+          className="glass-panel hud-legible flex flex-col gap-2 rounded-panel p-2"
         >
           <div className="flex flex-wrap gap-1">
             {QUICK_STATUSES.map((q) => (
@@ -108,7 +108,7 @@ export function StatusHud() {
               {...withClass(FIELD, 'w-full')}
             />
           </label>
-          <p id={hintId} data-testid="status-remaining" {...withClass(CAPTION, over > 0 ? 'text-danger' : 'text-ink-muted')}>
+          <p id={hintId} data-testid="status-remaining" {...withClass(CAPTION, over > 0 ? 'text-danger' : 'text-glass-ink-muted')}>
             {over > 0 ? STATUS_HUD_LABELS.over(over) : STATUS_HUD_LABELS.remaining(MAX - draft.length)}
           </p>
           <div className="flex items-center gap-2">

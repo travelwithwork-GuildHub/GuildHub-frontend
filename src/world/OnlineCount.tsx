@@ -28,7 +28,7 @@ export function OnlineCount({ count }: { count: number | null }) {
       role="status"
       aria-atomic="true"
       style={{ zIndex: layer('hud') }}
-      className="border-line bg-surface text-ink text-caption pointer-events-none absolute top-gutter left-gutter border px-gutter py-2"
+      className="glass-panel hud-legible text-caption pointer-events-none absolute top-gutter left-gutter rounded-panel px-gutter py-2"
     >
       {`${count} 人在線`}
     </div>

@@ -109,7 +109,7 @@ export function SceneChatComposer({ send, onEscape }: { send: (input: ChatIn) =>
         id={remainingId}
         data-testid="chat-remaining"
         data-remaining={rem}
-        {...withClass(CAPTION, tooLong ? 'text-danger' : 'text-ink-muted')}
+        {...withClass(CAPTION, tooLong ? 'text-danger' : 'text-glass-ink-muted')}
       >
         {rem < 0 ? `超過 ${-rem} 字` : `還可以輸入 ${rem} 字`}
       </p>

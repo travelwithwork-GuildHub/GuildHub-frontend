@@ -17,10 +17,10 @@
 
 ## 3. 常駐 HUD 半透明融合（`dom-visual-system`：`FE-X17-S03`／`S04`）
 
-- [ ] 3.1 加**glass 表面 token**（半透明 surface，深淺色各一；alpha `< 1`）到 `globals.css`／`src/design`。
+- [x] 3.1 加**glass 表面 token**（半透明 surface，深淺色各一；alpha `< 1`）到 `globals.css`／`src/design`。
 - [ ] 3.2 `AppHeader`：黑裸字＋白方塊 → 小 logo／emblem ＋線上數膠囊 badge（🟢 1），毛玻璃底、浮起。
-- [ ] 3.3 `StatusHud`：白盒 → 毛玻璃、浮起；狀態縮成色點＋單行摘要，點擊才展開編輯。
-- [ ] 3.4 `SceneChatHud`：白盒 → 毛玻璃、浮起；預設可收成浮動鈕、展開才出完整面板。
+- [x] 3.3 `StatusHud`：白盒 → 毛玻璃、浮起；狀態縮成色點＋單行摘要，點擊才展開編輯。
+- [x] 3.4 `SceneChatHud`：白盒 → 毛玻璃、浮起；預設可收成浮動鈕、展開才出完整面板。
 - [ ] 3.5 判準：`FE-X17-S03`（真瀏覽器量 HUD 背景合成 alpha `< 1`、有 `backdrop-filter`、不變暗世界）、`FE-X17-S04`（文字對比 `≥ 4.5:1`）。
 
 ## 4. 消滅原生表單感（實作層，走 controls token）
