@@ -5,6 +5,7 @@ import type { ProjectOut, ProjectResourceOut, ProjectStatus, ResourceType } from
 import { IdentityProvider, useIdentity } from '@/identity/IdentityProvider'
 import { ResourcesPanel } from '@/resources/ResourcesPanel'
 import { ResourcesProvider, useResourcesPanel } from '@/resources/ResourcesProvider'
+import { useBlockingPanels } from '@/panel/BlockingPanelCoordinator'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
 
 // 規格：openspec/changes/fe-j14-project-resources/specs/project-resources/spec.md
@@ -94,6 +95,16 @@ const locked = () => {
   return grabbed.lock.current
 }
 
+/** 另一個面板來要位子（`FE-X16-S14`）：回傳值就是「讓不讓」。 */
+const asked: { request: (() => boolean) | null } = { request: null }
+function AskForPanel() {
+  const { requestOpen } = useBlockingPanels()
+  useEffect(() => {
+    asked.request = () => requestOpen('inbox-panel')
+  }, [requestOpen])
+  return null
+}
+
 function OpenButton({ projectId }: { projectId: string }) {
   const { openPanel } = useResourcesPanel()
   const identity = useIdentity()
@@ -110,6 +121,7 @@ function renderTree(proj: ProjectOut) {
       <InteractionProvider>
         <ResourcesProvider>
           <GrabLock />
+          <AskForPanel />
           <OpenButton projectId={proj.id} />
           <ResourcesPanel projectId={proj.id} project={proj} />
         </ResourcesProvider>
@@ -234,13 +246,15 @@ describe('新增：送出前擋下伺服器一定會拒絕的輸入，只送原�
     expect(submitButton().disabled, '剛好在上限上，送出鈕卻不能按').toBe(false)
 
     await type('名稱', '😀'.repeat(limit.label + 1))
-    await waitFor(() => expect(error('label'), '名稱多一個字，沒有立刻說').not.toBeNull())
+    await flush()
+    expect(error('label'), '名稱多一個字，沒有立刻說').not.toBeNull()
     expect(submitButton().disabled).toBe(true)
 
     await type('名稱', '😀'.repeat(limit.label))
     await waitFor(() => expect(error('label')).toBeNull())
     await type('網址', head + 'a'.repeat(limit.url - head.length + 1))
-    await waitFor(() => expect(error('url'), '網址多一個字，沒有立刻說').not.toBeNull())
+    await flush()
+    expect(error('url'), '網址多一個字，沒有立刻說').not.toBeNull()
     expect(submitButton().disabled).toBe(true)
     expect(createResource.mock.calls, '即時擋下的東西不該送出去').toHaveLength(0)
   })
@@ -251,7 +265,8 @@ describe('新增：送出前擋下伺服器一定會拒絕的輸入，只送原�
     await type('類型', 'figma')
     await type('網址', 'https://example.com/x')
     await type('名稱', 'a'.repeat(11))
-    await waitFor(() => expect(error('label'), '上限是 10，11 個字沒有被擋 —— 100 寫死在元件裡了').not.toBeNull())
+    await flush()
+    expect(error('label'), '上限是 10，11 個字沒有被擋 —— 100 寫死在元件裡了').not.toBeNull()
     await type('名稱', 'a'.repeat(10))
     await waitFor(() => expect(error('label')).toBeNull())
     expect(submitButton().disabled).toBe(false)
@@ -266,7 +281,8 @@ describe('新增：送出前擋下伺服器一定會拒絕的輸入，只送原�
     await type('名稱', '設計稿')
     const head = 'https://example.com/'
     await type('網址', head + 'a'.repeat(31 - head.length))
-    await waitFor(() => expect(error('url'), '上限是 30，總長 31 沒有被擋 —— 2048 寫死在元件裡了').not.toBeNull())
+    await flush()
+    expect(error('url'), '上限是 30，總長 31 沒有被擋 —— 2048 寫死在元件裡了').not.toBeNull()
     await type('網址', head + 'a'.repeat(30 - head.length))
     await waitFor(() => expect(error('url')).toBeNull())
     expect(submitButton().disabled).toBe(false)
@@ -278,7 +294,10 @@ describe('新增：送出前擋下伺服器一定會拒絕的輸入，只送原�
     await type('類型', 'figma')
     for (const bad of ['javascript:alert(1)', 'data:text/html,x', 'example.com', '/relative', 'https://example.com/a b', 'https://example.com/a\tb']) {
       await type('網址', bad)
-      await waitFor(() => expect(error('url'), `${JSON.stringify(bad)} 沒有被即時擋下來`).not.toBeNull())
+      // **不要 `waitFor` 一個「應該出現」的元素**：沒出現時它會紅成一個看不出原因的 timeout。
+      // 驗證是 resolver（非同步）跑的，`flush()` 把 microtask 排乾就到位了，之後同步斷言 —— 紅訊息看得見是哪一個網址。
+      await flush()
+      expect(error('url'), `${JSON.stringify(bad)} 沒有被即時擋下來`).not.toBeNull()
       expect(submitButton().disabled, `${JSON.stringify(bad)}：送出鈕還能按`).toBe(true)
     }
     // 含空白的兩個（`a b`、`a\tb`）`safeHref` 其實放行（會編成 %20）—— 擋它們的是「不含空白」那一半。
@@ -304,7 +323,8 @@ describe('新增：送出前擋下伺服器一定會拒絕的輸入，只送原�
     await type('名稱', '   ')
     await type('類型', 'figma')
     await type('網址', 'https://example.com/x')
-    await waitFor(() => expect(submitButton().disabled, '只含空白是送出時才說的錯誤，不該禁用送出鈕').toBe(false))
+    await flush()
+    expect(submitButton().disabled, '只含空白是送出時才說的錯誤，不該禁用送出鈕').toBe(false)
     await submit()
     expect(error('label'), '名稱只有空白卻收下了').not.toBeNull()
     expect(createResource.mock.calls).toHaveLength(0)
@@ -319,6 +339,27 @@ describe('新增：送出前擋下伺服器一定會拒絕的輸入，只送原�
     const describedBy = (field('網址').getAttribute('aria-describedby') ?? '').split(/\s+/)
     expect(describedBy, '網址欄的 aria-describedby 沒有指到那段說明').toContain(hint.id)
     expect(hint.id.length).toBeGreaterThan(0)
+  })
+})
+
+describe('讓位：送出中或改過沒存的表單不讓位', () => {
+  it('[FE-X16-S14] 表單乾淨時讓位；打了字（未儲存）就不讓 —— 而且不開確認層', async () => {
+    await openForm(two())
+    const request = asked.request
+    if (request === null) throw new Error('協調者還沒掛好')
+
+    // 乾淨的表單：讓位（使用者沒有東西會掉）
+    expect(request(), '表單一個字都沒改，卻擋著不讓別的面板開').toBe(true)
+
+    cleanup()
+    listResources.mockReset()
+    getMyProfile.mockReset()
+    await openForm(two())
+    await type('名稱', '設計稿')
+    expect(asked.request?.(), '改了字沒存卻讓位了 —— 那些字會直接消失').toBe(false)
+    // 讓位不替使用者按下那個問題（`FE-X16-S14` 逐字）：不得冒出放棄修改的確認層
+    expect(screen.queryByRole('alertdialog'), '讓位時冒出了確認層').toBeNull()
+    expect(screen.queryByTestId('resource-form'), '被拒絕讓位之後表單要留著').not.toBeNull()
   })
 })
 
