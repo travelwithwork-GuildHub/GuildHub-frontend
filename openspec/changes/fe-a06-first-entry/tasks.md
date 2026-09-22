@@ -57,3 +57,21 @@
       〈註冊〉〈登入〉的「依記住我處置金鑰」＋`FE-A08-S07`（勾記住我落地金鑰／沒勾清掉，測試已刪）。
       要對這個 change 加 `account-login` 的 MODIFIED delta：三表單→兩表單、busy-lock 3→2、移除「記住我處置金鑰」；`S07` 因 OpenSpec 的 MODIFIED 不能丟 scenario，改寫成「登入成功後持久儲存中沒有恢復金鑰（我們根本不寫）」並補一條對應測試，或用 REMOVED＋ADDED 換掉那條 Requirement。**這是我（Claude）在 fe-a06 反轉時漏掉的 capability，fork 審出來的。**
 - [ ] 6.2 RootEntry.tsx 第 17 行過時註解（提到「session 不在但手上有恢復金鑰」）順手改掉。
+
+## 7. 二次反轉：進世界前要先有名字（2026-09-22，demo 前）
+
+**規格（spec/ 分支）**
+- [x] 7.1 `specs/first-entry/spec.md`：〈直接進世界的訪客會被提示，但不會被擋〉→〈進世界前要先有名字：訪客被導到取名，不匿名旁觀〉；反轉 `S04`（訪客看到取名不是世界）／`S05`（沒有繞過取名的旁觀出口）／`S06`（取名後進、已取名不再問）
+- [x] 7.2 proposal 加二次反轉段、Non-goals／已知限制對齊；`openspec validate fe-a06-first-entry --strict` 綠
+- [ ] 7.3 `progress.sh --check` 綠（change-id 仍對回 FE-A06）
+
+**實作（feat/ 分支）**
+- [ ] 7.4 `FirstEntryNotice.tsx`：`guest` → 顯示取名流程並**擋住世界**（蓋滿、吃掉世界指標／鍵盤、`aria-modal`）；拿掉「先四處看看」旁觀鈕與 `dismissed`；`signed-in`／`unavailable` 放行、`unknown` 顯示載入
+- [ ] 7.5 文案：`FirstEntryNotice` 標題「你現在是訪客」＋「取一個名字，世界裡的其他人就看得到你是誰。」重寫成不誤導的取名說明；`uiError.ts` 的 `authentication-required`「要先登入才看得到這裡。」改成不含「登入」的說法（仍在唯一語彙表、仍與其他句不同）
+- [ ] 7.6 藏帳密入口：`IdentityBadge` 的訪客「建立你的身分 → /login」不再曝光（require-name 後訪客不會在世界裡看到它，順手確認不留死連結）；`/login` 頁與帳密表單不動
+- [ ] 7.7 測試：`FirstEntryNotice` 的 `S04`（取名擋住世界、吃掉指標）／`S05`（沒有旁觀出口）／`S06`（取名後進、已取名不再問）改寫；確認 `identity-session` 的 `FE-A01-S12`（世界元件在訪客身分下照常渲染）仍綠
+- [ ] 7.8 e2e：訪客進 `/world` → 看到取名、動不了世界 → 取名 → 進得了世界（沿用 `lib/world.mjs`）
+
+**收尾**
+- [ ] 7.9 `pnpm test` 綠、`tsc`／`lint` rc=0；前後截圖自問「進入直覺嗎、還會不會把取名誤解成登入」
+- [ ] 7.10 封存前 archive-review（含前面 4.x 視覺、6.1 account-login 對齊 —— 都是封存前才擋的）請使用者手動跑
