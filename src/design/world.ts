@@ -18,9 +18,10 @@
 // ⚠️ **這個集合是可增長的。** `FE-W10 EnvironmentComponents` 需要新的語意色
 // 直接加，**不需要改規格** —— 規格保證的是「只有一個地方可以加」。
 //
-// ⚠️ **每個 token 的「值」是 FE-W14 VisualPolish（W5）的範圍。**
-// 這裡的值是從遷移前的硬寫顏色原樣搬過來的，**沒有經過視覺調校**。
-// 要調就在這一個檔案調。
+// ⚠️ **每個 token 的「值」是 FE-W14 VisualPolish 的範圍**（規格 `FE-W14-S01`）。
+// 這裡的值是**暖色像素調色盤**：地面偏草綠、牆與地毯偏暖奶油、強調色偏暖金、
+// 木頭偏暖褐 —— 彼此拉得開，讓角色（`avatarLook` 的 body／limb）在固定俯視相機下
+// 跟腳下地面清楚分得出來。要調色就在這一個檔案調，別處不得硬寫 hex。
 
 export const WORLD_COLORS = {
   /** 角色皮膚。原本是 `ChibiPlayer` 的 `SKIN`。 */
@@ -63,21 +64,21 @@ export const WORLD_COLORS = {
   /** 深色細節（眼睛、輪廓）。 */
   ink: '#20232e',
   /** 地面。原本是 `DebugShadowScene` 的平面。 */
-  ground: '#cfd4e4',
+  ground: '#8ec46a',
   /** 強調色，用在要被看見的物件上。原本是 `DebugShadowScene` 的方塊。 */
-  accent: '#6b7fd7',
+  accent: '#f2b13c',
   /** 牆面。比地面深一階，讓邊界在俯視角下看得出來。 */
-  wall: '#aeb6cf',
+  wall: '#e7d3a4',
   /** 地毯。分區用的暖色，跟地面的冷灰藍拉開。 */
-  carpet: '#d8bda6',
+  carpet: '#e6c79c',
   /** 平台／台階。介於地面與牆之間。 */
-  platform: '#bfc6da',
+  platform: '#d8c8a2',
   /** 木頭（桌面、層板）。 */
   wood: '#b08968',
   /** 深一階的木頭（桌腳、側板）。 */
   woodDark: '#8c6a4f',
   /** 葉子。 */
-  leaf: '#6f9e6a',
+  leaf: '#5aa83f',
   /** 陶盆。 */
   terracotta: '#c17f59',
   /** 金屬（燈桿、把手）。 */
@@ -91,7 +92,7 @@ export const WORLD_COLORS = {
   /** 釘在板面上的卡片。 */
   card: '#f7f2e6',
   /** 世界外面的地。**比地面暗一階** —— 它不是可以走過去的地方。 */
-  outside: '#9ba3b8',
+  outside: '#6fae5c',
 } as const
 
 export type WorldColorName = keyof typeof WORLD_COLORS
