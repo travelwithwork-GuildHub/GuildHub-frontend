@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import type { ProjectResourceOut, ResourceType } from '@/api/contract/rest'
+import { useEffect, useRef, useState } from 'react'
+import type { ProjectResourceOut } from '@/api/contract/rest'
 import { CAPTION, PRIMARY, SECONDARY, TERTIARY, withClass } from '@/design/controls'
 import { EmptyState } from '@/empty-state/EmptyState'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { PanelShell } from '@/panel/PanelShell'
 import { SafeExternalLink } from '@/security/SafeExternalLink'
+import { ResourceForm, type ResourceFormIntent } from './ResourceForm'
+import { RESOURCE_FORM_COPY, RESOURCE_TYPE_LABELS } from './resourceRules'
 import { RESOURCES_PANEL_TITLE, usePanelProject } from './ResourcesPanel'
 import { RESOURCES_PANEL_ID, useProjectResources, useResourcesPanel } from './ResourcesProvider'
 
@@ -16,11 +18,13 @@ import { RESOURCES_PANEL_ID, useProjectResources, useResourcesPanel } from './Re
 // ⚠️ **網址一律走 `SafeExternalLink`**：放行才是連結，放行不了的是純文字（`S01`／`S02`）。自己組 `<a href>` 會連 lint 一起紅。
 // ⚠️ **寫入控制項是「不存在」不是 `hidden`**（`S10`）：`hidden` 不是權限邊界。
 // ⚠️ 失敗的呈現由 `FE-X03` 的 `kind` 決定（`EmptyState` 的 `failureKind`），這裡不讀 status、不自己分類。
-// ⚠️ 新增／修改／刪除的**行為**在第 7 片（`--form`）。這一片只負責它們在不在 —— `S03`／`S10` 驗的正是這件事。
+// ⚠️ **新增**的行為在 `ResourceForm`（第 7 片前半）；這裡只管表單開不開。
+//    修改與刪除今天仍然只是「在不在」（`S03`／`S10` 驗的正是這件事），按下去不做事 —— 行為在第 7 片後半 `--edit-delete`，
+//    上限（`S16`）與寫入失敗的那一次確認（`S07`／`S08`）也在那一支。
 
 export const RESOURCES_PANEL_COPY = { close: '關閉', loading: '正在讀取這個專案的資源⋯⋯', closed: '這個專案已經結案，資源不能再修改。', create: '新增資源', edit: '修改', remove: '刪除' }
-/** type 的可辨識標記**是文字**，不是只靠顏色或形狀（`S01`：輔助技術讀得到是哪一種）。 */
-export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = { github: 'GitHub', figma: 'Figma', notion: 'Notion', drive: '雲端硬碟', meeting: '會議' }
+/** type 的文字標記搬到 `resourceRules`（表單的選項與清單要同一份）；這裡再匯出一次，呼叫端不必知道搬去哪了。 */
+export { RESOURCE_TYPE_LABELS }
 
 function Row({ resource, writer }: { resource: ProjectResourceOut; writer: boolean }) {
   return (
@@ -41,10 +45,13 @@ function Row({ resource, writer }: { resource: ProjectResourceOut; writer: boole
 
 export default function OpenResourcesPanel() {
   const { projectId, project } = usePanelProject()
-  const { closePanel, yieldPanel } = useResourcesPanel()
+  const { closePanel, yieldPanel, store } = useResourcesPanel()
   const { state, retry } = useProjectResources(projectId)
   const identity = useIdentity()
   const root = useRef<HTMLDivElement>(null)
+  const [creating, setCreating] = useState(false)
+  const formIntent = useRef<ResourceFormIntent | null>(null)
+  const createButton = useRef<HTMLButtonElement>(null)
 
   // 焦點進面板：Tab 從這裡開始在面板內循環。載入殼先取得焦點，內容掛上來後在同一個 commit 接過來。
   useEffect(() => {
@@ -59,12 +66,30 @@ export default function OpenResourcesPanel() {
   // 結案之後 owner 留著已經讀到的清單，非 owner 不顯示（closed 只有 owner 讀得到）。
   const items = state.phase === 'ready' || (state.phase === 'closed' && owner) ? state.items : null
 
+  // 已結案：開著的表單也是寫入控制項，一起收掉。**用推導的，不在 effect 裡 setState**
+  //（`react-hooks/set-state-in-effect`：那會多一輪串聯渲染，而且「已結案」本來就是一個推導得出來的事實）。
+  const formOpen = creating && !closed
+  const closeForm = () => setCreating(false)
+  // 表單收起來之後焦點回「新增」（表單被卸載，不接的話焦點掉到 body）。
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (!formOpen && wasOpen.current) createButton.current?.focus()
+    wasOpen.current = formOpen
+  }, [formOpen])
+
   return (
     <PanelShell
-      title={RESOURCES_PANEL_TITLE}
+      title={formOpen ? RESOURCE_FORM_COPY.createTitle : RESOURCES_PANEL_TITLE}
       closeLabel={RESOURCES_PANEL_COPY.close}
       testId={RESOURCES_PANEL_ID}
-      panel={{ id: RESOURCES_PANEL_ID, canYield: () => true, onYield: yieldPanel }}
+      back={formOpen ? { label: RESOURCE_FORM_COPY.back, onBack: closeForm } : undefined}
+      overlay={
+        formOpen && (
+          <ResourceForm projectId={projectId} store={store} onDone={closeForm} intentRef={formIntent} />
+        )
+      }
+      // 讓位協定（`FE-X16-S14`）：沒有表單時隨時可以；表單開著時問它（送出中或改過沒存 → 不行）
+      panel={{ id: RESOURCES_PANEL_ID, canYield: () => formIntent.current?.canYield() ?? true, onYield: yieldPanel }}
       onCloseRequest={closePanel}
     >
       {/* 只是捲動容器與初始焦點，不是第二個 landmark（殼的 section 已經叫「專案資源」）。 */}
@@ -76,7 +101,12 @@ export default function OpenResourcesPanel() {
         {items !== null && items.length > 0 && (
           <ul className="flex flex-col gap-gutter">{items.map((resource) => <Row key={resource.id} resource={resource} writer={writer} />)}</ul>
         )}
-        {writer && <button type="button" data-testid="resource-create" {...withClass(PRIMARY, 'self-start')}>{RESOURCES_PANEL_COPY.create}</button>}
+        {/* ⚠️ 上限（`S16`：滿了就不能新增、而且說得出為什麼）在後半 `--edit-delete` —— 它的另一半「刪一筆就恢復」要刪除。 */}
+        {writer && (
+          <button ref={createButton} type="button" data-testid="resource-create" onClick={() => setCreating(true)} {...withClass(PRIMARY, 'self-start')}>
+            {RESOURCES_PANEL_COPY.create}
+          </button>
+        )}
       </div>
     </PanelShell>
   )

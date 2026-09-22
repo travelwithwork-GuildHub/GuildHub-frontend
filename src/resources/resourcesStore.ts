@@ -97,6 +97,20 @@ export function createResourcesStore() {
   return {
     /** 使用者按的重試、規格指名的重讀。 */
     read,
+    /**
+     * 新增成功：伺服器回的那一筆接在**最後**（清單固定 `created_at ASC, id ASC`），不樂觀更新（D1）。
+     *
+     * ⚠️ **同時把序號推進一格**：規格〈晚到的回應〉的第二句 —— 一個更早發出、還在路上的讀取
+     * MUST NOT 覆蓋「在它之後成功的寫入所造成的清單變化」。推進序號就是讓那一次讀取回來時認不得自己。
+     */
+    created: (projectId: string, resource: ProjectResourceOut) => {
+      const entry = entryOf(projectId)
+      entry.seq += 1
+      entry.items = [...entry.items, resource]
+      set(entry, { phase: 'ready', items: entry.items })
+    },
+    // ⚠️ **寫入失敗的那一次確認（D2）在後半 `--edit-delete`**：403／409 不只有「結案」一個意思，
+    // 要打一次 `GET /api/projects/{id}`。它跟修改、刪除共用同一條路徑，判準（`S07`／`S08`）也在那一支。
     /** 面板開啟：**第一次**開啟跟看板掛載那一次共用（不多送一次，`S24`）；之後每一次開啟都重讀（`S05`）。 */
     openRead: (projectId: string) => {
       const entry = entryOf(projectId)
