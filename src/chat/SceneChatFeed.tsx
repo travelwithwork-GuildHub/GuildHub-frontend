@@ -24,7 +24,7 @@ export function SceneChatFeed({ log }: { log: ChatLog }) {
   return (
     <div role="log" aria-label={CHAT_FEED_LABELS.log} data-testid="chat-feed" className="flex min-h-0 min-w-0 flex-col gap-1">
       {log.length === 0 ? (
-        <p data-testid="chat-empty" {...withClass(CAPTION, 'text-ink-muted')}>
+        <p data-testid="chat-empty" {...withClass(CAPTION, 'text-glass-ink-muted')}>
           {CHAT_FEED_LABELS.empty}
         </p>
       ) : (
@@ -40,7 +40,7 @@ export function SceneChatFeed({ log }: { log: ChatLog }) {
                 {record.body}
               </span>
               {record.truncated && (
-                <span data-testid="chat-truncated" {...withClass(CAPTION, 'text-ink-muted')}>
+                <span data-testid="chat-truncated" {...withClass(CAPTION, 'text-glass-ink-muted')}>
                   {CHAT_FEED_LABELS.truncated}
                 </span>
               )}
