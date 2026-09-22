@@ -49,7 +49,10 @@ vi.mock('@/api/operations', async (importOriginal) => ({
  * 不是「面板端出 `VOCABULARY[kind]`」——後者連「三個 kind 都印同一句」都抓不到。
  */
 const COPY = {
-  'authentication-required': '要先登入才看得到這裡。',
+  // ⚠️ `FE-A06`（#620，2026-09-22）把這一句從「要先登入才看得到這裡。」改成現在這句
+  // （訪客入口改由取名門檻承擔，主動線不再談帳密）。逐字抄的代價就是別人改語彙時這裡會紅 ——
+  // **那是這條判準在做事**，不是它壞了：改成 `import { VOCABULARY }` 就再也抓不到文案改錯。
+  'authentication-required': '這裡要有身分才看得到 —— 先取個名字加入。',
   'permission-denied': '你沒有權限做這件事。',
   'not-found': '找不到這個東西 —— 它可能已經被移除了。',
 } as const
