@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { ProjectResourceOut, ProjectResourceUpdate, ResourceType } from '@/api/contract/rest'
 import { createResource, updateResource } from '@/api/operations'
 import { CAPTION, FIELD, FIELD_LABEL, FORM, PRIMARY, SECONDARY, withClass } from '@/design/controls'
@@ -60,6 +60,10 @@ const VISIBILITY_ID = 'resource-form-visibility'
 
 export function ResourceForm({ projectId, store, resource, onDone, onWriteDenied, intentRef }: ResourceFormProps) {
   const root = useRef<HTMLFormElement>(null)
+  // 伺服器說沒有權限（而且確認過專案仍不是 closed）：表單留著讓那一句看得見，但**送出鈕收掉** ——
+  // 它也是寫入控制項（〈結案與權限失敗〉：移除寫入控制項）。留著的話使用者只能一再撞同一堵牆，
+  // 而且每撞一次就多送一次 `D2` 的確認請求。
+  const [denied, setDenied] = useState(false)
   // 上限在**渲染時**讀（`resourceFormSchema()` 自己去拿 `LIMITS`）—— 模組層的常數證不了「數字不是寫死的」。
   const schema = useMemo(() => resourceFormSchema(), [])
   // 修改的初始值是那一筆**目前的值**；差集也拿它當基準（`useForm` 的 `defaultValues` 只吃第一次）。
@@ -88,10 +92,16 @@ export function ResourceForm({ projectId, store, resource, onDone, onWriteDenied
       } catch (cause) {
         const outcome = await store.writeFailed(projectId, cause)
         if (outcome === 'closed') return // 面板換成「已結案」，表單被卸載 —— 沒有東西要顯示
-        // **重讀的時機是封閉列舉**（規格〈讀取的時機是封閉的〉第 4 點）：只有新增的 409（別處已經新增到上限，`S08`）
-        // 與修改的 404（這一筆已經被刪掉，`S19`）。在這裡多加一個「順便也重讀」就是在列舉外自己加時機。
-        if (outcome.kind === (resource === undefined ? 'conflict' : 'not-found')) store.read(projectId)
-        if (outcome.kind === 'permission-denied') onWriteDenied()
+        // **重讀的時機是封閉列舉**（規格〈讀取的時機是封閉的〉第 4 點）：
+        //  - **任何寫入**的 409 —— 規格〈結案與權限失敗〉第 80 行寫的是「寫入的 409」，`S07` 最後一句也明寫
+        //    「`PATCH` 回 409 或 403 時亦同（確認流程不分是哪一個寫入動作）」，所以新增與修改都要重讀；
+        //  - **修改**的 404（這一筆已經被刪掉，`S19`）—— 新增的 404 規格沒有指名，不重讀。
+        // 在這個列舉之外多加一個「順便也重讀」就是自己加時機。
+        if (outcome.kind === 'conflict' || (resource !== undefined && outcome.kind === 'not-found')) store.read(projectId)
+        if (outcome.kind === 'permission-denied') {
+          setDenied(true) // 送出鈕也是寫入控制項：見下方 `disabled`
+          onWriteDenied()
+        }
         throw new ResourceWriteRejected(outcome.message)
       }
     },
@@ -163,7 +173,7 @@ export function ResourceForm({ projectId, store, resource, onDone, onWriteDenied
       </p>
       <SubmitError message={submitError} />
       <div className="flex gap-gutter">
-        <button type="submit" {...PRIMARY} disabled={!canSubmit}>
+        <button type="submit" {...PRIMARY} disabled={!canSubmit || denied}>
           {resource === undefined ? RESOURCE_FORM_COPY.submit : RESOURCE_FORM_COPY.save}
         </button>
         <button type="button" {...SECONDARY} onClick={onDone} disabled={busy}>
