@@ -6,11 +6,11 @@
 - [ ] 1.3 規格 PR 合併到 main（governance 改 charter 的 #625 已先合併）
 
 ## 2. 實作：色票與材質貼圖（feat/fe-w14-pixel-restyle--materials）
-- [ ] 2.1 `src/design/world.ts`：暖色像素調色盤定案（ground 草綠、wall／carpet 暖奶油、accent 暖金、leaf／outside 深草綠）—— 單一色票來源不變（`FE-W14-S01`）
-- [ ] 2.2 `material.ts`：`pixelTexture(hex)`（同色系雜訊、`NearestFilter`、`RepeatWrapping`、依 hex 快取）＋ `woodTexture(hex)`（橫向順紋＋深紋路＋板縫）；`build()` 對 `wood`／`woodDark` 用木紋、其餘用雜訊；`basic` 不加貼圖（`FE-W14-S02`）
-- [ ] 2.3 沒有 `document` 時 `map` 退化為 `null`（純色）、不拋錯（`FE-W14-S03`）
-- [ ] 2.4 單元測試：wood token 材質有 `NearestFilter`／`RepeatWrapping` 的 `map`、同 token 同實例、異 token 異實例（`FE-W14-S02`）；無 document 回純色不拋（`FE-W14-S03`）
-- [ ] 2.5 突變確認：拿掉「依 hex 快取」讓每次 new 一張 → 材質快取測試要紅
+- [x] 2.1 `src/design/world.ts`：暖色像素調色盤定案（ground 草綠、wall／carpet 暖奶油、accent 暖金、leaf／outside 深草綠）—— 單一色票來源不變（`FE-W14-S01`）
+- [x] 2.2 `material.ts`：`noiseTexture(hex)`（同色系決定性值噪、`NearestFilter`、`RepeatWrapping`、依 hex 快取）＋ `woodTexture(hex)`（橫向順紋＋深紋路＋板縫）；`build()` 對 `wood`／`woodDark` 用木紋、其餘用雜訊；`basic` 不加貼圖（`FE-W14-S02`）
+- [x] 2.3 沒有 canvas 2D context（SSR／jsdom）時 `map` 退化為 `null`（純色）、不拋錯（`FE-W14-S03`）
+- [x] 2.4 單元測試：wood token 材質有 `NearestFilter`／`RepeatWrapping` 的 `map`、同 token 同實例、異 token 異實例、同 hex 共用同一張貼圖、`basic` 無貼圖（`FE-W14-S02`）；無 context 回純色不拋（`FE-W14-S03`）
+- [x] 2.5 突變確認：拿掉 `noiseTexture` 的「依 hex 快取」讓每次 new 一張 → `FE-W14-S02`「同 hex 共用同一張貼圖」測試變紅（已驗）
 
 ## 3. 實作：像素草地經共用 factory（feat/fe-w14-pixel-restyle--grass）
 - [ ] 3.1 把像素草地貼圖（16×16 多階綠＋草葉痕、`NearestFilter`／`RepeatWrapping`）搬進 `world-design-system` 的共用 resource factory —— `WorldShell` 不再直接 `new CanvasTexture`（`FE-W14-S04`；D4）
