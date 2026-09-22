@@ -247,6 +247,9 @@ try {
   const aJump = aBefore === null || aSat === null ? Infinity : Math.hypot(aSat.x - aBefore.x, aSat.z - aBefore.z)
   check(`[S08] A 入座後就位到 0 號站位（(${aSat?.x.toFixed(2)},${aSat?.z.toFixed(2)}) ≈ 站位 (${stanceOf(0).x},${stanceOf(0).z})，Δ${distTo(aSat, 0).toFixed(2)}）`, distTo(aSat, 0) < 0.15, true)
   console.log(`   [S08] A 就位跳躍距離 ${aJump.toFixed(2)}（按 E 前 (${aBefore?.x.toFixed(2)},${aBefore?.z.toFixed(2)}) → 站位）`)
+  // 就位必須是「明顯搬過去」，不是原地：按 E 前停在走近觸發提示的位置（離站位一段距離），
+  // 入座後被搬到站位。沒有這條，若角色剛好停在站位上（aJump≈0）上面的「就位到站位」也會過（恆真）。
+  check('[S08] A 按 E 前後明顯移動（就位真的把人搬到站位，不是原地）', Number.isFinite(aJump) && aJump > 1.0, true)
   await A.page.screenshot({ path: path.join(OUT, '2-a-seated.png') })
 
   // A 已有座位：走到 1 號空位不再有「入座」提示（一人一格，不換座）
