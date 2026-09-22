@@ -16,8 +16,7 @@ import type { ResourcesStore } from './resourcesStore'
 // ⚠️ **不樂觀更新**（design D1）：`id`、`created_at`、順序都由伺服器決定，201 回來才動清單。
 // ⚠️ **Escape 自己註冊一層**（`S21`）：表單在面板的 `overlay` 裡，所以它是上面那一層 ——
 //    一下 Escape 關表單、面板還開著、**世界命令鎖仍由面板持有**（鎖在 `PanelHost`，不在這裡）。
-// ⚠️ **送出失敗只走 `FE-X05` 的預設呈現**；403／409 要先確認一次專案狀態（D2），**那條路徑跟修改、
-//    刪除共用，在後半 `--edit-delete`**。
+// ⚠️ **送出失敗只走 `FE-X05` 的預設呈現**；403／409 要先確認一次專案狀態（D2）—— 那條路徑跟修改、刪除共用，在後半 `--edit-delete`。
 
 /** 表單掛給面板的同步判斷：能不能讓位（`FE-X16-S14`：送出中或有未儲存的修改都不行，而且不問）。 */
 export interface ResourceFormIntent {

@@ -4,6 +4,7 @@ import { act, useEffect, type RefObject } from 'react'
 import type { ProjectOut, ProjectResourceOut, ProjectStatus, ResourceType } from '@/api/contract/rest'
 import { IdentityProvider, useIdentity } from '@/identity/IdentityProvider'
 import { ResourcesPanel } from '@/resources/ResourcesPanel'
+import { resourceFormSchema } from '@/resources/resourceRules'
 import { ResourcesProvider, useResourcesPanel } from '@/resources/ResourcesProvider'
 import { useBlockingPanels } from '@/panel/BlockingPanelCoordinator'
 import { InteractionProvider, useInteraction } from '@/world/interaction/InteractionProvider'
@@ -245,6 +246,17 @@ describe('新增：送出前擋下伺服器一定會拒絕的輸入，只送原�
     expect(error('url')).toBeNull()
     expect(submitButton().disabled, '剛好在上限上，送出鈕卻不能按').toBe(false)
 
+    // **真的送一次**：規格要的是「剛好在上限上時送出的值是完整的原字串」——
+    // 只驗「按得下去」的話，一個在送出前把值截短的實作照樣全綠（外部審查抓到的）。
+    const atLimit = { label: '😀'.repeat(limit.label), url: head + 'a'.repeat(limit.url - head.length) }
+    createResource.mockResolvedValue(resource(atLimit.label, 'figma', atLimit.url))
+    await submit()
+    expect(createResource.mock.calls, '上限值送出時被截掉了').toEqual([[PID, { label: atLimit.label, type: 'figma', url: atLimit.url }]])
+    createResource.mockReset()
+    click(createButton())
+    await screen.findByTestId('resource-form')
+    await type('類型', 'figma')
+
     await type('名稱', '😀'.repeat(limit.label + 1))
     await flush()
     expect(error('label'), '名稱多一個字，沒有立刻說').not.toBeNull()
@@ -333,7 +345,11 @@ describe('新增：送出前擋下伺服器一定會拒絕的輸入，只送原�
   it('[FE-J14-S15] 送出前看得到「這個連結能進房的人都看得到」，而且關聯到網址欄', async () => {
     await openForm(two())
     const hint = screen.getByTestId('resource-form-visibility')
-    expect(hint.textContent?.trim().length, '說明是空的').toBeGreaterThan(0)
+    // **逐字**，不是「非空」：規格要的是「讓人辨識連結的可見範圍是能進這間房的人」，
+    // 而一句「提示」也是非空的（外部審查抓到的）。抄在這裡、不 import —— 文案改壞時期望值不會跟著錯。
+    expect(hint.textContent, '說明沒有講出「進得了這間房的人都看得到」這件事').toBe(
+      '這個連結，進得了這間房的人都看得到 —— Drive、Notion、會議連結常常帶著存取權杖。',
+    )
     // 可見 ＋ 被輔助技術關聯到網址欄：`aria-describedby` 指到它
     expect(hint.hasAttribute('hidden')).toBe(false)
     const describedBy = (field('網址').getAttribute('aria-describedby') ?? '').split(/\s+/)
@@ -360,6 +376,36 @@ describe('讓位：送出中或改過沒存的表單不讓位', () => {
     // 讓位不替使用者按下那個問題（`FE-X16-S14` 逐字）：不得冒出放棄修改的確認層
     expect(screen.queryByRole('alertdialog'), '讓位時冒出了確認層').toBeNull()
     expect(screen.queryByTestId('resource-form'), '被拒絕讓位之後表單要留著').not.toBeNull()
+  })
+
+  it('[FE-X16-S14] 送出中也不讓位 —— 就算此刻欄位已經被清空（dirty 不再成立）', async () => {
+    // 送出中欄位**沒有**被 disabled，所以使用者清得掉它們：那一刻 `isDirty` 回到 false，
+    // 只看 dirty 的實作會在請求還在路上時讓位、把表單連同進行中的送出一起卸載（外部審查抓到的）。
+    createResource.mockReturnValue(deferred<ProjectResourceOut>().promise)
+    await openForm(two())
+    await fillValid()
+    await act(async () => {
+      submitButton().form?.requestSubmit()
+    })
+    await flush()
+    expect(createResource.mock.calls, '請求沒送出去 —— 這條判準會量到別的東西').toHaveLength(1)
+
+    await type('名稱', '')
+    await type('類型', '')
+    await type('網址', '')
+    await flush()
+    expect(asked.request?.(), '送出中卻讓位了 —— 那個請求的結果會掉在一個已經不存在的表單上').toBe(false)
+  })
+})
+
+describe('表單規則（直接打 schema —— DOM 產不出這些值）', () => {
+  it('[FE-J14-S11] type 只收那五種：空的是「按下去才說」，不在集合裡的直接不收', () => {
+    const ok = { label: '設計稿', url: 'https://example.com/x' }
+    expect(resourceFormSchema().safeParse({ ...ok, type: 'figma' }).success).toBe(true)
+    // `<select>` 產不出 `other`，但送出時是 `as ResourceType` 直接餵給契約 ——
+    // 這一層不擋的話那個 cast 就是謊話（外部審查抓到的）
+    expect(resourceFormSchema().safeParse({ ...ok, type: 'other' }).success, 'type 收下了不在那五種裡的值').toBe(false)
+    expect(resourceFormSchema().safeParse({ ...ok, type: '' }).success).toBe(false)
   })
 })
 

@@ -9,9 +9,8 @@ import { safeHref } from '@/security/safeHref'
 // 烤進 schema 的話，「數字不是寫死的」那條判準（`S12` 的 mock 那段）永遠證不了。
 // ⚠️ **兩層驗證時機**（`FE-X05`）：只有 `too_small` 是「按下去才說」。所以「空的」「只含空白」「沒選 type」
 // 必須用 `too_small` 發 issue —— 寫成 `custom`／`refine` 會變成即時錯誤、把送出鈕鎖住，而規格要的是相反。
-// ⚠️ **網址的格式條件是「`safeHref` 放行 ∧ 不含空白」，兩個都要**（D5）：兩者不等價 ——
-// `https://example.com/a b` 會被 URL 解析器編成 `%20` 而放行，送原字串到後端是 500；反過來 `https://[`
-// 後端收得下、`safeHref` 不收。送出的一律是**原字串**。
+// ⚠️ **網址的格式條件是「`safeHref` 放行 ∧ 不含空白」，兩個都要**（D5）：兩者不等價 —— `https://example.com/a b`
+// 會被 URL 解析器編成 `%20` 而放行、送原字串到後端是 500；反過來 `https://[` 後端收得下、`safeHref` 不收。送出的一律是**原字串**。
 
 export const RESOURCE_TYPE_OPTIONS = ResourceType.options
 /** type 的可辨識標記**是文字**，不是只靠顏色或形狀（`S01`：輔助技術讀得到是哪一種）。 */
@@ -58,8 +57,10 @@ export function resourceFormSchema() {
         // 後端的 check 是 `btrim(label) <> ''`，而且**不 trim** —— 前端擋的是「只有空白」，送的仍是原字串
         if (value.trim() === '') required(ctx, RESOURCE_FORM_COPY.labelRequired)
       }),
+    // ⚠️ 成員資格也要擋：送出時直接 `as ResourceType` 餵給契約 —— 這裡不擋，那個 cast 就是謊話，壞值要到 `operations` 才被 Zod 丟成例外。
     type: z.string().superRefine((value, ctx) => {
       if (value === '') required(ctx, RESOURCE_FORM_COPY.typeRequired)
+      else if (!(RESOURCE_TYPE_OPTIONS as readonly string[]).includes(value)) ctx.addIssue({ code: 'custom', message: RESOURCE_FORM_COPY.typeRequired })
     }),
     url: z
       .string()
