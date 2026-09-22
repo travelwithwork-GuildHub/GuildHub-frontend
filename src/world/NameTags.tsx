@@ -69,13 +69,13 @@ function PlayerTag({
         style={{ width: NAME_TAG_SIZE.width, height: NAME_TAG_SIZE.height }}
         {...withClass(
           CAPTION,
-          `bg-surface/75 text-ink shadow-panel overflow-hidden border px-3 text-center leading-7 text-ellipsis whitespace-nowrap rounded-full backdrop-blur-sm ${isSelf ? 'border-accent' : 'border-line'}`,
+          `bg-glass text-glass-ink hud-legible shadow-panel overflow-hidden border px-3 text-center leading-7 text-ellipsis whitespace-nowrap rounded-full backdrop-blur-sm ${isSelf ? 'border-accent' : 'border-glass-line'}`,
         )}
       >
         {name}
       </div>
       {st !== '' && (
-        <span data-testid={`${testid}-status`} {...withClass(CAPTION, 'bg-surface/75 border-line text-ink-muted shadow-panel absolute bottom-full left-0 mb-0.5 w-full overflow-hidden rounded-full border px-2 text-center leading-5 text-ellipsis whitespace-nowrap backdrop-blur-sm')}>
+        <span data-testid={`${testid}-status`} {...withClass(CAPTION, 'bg-glass border-glass-line text-glass-ink-muted hud-legible shadow-panel absolute bottom-full left-0 mb-0.5 w-full overflow-hidden rounded-full border px-2 text-center leading-5 text-ellipsis whitespace-nowrap backdrop-blur-sm')}>
           {st}
         </span>
       )}
