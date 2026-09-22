@@ -30,9 +30,16 @@
 - [ ] 4.3 按鈕點擊微動畫（`transform: scale`、尊重 `prefers-reduced-motion`）。
 - [ ] 4.4 不破 `FE-X16` 既有判準（data-tier、對比、焦點環、每區至多一主要動作）。
 
-## 5. 收尾
+## 5. 情境提示膠囊＋出口鈕降級（`dom-visual-system`：`FE-X17-S05`／`S06`）— demo P0 病灶
 
-- [ ] 5.1 全套件綠、`FE-X16` 既有 e2e 與判準不紅、`openspec validate` 綠、`progress.sh --check` 綠。
-- [ ] 5.2 **前後截圖**（1440×900 與手機寬），自問「有 3D 體驗了嗎、還像網頁嗎」。
-- [ ] 5.3 送 codex／gemini 驗成品。
-- [ ] 5.4 部署最新版到 Vercel（`ship.sh`）。
+- [ ] 5.1 `InteractionPrompt`：白盒（`border-line bg-surface text-ink border`）→ 深色半透明 glass 膠囊（沿用 §3.1 的 glass token）＋圓角＋浮起；`E` 用獨立鍵帽樣式（`<kbd>` 已在，補樣式看得出是一顆鍵）；位置維持 `bottom-gutter left-1/2 -translate-x-1/2`。文字對底 `≥ 4.5:1`。
+- [ ] 5.2 `ReturnToHallButton`／`AppHeader`：房間裡不再把「回到 Guild Hall」當常駐具名文字大鈕；收進 overflow／`⋯` 選單項或 icon-only＋`aria-label`，觸發同一個 `returnToHall`。鍵盤可達、讀屏有名。大廳不受影響（大廳本來就沒這顆）。
+- [ ] 5.3 判準：`FE-X17-S05`（真瀏覽器量：門前提示背景合成 alpha `< 1`、有 `kbd` 鍵帽、下半部置中、對比 `≥ 4.5:1`）、`FE-X17-S06`（房間裡沒有常駐具名「回到 Guild Hall」大鈕、返回動作鍵盤可達、門前提示在）。
+- [ ] 5.4 不破 `FE-V01` 既有 e2e／判準（穿門即走、門前按 E、`returnToHall` 行為不變）。
+
+## 6. 收尾
+
+- [ ] 6.1 全套件綠、`FE-X16` 既有 e2e 與判準不紅、`openspec validate` 綠、`progress.sh --check` 綠。
+- [ ] 6.2 **前後截圖**（1440×900 與手機寬），自問「有 3D 體驗了嗎、還像網頁嗎」。
+- [ ] 6.3 送 codex／gemini 驗成品。
+- [ ] 6.4 部署最新版到正式站（使用者 `vercel --prod`）。
