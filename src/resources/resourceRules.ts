@@ -18,11 +18,13 @@ export const RESOURCE_TYPE_LABELS: Record<z.infer<typeof ResourceType>, string> 
 
 export const RESOURCE_FORM_COPY = {
   createTitle: '新增資源',
+  editTitle: '修改資源',
   label: '名稱',
   type: '類型',
   url: '網址',
   typeUnset: '還沒選',
   submit: '新增',
+  save: '儲存',
   cancel: '取消',
   back: '返回',
   /** `S15`：送出前就要看得到可見範圍（Drive、Notion、會議連結常常帶著存取權杖）。 */
@@ -34,6 +36,11 @@ export const RESOURCE_FORM_COPY = {
   urlTooLong: (max: number) => `網址最多 ${max} 個字。`,
   urlInvalid: '網址要以 http:// 或 https:// 開頭，而且不能有空白。',
 } as const
+
+/** 寫入被伺服器拒絕，而且已經照 `D2` 確認過專案狀態：訊息是 `FE-X03` 的語彙，不是後端的字。 */
+export class ResourceWriteRejected extends Error {
+  override name = 'ResourceWriteRejected'
+}
 
 export interface ResourceFormValues {
   label: string
