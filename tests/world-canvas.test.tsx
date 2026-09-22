@@ -20,8 +20,17 @@ vi.mock('@react-three/fiber', () => ({
       return selector ? selector(state) : state
     },
     useFrame: () => {},
-  Canvas: ({ children, onCreated }: { children?: ReactNode; onCreated?: () => void }) => {
-    onCreated?.() // 真的 Canvas 建好 renderer 之後會呼叫它；殼也要，否則 S05 測不到
+  Canvas: ({
+    children,
+    onCreated,
+  }: {
+    children?: ReactNode
+    onCreated?: (state: { gl: { domElement: HTMLElement } }) => void
+  }) => {
+    // 真的 Canvas 建好 renderer 之後會用 RootState 呼叫它（含 `gl.domElement` ——
+    // WorldCanvas 在 onCreated 設 `image-rendering: pixelated`，FE-W14-S05）。
+    // 殼給最小替身：一個真的 canvas 元素，讓那行樣式賦值不炸；否則 S05／S07 測不到。
+    onCreated?.({ gl: { domElement: document.createElement('canvas') } })
     return <div data-testid="r3f-canvas-stub">{children}</div>
   },
 }))
