@@ -54,3 +54,7 @@ docs/arch.html
 
 # Claude Code 的個人本機設定（權限、本機 plugin 開關）。每台機器不同，不進版控。
 /.claude/settings.local.json
+
+# 丟進來給我看的參考截圖（feedback／走查用）。**不進版控** —— 是溝通用的暫存圖，不是 repo 內容；
+# 要留成證據就放 docs/evidence/。
+/img/
