@@ -25,12 +25,14 @@ import { spawnSync } from 'node:child_process'
 import {
   loadConfig,
   modelsFrom,
+  writerFrom,
+  writerHarnessArgError,
+  nextWriterSeat,
   memberFileName,
   git,
   changedFiles,
   parseArgs,
   CLEAN_GIT_ENV,
-  assertSettingsAllowRegex,
   agySettingsPath,
   isDirectRun,
   readMembersJson,
@@ -40,6 +42,7 @@ import {
   writeTreeOf,
   MEASUREMENT_SCHEMA_VERSION,
 } from './lib.mjs'
+import { getHarness } from './harnesses/index.mjs'
 import { main as writeMain } from './write.mjs'
 import { main as councilMain, parseVerdicts } from './council.mjs'
 
@@ -56,12 +59,14 @@ function formatReviewerSummary(m) {
   lines.push(`[${m.name} (${m.model})] 整份: ${overall}`)
   if (m.empty) return lines
 
+  const uncitedSet = new Set(Array.isArray(m.uncited) ? m.uncited : (parseVerdicts(m.text || '').uncited || []))
   const textLines = (m.text || '').split('\n').map((l) => l.trim()).filter(Boolean)
   for (const [qn, verdict] of Object.entries(m.q || {})) {
     if (verdict === '不簽') {
       const matchLine = textLines.find((l) => l.startsWith(qn) || l.includes(qn))
       const reason = matchLine ? matchLine.slice(0, 200) : '不簽'
-      lines.push(`  - ${qn} (不簽): ${reason}`)
+      const suffix = uncitedSet.has(qn) ? '　⚠ 無引用（不納入結論，accept 用 --disposition 記 rejected）' : ''
+      lines.push(`  - ${qn} (不簽): ${reason}${suffix}`)
     }
   }
 
@@ -85,6 +90,34 @@ function appendLifecycle(outDir, entry, env = process.env) {
   const full = { ...base, ...entry }
   fs.mkdirSync(outDir, { recursive: true })
   fs.appendFileSync(lifecycleFile, JSON.stringify(full) + '\n')
+}
+
+/**
+ * 寫手最後一筆台帳的 failure（write.mjs 1.16.0 起每筆都帶統一形狀 failure；沒有／讀不到 ⇒ null）。
+ * 只讀 `<writeOutDir>/ledger.ndjson`（write.mjs 收到 --out 時的預設台帳位置）；壞行跳過，取最後一筆合法的。
+ */
+export function lastWriterFailure(writeOutDir) {
+  const file = path.join(writeOutDir, 'ledger.ndjson')
+  if (!fs.existsSync(file)) return null
+  let last = null
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    const t = line.trim()
+    if (!t) continue
+    try {
+      last = JSON.parse(t)
+    } catch {
+      /* 壞行跳過 */
+    }
+  }
+  return last && last.failure && typeof last.failure === 'object' ? last.failure : null
+}
+
+/** 收貨摘要的「下一席」那一行：只在寫手 failure.kind==='quota' 且 config 還有下一席時才印；不自動重跑。 */
+export function writerQuotaHintLine(summary) {
+  const f = summary.writerFailure
+  const next = summary.writerNext
+  if (!f || f.kind !== 'quota' || !next) return null
+  return `🔴 寫手額度用盡：下一席 ${next.harness}/${next.model}，重跑加 --writer-harness ${next.harness}`
 }
 
 function buildReceiptSummaryLines(summary, reviewMembers, summaryPath) {
@@ -118,6 +151,9 @@ function buildReceiptSummaryLines(summary, reviewMembers, summaryPath) {
       )
     }
   }
+  // 1.16.0 寫手鏈：額度用盡只【提示】下一席（統整者自己決定要不要重跑；council 09-22 第 4 題：fallback 不自動）。
+  const quotaHint = writerQuotaHintLine(summary)
+  if (quotaHint) lines.push(quotaHint)
 
   if (summary.tierEscalatedBy && summary.tierEscalatedBy.length > 0) {
     lines.push(`tierEscalatedBy: ${summary.tierEscalatedBy.join(', ')}`)
@@ -391,7 +427,7 @@ export async function main(argv, deps = {}) {
       return 2
     }
     const RUN_USAGE =
-      '用法：run --coordinator <claude|agy|codex> --name <n> --brief <file> --branch <prefix/name> --allow <path>… --test "<cmd>" [--tier standard|block] [--base main] [--review-only] [--write-timeout-ms <ms>]'
+      '用法：run --coordinator <claude|agy|codex> --name <n> --brief <file> --branch <prefix/name> --allow <path>… --test "<cmd>" [--tier standard|block] [--base main] [--review-only] [--write-timeout-ms <ms>] [--writer-harness <name>]'
     if (!a.name || !a.brief || !a.branch || !a.allow || a.allow.length === 0 || !a.test) {
       console.error(RUN_USAGE)
       return 2
@@ -403,7 +439,24 @@ export async function main(argv, deps = {}) {
       return 2
     }
 
-    const writeTimeoutRaw = a['write-timeout-ms'] !== undefined ? a['write-timeout-ms'] : (config.writer && config.writer.timeoutMs)
+    // 🔴 1.16.0 寫手鏈：一次只跑一席。`--writer-harness <name>`（或 env LLM_TEAM_WRITER_HARNESS）選 config.writer 陣列裡的席，
+    //    預設第 0 席；不在 config ⇒ exit 2 列出可用席。timeoutMs 也是選中那席的。
+    //    裸旗標（parseArgs 得 true）／空字串 ⇒ 拒絕、不准靜默落第 0 席（r3 sol Q2）。
+    const harnessArgErr = writerHarnessArgError(a['writer-harness'], config)
+    if (harnessArgErr) {
+      console.error(`🔴 ${harnessArgErr}`)
+      return 2
+    }
+    const writerHarnessArg = a['writer-harness']
+    let writer
+    try {
+      writer = writerFrom(config, env, { harness: writerHarnessArg })
+    } catch (e) {
+      console.error(`🔴 ${e.message}`)
+      return 2
+    }
+
+    const writeTimeoutRaw = a['write-timeout-ms'] !== undefined ? a['write-timeout-ms'] : writer.timeoutMs
     let writeTimeoutMs = null
     if (writeTimeoutRaw !== undefined) {
       let n = NaN
@@ -493,11 +546,23 @@ export async function main(argv, deps = {}) {
       tierEscalatedBy = matchedRiskDomains
     }
 
-    // G2 settings 對帳（搬到 worktree add 之前，避免漂移造成 worktree 殘留）
-    // 🔴 2026-09-13 H6 複審坐實：曾寫成「注入 writeMain ⇒ 跳過 G2」，把測試捷徑當契約；G2 只能由 deps.assertSettings 覆寫。陽性對照 ticket.test.mjs「T37 G2 對帳：deps 注入 writeMain 時仍受 G2 約束（assertSettings 拋錯 ⇒ run 回 2 且未建 worktree）」
-    const checkSettings = deps.assertSettings || assertSettingsAllowRegex
+    // G2 寫手 harness 的 preflight（搬到 worktree add 之前，避免漂移造成 worktree 殘留）
+    // 🔴 2026-09-13 H6 複審坐實：曾寫成「注入 writeMain ⇒ 跳過 G2」，把測試捷徑當契約；G2 只能由 deps 覆寫。陽性對照 ticket.test.mjs「T37 G2 對帳：deps 注入 writeMain 時仍受 G2 約束（assertSettings 拋錯 ⇒ run 回 2 且未建 worktree）」
+    // 🔴 1.16.0：改走 registry 的 `getHarness(writer.harness).preflight(env, config, { repoRoot, role: 'write' })`——不認 harness 名字
+    //    （agy ＝ settings.json 對帳；gemini ＝ 驗 policy TOML 產得出來，這裡不給 outDir 所以不落地，落地在 write.mjs G2 的 outDir——
+    //    不進 worktree，changed 不需要特例；陽性對照 ticket.test.mjs T96/T97）。
+    //    任一條 !ok 或 throw ⇒ exit 2。`deps.assertSettings` 相容保留：有注入就當它是這一席 preflight 的實作（舊簽名 (settingsFile, repoRoot, config)）。
+    const getHarnessFn = deps.getHarness || getHarness
+    const runPreflight = deps.assertSettings
+      ? () => deps.assertSettings(agySettingsPath(env), repoRoot, config)
+      : () => {
+          const h = getHarnessFn(writer.harness)
+          const checks = h.preflight ? h.preflight(env, config, { repoRoot, role: 'write' }) : []
+          const bad = checks.find((c) => !c.ok)
+          if (bad) throw new Error(bad.message || `${bad.label} 不通過`)
+        }
     try {
-      checkSettings(agySettingsPath(env), repoRoot, config)
+      runPreflight()
     } catch (e) {
       console.error(`🔴 G2：${e.message}`)
       return 2
@@ -601,10 +666,11 @@ export async function main(argv, deps = {}) {
       ]
       if (writeTimeoutMs !== null) writeArgs.push('--timeout-ms', String(writeTimeoutMs))
       if (a.model) writeArgs.push('--model', a.model)
+      if (writerHarnessArg) writeArgs.push('--writer-harness', writerHarnessArg)
       if (configFile) writeArgs.push('--config', configFile)
 
       writeExit = writeMainFn(writeArgs, deps)
-      appendLifecycle(outDir, { event: 'writer-done', ticket: a.name, writeExit }, env)
+      appendLifecycle(outDir, { event: 'writer-done', ticket: a.name, writeExit, writerHarness: writer.harness }, env)
 
       // 🔴 P5：write 非 0（含 2＝守門擋下、3＝被拒／越界／逾時）⇒ 不跑 --test、不開 council；以前 exit 3 落到 changed.length > 0 就拿半成品去複審。
       //    陽性對照 ticket.test.mjs「P5 writeMain 回 3 且有改檔 ⇒ councilMain 假函式沒被呼叫、runTest 沒被呼叫、summary.review === null」；
@@ -720,6 +786,7 @@ export async function main(argv, deps = {}) {
           const v = parseVerdicts(text)
           const empty = m.empty === true || m.timedOut === true || !text.trim()
           if (empty) anyEmpty = true
+          const uncited = Array.isArray(m.uncited) ? m.uncited : (v.uncited || [])
           reviewMembers.push({
             name: m.name,
             harness: m.harness,
@@ -727,6 +794,7 @@ export async function main(argv, deps = {}) {
             quotaBucket: m.quotaBucket,
             overall: m.overall !== undefined ? m.overall : v.overall,
             q: m.q && typeof m.q === 'object' ? m.q : v.q,
+            uncited,
             empty,
             timedOut: m.timedOut === true,
             text,
@@ -742,6 +810,11 @@ export async function main(argv, deps = {}) {
       appendLifecycle(outDir, { event: 'review-done', ticket: a.name, anyEmpty, rosterMismatch }, env)
     }
 
+    // 1.16.0 寫手鏈：寫手最終 failure（write.mjs 台帳最後一筆）＋ config 的下一席。只在 write 非 0 時看；提示由收貨摘要印，這裡不重跑。
+    //    陽性對照 ticket.test.mjs「T90 假寫手台帳 failure quota ⇒ 摘要含「下一席 gemini」；非 quota ⇒ 不含」。
+    const writerFailure = !reviewOnly && writeExit !== 0 ? lastWriterFailure(writeOutDir) : null
+    const writerNext = writerFailure && writerFailure.kind === 'quota' ? nextWriterSeat(config, writer.harness) : null
+
     // 計算 rounds
     let rounds = 1
     if (fs.existsSync(writeOutDir)) {
@@ -756,7 +829,7 @@ export async function main(argv, deps = {}) {
     if (doReview) {
       reviewObj = {
         tier,
-        members: reviewMembers.map(({ name, harness, model, quotaBucket, overall, q, empty, timedOut }) => ({ name, harness, model, quotaBucket, overall, q, empty, timedOut })),
+        members: reviewMembers.map(({ name, harness, model, quotaBucket, overall, q, empty, timedOut, uncited }) => ({ name, harness, model, quotaBucket, overall, q, empty, timedOut, uncited })),
         anyEmpty,
         membersSource: 'review/members.json',
         reviewedTree: writeTreeOfFn(worktree),
@@ -792,6 +865,10 @@ export async function main(argv, deps = {}) {
       reviewOnly,
       writeExit,
       writeTimedOut,
+      // 1.16.0：實際跑的寫手席＋最終 failure＋（只在 quota 時）下一席；不自動重跑。
+      writer: { harness: writer.harness, model: a.model || writer.model, quotaBucket: writer.quotaBucket },
+      writerFailure,
+      writerNext: writerNext ? { harness: writerNext.harness, model: writerNext.model } : null,
       rounds,
       changed,
       verifyExit,
