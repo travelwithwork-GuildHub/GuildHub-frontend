@@ -122,7 +122,9 @@ export function AvatarPicker() {
           style={{ zIndex: layer('panel') }}
           // `max-w-full`＋選項 `flex-wrap`：八款在 1024 寬也放得下（`FE-A05-S23`）
           // 入口在標題列靠右那一組（`FE-X16-S19`），彈出層靠標題列的右緣；定位基準仍是整條標題列（`max-w-full` 才放得下八款）
-          className="bg-surface-raised border-control-edge absolute top-full right-gutter mt-2 flex max-w-full flex-col gap-gutter rounded border p-gutter"
+          // ⚠️ **`text-ink`（深字，淺底用）不可省**：這個彈出層是 `AppHeader` 的子孫，會繼承標題列的 `text-glass-ink`（淺字、給深玻璃底用）；
+          // 但彈出層自己是淺色 `bg-surface-raised`，不重設字色就會淺字壓淺底＝標題與「角色 N」看不清（截圖回報，X17 標題列回歸）。
+          className="bg-surface-raised border-control-edge text-ink absolute top-full right-gutter mt-2 flex max-w-full flex-col gap-gutter rounded border p-gutter"
         >
           {/* 開著才在 Escape 的堆疊裡；面板開著時它在下面（但會先因失焦而關）。 */}
           <EscapeLayer onEscape={dismiss} element={popover} />
