@@ -205,17 +205,19 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
           <div data-testid="world-stage" inert={worldDialogOpen} className="contents">
           <Canvas
             shadows
-            // 規格 FE-W14-S05：像素風以**固定的低有效 DPR `0.25`** 渲染，
+            // 規格 FE-W14-S05：像素風以**固定的低有效 DPR `0.5`** 渲染，
             // 再靠 canvas 的 `image-rendering: pixelated` 最近鄰放大成點陣外觀 ——
-            // 低解析度 backing store 被硬邊放大，同時把 GPU 要著色的像素數降到約 1/16
-            // （服務 FE-X09「弱裝置」）。`world-canvas` 的 DPR 契約不變（上限 `2`、`0.25 ≤ 2`）。
+            // 低解析度 backing store 被硬邊放大。**由 `0.25` 提高到 `0.5`（品質優先）**：`0.25`（1/16 像素）下角色臉僅
+            // 1–2px、站定被次像素移動洗進洗出、移動中硬邊每幀跨像素跳 → 使用者回報「糊、走路閃、廉價」。`0.5`（1/4 像素）
+            // 讓角色像素加倍（臉 3–4px 可讀）、邊緣抖動變細；代價 fragment 約 ×4，demo 以品質優先於 FE-X09 弱裝置預算
+            // （兩模型＋使用者確認）。`world-canvas` 的 DPR 契約不變（上限 `2`、`0.5 ≤ 2`）。徹底消移動抖動的 RT 方案留作後續。
             //
             // ⚠️ **`antialias: false`（走動穩定 change fe-w14-motion-stability 的最終決定）**：曾一度改開 MSAA 來治
             // 「走動時幾何邊緣閃」，但在 `dpr 0.25` 下 MSAA 把**角色的硬像素邊緣軟化成柔邊**（角色純方塊、無貼圖，
             // 靜止時看起來糊、臉部 1–2px 細節被抹）。取捨評估（codex／gemini 一致）後撤回：致暈主因是大面積地面／牆的
             // **貼圖爬行**，已由 `pixelate()` 的 mipmap 治好；殘留的幾何邊緣抖動在貼圖爬行消失後不足以致暈，而靜止時
             // 角色讀成清晰硬邊像素才不可退讓。所以 `antialias` 維持關閉、只靠 mipmap 消閃。見 design.md〈撤回 MSAA〉。
-            dpr={0.25}
+            dpr={0.5}
             gl={{ antialias: false }}
             onCreated={(state?: Partial<RootState>) => {
               // 最近鄰放大：沒有這行，瀏覽器會用雙線性把 1/4 解析度的畫面**平滑**放大回來，
