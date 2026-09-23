@@ -205,14 +205,17 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
           <div data-testid="world-stage" inert={worldDialogOpen} className="contents">
           <Canvas
             shadows
-            // 規格 FE-W14-S05：像素風以**固定的低有效 DPR `0.25`**、關 antialias 渲染，
+            // 規格 FE-W14-S05：像素風以**固定的低有效 DPR `0.25`** 渲染，
             // 再靠 canvas 的 `image-rendering: pixelated` 最近鄰放大成點陣外觀 ——
             // 低解析度 backing store 被硬邊放大，同時把 GPU 要著色的像素數降到約 1/16
-            // （服務 FE-X09「弱裝置」）。`world-canvas` 的 DPR Requirement 已在本 change
-            // 一併 MODIFIED 放寬下限（上限 `2` 仍成立，`0.25 ≤ 2`）——「1 到 2 之間」的
-            // 下限是防高 DPR 浪費像素，跟像素風刻意降解析度同一個方向，不衝突。
+            // （服務 FE-X09「弱裝置」）。`world-canvas` 的 DPR 契約不變（上限 `2`、`0.25 ≤ 2`）。
+            //
+            // ⚠️ **`antialias: true`（change fe-w14-motion-stability，走動穩定）**：在那個 1/16 低解析
+            // backing store 上做原生 MSAA，讓移動中的**幾何邊緣覆蓋率**漸變而非二元跳動 —— 治「走動時整片＋人物閃」。
+            // 像素格不因 MSAA 消失（`pixelated` 最近鄰放大照舊，仍是硬邊方塊）；著色仍 1/16，只多多重取樣 buffer 的頻寬。
+            // 貼圖爬行（另一半閃）由 `pixelate()` 的 mipmap 治。原生 MSAA 若不足，後備是手動 MSAA-FBO（見 design.md）。
             dpr={0.25}
-            gl={{ antialias: false }}
+            gl={{ antialias: true }}
             onCreated={(state?: Partial<RootState>) => {
               // 最近鄰放大：沒有這行，瀏覽器會用雙線性把 1/4 解析度的畫面**平滑**放大回來，
               // 點陣邊緣就糊掉了 —— 那正是像素外觀要避免的。

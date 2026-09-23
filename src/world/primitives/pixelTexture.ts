@@ -1,4 +1,4 @@
-import { NearestFilter, RepeatWrapping } from 'three'
+import { NearestFilter, NearestMipmapLinearFilter, RepeatWrapping } from 'three'
 import type { CanvasTexture, Color } from 'three'
 
 // 像素貼圖的共用底層工具。規格 `FE-W14-S02`／`S03`／`S04`。
@@ -38,11 +38,15 @@ export function offscreen2d(
   return { canvas, ctx }
 }
 
-/** 把 canvas 貼圖設成最近鄰、可重複、指定 tiling 的像素貼圖。 */
+/** 把 canvas 貼圖設成最近鄰放大、可重複、指定 tiling 的像素貼圖。 */
 export function pixelate(texture: CanvasTexture, repeat: number, name: string): CanvasTexture {
   texture.name = name
+  // ⚠️ **`magFilter` 最近鄰、`minFilter` 走 mipmap（`FE-W14-S02`，走動穩定）。**
+  // 放大（近看）用 `NearestFilter` → 硬像素外觀不變；縮小（遠看／移動）走 mipmap → 不再每幀取到不同 texel 而爬行／閃。
+  // 低有效 DPR 下無 mipmap 的 minification 是「走動時地面／牆整片爬」的成因之一（見 change fe-w14-motion-stability）。
   texture.magFilter = NearestFilter
-  texture.minFilter = NearestFilter
+  texture.minFilter = NearestMipmapLinearFilter
+  texture.generateMipmaps = true
   texture.wrapS = RepeatWrapping
   texture.wrapT = RepeatWrapping
   texture.repeat.set(repeat, repeat)
