@@ -36,36 +36,6 @@ render loop **MUST NOT** 每幀新建 `CanvasTexture`。
 - **THEN** SHALL 回一個純色 `MeshStandardMaterial`、其 `map` 為未設定（`null`）
 - **AND** SHALL NOT 拋錯
 
-### Requirement: World 以低有效 DPR 做像素化渲染
-
-`/world` 的 WebGL 畫面 SHALL 以固定的**低有效 DPR**（`0.25`）、**關閉 antialias** 渲染，
-並把 canvas 的 CSS `image-rendering` 設為 `pixelated`，使低解析度的 backing store 被**最近鄰放大**
-成點陣外觀。這是像素風的來源，也把 GPU 要著色的像素數降到約 1/16（與 `FE-X09`「弱裝置」同一目標）。
-
-此有效 DPR **刻意低於** `world-canvas` 原本「1 到 2 之間」的下限；`world-canvas` 的 DPR Requirement
-已放寬下限、把像素模式的低 DPR 交由此處決定（上限 `2` 仍成立，`0.25 ≤ 2`）。
-
-> **本 change 一度把「關閉 antialias」改述為「開啟多重取樣（MSAA）」**來治「走動時幾何邊緣閃」，部署後實測發現：
-> `dpr 0.25` 下 MSAA 把**角色的硬像素邊緣軟化成柔邊**（角色純方塊、無貼圖，靜止看起來糊、臉部 1–2px 細節被抹）。
-> 兩模型（codex gpt-5.6-terra ＋ gemini 3.1 Pro）一致後**撤回、`antialias` 維持關閉**：致暈主因是大面積地面／牆的
-> **貼圖爬行**、已由本 change 的 mipmap（`S02`／`S04`）治好；殘留的幾何邊緣抖動在貼圖爬行消失後不足以致暈，靜止時
-> 角色清晰不可退讓。詳見 `design.md`〈撤回 MSAA〉。**本 change 對這條需求的淨效果＝維持 antialias 關閉不變（`S05` 同 base）**，
-> 只在其下補一條 mipmap 生成失敗的退化保證（`S09`）。
-
-#### Scenario: [FE-W14-S05] 畫面以 1/4 解析度渲染再最近鄰放大
-
-- **WHEN** 在支援 WebGL2 的真瀏覽器開啟 `/world`
-- **THEN** canvas 的 backing store 每一軸 SHALL 約為其 CSS 顯示尺寸的 1/4（有效 DPR ≈ `0.25`）
-- **AND** canvas 的 `image-rendering` SHALL 是 `pixelated`（最近鄰放大，不是平滑內插）
-- **AND** renderer 的 antialias SHALL 關閉
-- **AND** 畫面上的邊緣 SHALL 呈現硬邊的點陣外觀（前後截圖為證）
-
-#### Scenario: [FE-W14-S09] 無法建 mipmap 時，畫面照常出、不白屏不拋錯
-
-- **WHEN** 某張像素貼圖在該 WebGL 環境無法產生 mipmap
-- **THEN** 該材質 SHALL 退化為原本的最近鄰、無 mipmap 管線，`/world` SHALL 仍然渲染出畫面
-- **AND** SHALL NOT 出現白屏，SHALL NOT 拋錯（mipmap 消閃是加分，缺它時退化，不是壞掉）
-
 ### Requirement: 地面疊一張像素草地，且經共用 resource factory 取得
 
 Guild Hall 的地面 SHALL 在主地板上疊一張**像素草地** plane（`magFilter` 為 `NearestFilter`、`wrap` 為 `RepeatWrapping`，
@@ -84,3 +54,42 @@ filter、`generateMipmaps` SHALL 為真 —— 草地是地板主表面，低有
 - **THEN** 主地板上 SHALL 疊一張像素草地 plane，其貼圖的 `magFilter` 是 `NearestFilter`、`minFilter` 走 mipmap（`generateMipmaps` 為真）、`wrap` 是 `RepeatWrapping`
 - **AND** 該貼圖 SHALL 由共用 resource factory 產生（`WorldShell` 不直接 `new CanvasTexture`）
 - **AND** `WorldShell` 卸載時 SHALL NOT 對草地貼圖或其 geometry 呼叫 `dispose()`（factory 擁有）
+
+## ADDED Requirements
+
+### Requirement: World 以低有效 DPR（0.5）做像素化渲染
+
+`/world` 的 WebGL 畫面 SHALL 以固定的**低有效 DPR**（`0.5`）、**關閉 antialias** 渲染，並把 canvas 的 CSS
+`image-rendering` 設為 `pixelated`，使低解析度的 backing store 被**最近鄰放大**成點陣外觀。這是像素風的來源。
+
+有效 DPR 由 `0.25` **提高到 `0.5`**（本 change 的最後修訂）：`0.25`（每軸 1/4、共 1/16 像素）下角色臉部細節僅 1–2px，
+站定時被相機收斂尾巴／待機浮動的次像素移動洗進洗出、移動中硬邊每幀跨像素跳動 —— 使用者實測回報「糊、會變化、走路閃、
+看起來廉價」。提到 `0.5`（每軸 1/2、共 1/4 像素）讓角色像素密度加倍（臉 3–4px 可讀）、移動時邊緣抖動變細約一半，仍保像素風。
+代價是 fragment 著色量約 ×4：demo **以視覺品質優先於 `FE-X09` 弱裝置預算**，此權衡經 codex／gemini 與使用者確認。
+`world-canvas` 的 DPR 上限 `2` 仍成立（`0.5 ≤ 2`）。
+
+> 徹底消除移動中邊緣抖動需要「固定低解析 RenderTarget ＋ 位置 snap」（兩模型排序 C＞A＞B），屬較大架構改動，留作後續；
+> 本 change 取「提高有效 DPR」為快速、明顯的品質提升。`S05`／`S09` 沿用退役前的 ID（低解析 pixelated 渲染／mipmap 失敗退化的核心語意未變）。
+
+#### Scenario: [FE-W14-S05] 畫面以低解析度渲染再最近鄰放大
+
+- **WHEN** 在支援 WebGL2 的真瀏覽器開啟 `/world`
+- **THEN** canvas 的 backing store 每一軸 SHALL 約為其 CSS 顯示尺寸的 `0.5`（有效 DPR ≈ `0.5`）
+- **AND** canvas 的 `image-rendering` SHALL 是 `pixelated`（最近鄰放大，不是平滑內插）
+- **AND** renderer 的 antialias SHALL 關閉
+- **AND** 畫面上的邊緣 SHALL 呈現硬邊的點陣外觀（前後截圖為證）
+
+#### Scenario: [FE-W14-S09] 無法建 mipmap 時，畫面照常出、不白屏不拋錯
+
+- **WHEN** 某張像素貼圖在該 WebGL 環境無法產生 mipmap
+- **THEN** 該材質 SHALL 退化為原本的最近鄰、無 mipmap 管線，`/world` SHALL 仍然渲染出畫面
+- **AND** SHALL NOT 出現白屏，SHALL NOT 拋錯（mipmap 消閃是加分，缺它時退化，不是壞掉）
+
+## REMOVED Requirements
+
+### Requirement: World 以低有效 DPR 做像素化渲染
+
+**退役原因：有效 DPR 由 `0.25` 提高到 `0.5`**（見上方 ADDED 的〈World 以低有效 DPR（0.5）做像素化渲染〉）。
+原需求的標題與 `S05` 的標題都寫死「1/4 解析度／`0.25`」，`0.25` 已不再成立 —— 依 OpenSpec，標題不真時 MUST 用
+REMOVED ＋ ADDED 換掉，不能用 MODIFIED 保留一個已經不真的標題（沿用 `fe-n08` 的作法）。核心語意（低解析 pixelated
+渲染、mipmap 失敗退化）未變，故 `S05`／`S09` 在 ADDED 需求沿用同一個 ID。

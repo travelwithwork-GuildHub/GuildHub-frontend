@@ -25,19 +25,22 @@
 - **MODIFIED `world-visual-polish` 的〈場景材質⋯像素貼圖〉**：貼圖 `magFilter` 維持 `NearestFilter`（近看硬像素不變），
   但 `minFilter` 改成**走 mipmap** 的 filter、`generateMipmaps` 為真 —— 治 (A) 貼圖爬行。材質快取契約（同 token 同實例、
   不可變、不每幀新建、SSR 退化純色）**完全不變**；`S02` 補上 min／mag／mipmap 的斷言。
-- **〈以低有效 DPR 做像素化渲染〉維持不變**：DPR `0.25` ＋ `pixelated` ＋ 1/16 著色預算 ＋ `antialias` 關閉 —— `S05` 一字不動。
-  （曾一度改述為「開啟 MSAA」治 (B)，實測後撤回，見上「為什麼要動規格」與 `design.md`〈撤回 MSAA〉。）
+- **〈以低有效 DPR 做像素化渲染〉：有效 DPR `0.25` → `0.5`**（REMOVE 舊 1/4 需求＋ADD 新 1/2 需求，`S05`／`S09` 沿用 ID）。
+  `antialias` 維持關閉、`pixelated` 不動。`0.25` 下角色臉僅 1–2px、移動邊緣每幀跳格 → 使用者回報「糊、走路閃、廉價」；`0.5`
+  讓角色像素加倍（臉可讀）、邊緣抖動變細。代價 fragment ×4，demo **以品質優先於 `FE-X09` 弱裝置預算**（兩模型＋使用者確認）。
+  （更早一度改述為「開啟 MSAA」治 (B)、實測後撤回，見「為什麼要動規格」與 `design.md`〈撤回 MSAA〉；徹底消閃的 RT 方案留作後續。）
 
 ## Non-goals
 
-- **不提高有效 DPR、不改全解析度渲染。** 兩模型一致：`dpr 0.5` 只把閃「變細變快」、fragment ×4 直接打 `FE-X09`
-  弱裝置預算，是昂貴的半解。著色維持 1/16。
+- **~~不提高有效 DPR~~（已推翻）→ 有效 DPR `0.25` 提高到 `0.5`。** 原本的立場是「不提高：`dpr 0.5` 只把閃變細、
+  fragment ×4 打 `FE-X09` 弱裝置預算」。但實測部署後使用者回報 `0.25` 下角色臉糊/走路閃/看起來廉價 —— **demo 以視覺品質
+  優先於弱裝置預算**，故提到 `0.5`（見〈What Changes〉與 spec 的 ADDED 需求）。不改全解析度渲染（`0.5` 仍是低解析像素風）。
 - **不做 grid-snap（相機／角色 snap 到像素格）。** 它能完全消閃且零成本，但把平滑移動換成一格一格跳（`0.25` 下一格＝
   螢幕 4px，很明顯）。使用者要的是不閃、不是頓；本 change 選「保平滑移動」的路。grid-snap 留作未來若仍不足時的選項。
 - **不換渲染架構、不引入後處理相依。** (A) 的解是純貼圖旗標（`minFilter`／mipmap），零新相依、同一顆 `<Canvas>`。
   (B) 曾試原生 canvas MSAA（`antialias:true`）後撤回；不上手動 MSAA-FBO、不上任何後處理 pass —— 殘留幾何邊緣抖動
   在 (A) 消失後可接受，清晰的靜止角色優先。若未來仍不足，grid-snap 或 motion-gated AA 是**後備**（見 `design.md`），非本 change。
-- **不改 `world-canvas` 的 DPR 契約。** canvas 仍 dpr `0.25`、上限 `2`；低解析在 canvas 自己的 backing store，不搬到
-  render target，所以 `world-canvas` 一字不動。
-- **不改調色盤、貼圖內容、角色外觀、相機、動畫、坐姿。** 只動 `minFilter`／mipmap 與 `antialias` 兩個渲染旗標。
+- **不改 `world-canvas` 的 DPR 契約。** canvas 的有效 dpr 提到 `0.5`（上限 `2` 仍成立、下限已放寬）；低解析仍在 canvas 自己的
+  backing store，不搬到 render target，所以 `world-canvas` 一字不動。
+- **不改調色盤、貼圖內容、角色外觀、相機、動畫、坐姿。** 只動 `minFilter`／mipmap、`antialias`、`dpr` 三個渲染旗標。
 - **不做效能數字目標。** 40 人 instancing／LOD 與數字門檻歸 `FE-W13`／`FE-O12`。本 change 只確保著色預算不退（維持 1/16）。
