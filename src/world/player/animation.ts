@@ -53,8 +53,14 @@ export function poseAt(phase: number, state: AnimationState) {
       swing: Math.sin(t) * ANIMATION.swing,
     }
   }
+  // ⚠️ **待機時角色垂直靜止（`bounce: 0`）—— 走動穩定。**
+  // 以前待機也有 `sin(t)` 的呼吸起伏（幅度 `bounce*0.35 ≈ 0.021` 世界單位）。但在 `dpr 0.25`（角色僅約 30px 高、
+  // 眼/嘴只有 1–2px）下，那個**次像素**的每幀移動讓臉部細節一幀落在這格、一幀落在那格 → 洗進洗出、看起來糊且會變化
+  // （antialias 關閉後是硬跳）。幅度 `0.021` 遠小於一個 render 像素（≈0.06–0.12 世界單位），所以起伏**本來就幾乎看不見**，
+  // 拿掉沒有可見損失，卻換來站定時角色（連同臉、身體邊緣）完全穩定。兩模型（codex／gemini）一致選此法。
+  // walk 的起伏不動（移動中本就有位移，殘留抖動可接受）。這些值原本就是「暫定、未被測試釘住、FE-W14 會調」。
   return {
-    bounce: Math.sin(t) * ANIMATION.bounce * 0.35,
+    bounce: 0,
     swing: 0,
   }
 }
