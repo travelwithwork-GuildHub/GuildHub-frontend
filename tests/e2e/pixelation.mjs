@@ -100,19 +100,19 @@ try {
     bad('拿不到 canvas 尺寸', '世界沒有畫出可量的 canvas —— 環境問題')
   } else {
     // 有效 DPR ＝ backing store / CSS 尺寸。
-    // ⚠️ **不乘 `window.devicePixelRatio`。** R3F 的 `dpr={0.25}` 是**絕對**像素比
-    //（`gl.setPixelRatio(0.25)`），backing = CSS × 0.25，跟硬體 DPR 無關 ——
-    // 乘上去會在 Retina（dpr=2）算成 0.125 誤紅（headless dpr=1 剛好遮住這個 bug）。
-    // 目標 0.25；給 [0.18, 0.32] 的容忍（整數捨入＋捲軸/邊框的零頭）。
+    // ⚠️ **不乘 `window.devicePixelRatio`。** R3F 的 `dpr={0.5}` 是**絕對**像素比
+    //（`gl.setPixelRatio(0.5)`），backing = CSS × 0.5，跟硬體 DPR 無關 ——
+    // 乘上去會在 Retina（dpr=2）算成 0.25 誤紅（headless dpr=1 剛好遮住這個 bug）。
+    // 目標 0.5（`FE-W14-S05`：有效 DPR 由 0.25 提高到 0.5，品質優先）；給 [0.42, 0.58] 的容忍（整數捨入＋捲軸/邊框的零頭）。
     const ratioX = m.backingW / m.cssW
     const ratioY = m.backingH / m.cssH
-    const inband = (r) => r >= 0.18 && r <= 0.32
+    const inband = (r) => r >= 0.42 && r <= 0.58
     if (inband(ratioX) && inband(ratioY)) {
-      ok(`有效 DPR ≈ ${ratioX.toFixed(3)}×${ratioY.toFixed(3)}（目標 0.25；backing ${m.backingW}×${m.backingH} / CSS ${m.cssW}×${m.cssH}）`)
+      ok(`有效 DPR ≈ ${ratioX.toFixed(3)}×${ratioY.toFixed(3)}（目標 0.5；backing ${m.backingW}×${m.backingH} / CSS ${m.cssW}×${m.cssH}）`)
     } else {
-      bad('有效 DPR 不在 1/4 附近', `x=${ratioX.toFixed(3)} y=${ratioY.toFixed(3)}（backing ${m.backingW}×${m.backingH} / CSS ${m.cssW}×${m.cssH}）`)
+      bad('有效 DPR 不在 1/2 附近', `x=${ratioX.toFixed(3)} y=${ratioY.toFixed(3)}（backing ${m.backingW}×${m.backingH} / CSS ${m.cssW}×${m.cssH}）`)
     }
-    // 上限 2 仍成立（`FE-W01-S02`）：0.25 遠低於 2。
+    // 上限 2 仍成立（`FE-W01-S02`）：0.5 遠低於 2。
     if (ratioX <= 2 && ratioY <= 2) ok('有效 DPR 未超過上限 2')
     else bad('有效 DPR 超過上限 2', `x=${ratioX} y=${ratioY}`)
 
