@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { MeshStandardMaterial, NearestFilter, RepeatWrapping } from 'three'
+import { MeshStandardMaterial, NearestFilter, NearestMipmapLinearFilter, RepeatWrapping } from 'three'
 import { GRASS_TEXTURE_NAME, grassGeometry, grassMaterial, grassTexture } from '@/world/primitives/grass'
 import { createsGpuResources } from '../tests/e2e/leak-harness/coverage'
 
@@ -29,8 +29,10 @@ describe('像素草地 factory（有 canvas 2D context）', () => {
   it('[FE-W14-S04] 草地貼圖來自 factory、是最近鄰可重複、依 repeat 快取', () => {
     const tex = grassTexture(20)
     expect(tex, '有 context 時要有草地貼圖').not.toBeNull()
+    // mag 最近鄰（近看硬像素），min 走 mipmap（地板遠看／移動不爬）—— change fe-w14-motion-stability
     expect(tex?.magFilter).toBe(NearestFilter)
-    expect(tex?.minFilter).toBe(NearestFilter)
+    expect(tex?.minFilter).toBe(NearestMipmapLinearFilter)
+    expect(tex?.generateMipmaps).toBe(true)
     expect(tex?.wrapS).toBe(RepeatWrapping)
     expect(tex?.wrapT).toBe(RepeatWrapping)
     expect(tex?.name).toBe(GRASS_TEXTURE_NAME)

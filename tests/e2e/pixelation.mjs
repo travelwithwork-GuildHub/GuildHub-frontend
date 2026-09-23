@@ -120,18 +120,20 @@ try {
     else bad('image-rendering 不是 pixelated', String(m.imageRendering))
   }
 
-  // antialias 要在 renderer 建立時就關掉。
+  // antialias 要在 renderer 建立時就**開**（change fe-w14-motion-stability：在 1/16 低解析 buffer 上做 MSAA，
+  // 讓移動中的幾何邊緣覆蓋率漸變而非二元跳動 —— 治「走動時整片＋人物閃」）。`FE-W14-S05`。
   const aa = await page.evaluate(() => {
     const c = document.querySelector('canvas')
     try {
       const gl = c?.getContext('webgl2')
-      return gl ? Boolean(gl.getContextAttributes()?.antialias) : null
+      if (!gl) return null
+      return { requested: Boolean(gl.getContextAttributes()?.antialias), samples: gl.getParameter(gl.SAMPLES) }
     } catch {
       return null
     }
   })
-  if (aa === false) ok('renderer 的 antialias 已關閉')
-  else bad('antialias 沒有關閉', String(aa))
+  if (aa && aa.requested === true) ok(`renderer 的 antialias 已開啟（實得 SAMPLES=${aa.samples}；真 GPU 應 > 1，swiftshader 可能回 0）`)
+  else bad('antialias 沒有開啟', String(aa === null ? null : JSON.stringify(aa)))
 
   // 截圖：整個像素世界（草地＋角色描邊／髮型＋硬邊點陣）—— 可讀性（`FE-W14-S01`）人眼判。
   await page.screenshot({ path: `${SHOTS}/world-pixel-after.png` })

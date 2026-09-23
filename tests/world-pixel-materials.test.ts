@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { MeshStandardMaterial, NearestFilter, RepeatWrapping } from 'three'
+import { MeshStandardMaterial, NearestFilter, NearestMipmapLinearFilter, RepeatWrapping } from 'three'
 import {
   NOISE_TEXTURE_NAME,
   WOOD_TEXTURE_NAME,
@@ -36,8 +36,10 @@ describe('像素材質貼圖（有 canvas 2D context）', () => {
 
     const map = (wood1 as MeshStandardMaterial).map
     expect(map, 'wood 材質要有貼圖').not.toBeNull()
+    // mag 最近鄰（近看硬像素），min 走 mipmap（遠看／移動不爬）—— `FE-W14-S02`（change fe-w14-motion-stability）
     expect(map?.magFilter).toBe(NearestFilter)
-    expect(map?.minFilter).toBe(NearestFilter)
+    expect(map?.minFilter).toBe(NearestMipmapLinearFilter)
+    expect(map?.generateMipmaps).toBe(true)
     expect(map?.wrapS).toBe(RepeatWrapping)
     expect(map?.wrapT).toBe(RepeatWrapping)
     // **木頭走木紋，不是一般雜訊** —— 用貼圖名字辨識（假 context 下讀不到像素）
@@ -52,6 +54,8 @@ describe('像素材質貼圖（有 canvas 2D context）', () => {
     const map = (carpet as MeshStandardMaterial).map
     expect(map).not.toBeNull()
     expect(map?.magFilter).toBe(NearestFilter)
+    expect(map?.minFilter).toBe(NearestMipmapLinearFilter)
+    expect(map?.generateMipmaps).toBe(true)
     expect(map?.wrapS).toBe(RepeatWrapping)
     // 一般 token 是雜訊貼圖，不是木紋
     expect(map?.name).toBe(NOISE_TEXTURE_NAME)
