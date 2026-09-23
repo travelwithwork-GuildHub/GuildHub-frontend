@@ -103,11 +103,9 @@ export function PanelShell({ title, closeLabel, testId, bodyTestId, overlayTestI
             data-testid={bodyTestId ?? `${testId}-body`}
             // `inert`：不可聚焦、不可點。jsdom 認得屬性但不實作行為 —— 判準只驗屬性，行為在真瀏覽器。
             inert={overlayOpen || dialogOpen}
-            // 溢出時捲的是這裡，標題列不走（`S08`）。
-            // ⚠️ **`px-1.5 -mx-1.5`（#4 回歸修正，2026-09-23）**：`overflow-y-auto` 依 CSS 規範會把另一軸的 `overflow-x`
-            // 從 `visible` 變成 `auto`，於是聚焦輸入框往外的 focus ring（globals.css：`outline 2px + offset 2px`＝外擴 4px）左右被裁。
-            // 給捲動區 6px 內距讓 ring 有空間、再用等量負外距把邊緣拉回與標題列對齊（父層無 overflow、不會再裁）。
-            className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto px-1.5 -mx-1.5"
+            // 溢出時捲的是這裡，標題列不走（`S08`）。輸入框的焦點環改 inset（globals.css）後，
+            // 這層 `overflow-y-auto`（連帶 `overflow-x:auto`）不會再裁到它 —— 不需再靠內距補救。
+            className="flex min-h-0 flex-1 flex-col gap-gutter overflow-y-auto"
           >
             {children}
           </div>

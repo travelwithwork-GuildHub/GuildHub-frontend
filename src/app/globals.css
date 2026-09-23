@@ -106,6 +106,14 @@
     outline-offset: 2px;
   }
 
+  /* 表單欄位的焦點環改 inset（畫在框內側）：輸入框沒有填色會吃掉環，改內側沒有視覺損失，
+     而**外擴的環會被任何 `overflow` 捲動容器左右裁掉**（面板／清單／詳情／發案表單⋯共 8 個 `overflow-y-auto`，
+     `overflow-y:auto` 依 CSS 連帶把 `overflow-x` 變 `auto`）—— 這是「輸入框左右被切」回歸的真因。
+     inset 後任何容器都裁不到。仍是 `2px`、對表面 `≥ 3:1`（`FE-X16-S10` 不變）。按鈕／連結維持外擴（填色不吃環）。 */
+  :is(input, textarea, select):focus-visible {
+    outline-offset: -2px;
+  }
+
   /* 按下去的切換（`aria-pressed="true"`：登入頁的分頁、看板的視圖）：邊界加粗到 ink，**不填色** —— `FE-X16-S10` 的次要級不能有填色，
      而 hover 也是 ink 邊界，所以用 inset 的第二圈把「現在在這一頁」跟「滑過去」分開（`ui-ux-pro-max`：pressed 狀態要跟看得見的標籤一致）。 */
   button[aria-pressed='true'] {
