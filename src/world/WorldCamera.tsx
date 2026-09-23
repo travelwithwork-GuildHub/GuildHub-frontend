@@ -6,6 +6,10 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { OrthographicCamera } from 'three'
 import { CAMERA_DEFAULTS, cameraOffset, damp, orthoFrustum, type MutableVector3 } from './camera'
 
+// 相機收斂尾巴的 snap 門檻（世界單位）。遠小於一個 render 像素（viewHeight 12 / (CSS 高 × dpr 0.25) ≈ 0.06–0.12 世界單位），
+// 所以 snap 幅度看不出來；作用是斬斷指數阻尼「永遠差一點點」的無限尾巴，讓站定後整個畫面不再次像素飄移（見 useFrame）。
+const CAMERA_SETTLE_EPSILON = 0.01
+
 // 固定的 Orthographic Elevated 相機。**不提供任何旋轉或自由移動的操作** ——
 // 沒有 OrbitControls，也沒有任何接受使用者輸入去改變相機的東西。
 //
@@ -71,11 +75,29 @@ export function WorldCamera({ targetRef }: WorldCameraProps) {
     const target = targetRef.current
     const offset = cameraOffset()
     const { halfLife } = CAMERA_DEFAULTS
+    const wantX = target.x + offset.x
+    const wantY = target.y + offset.y
+    const wantZ = target.z + offset.z
+
+    // ⚠️ **收斂尾巴的 epsilon snap —— 走動穩定。**
+    // 阻尼是指數逼近，永遠差最後一點點；那條**無限尾巴**會在角色停下很久之後才慢慢跨過一個 render 像素，
+    // 讓整個畫面（角色臉、門標籤、座位…全部）突然平移一格（`dpr 0.25` 下＝4 螢幕像素）。站著看就是「東西會自己跳/飄」。
+    // 已在目標的 render 次像素內（`CAMERA_SETTLE_EPSILON` 遠小於一個 render 像素 ≈0.06–0.12 世界單位）就**直接 snap 到 target**、
+    // 這一幀不再阻尼 —— 站定後整個畫面凍住、不再次像素飄移。目標一移動（走路）差距超過 epsilon，阻尼自然恢復、平滑跟隨。
+    // 與 `world-camera`〈相機收斂到 target〉一致：這是**更精確地收斂**（snap 幅度 < epsilon、看不出來），不是新方向、不越過 target。
+    if (
+      Math.abs(camera.position.x - wantX) < CAMERA_SETTLE_EPSILON &&
+      Math.abs(camera.position.y - wantY) < CAMERA_SETTLE_EPSILON &&
+      Math.abs(camera.position.z - wantZ) < CAMERA_SETTLE_EPSILON
+    ) {
+      camera.position.set(wantX, wantY, wantZ)
+      return
+    }
 
     camera.position.set(
-      damp(camera.position.x, target.x + offset.x, dt, halfLife),
-      damp(camera.position.y, target.y + offset.y, dt, halfLife),
-      damp(camera.position.z, target.z + offset.z, dt, halfLife),
+      damp(camera.position.x, wantX, dt, halfLife),
+      damp(camera.position.y, wantY, dt, halfLife),
+      damp(camera.position.z, wantZ, dt, halfLife),
     )
   })
 
