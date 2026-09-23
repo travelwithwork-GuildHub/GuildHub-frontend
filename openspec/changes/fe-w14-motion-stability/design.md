@@ -1,0 +1,66 @@
+# design：`FE-W14` 走動畫面穩定
+
+## 問題的數學形狀
+
+以固定低有效 DPR（`0.25`，1/16 像素）、**無抗鋸齒**、`image-rendering: pixelated` 渲染一個**連續平移**的 3D 場景：
+每幀最近鄰取樣落在低頻格子上，幾何邊界與貼圖高頻細節跨越 sub-pixel 邊界時，取到的樣本會**二元翻動**。這是取樣定理
+的必然結果 —— codex 與 gemini 各自獨立給出同一句：`1/16 像素 ＋ 連續移動 ＋ 無 AA` **無法**同時消閃，只能三選一：
+
+1. 提高取樣率（升 DPR）；
+2. 讓幾何**不要**連續移動（snap 到像素格）；
+3. 把邊界**覆蓋率混合**掉（多重取樣 / mipmap）。
+
+## 選項比較（兩模型輸入）
+
+| 手段 | 治 | 效能（vs 1/16） | 保像素風 | 消閃 | 改規格 |
+|---|---|---|---|---|---|
+| **① 貼圖 mipmap（min）** | 貼圖爬行 A | 幾乎 0（記憶體 +~33%/圖） | 是（mag 仍 Nearest） | A 幾乎全消 | 是（S02） |
+| **② 低解析 buffer 上 MSAA** | 幾何/邊緣/陰影 C | 低（多重取樣 buffer 的頻寬，著色仍 1/16） | 是（格子仍在，格內邊緣漸變） | C 大幅 | 是（S05） |
+| ③ 升 dpr 0.5 | A＋C | **×4 fragment**（打 FE-X09） | 像素變小、稀釋 | 只「變細變快」 | 是 |
+| ④ grid-snap 相機＋角色 | A＋C | 0 | 是（最純） | **完全消** | 否 |
+
+- **codex**：推「低解析 render target ＋ nearest，dpr 提到 0.5」，並說 MSAA「只軟化邊、不解全域爬行」。
+- **gemini**：推「1/16 render target ＋ 在該 FBO 上 MSAA(2–4)」，弱裝置 OK、平滑移動、幾乎全消；反對 dpr 0.5（昂貴半解）。
+- **統整判讀**：使用者主訴是「**整個畫面＋人物**在閃」＝主要是**幾何邊緣**的時間性抖動（C）。MSAA 正是對付邊緣覆蓋率
+  跨 sub-pixel 跳動的手段 → gemini 的方向直打主訴、又保弱裝置。codex 低估 MSAA 在此的作用，dpr 0.5 兩邊都認較弱。
+  MSAA 不管貼圖內部（A），那個用 mipmap 補。**最終＝① ＋ ②**，使用者也在三選項中選了「MSAA-FBO ＋ mipmap」。
+- **③／④ 不取**：③ 打弱裝置且只是半解；④ 完全消閃但把平滑移動換成明顯的一格一格跳，使用者要「不閃」非「頓」。
+  ④ 保留為未來若 ①＋② 仍不足時的升級路（零成本、不改規格）。
+
+## 實作抉擇：原生 canvas MSAA（選定）vs 手動 MSAA-FBO（後備）
+
+gemini 用**手動 `WebGLRenderTarget` ＋ 全螢幕 pass** 的理由是把 canvas 留在 dpr 1、精準控制像素格。但同一個「在
+1/16 低解析 buffer 上做 MSAA、再 nearest 放大」的結果，可以用**更簡單**的方式達成：
+
+- **選定**：`<Canvas dpr={0.25} gl={{ antialias: true }}>` ＋ `image-rendering: pixelated`。瀏覽器直接在那個 1/16 的
+  default framebuffer（drawing buffer）上做原生 MSAA，CSS 再 nearest 放大。**零新相依、不動 `world-canvas`、同一顆
+  `<Canvas>`、改動面積最小 → demo 風險最低。** 著色仍 1/16，只多多重取樣 buffer 的頻寬。
+- **後備（不預先做）**：手動 `WebGLRenderTarget`（1/16 尺寸、`samples≥2`）＋ nearest blit 的全螢幕 pass。只有在真瀏覽器
+  量到原生 MSAA 在 dpr 0.25 下 sample 不足／未被實作、消閃不明顯時才上。屆時 canvas 改 dpr 1、低解析移進 RT，
+  那才需要一併 MODIFY `world-canvas` 的 DPR 契約 —— 本 change 先不做。
+
+**規格因此只寫可觀察結果**（低解析 buffer 上多重取樣＋最近鄰放大＋貼圖 mipmap），不綁「canvas 原生」或「手動 FBO」
+其中一種手法。兩種實作都滿足 `S05`。
+
+## mipmap filter 的選擇（實作層，S02 不綁死）
+
+`magFilter` 維持 `NearestFilter`（近看硬像素）。`minFilter` 走 mipmap，具體用哪個由實作與前後截圖定：
+- `NearestMipmapNearest`（codex 傾向）：每階仍硬，可能有階間跳線；
+- `NearestMipmapLinear`（gemini 傾向）：階間混合、消爬行、遠處略軟。
+兩者只差一個 enum，屬純視覺差 —— 依「分歧去量不裁決」，實作時用走動前後截圖對比二選一，規格只要求「一個使用 mipmap
+的 filter ＋ generateMipmaps」。
+
+## 驗證
+
+- **可機器驗的**（單元／真瀏覽器）：貼圖 `minFilter` 是 mipmap 變體、`magFilter` 仍 `NearestFilter`、`generateMipmaps`
+  為真（S02）；drawing buffer 實得 sample 數 `> 1`、backing store ≈1/4、`image-rendering: pixelated`（S05）。
+- **半主觀的**（前後截圖／短錄影）：走動時「整片＋人物閃」是否明顯緩解 —— 沿用 `FE-W14` 的前後截圖 review（web-facing
+  的可觀察成果）。真瀏覽器 e2e（`tests/e2e/`）沿用 `--use-gl=swiftshader`；swiftshader 是否忠實反映 MSAA 由跑的人確認，
+  必要時 headed 真 GPU 覆核。
+- **失敗路徑**（S09）：模擬缺 MSAA／mipmap 時仍出畫面、不白屏不拋錯。
+
+## 對既有判準的影響
+
+- `S05` 原「antialias SHALL 關閉」→「SHALL 開啟多重取樣」：**S05 的 e2e 要改**（原本斷言 antialias 關）。
+- `S02` 補 min／mag／mipmap 斷言：材質單元測試要加對應斷言。
+- 材質快取契約、SSR 退化、每幀不新建 texture、`world-canvas` DPR：**全部不動**。
