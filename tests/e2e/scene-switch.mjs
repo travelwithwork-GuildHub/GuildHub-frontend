@@ -91,7 +91,7 @@ try {
     if (sockets.length === 2 && entered?.scene === `room:${ROOM}` && entered.token === TOKEN) ok('[S04] 進房間：第二條 socket 帶 scene=room:<id> 與票，而且只建了一條')
     else bad('[S04] 進房間的 socket 不對', JSON.stringify(sockets))
     await sameCanvas('S04', '進房間之後')
-    const returnButton = await page.$('button:has-text("回到 Guild Hall")')
+    const returnButton = await page.$('button[aria-label="回到 Guild Hall"]')
     if (returnButton !== null) ok('[S13] 房間裡有「回到 Guild Hall」')
     else bad('[S13] 房間裡沒有「回到 Guild Hall」', '')
     await page.screenshot({ path: path.join(OUT, 'in-room.png') })
@@ -103,7 +103,7 @@ try {
     if (sockets.length === 3 && sockets[2]?.scene === 'lobby') ok('[S09] 上一頁：連線回到 scene=lobby（走過場）')
     else bad('[S09] 上一頁之後的 socket 不對', JSON.stringify(sockets))
     await sameCanvas('S09', '上一頁之後')
-    if ((await page.$('button:has-text("回到 Guild Hall")')) === null) ok('[S13] 回到大廳之後按鈕不見了')
+    if ((await page.$('button[aria-label="回到 Guild Hall"]')) === null) ok('[S13] 回到大廳之後按鈕不見了')
     else bad('[S13] 回到大廳之後按鈕還在', '')
 
     since = await overlaysSeen(page)
@@ -146,7 +146,7 @@ try {
     await page.screenshot({ path: path.join(OUT, 'reload-in-room.png') })
 
     let since = await overlaysSeen(page)
-    await page.click('button:has-text("回到 Guild Hall")')
+    await page.click('button[aria-label="回到 Guild Hall"]')
     await waitForTransition(page, '回到 Guild Hall', since)
     await expectUrl(page, '[S13] 回到 Guild Hall', '/world')
     await expectNoToken(page, urls, '按「回到 Guild Hall」後')

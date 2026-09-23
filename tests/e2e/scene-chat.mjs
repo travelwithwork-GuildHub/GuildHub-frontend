@@ -247,7 +247,7 @@ try {
 
     // S09：回大廳（有一則）→ 再進房被拒 → 自動回大廳 → 那則還在
     since = await overlaysSeen(page)
-    await page.click('button:has-text("回到 Guild Hall")')
+    await page.click('button[aria-label="回到 Guild Hall"]')
     await waitForTransition(page, '回到 Guild Hall', since, 'S09')
     serverChat(sockets, '阿福', '回來啦')
     await waitRows(page, 1)
