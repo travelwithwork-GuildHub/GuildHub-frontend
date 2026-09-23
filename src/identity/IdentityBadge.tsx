@@ -50,11 +50,14 @@ export function IdentityBadge() {
       // **顯示的是查詢的結果**，不是任何前端保存的值（`S04`／`S11`）
       return (
         <p data-testid="identity">
-          {/* accessible name 以「我的名片」開頭、**含**畫面上看得到的名字（WCAG 2.5.3 label-in-name：語音控制唸名字要按得到）。 */}
+          {/* accessible name 以「我的名片」開頭、**含**畫面上看得到的名字（WCAG 2.5.3 label-in-name：語音控制唸名字要按得到）。
+              ⚠️ **`hover:!bg-glass-line`（`!important`）**：`TERTIARY` 為淺色表面設計、帶 `hover:bg-surface-sunken`（近白、不透明）。
+              只附加 `hover:bg-glass-line`（白 16% 半透明）不會蓋掉它 —— 兩個 hover 底並存時不透明的淺色勝出，
+              於是深玻璃標題列上 hover 變亮底＋亮字＝看不到（截圖回報）。用 `!` 強制玻璃色勝出，跟 `SceneChatComposer` 送出鈕同一套。 */}
           <button
             type="button"
             aria-label={`我的名片：${identity.profile.display_name}`}
-            {...withClass(TERTIARY, 'text-glass-ink hover:bg-glass-line')}
+            {...withClass(TERTIARY, 'text-glass-ink hover:!bg-glass-line')}
             onClick={(e) => openPanel(e.currentTarget)}
           >
             {identity.profile.display_name}
