@@ -3,7 +3,7 @@
 import { useId, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { LIMITS, remaining, violates } from '@/api/contract/limits'
 import type { ChatIn } from '@/api/contract/ws'
-import { CAPTION, FIELD, FIELD_LABEL, SECONDARY, withClass } from '@/design/controls'
+import { CAPTION, FIELD_LABEL, HUD_FIELD, SECONDARY, withClass } from '@/design/controls'
 import { SubmitError } from '@/forms/SubmitError'
 
 // 場景聊天的輸入。規格 `FE-K04`〈全空白不送、非空白原值送；沒有上限；只有 transport 接受了才清空、失敗保留〉（design D3、D4）。
@@ -86,7 +86,7 @@ export function SceneChatComposer({ send, onEscape }: { send: (input: ChatIn) =>
         {CHAT_COMPOSER_LABELS.field}
         <textarea
           rows={2}
-          {...withClass(FIELD, 'resize-none')}
+          {...withClass(HUD_FIELD, 'resize-none')}
           value={value}
           onChange={(e) => {
             setValue(e.target.value)
@@ -114,8 +114,9 @@ export function SceneChatComposer({ send, onEscape }: { send: (input: ChatIn) =>
         {rem < 0 ? `超過 ${-rem} 字` : `還可以輸入 ${rem} 字`}
       </p>
       <SubmitError key={failures} message={failures > 0 ? CHAT_COMPOSER_LABELS.notSent : null} />
-      {/* 聊天框是非阻斷的表面：送出是次要，不跟面板的主要動作搶（`FE-X16-S09`） */}
-      <button type="submit" {...SECONDARY} disabled={tooLong}>
+      {/* 聊天框是非阻斷的表面：送出是次要級（`FE-X16-S09` 明訂它是 secondary，所以沿用 `SECONDARY` 常數保住 tier），
+          玻璃上把淺底邊框／hover 重上成玻璃色＋點擊微動畫，消滅原生表單感（`FE-X17` §4.1／§4.3）。 */}
+      <button type="submit" {...withClass(SECONDARY, 'hud-press !border-glass-line hover:!bg-glass-line hover:!border-glass-line')} disabled={tooLong}>
         {CHAT_COMPOSER_LABELS.submit}
       </button>
     </form>

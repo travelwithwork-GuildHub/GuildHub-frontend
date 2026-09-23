@@ -25,10 +25,10 @@
 
 ## 4. 消滅原生表單感（實作層，走 controls token）
 
-- [ ] 4.1 HUD 內的按鈕改用 `TERTIARY`（無邊框、hover 才浮）；主要動作留 `PRIMARY`；選中狀態低飽和 accent 填色。
-- [ ] 4.2 HUD 內輸入框拔原生邊框、改底線或 `surface-sunken`。
-- [ ] 4.3 按鈕點擊微動畫（`transform: scale`、尊重 `prefers-reduced-motion`）。
-- [ ] 4.4 不破 `FE-X16` 既有判準（data-tier、對比、焦點環、每區至多一主要動作）。
+- [x] 4.1 HUD 內的按鈕改成 glass ghost（`HUD_GHOST_BUTTON`：無邊框、hover 才浮 `bg-glass-line`）；快捷 chip 走 `HUD_CHIP`、選中態由 `.glass-panel button[aria-pressed]` 上亮邊＋淡填色；主要動作留 `PRIMARY`。**聊天送出沿用 `SECONDARY`（`FE-X16-S09` 明訂它是 secondary，tier 只能來自 controls.ts 的三個常數），僅把淺底邊框／hover 用 `!important` 重上成玻璃色。**
+- [x] 4.2 HUD 內輸入框改 `HUD_FIELD`（glass-native：半透明填色 `glass-field` ＋明確邊框 `glass-field-edge`）——底線／純透明撐不住空框可辨識，改「填色＋邊框」滿足 `FE-X13-S04`。
+- [x] 4.3 按鈕點擊微動畫 `.hud-press`（`transform: scale(0.97)`、時長對齊唯一的 `--motion`＝`FE-X16-S12`、`prefers-reduced-motion` 下完全不縮）。
+- [x] 4.4 不破 `FE-X16` 既有判準：S09 逐區數 primary 綠、聊天送出仍 `data-tier="secondary"`；焦點環由 `.glass-panel …:focus-visible` 換成高亮色（S10）；對比在 §6 真瀏覽器量。（單元全綠、真瀏覽器煙霧量到玻璃 token 生效、輸入框非白底、焦點環亮色、送出鈕邊框被玻璃色覆蓋）
 
 ## 5. 情境提示膠囊＋出口鈕降級（`dom-visual-system`：`FE-X17-S05`／`S06`）— demo P0 病灶
 

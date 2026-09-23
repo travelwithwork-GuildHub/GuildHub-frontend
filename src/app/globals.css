@@ -40,6 +40,14 @@
   --color-glass-ink-muted: oklch(0.84 0.01 260);
   --color-glass-line: oklch(1 0 0 / 0.16);
 
+  /* 玻璃上的原生表單感消除（`FE-X17` §4）。**輸入框**：底線／純透明撐不住空框可辨識（`FE-X13-S04`：空框只能靠填色或邊界達對比），
+     所以走「半透明填色（比殼亮一階）＋明確邊框」；`--color-glass-field-edge` 是承擔「空框看得見」的那道邊（對玻璃 ≥ 3:1）。
+     `--color-glass-field` 只是讓輸入區跟殼分層的填色，辨識靠邊框。 */
+  --color-glass-field: oklch(0.3 0.02 260 / 0.55);
+  --color-glass-field-edge: oklch(0.64 0.02 260 / 0.85);
+  /* 玻璃上的焦點環（`FE-X16-S10` 要對背景 ≥ 3:1）：深玻璃上 accent 藍偏弱，改用一個高亮的中性色，只換顏色不換 2px／offset。 */
+  --color-glass-focus: oklch(0.86 0.02 260);
+
   /* 字級五級（S03）：內文 16px／1.5、說明 13px；面板標題 22px = 1.375 × 內文（要 ≥ 1.25）；頁面標題 32px = 2 ×（要 ≥ 1.5）。 */
   --text-caption: 0.8125rem;
   --text-caption--line-height: 1.4;
@@ -140,5 +148,28 @@
     font-weight: 600;
     line-height: 1;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* HUD 控制項的點擊微動畫（`FE-X17` §4.3）：按下時輕微內縮。時長對齊唯一的 `--motion`（`FE-X16-S12`：全站動態時長相等）。
+     全域的減少動態規則只把 transition-duration 歸零、**不會**歸零 transform，所以這裡明確在 reduced-motion 下完全不縮。 */
+  .hud-press { transition: transform var(--motion) ease-out; }
+  .hud-press:active { transform: scale(0.97); }
+  @media (prefers-reduced-motion: reduce) {
+    .hud-press:active { transform: none; }
+  }
+
+  /* 玻璃上的控制項焦點環（`FE-X16-S10`）：只覆蓋顏色，2px／offset 沿用 `@layer base` 的定義。
+     涵蓋「殼本身可按」（狀態收合膠囊 = `.glass-panel`）與「殼裡的控制」兩種。 */
+  .glass-panel:focus-visible,
+  .glass-panel :is(button, input, textarea, select, a):focus-visible {
+    outline-color: var(--color-glass-focus);
+  }
+
+  /* 玻璃上的「按下切換」（`aria-pressed="true"`，快捷狀態 chip）：`@layer base` 的 ink 深色邊界在深玻璃上看不見，
+     改成高亮描邊＋一層淡填色，讓「現在選著這個」在玻璃上讀得出來（`FE-X17` §4.1 選中狀態）。 */
+  .glass-panel button[aria-pressed='true'] {
+    border-color: var(--color-glass-focus);
+    box-shadow: inset 0 0 0 1px var(--color-glass-focus);
+    background-color: var(--color-glass-line);
   }
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { LIMITS } from '@/api/contract/limits'
-import { CAPTION, FIELD, FIELD_LABEL, PRIMARY, SECONDARY, TERTIARY, withClass } from '@/design/controls'
+import { CAPTION, FIELD_LABEL, HUD_CHIP, HUD_FIELD, HUD_GHOST_BUTTON, PRIMARY, withClass } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { useIdentity } from '@/identity/IdentityProvider'
 import { useStatusIfProvided } from '@/realtime/StatusProvider'
@@ -73,7 +73,7 @@ export function StatusHud() {
       className="absolute top-16 left-gutter flex w-[min(20rem,30vw)] flex-col gap-2"
     >
       {/* 收合的膠囊：目前狀態（回聲為準）；送出中另外標 */}
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} {...withClass(SECONDARY, 'glass-panel hud-legible text-caption w-max max-w-full overflow-hidden text-ellipsis whitespace-nowrap')}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="glass-panel hud-legible hud-press hover:bg-glass-line text-caption rounded-control w-max max-w-full overflow-hidden px-gutter py-2 font-medium text-ellipsis whitespace-nowrap">
         {toggleLabel}
         {snapshot.pending !== null && <span className="text-glass-ink-muted ml-2">{STATUS_HUD_LABELS.pending}</span>}
       </button>
@@ -89,7 +89,7 @@ export function StatusHud() {
         >
           <div className="flex flex-wrap gap-1">
             {QUICK_STATUSES.map((q) => (
-              <button key={q} type="button" onClick={() => submit(q)} aria-pressed={snapshot.text === q} {...withClass(TERTIARY, 'border-line text-caption border py-1 aria-pressed:bg-surface-sunken')}>
+              <button key={q} type="button" onClick={() => submit(q)} aria-pressed={snapshot.text === q} className={`${HUD_CHIP} text-caption`}>
                 {q}
               </button>
             ))}
@@ -105,7 +105,7 @@ export function StatusHud() {
               aria-invalid={over > 0 || undefined}
               aria-describedby={hintId}
               autoComplete="off"
-              {...withClass(FIELD, 'w-full')}
+              {...withClass(HUD_FIELD, 'w-full')}
             />
           </label>
           <p id={hintId} data-testid="status-remaining" {...withClass(CAPTION, over > 0 ? 'text-danger' : 'text-glass-ink-muted')}>
@@ -116,11 +116,11 @@ export function StatusHud() {
               {STATUS_HUD_LABELS.submit}
             </button>
             {hasStatus && (
-              <button type="button" onClick={() => submit('')} {...withClass(TERTIARY, 'text-caption py-1')}>
+              <button type="button" onClick={() => submit('')} className={`${HUD_GHOST_BUTTON} text-caption`}>
                 {STATUS_HUD_LABELS.clear}
               </button>
             )}
-            <button type="button" onClick={() => setOpen(false)} {...withClass(TERTIARY, 'text-caption ml-auto py-1')}>
+            <button type="button" onClick={() => setOpen(false)} className={`${HUD_GHOST_BUTTON} text-caption ml-auto`}>
               {STATUS_HUD_LABELS.close}
             </button>
           </div>
