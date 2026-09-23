@@ -305,10 +305,9 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
           <OnlineCount count={onlineCount} />
           {/* 遠端玩家的名字牌（`FE-W08`）：HUD，兩個場景都有；位置每幀由 Canvas 裡的 `RemotePlayer` 寫，這裡只掛節點。 */}
           <NameTags roster={roster} nodesRef={tagNodesRef} self={{ name: myName }} />
-          {/* 場景聊天（`FE-K04`）：非阻斷的 HUD，靠左下、不遮提示；只看不鎖，輸入框有焦點才鎖（`EditableFocusLock`）。沒 provider 就不畫。 */}
-          <SceneChatHud />
-          {/* 自己的狀態文字（`FE-K05`）：HUD，在線數底下；只給已登入的人、沒 provider 不畫；輸入框有焦點才鎖（同一道 `EditableFocusLock`）。 */}
-          <StatusHud />
+          {/* ⚠️ 場景聊天（`FE-K04`）與狀態（`FE-K05`）**移到本層尾端、所有世界標註（門標籤／看板摘要／座位）之後**渲染。
+              三者同在 `layer('hud')`（z 相等），相等時 DOM 靠後者疊在上面。可互動的聊天輸入必須蓋過純標註、
+              `pointer-events-none` 的門標籤 —— 否則走到門邊時門標籤會把聊天輸入框整個遮住（使用者回報）。見下方尾端。 */}
           {/* 看板開出來的清單面板（`FE-B01`）。DOM，`layer('panel')`。 */}
           <BoardPanel />
           {/* 「我的名片」面板（`FE-A04`）：開關在標題列的按鈕，面板在這裡 —— 同一個定位基準、同一把鎖的 provider 底下。 */}
@@ -328,6 +327,11 @@ export default function WorldCanvas({ onReady }: { onReady?: () => void } = {}) 
           {/* 工位的投影錨點（`FE-W16-S06`）**只在房間**，裡面是座位標籤與回饋（`FE-J13`）；沒登入就只有錨點（aria-hidden、沒內容、e2e 的尺）。
               以 `projectId` 為 key：換房間名字快取從頭來。 */}
           {scene.id === 'room' && <RoomSeats key={scene.projectId} projectId={scene.projectId} nodesRef={seatNodesRef} relocateRef={relocate} />}
+          {/* 場景聊天（`FE-K04`）：非阻斷的 HUD，靠左下、不遮提示；只看不鎖，輸入框有焦點才鎖（`EditableFocusLock`）。沒 provider 就不畫。
+              ⚠️ **排在所有世界標註（門標籤／看板摘要／座位）之後**：同一個 `hud` band、DOM 靠後 → 疊在上面，聊天輸入框不被門標籤遮住。 */}
+          <SceneChatHud />
+          {/* 自己的狀態文字（`FE-K05`）：HUD，在線數底下；只給已登入的人、沒 provider 不畫；輸入框有焦點才鎖（同一道 `EditableFocusLock`）。同上：排在世界標註後面。 */}
+          <StatusHud />
           </div>
           {/* 房間密碼視窗（`FE-N08`）：沒票的門按 E 開；同一把鎖、同一個焦點錨。開關在 page.tsx 的 RoomEntryGateProvider。在 `world-stage` 外面：遮罩蓋的是它以外的整層。 */}
           <RoomPasswordDialog rooms={rooms.all} />
