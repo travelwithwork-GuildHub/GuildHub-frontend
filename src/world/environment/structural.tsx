@@ -56,7 +56,13 @@ export function carpetDefinition(width: number, depth: number): PropDefinition {
   return {
     parts: [
       {
-        geometry: { shape: 'RoundedBox', width, height: 0.02, depth, radius: RADIUS },
+        // ⚠️ **radius 必須遠小於 height/2（0.01），不能用共用的 `RADIUS`（0.06）。**
+        // `roundedBox` 把 2D 形狀做在 width×height 平面，`sh = height − 2×radius`。RADIUS 被夾成
+        // `0.02 × 0.49 ≈ 0.0098`（`MAX_RADIUS_FRACTION`），於是 `sh ≈ 0.0004` —— **形狀高度幾乎歸零、
+        // extrude 出自相交的退化幾何**，渲染成一條閃爍/破裂的黃線（`dpr 0.5` 後現形，使用者回報）。
+        // 取 `0.004`：`sh = 0.012`（非退化），且圓角頂面最低 ≈ `0.02 − 0.004 = 0.016`，離草地（`GRASS_Y` 0.01）
+        // 還有 0.006 > `Z_SAFE`（0.005），不 z-fight。carpet 頂面仍是 0.02，`world-ground-layers` 判準不受影響。
+        geometry: { shape: 'RoundedBox', width, height: 0.02, depth, radius: 0.004 },
         material: { kind: 'standard', color: 'carpet', roughness: 1 },
         position: [0, 0.01, 0],
         castShadow: false,
