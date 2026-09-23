@@ -90,6 +90,28 @@ export const CHECK_ROW = 'flex items-center gap-2'
 export const HUD_ICON_BUTTON = 'text-glass-ink hover:bg-glass-line rounded-control flex items-center justify-center px-2 py-2'
 
 /**
+ * 深色玻璃 HUD 上的**文字**按鈕（`FE-X17` §4.1）。承接 `HUD_ICON_BUTTON` 的低顯著邏輯：無邊框、無填色、
+ * hover 才浮一層極淡亮面（`bg-glass-line`）＋字轉亮；點擊微動畫走 `.hud-press`（globals.css，尊重 `prefers-reduced-motion`）。
+ * 給玻璃上的**次要**動作（聊天送出、回到最新、清除／收合）——**不是** primary（primary 仍用 `PRIMARY` 的填色，每區至多一個，`FE-X16-S09`）。
+ * ⚠️ 它不帶 `data-tier`：次要級在 3D HUD 上刻意不搶視線，層級由「有沒有填色」表達（primary 有、其餘沒有）。
+ * ⚠️ 文字色是玻璃上的淺色；玻璃外（淺底）不要用它。
+ */
+export const HUD_GHOST_BUTTON = `text-glass-ink-muted hover:text-glass-ink hover:bg-glass-line rounded-control hud-press px-3 py-1.5 font-medium ${DISABLED}`
+
+/**
+ * 深色玻璃 HUD 上的快捷 chip（`FE-X17` §4.1）。比 ghost 多一道邊框（一組可選項要看得出邊界），選中（`aria-pressed`）的填色與描邊
+ * 由 `.glass-panel button[aria-pressed='true']` 接手（globals.css）——base 的 ink 深色邊界在深玻璃上看不見。
+ */
+export const HUD_CHIP = 'text-glass-ink hover:bg-glass-line border-glass-line rounded-control hud-press border px-2 py-1 font-medium'
+
+/**
+ * 深色玻璃 HUD 上的文字輸入框（`FE-X17` §4.2）。跟 `FIELD` 同一個責任（空框也看得見，`FE-X13-S04`）——
+ * 但改走 glass-native：半透明填色（`glass-field`）＋明確邊框（`glass-field-edge`，撐起空框的可辨識），不是白底原生框。
+ * 焦點環由 `.glass-panel …:focus-visible` 的高亮色接手（globals.css）。用在聊天輸入、狀態輸入。
+ */
+export const HUD_FIELD = { className: 'bg-glass-field border-glass-field-edge text-glass-ink rounded-control w-full border px-3 py-2' } as const
+
+/**
  * 一個表單的容器。**這不是「順手統一 layout」，是 `FE-X13-S06` 要求的同一份外觀。**
  * `w-full max-w-sm` 讓表單填滿容器（窄面板裡填滿、寬登入頁封頂在 24rem），欄位再靠 `w-full` 填滿表單 ——
  * 沒有這個上限時，欄位在寬頁上會拉太長、在窄面板裡（舊 `items-start`）又縮成固定寬、左半截像被切掉。

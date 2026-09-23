@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { CAPTION, SECONDARY, withClass } from '@/design/controls'
+import { CAPTION, HUD_GHOST_BUTTON, withClass } from '@/design/controls'
 import { layer } from '@/design/layers'
 import { useActivePanel } from '@/panel/BlockingPanelCoordinator'
 import { useSceneChatIfProvided } from '@/realtime/SceneChatProvider'
@@ -152,7 +152,7 @@ export function SceneChatHud() {
         {/* 控制在列表**下面**自己的一列，不浮在列表上 —— 浮著會蓋住正在讀的舊訊息（審查抓到的）。 */}
         {unseen && chat.log.length > 0 && (
           <div className="flex justify-center pt-1">
-            <button type="button" onClick={jumpToLatest} data-testid="chat-jump-latest" {...withClass(SECONDARY, CAPTION.className)}>
+            <button type="button" onClick={jumpToLatest} data-testid="chat-jump-latest" className={`${HUD_GHOST_BUTTON} ${CAPTION.className}`}>
               {CHAT_HUD_LABELS.jumpToLatest}
             </button>
           </div>
