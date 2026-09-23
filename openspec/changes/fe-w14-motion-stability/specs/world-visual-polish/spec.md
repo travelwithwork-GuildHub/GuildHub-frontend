@@ -38,34 +38,33 @@ render loop **MUST NOT** 每幀新建 `CanvasTexture`。
 
 ### Requirement: World 以低有效 DPR 做像素化渲染
 
-`/world` 的 WebGL 畫面 SHALL 以固定的**低有效 DPR**（`0.25`）渲染，並把 canvas 的 CSS `image-rendering` 設為
-`pixelated`，使低解析度的 backing store 被**最近鄰放大**成點陣（方塊）外觀。這是像素風的來源，也把 GPU 要**著色**
-的像素數維持在約 1/16（與 `FE-X09`「弱裝置」同一目標）—— 本 change **MUST NOT** 為了消閃把場景改以全解析度著色。
+`/world` 的 WebGL 畫面 SHALL 以固定的**低有效 DPR**（`0.25`）、**關閉 antialias** 渲染，
+並把 canvas 的 CSS `image-rendering` 設為 `pixelated`，使低解析度的 backing store 被**最近鄰放大**
+成點陣外觀。這是像素風的來源，也把 GPU 要著色的像素數降到約 1/16（與 `FE-X09`「弱裝置」同一目標）。
 
-renderer SHALL **開啟多重取樣（MSAA，`antialias` 為真）**，讓那個低解析 backing store 上的**幾何邊緣覆蓋率**被
-多重取樣（不是二元的中／不中）。原因：`0.25` 有效 DPR ＋ 連續移動 ＋ 無抗鋸齒時，角色與物件的邊緣、陰影邊會在
-粗像素格上**每幀二元跳動**（走動時整個畫面在閃）；在低解析 buffer 上做 MSAA 讓邊緣像素呈漸變覆蓋，移動時是平滑
-過渡而不是跳動。**像素格本身不變**：最近鄰放大照舊，畫面仍是硬邊方塊；被平滑的是方塊**內**的邊緣覆蓋值，不是把整張
-畫面內插放大。多重取樣只在低解析 buffer 上做，著色仍是約 1/16 —— 弱裝置的預算不破。此有效 DPR（`0.25`、上限 `2`）
-與 `world-canvas` 的 DPR 契約不變（低解析仍在 canvas 自己的 backing store，不搬到 render target）。
+此有效 DPR **刻意低於** `world-canvas` 原本「1 到 2 之間」的下限；`world-canvas` 的 DPR Requirement
+已放寬下限、把像素模式的低 DPR 交由此處決定（上限 `2` 仍成立，`0.25 ≤ 2`）。
 
-> 此需求把原文的「renderer 的 antialias SHALL 關閉」翻成「SHALL 開啟多重取樣」。理由與量測見本 change 的
-> `design.md`（codex／gemini 一致：`1/16 像素 ＋ 連續移動 ＋ 無 AA` 數學上必然閃，只能靠「把幾何 snap 到格」或
-> 「把邊界覆蓋率混合掉」二選一；選後者以保住平滑移動與弱裝置效能）。
+> **本 change 一度把「關閉 antialias」改述為「開啟多重取樣（MSAA）」**來治「走動時幾何邊緣閃」，部署後實測發現：
+> `dpr 0.25` 下 MSAA 把**角色的硬像素邊緣軟化成柔邊**（角色純方塊、無貼圖，靜止看起來糊、臉部 1–2px 細節被抹）。
+> 兩模型（codex gpt-5.6-terra ＋ gemini 3.1 Pro）一致後**撤回、`antialias` 維持關閉**：致暈主因是大面積地面／牆的
+> **貼圖爬行**、已由本 change 的 mipmap（`S02`／`S04`）治好；殘留的幾何邊緣抖動在貼圖爬行消失後不足以致暈，靜止時
+> 角色清晰不可退讓。詳見 `design.md`〈撤回 MSAA〉。**本 change 對這條需求的淨效果＝維持 antialias 關閉不變（`S05` 同 base）**，
+> 只在其下補一條 mipmap 生成失敗的退化保證（`S09`）。
 
 #### Scenario: [FE-W14-S05] 畫面以 1/4 解析度渲染再最近鄰放大
 
 - **WHEN** 在支援 WebGL2 的真瀏覽器開啟 `/world`
 - **THEN** canvas 的 backing store 每一軸 SHALL 約為其 CSS 顯示尺寸的 1/4（有效 DPR ≈ `0.25`）
 - **AND** canvas 的 `image-rendering` SHALL 是 `pixelated`（最近鄰放大，不是平滑內插）
-- **AND** renderer 的 drawing buffer SHALL 啟用多重取樣（`antialias` 為真、實得 sample 數 `> 1`）
-- **AND** 放大後畫面 SHALL 仍是硬邊方塊點陣（像素格不因 MSAA 消失），而移動中的邊緣不再逐幀二元跳動（前後截圖／錄影為證）
+- **AND** renderer 的 antialias SHALL 關閉
+- **AND** 畫面上的邊緣 SHALL 呈現硬邊的點陣外觀（前後截圖為證）
 
-#### Scenario: [FE-W14-S09] 缺多重取樣或無法建 mipmap 時，畫面照常出、不白屏不拋錯
+#### Scenario: [FE-W14-S09] 無法建 mipmap 時，畫面照常出、不白屏不拋錯
 
-- **WHEN** WebGL 環境不提供多重取樣（`antialias` 未被實作），或某張像素貼圖無法產生 mipmap
-- **THEN** `/world` SHALL 仍然渲染出畫面（該面向退化為原本的最近鄰、無 MSAA／無 mipmap 管線）
-- **AND** SHALL NOT 出現白屏，SHALL NOT 拋錯（消閃是加分，缺它時退化，不是壞掉）
+- **WHEN** 某張像素貼圖在該 WebGL 環境無法產生 mipmap
+- **THEN** 該材質 SHALL 退化為原本的最近鄰、無 mipmap 管線，`/world` SHALL 仍然渲染出畫面
+- **AND** SHALL NOT 出現白屏，SHALL NOT 拋錯（mipmap 消閃是加分，缺它時退化，不是壞掉）
 
 ### Requirement: 地面疊一張像素草地，且經共用 resource factory 取得
 
