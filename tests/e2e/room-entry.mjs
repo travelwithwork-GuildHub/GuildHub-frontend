@@ -330,7 +330,7 @@ try {
 
     // S05 尾：回大廳、拿掉票、同一扇門再開是空的
     since = await overlaysSeen(page)
-    await page.click('button:has-text("回到 Guild Hall")')
+    await page.click('button[aria-label="回到 Guild Hall"]')
     await waitForTransition(page, '再回到 Guild Hall', since, 'S05')
     await page.evaluate((k) => sessionStorage.removeItem(k), tokenKey(P.id))
     await approachDoor(page)
