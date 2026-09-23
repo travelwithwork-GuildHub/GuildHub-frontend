@@ -42,4 +42,4 @@
 - [x] 6.1 全套件綠（唯一紅是既有的 `db-schema-copy`／FE-O04-S01，後端 clone SQL 分歧、CI 略過）、`typecheck`／`lint` 綠、`openspec validate --strict` 綠、`progress.sh --check` 綠。muted token 只動玻璃、與 `FE-X16` 淺色表面正交，不影響其判準。
 - [x] 6.2 成品截圖（`docs/evidence/fe-x17/` 1440×900 與 390 手機寬）：門前 `[E]` 膠囊 little-ritual 風、左側 HUD 全深玻璃、名牌玻璃。自問→**是 3D 遊戲感、不像網頁**。（剩門標籤／看板卡／假 WS 座位 toast 是白盒，但屬 FE-W06／FE-W20／假資料，非 X17；兩模型一致「材質差異是好的空間語意、不在 X17 順手改」。）
 - [x] 6.3 送 codex（gpt-5.6-terra）＋gemini（3.1 Pro）驗成品：muted 提亮 vs 加深玻璃兩模型分歧→用「glow 最亮色下 muted 仍 4.58:1」定案留 0.90、玻璃不動；量測法兩模型認可；白盒一致不在 X17 改。
-- [ ] 6.4 部署最新版到正式站（使用者 `vercel --prod`）—— **§6 動了 muted token，合併後需再部署一次才會 live**。
+- [x] 6.4 部署最新版到正式站（使用者 `vercel --prod`）：2026-09-23 已部署（dpl `ES3EFqKa2oFjzpHBF68dzAdjchhs`、READY、alias `guildhub-frontend.vercel.app`，build 從 main `7c22d41` 含 §6 muted 0.90）。走查走閘道網址；真 iPhone Safari 走查是 demo 前唯一必做（見 CORS 記憶）。
