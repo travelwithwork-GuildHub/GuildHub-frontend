@@ -26,10 +26,17 @@
   **不動**。同步改回檔頭 `S05` 註解（不再宣稱開 MSAA）。一行旗標，不引入任何相依。
 - [ ] 2.3 確認著色預算不退：backing store 仍 dpr `0.25`（≈1/16 fragment）—— 一直不變。
 
+## 2.5 有效 DPR 0.25 → 0.5，治「移動閃＋臉糊＋廉價感」（`FE-W14-S05`）
+
+- [ ] 2.5.1 `WorldCanvas.tsx`：`dpr={0.25}` → `dpr={0.5}`。`image-rendering: pixelated`、`antialias: false` 不動。
+  角色像素密度加倍（臉 1–2px → 3–4px 可讀）、移動邊緣抖動變細約一半；代價 fragment ×4，demo 以品質優先於 `FE-X09`。
+- [ ] 2.5.2 規格：REMOVE 舊「World 以低有效 DPR（0.25/1/4）」需求 ＋ ADD「World 以低有效 DPR（0.5）」需求（`S05`／`S09` 沿用 ID）。
+- [ ] 2.5.3 徹底消移動邊緣抖動的「固定低解析 RT ＋ 位置 snap」（兩模型 C＞A＞B）**不在本 change** —— 留作後續若 0.5 仍不足。
+
 ## 3. 真瀏覽器判準與前後對比（`FE-W14-S05`／`S02`；web-facing 驗證）
 
-- [ ] 3.1 改回 `S05` 的 e2e（`tests/e2e/pixelation.mjs`）：斷言由「drawing buffer sample 數 `> 1`」**改回**「`antialias` 關閉
-  （`getContextAttributes().antialias === false`）」；保留「backing store ≈1/4、`image-rendering: pixelated`」。
+- [ ] 3.1 `S05` 的 e2e（`tests/e2e/pixelation.mjs`）：斷言「`antialias` 關閉（`getContextAttributes().antialias === false`）」、
+  `image-rendering: pixelated`，且**有效 DPR 容忍帶由 `[0.18, 0.32]`（0.25）改為 `[0.42, 0.58]`（0.5）**。
 - [ ] 3.2 走動前後對比：以同一段走位（沿用 `lib/world.mjs` 的 walker）截圖／短錄影，人眼確認 (a) 靜止時角色是清晰硬邊像素、
   (b) 走動時地面／牆不再爬行（mipmap 生效）、(c) 殘留的幾何邊緣抖動不致暈。
   （swiftshader headless 不忠實反映邊緣時間性，必要時 headed 真 GPU 覆核 —— 見 `reference` 記憶「headless FPS 不可信用 HEADED=1」。）
