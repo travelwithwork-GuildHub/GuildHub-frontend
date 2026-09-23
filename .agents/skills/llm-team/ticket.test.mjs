@@ -110,7 +110,7 @@ function fakeCouncilOut(reviewOutDir, files, opts = {}) {
       if (!m) throw new Error(`fakeCouncilOut：未知成員檔名 ${file}`)
       const text = files[file]
       const v = parseVerdicts(text)
-      return { ...m, overall: v.overall, q: v.q, empty: !text.trim(), timedOut: false, invalid: Boolean(text.trim()) && v.overall === null, exit: 0, signal: null, ms: 1 }
+      return { ...m, overall: v.overall, q: v.q, uncited: v.uncited || [], empty: !text.trim(), timedOut: false, invalid: Boolean(text.trim()) && v.overall === null, exit: 0, signal: null, ms: 1 }
     })
   fs.writeFileSync(path.join(reviewOutDir, 'members.json'), JSON.stringify(members, null, 2))
   return members
@@ -7024,5 +7024,365 @@ describe('1.12.0 ticket：複審者到底看了什麼要印在收貨摘要', () 
     const i = r.councilArgs.indexOf('--diff-cap'); assert.ok(i !== -1 && r.councilArgs[i + 1] === '200000', 'ticket run 要把 --diff-cap 傳給 council')
     assert.match(r.out, /⚠ 本票 diff cap 由 120000 提高至 200000；完整送審 150000 字元/)
     assert.match(r.out, /⚠ writer-report 截斷 20000\/31540 字元/)
+  })
+})
+
+describe('1.13.0 ticket：無引用的不簽在收貨摘要印 ⚠', () => {
+  async function runTicket(name, councilImpl, extra = []) {
+    const repo = makeRepo()
+    const briefFile = path.join(tmpdir('brief-'), 'brief.md'); fs.writeFileSync(briefFile, '# 票\n內容')
+    const worktreePath = path.join(repo.dir, '.claude', 'worktrees', name)
+    const reviewOutDir = path.join(repo.dir, '.local', 'llm-team', name, 'review')
+    let councilArgs = null
+    const deps = {
+      repoRoot: repo.dir,
+      assertSettings: () => true,
+      writeMain: () => { fs.writeFileSync(path.join(worktreePath, 'hello.txt'), 'hello\n'); return 0 },
+      councilMain: (args) => { councilArgs = args; return councilImpl(reviewOutDir) },
+      runTest: () => ({ exit: 0, out: 'ok' }),
+    }
+    const outs = []; const origLog = console.log; console.log = (m) => outs.push(String(m))
+    let code
+    try {
+      code = await ticketMain(['run', '--name', name, '--brief', briefFile, '--branch', `feat/${name}--s`, '--allow', 'hello.txt', '--test', 'true', ...extra], deps)
+    } finally { console.log = origLog }
+    const summary = JSON.parse(fs.readFileSync(path.join(repo.dir, '.local', 'llm-team', name, 'summary.json'), 'utf8'))
+    return { code, summary, out: outs.join('\n'), councilArgs }
+  }
+
+  test('一題無引用（Q2）、一題有引用（Q3）⇒ 收貨摘要對 Q2 含「⚠ 無引用」、對 Q3 不含；summary.json review.members[0].uncited 等於 [\'Q2\']', async () => {
+    const r = await runTicket('cite1', (dir) => {
+      fakeCouncilOut(dir, {
+        'agy-opus': 'Q2：不簽｜x｜y\nQ3：不簽｜x｜y｜council.mjs:153\n整份：不簽\nQ6：親跑驗收',
+        'agy-gemini': 'Q1：簽｜ok｜無\n整份：簽\nQ6：親跑驗收',
+      })
+      return 0
+    })
+    assert.equal(r.code, 0)
+    assert.deepEqual(r.summary.review.members[0].uncited, ['Q2'])
+    const lines = r.out.split('\n')
+    const q2Line = lines.find((l) => l.includes('Q2 (不簽)'))
+    const q3Line = lines.find((l) => l.includes('Q3 (不簽)'))
+    assert.ok(q2Line, '收貨摘要應含 Q2 行')
+    assert.ok(q3Line, '收貨摘要應含 Q3 行')
+    assert.match(q2Line, /⚠ 無引用/)
+    assert.doesNotMatch(q3Line, /⚠ 無引用/)
+  })
+})
+
+// ═══════════════════ 1.16.0 寫手鏈（票 llm-team-gemini-writer）：G2 走 registry preflight、--writer-harness 透傳、收貨摘要「下一席」提示 ═══════════════════
+describe('1.16.0 寫手鏈：ticket run', () => {
+  const SEATS = [
+    { harness: 'agy', model: 'gemini-3.8-flash-high', quotaBucket: 'gemini' },
+    { harness: 'gemini', model: 'gemini-3.8-flash', quotaBucket: 'gemini-api' },
+  ]
+  /** 假寫手：從 args 找 --out，寫一筆帶 failure 的台帳（模擬 write.mjs 1.16.0 每筆都帶 failure），回 exitCode。 */
+  function fakeWriter({ exitCode, failure, changeFile = null, calls = [] }) {
+    return (args) => {
+      calls.push(args)
+      const out = args[args.indexOf('--out') + 1]
+      const wt = args[args.indexOf('--worktree') + 1]
+      fs.mkdirSync(out, { recursive: true })
+      fs.writeFileSync(path.join(out, 'round-1.stdout.ndjson'), '')
+      const entry = { schemaVersion: 1, round: 1, verdict: exitCode === 0 ? 'PASS' : 'FAIL_headless', ...(failure ? { failure } : {}) }
+      fs.writeFileSync(path.join(out, 'ledger.ndjson'), JSON.stringify(entry) + '\n')
+      if (changeFile) fs.writeFileSync(path.join(wt, changeFile), 'x')
+      return exitCode
+    }
+  }
+  async function run({ name, cfg, extraArgs = [], deps = {} }) {
+    const repo = makeRepo(cfg)
+    const briefFile = path.join(tmpdir('brief-'), 'brief.md')
+    fs.writeFileSync(briefFile, `# ${name}\n內容`)
+    const outs = []
+    const errs = []
+    const origLog = console.log
+    const origErr = console.error
+    console.log = (m) => outs.push(String(m))
+    console.error = (m) => errs.push(String(m))
+    let code
+    try {
+      code = await ticketMain(['run', '--name', name, '--brief', briefFile, '--branch', `feat/${name}--s`, '--allow', 'a.txt', '--test', 'true', ...extraArgs], { repoRoot: repo.dir, ...deps })
+    } finally {
+      console.log = origLog
+      console.error = origErr
+    }
+    const summaryFile = path.join(repo.dir, '.local', 'llm-team', name, 'summary.json')
+    const summary = fs.existsSync(summaryFile) ? JSON.parse(fs.readFileSync(summaryFile, 'utf8')) : null
+    return { code, out: outs.join('\n'), errs: errs.join('\n'), summary, repo }
+  }
+
+  test('T90 寫手 exit 3 且台帳 failure.kind quota、config 還有下一席 ⇒ 收貨摘要含「🔴 寫手額度用盡：下一席 gemini/gemini-3.8-flash，重跑加 --writer-harness gemini」；summary.writerNext；不自動重跑（writeMain 只被叫 1 次）', async () => {
+    const calls = []
+    const r = await run({ name: 't90', cfg: { writer: SEATS }, deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 3, failure: { kind: 'quota', code: 'RESOURCE_EXHAUSTED', retryable: false }, calls }) } })
+    assert.equal(r.code, 3)
+    assert.equal(calls.length, 1, '不自動連跑下一席')
+    assert.match(r.out, /🔴 寫手額度用盡：下一席 gemini\/gemini-3\.8-flash，重跑加 --writer-harness gemini/)
+    assert.deepEqual(r.summary.writer, { harness: 'agy', model: 'gemini-3.8-flash-high', quotaBucket: 'gemini' })
+    assert.deepEqual(r.summary.writerFailure, { kind: 'quota', code: 'RESOURCE_EXHAUSTED', retryable: false })
+    assert.deepEqual(r.summary.writerNext, { harness: 'gemini', model: 'gemini-3.8-flash' })
+    assert.equal(r.summary.review, null)
+  })
+  test('T91 陽性對照：failure 不是 quota（policy）⇒ 摘要不含「下一席」；quota 但已是最後一席（--writer-harness gemini）⇒ 不含；quota 但單物件 config ⇒ 不含；write exit 0 ⇒ 不看台帳', async () => {
+    const a = await run({ name: 't91a', cfg: { writer: SEATS }, deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 3, failure: { kind: 'policy', retryable: false } }) } })
+    assert.equal(a.code, 3)
+    assert.doesNotMatch(a.out, /下一席/)
+    assert.equal(a.summary.writerNext, null)
+    assert.deepEqual(a.summary.writerFailure, { kind: 'policy', retryable: false })
+    const b = await run({ name: 't91b', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', 'gemini'], deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 3, failure: { kind: 'quota', retryable: false } }) } })
+    assert.equal(b.code, 3)
+    assert.doesNotMatch(b.out, /下一席/)
+    assert.equal(b.summary.writer.harness, 'gemini')
+    assert.equal(b.summary.writerNext, null)
+    const c = await run({ name: 't91c', cfg: {}, deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 3, failure: { kind: 'quota', retryable: false } }) } })
+    assert.doesNotMatch(c.out, /下一席/)
+    assert.equal(c.summary.writerNext, null)
+    const d = await run({ name: 't91d', cfg: { writer: SEATS }, deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 0, failure: { kind: 'quota', retryable: false } }), councilMain: () => 0, runTest: () => ({ exit: 0, out: '' }) } })
+    assert.equal(d.summary.writerFailure, null, 'write exit 0 ⇒ 不讀台帳的 failure')
+    assert.doesNotMatch(d.out, /下一席/)
+  })
+  test('T92 --writer-harness gemini 透傳給 writeMain（args 含 --writer-harness gemini）；summary.writer 記 gemini 席；沒給 ⇒ args 不含且 summary.writer 是第 0 席 agy', async () => {
+    const calls = []
+    const r = await run({ name: 't92', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', 'gemini'], deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 3, calls }) } })
+    const i = calls[0].indexOf('--writer-harness')
+    assert.ok(i >= 0 && calls[0][i + 1] === 'gemini', JSON.stringify(calls[0]))
+    assert.deepEqual(r.summary.writer, { harness: 'gemini', model: 'gemini-3.8-flash', quotaBucket: 'gemini-api' })
+    const calls2 = []
+    const r2 = await run({ name: 't92b', cfg: { writer: SEATS }, deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 3, calls: calls2 }) } })
+    assert.ok(!calls2[0].includes('--writer-harness'))
+    assert.equal(r2.summary.writer.harness, 'agy')
+  })
+  test('T93 --writer-harness nope ⇒ exit 2、訊息列可用席、不建 worktree、writeMain 0 次；config.writer 陣列的 timeoutMs 取選中那席', async () => {
+    const calls = []
+    const r = await run({ name: 't93', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', 'nope'], deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 0, calls }) } })
+    assert.equal(r.code, 2)
+    assert.equal(calls.length, 0)
+    assert.match(r.errs, /寫手席 "nope" 不在 config\.writer.*可用：agy\/gemini-3\.8-flash-high, gemini\/gemini-3\.8-flash/)
+    assert.equal(fs.existsSync(path.join(r.repo.dir, '.claude', 'worktrees', 't93')), false)
+    const seatsWithTimeout = [{ ...SEATS[0], timeoutMs: 1111 }, { ...SEATS[1], timeoutMs: 2222 }]
+    const c1 = []
+    await run({ name: 't93b', cfg: { writer: seatsWithTimeout }, extraArgs: ['--writer-harness', 'gemini'], deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 3, calls: c1 }) } })
+    assert.equal(c1[0][c1[0].indexOf('--timeout-ms') + 1], '2222')
+    const c2 = []
+    await run({ name: 't93c', cfg: { writer: seatsWithTimeout }, deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 3, calls: c2 }) } })
+    assert.equal(c2[0][c2[0].indexOf('--timeout-ms') + 1], '1111')
+  })
+  test('T94 G2 走 registry preflight（沒注入 assertSettings）：deps.getHarness 假 gemini 席收到 role write、repoRoot、無 worktree（worktree 還沒建）；回 !ok ⇒ run 2、不建 worktree、writeMain 0 次；全 ok ⇒ 過；T37 的 agy 路徑照舊（假 agy 也走 preflight）', async () => {
+    const { getHarness } = await import('./harnesses/index.mjs')
+    const real = getHarness('gemini')
+    const seen = []
+    const bad = { ...real, preflight: (env, config, d) => { seen.push(d); return [{ ok: false, label: 'policy(toml)', message: 'policy 產不出來' }] } }
+    const calls = []
+    const r = await run({ name: 't94', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', 'gemini'], deps: { getHarness: (n) => (n === 'gemini' ? bad : getHarness(n)), writeMain: fakeWriter({ exitCode: 0, calls }) } })
+    assert.equal(r.code, 2)
+    assert.match(r.errs, /🔴 G2：policy 產不出來/)
+    assert.equal(calls.length, 0)
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0].role, 'write')
+    assert.equal(seen[0].repoRoot, r.repo.dir)
+    assert.equal(seen[0].worktree, undefined, 'ticket G2 在 worktree 建立前跑，不給 worktree（不落地）')
+    assert.equal(fs.existsSync(path.join(r.repo.dir, '.claude', 'worktrees', 't94')), false)
+    const ok = { ...real, preflight: () => [{ ok: true, label: 'policy(toml)' }] }
+    const calls2 = []
+    const r2 = await run({ name: 't94b', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', 'gemini'], deps: { getHarness: (n) => (n === 'gemini' ? ok : getHarness(n)), writeMain: fakeWriter({ exitCode: 3, calls: calls2 }) } })
+    assert.equal(r2.code, 3)
+    assert.equal(calls2.length, 1)
+    // 真 gemini preflight（role write、無 worktree）也是 ok:true 不落地——repo 根不會多出 .gemini/
+    const calls3 = []
+    const r3 = await run({ name: 't94c', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', 'gemini'], deps: { writeMain: fakeWriter({ exitCode: 3, calls: calls3 }) } })
+    assert.equal(r3.code, 3)
+    assert.equal(calls3.length, 1)
+    assert.equal(fs.existsSync(path.join(r3.repo.dir, '.gemini')), false, 'ticket G2 不在 repo 根落地 policy')
+    // agy 席（預設）走真 agy preflight：AGY_SETTINGS 不存在 ⇒ G2 擋（與 T37 同一條路，只是換成 registry）
+    const r4 = await run({ name: 't94d', cfg: { writer: SEATS }, deps: { env: { ...process.env, AGY_SETTINGS: '/nope/settings.json' }, writeMain: fakeWriter({ exitCode: 0 }) } })
+    assert.equal(r4.code, 2)
+    assert.match(r4.errs, /🔴 G2：agy settings 不存在：\/nope\/settings\.json/)
+  })
+  test('T95 assertSettings 注入相容：有注入 ⇒ 它就是 G2（throw ⇒ 2；回 true ⇒ 過），registry preflight 不被叫', async () => {
+    const { getHarness } = await import('./harnesses/index.mjs')
+    let preflightCalls = 0
+    const spy = { ...getHarness('gemini'), preflight: () => { preflightCalls++; return [] } }
+    const r = await run({ name: 't95', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', 'gemini'], deps: { getHarness: (n) => (n === 'gemini' ? spy : getHarness(n)), assertSettings: () => { throw new Error('舊接縫擋下') }, writeMain: fakeWriter({ exitCode: 0 }) } })
+    assert.equal(r.code, 2)
+    assert.match(r.errs, /🔴 G2：舊接縫擋下/)
+    assert.equal(preflightCalls, 0)
+  })
+
+  test('T98 r3（sol Q2）：裸 --writer-harness（parseArgs 得 true）⇒ run 回 2、stderr「🔴 --writer-harness 需要席名（可用：agy、gemini）」、不建 worktree／分支、writeMain 0 次（不准靜默落第 0 席）', async () => {
+    const calls = []
+    const r = await run({ name: 't98', cfg: { writer: SEATS }, extraArgs: ['--writer-harness'], deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 0, calls }) } })
+    assert.equal(r.code, 2)
+    assert.match(r.errs, /^🔴 --writer-harness 需要席名（可用：agy、gemini）$/m)
+    assert.equal(calls.length, 0)
+    assert.equal(r.summary, null, 'G2 前就擋，沒有 summary')
+    assert.equal(fs.existsSync(path.join(r.repo.dir, '.claude', 'worktrees', 't98')), false)
+    assert.equal(r.repo.g('branch', '--list', 'feat/t98--s').trim(), '')
+    // 裸旗標後面接別的旗標也是裸（parseArgs 把下一個 -- 開頭當新旗標）
+    const r2 = await run({ name: 't98b', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', '--tier', 'standard'], deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 0, calls }) } })
+    assert.equal(r2.code, 2)
+    assert.match(r2.errs, /--writer-harness 需要席名/)
+    assert.equal(calls.length, 0)
+  })
+  test('T99 r3（sol Q2）：--writer-harness "" ⇒ 同樣回 2、不建 worktree、writeMain 0 次；單物件 config 的可用清單只有 agy', async () => {
+    const calls = []
+    const r = await run({ name: 't99', cfg: { writer: SEATS }, extraArgs: ['--writer-harness', ''], deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 0, calls }) } })
+    assert.equal(r.code, 2)
+    assert.match(r.errs, /🔴 --writer-harness 需要席名（可用：agy、gemini）/)
+    assert.equal(calls.length, 0)
+    assert.equal(fs.existsSync(path.join(r.repo.dir, '.claude', 'worktrees', 't99')), false)
+    const r2 = await run({ name: 't99b', cfg: {}, extraArgs: ['--writer-harness', ''], deps: { assertSettings: () => true, writeMain: fakeWriter({ exitCode: 0, calls }) } })
+    assert.equal(r2.code, 2)
+    assert.match(r2.errs, /🔴 --writer-harness 需要席名（可用：agy）/)
+    assert.equal(calls.length, 0)
+  })
+
+  // ─── r2（統整者真跑 `ticket run --writer-harness gemini` 坐實＋sol Q2／Q3）：policy TOML 曾落在 worktree，收貨摘要把它列成改動檔、land 被擋 ───
+  const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), 'harnesses', '__fixtures__', 'gemini-write-stream.ndjson')
+  /** 假 spawn：在 cwd 寫 hello.txt、回真跑 fixture；preflight 用真的（會把 policy 寫進 outDir）。 */
+  async function geminiTicket(name, { preflightOverride = null, stdout = null, seats = SEATS } = {}) {
+    const { getHarness } = await import('./harnesses/index.mjs')
+    const real = getHarness('gemini')
+    const spawnCalls = []
+    const inject = (o) => ({
+      ...o,
+      env: { GEMINI_BIN: '/fake/gemini', PATH: '/x' },
+      resolveKey: () => 'test-key',
+      spawn: (bin, args, opts) => {
+        spawnCalls.push({ args, cwd: opts.cwd })
+        fs.writeFileSync(path.join(opts.cwd, 'hello.txt'), 'hello\n')
+        return { status: 0, signal: null, stdout: stdout !== null ? stdout : fs.readFileSync(FIX, 'utf8'), stderr: '' }
+      },
+    })
+    const fake = {
+      ...real,
+      ...(preflightOverride ? { preflight: preflightOverride(real) } : {}),
+      write: { ...real.write, run: (o) => real.write.run(inject(o)), resume: (o) => real.write.resume(inject(o)) },
+    }
+    const repo = makeRepo({ writer: seats })
+    const briefFile = path.join(tmpdir('brief-'), 'brief.md')
+    fs.writeFileSync(briefFile, `# ${name}\n寫 hello.txt`)
+    const worktree = path.join(repo.dir, '.claude', 'worktrees', name)
+    const outDir = path.join(repo.dir, '.local', 'llm-team', name)
+    const outs = []
+    const origLog = console.log
+    const origErr = console.error
+    const errs = []
+    console.log = (m) => outs.push(String(m))
+    console.error = (m) => errs.push(String(m))
+    let code
+    let councilCalls = 0
+    try {
+      code = await ticketMain(['run', '--name', name, '--brief', briefFile, '--branch', `feat/${name}--s`, '--allow', 'hello.txt', '--test', 'true', '--writer-harness', 'gemini'], {
+        repoRoot: repo.dir,
+        getHarness: (n) => (n === 'gemini' ? fake : getHarness(n)),
+        councilMain: () => {
+          councilCalls++
+          fakeCouncilOut(path.join(outDir, 'review'), { 'agy-opus': 'Q1：簽｜ok｜無\n整份：簽\nQ6：看 hello.txt', 'agy-gemini': 'Q1：簽｜ok｜無\n整份：簽\nQ6：看 hello.txt' })
+          return 0
+        },
+        runTest: () => ({ exit: 0, out: 'ok' }),
+      })
+    } finally {
+      console.log = origLog
+      console.error = origErr
+    }
+    const summary = JSON.parse(fs.readFileSync(path.join(outDir, 'summary.json'), 'utf8'))
+    const status = git(worktree, ['status', '--porcelain']).split('\n').map((l) => l.trim()).filter(Boolean)
+    return { code, summary, out: outs.join('\n'), errs: errs.join('\n'), repo, worktree, outDir, spawnCalls, status, councilCalls }
+  }
+  test('T96 成功的 gemini ticket（真 preflight、假 spawn 回真跑 fixture）⇒ run 0、summary.changed 精確＝allowlist、outDir 有 write/run-1/gemini-policy.toml、寫手 argv 帶 --policy 指到它、worktree git status 只有 hello.txt、summary／status 都沒有任何 .gemini 路徑', async () => {
+    const r = await geminiTicket('t96')
+    assert.equal(r.code, 0, r.errs)
+    assert.deepEqual(r.summary.changed, ['hello.txt'], 'changed 精確等於 allowlist（沒有 policy 檔混進來）')
+    assert.equal(r.summary.writeExit, 0)
+    assert.equal(r.summary.writer.harness, 'gemini')
+    const policy = path.join(r.outDir, 'write', 'run-1', 'gemini-policy.toml')
+    assert.ok(fs.existsSync(policy), `policy 應在 outDir：${policy}`)
+    assert.ok(fs.readFileSync(policy, 'utf8').includes('commandPrefix = "npm test"'), 'config.allowCommandHeads 進 policy')
+    assert.equal(r.spawnCalls.length, 1)
+    const i = r.spawnCalls[0].args.indexOf('--policy')
+    assert.equal(r.spawnCalls[0].args[i + 1], policy, '寫手用 --policy 載入 outDir 那份')
+    assert.equal(r.spawnCalls[0].cwd, r.worktree)
+    assert.deepEqual(r.status.map((l) => l.replace(/^\S+\s+/, '')), ['hello.txt'], 'worktree 只多 allow 內的檔（乾淨到可以 land）')
+    assert.equal(fs.existsSync(path.join(r.worktree, '.gemini')), false)
+    assert.ok(!JSON.stringify(r.summary).includes('.gemini'), 'summary 任何欄位都不含 .gemini 路徑')
+    assert.ok(!r.status.some((l) => l.includes('.gemini')), 'git status 不含 .gemini 路徑')
+    assert.ok(!r.out.includes('.gemini') && !r.out.includes('gemini-policy'), '收貨摘要不列 policy 檔')
+    assert.match(r.out, /改動檔: hello\.txt/)
+  })
+  test('T97 陽性對照（sol Q3）：把真 preflight 的 outDir 改成 worktree ⇒ policy 落在 worktree ⇒ write G4 越界 exit 3、summary.changed 含 gemini-policy.toml、run 回 3——T96 的斷言確實咬得到「policy 進 worktree」', async () => {
+    const r = await geminiTicket('t97', { preflightOverride: (real) => (env, config, d) => real.preflight(env, config, { ...d, outDir: d.outDir ? path.join(d.repoRoot, '.claude', 'worktrees', 't97') : undefined }) })
+    assert.equal(r.code, 3)
+    assert.equal(r.summary.writeExit, 3)
+    assert.ok(r.summary.changed.includes('gemini-policy.toml'), JSON.stringify(r.summary.changed))
+    assert.notDeepEqual(r.summary.changed, ['hello.txt'])
+    assert.match(r.errs, /🔴 G4 第 1 輪：越界檔/)
+    assert.ok(r.status.some((l) => l.includes('gemini-policy.toml')), 'worktree 不乾淨（這就是 r1 統整者真跑撞到的形狀）')
+  })
+  test('T100 r4（sol r3 Q2）：假寫手回 init＋正文非空＋exit 0＋result error quota（真 write.mjs、真 preflight；config 兩席 [gemini, agy]、跑第 0 席 gemini）⇒ write G3 擋、run 回 3、不開 council、summary.writerFailure quota、收貨摘要印「下一席 agy/gemini-3.8-flash-high，重跑加 --writer-harness agy」', async () => {
+    const stdout = [
+      '{"type":"init","session_id":"sess-quota","model":"m"}',
+      '{"type":"message","role":"assistant","content":"改好了","delta":true}',
+      '{"type":"result","status":"error","error":{"type":"QuotaExceededError","message":"quota"},"stats":{"total_tokens":1}}',
+    ].join('\n') + '\n'
+    const r = await geminiTicket('t100', { stdout, seats: [SEATS[1], SEATS[0]] })
+    assert.equal(r.code, 3)
+    assert.equal(r.summary.writeExit, 3)
+    assert.equal(r.councilCalls, 0, 'P5：write 非 0 不開 council')
+    assert.equal(r.summary.review, null)
+    assert.equal(r.summary.writer.harness, 'gemini')
+    assert.deepEqual(r.summary.writerFailure, { kind: 'quota', code: 'QuotaExceededError', retryable: false })
+    assert.deepEqual(r.summary.writerNext, { harness: 'agy', model: 'gemini-3.8-flash-high' })
+    assert.match(r.out, /🔴 寫手額度用盡：下一席 agy\/gemini-3\.8-flash-high，重跑加 --writer-harness agy/)
+    assert.match(r.out, /🔴 未複審（write 非 0/)
+    // 同形狀、config [agy, gemini] 且 --writer-harness gemini（最後一席）⇒ 仍擋、但沒有下一席可提示
+    const last = await geminiTicket('t100b', { stdout })
+    assert.equal(last.code, 3)
+    assert.equal(last.summary.writerFailure.kind, 'quota')
+    assert.equal(last.summary.writerNext, null)
+    assert.doesNotMatch(last.out, /下一席/)
+  })
+  test('T101 對照：agy 席的 quota 形狀（非零 exit＋stderr 429，09-21 真事故；假 agy harness 用真 normalize、preflight 假）⇒ run 3、不開 council、收貨摘要印「🔴 寫手額度用盡：下一席 gemini/gemini-3.8-flash，重跑加 --writer-harness gemini」——這條靠 exit≠0 就擋，不依賴 r4 閘', async () => {
+    const { getHarness } = await import('./harnesses/index.mjs')
+    const real = getHarness('agy')
+    const agyStdout = [
+      JSON.stringify({ event: 'init', conversation_id: 'conv-q' }),
+      JSON.stringify({ event: 'result', result: { status: 'SUCCESS', conversation_id: 'conv-q', response: '改好了', usage: { total_tokens: 1 } } }),
+    ].join('\n') + '\n'
+    // agy 的 quota 形狀：非零 exit＋stderr 429 RESOURCE_EXHAUSTED（2026-09-21 真事故）；正文非空、conversation id 也有
+    const fake = {
+      ...real,
+      preflight: () => [],
+      write: { ...real.write, run: (o) => real.write.run({ ...o, env: { AGY_BIN: '/fake/agy', PATH: '/x' }, spawn: (b, a, opts) => { fs.writeFileSync(path.join(opts.cwd, 'hello.txt'), 'x'); return { status: 1, signal: null, stdout: agyStdout, stderr: '429 RESOURCE_EXHAUSTED' } } }) },
+    }
+    const repo = makeRepo({ writer: SEATS })
+    const briefFile = path.join(tmpdir('brief-'), 'brief.md')
+    fs.writeFileSync(briefFile, '# t101\n寫 hello.txt')
+    const outs = []
+    const origLog = console.log
+    const origErr = console.error
+    console.log = (m) => outs.push(String(m))
+    console.error = () => {}
+    let councilCalls = 0
+    let code
+    try {
+      code = await ticketMain(['run', '--name', 't101', '--brief', briefFile, '--branch', 'feat/t101--s', '--allow', 'hello.txt', '--test', 'true'], {
+        repoRoot: repo.dir,
+        getHarness: (n) => (n === 'agy' ? fake : getHarness(n)),
+        councilMain: () => { councilCalls++; return 0 },
+        runTest: () => ({ exit: 0, out: 'ok' }),
+      })
+    } finally {
+      console.log = origLog
+      console.error = origErr
+    }
+    const summary = JSON.parse(fs.readFileSync(path.join(repo.dir, '.local', 'llm-team', 't101', 'summary.json'), 'utf8'))
+    assert.equal(code, 3)
+    assert.equal(summary.writeExit, 3)
+    assert.equal(councilCalls, 0)
+    assert.equal(summary.writer.harness, 'agy')
+    assert.equal(summary.writerFailure.kind, 'quota')
+    assert.deepEqual(summary.writerNext, { harness: 'gemini', model: 'gemini-3.8-flash' })
+    assert.match(outs.join('\n'), /🔴 寫手額度用盡：下一席 gemini\/gemini-3\.8-flash，重跑加 --writer-harness gemini/)
   })
 })
