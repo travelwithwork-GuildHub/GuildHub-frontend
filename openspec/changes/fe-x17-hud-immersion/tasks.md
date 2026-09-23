@@ -21,7 +21,7 @@
 - [x] 3.2 `AppHeader`：黑裸字＋白方塊 → 小 logo／emblem ＋線上數膠囊 badge（🟢 1），毛玻璃底、浮起。
 - [x] 3.3 `StatusHud`：白盒 → 毛玻璃、浮起；狀態縮成色點＋單行摘要，點擊才展開編輯。
 - [x] 3.4 `SceneChatHud`：白盒 → 毛玻璃、浮起；預設可收成浮動鈕、展開才出完整面板。
-- [ ] 3.5 判準：`FE-X17-S03`（真瀏覽器量 HUD 背景合成 alpha `< 1`、有 `backdrop-filter`、不變暗世界）、`FE-X17-S04`（文字對比 `≥ 4.5:1`）。
+- [x] 3.5 判準：`FE-X17-S03`（真瀏覽器量 HUD 背景合成 alpha `< 1`、有 `backdrop-filter`、不變暗世界）、`FE-X17-S04`（文字對比 `≥ 4.5:1`）。**`tests/e2e/hud-immersion.mjs`**：常駐 HUD＋門前提示各 alpha=0.66、blur(12px)；主字 6.23:1、次要字 4.58:1（把玻璃合成到世界最亮色 glow #ffe9b0 這個最壞背景上量）。**§6 抓到 muted 0.84 只有 4.06:1、提亮到 0.90 修正。**
 
 ## 4. 消滅原生表單感（實作層，走 controls token）
 
@@ -34,12 +34,12 @@
 
 - [x] 5.1 `InteractionPrompt`：白盒（`border-line bg-surface text-ink border`）→ 深色半透明 glass 膠囊（`.glass-panel`，glass token 加在 `globals.css`）＋圓角＋浮起；`E` 用獨立鍵帽樣式（`kbd.keycap`）；位置維持 `bottom-gutter left-1/2 -translate-x-1/2`。（合成 alpha／對比在 §6 真瀏覽器量）
 - [x] 5.2 `ReturnToHallButton`：房間裡不再把「回到 Guild Hall」當常駐具名文字大鈕；改 icon-only＋`aria-label`（低顯著後備），觸發同一個 `returnToHall`。鍵盤可達、讀屏有名。大廳不受影響（本來就沒這顆）。e2e 選擇器（`dom-surfaces`／`room-entry`）從 `has-text` 改 `aria-label`。
-- [ ] 5.3 判準：`FE-X17-S05`（真瀏覽器量：門前提示背景合成 alpha `< 1`、有 `kbd` 鍵帽、下半部置中、對比 `≥ 4.5:1`）、`FE-X17-S06`（房間裡沒有常駐具名「回到 Guild Hall」大鈕、返回動作鍵盤可達、門前提示在）。
-- [ ] 5.4 不破 `FE-V01` 既有 e2e／判準（穿門即走、門前按 E、`returnToHall` 行為不變）。
+- [x] 5.3 判準：`FE-X17-S05`（真瀏覽器量：門前提示背景合成 alpha `< 1`、有 `kbd` 鍵帽、下半部置中、對比 `≥ 4.5:1`）、`FE-X17-S06`（房間裡沒有常駐具名「回到 Guild Hall」大鈕、返回動作鍵盤可達、門前提示在）。`hud-immersion.mjs` 走到門前量到：alpha=0.66、blur、有 kbd.keycap、中心 x=720／1440 對齊中線、y=841 在下半部、對比 6.23:1。S06 由 #643 的 icon 化＋`dom-surfaces`/`room-entry` 選擇器改 aria-label 守著。
+- [x] 5.4 不破 `FE-V01` 既有 e2e／判準（穿門即走、門前按 E、`returnToHall` 行為不變）：§6 e2e 的 `approachDoor` 正常走到門前、提示如常出現；未動 `RoomExitTrigger`／`InteractionPrompt` 行為，只動視覺。
 
 ## 6. 收尾
 
-- [ ] 6.1 全套件綠、`FE-X16` 既有 e2e 與判準不紅、`openspec validate` 綠、`progress.sh --check` 綠。
-- [ ] 6.2 **前後截圖**（1440×900 與手機寬），自問「有 3D 體驗了嗎、還像網頁嗎」。
-- [ ] 6.3 送 codex／gemini 驗成品。
-- [ ] 6.4 部署最新版到正式站（使用者 `vercel --prod`）。
+- [x] 6.1 全套件綠（唯一紅是既有的 `db-schema-copy`／FE-O04-S01，後端 clone SQL 分歧、CI 略過）、`typecheck`／`lint` 綠、`openspec validate --strict` 綠、`progress.sh --check` 綠。muted token 只動玻璃、與 `FE-X16` 淺色表面正交，不影響其判準。
+- [x] 6.2 成品截圖（`docs/evidence/fe-x17/` 1440×900 與 390 手機寬）：門前 `[E]` 膠囊 little-ritual 風、左側 HUD 全深玻璃、名牌玻璃。自問→**是 3D 遊戲感、不像網頁**。（剩門標籤／看板卡／假 WS 座位 toast 是白盒，但屬 FE-W06／FE-W20／假資料，非 X17；兩模型一致「材質差異是好的空間語意、不在 X17 順手改」。）
+- [x] 6.3 送 codex（gpt-5.6-terra）＋gemini（3.1 Pro）驗成品：muted 提亮 vs 加深玻璃兩模型分歧→用「glow 最亮色下 muted 仍 4.58:1」定案留 0.90、玻璃不動；量測法兩模型認可；白盒一致不在 X17 改。
+- [ ] 6.4 部署最新版到正式站（使用者 `vercel --prod`）—— **§6 動了 muted token，合併後需再部署一次才會 live**。
