@@ -66,3 +66,22 @@ renderer SHALL **開啟多重取樣（MSAA，`antialias` 為真）**，讓那個
 - **WHEN** WebGL 環境不提供多重取樣（`antialias` 未被實作），或某張像素貼圖無法產生 mipmap
 - **THEN** `/world` SHALL 仍然渲染出畫面（該面向退化為原本的最近鄰、無 MSAA／無 mipmap 管線）
 - **AND** SHALL NOT 出現白屏，SHALL NOT 拋錯（消閃是加分，缺它時退化，不是壞掉）
+
+### Requirement: 地面疊一張像素草地，且經共用 resource factory 取得
+
+Guild Hall 的地面 SHALL 在主地板上疊一張**像素草地** plane（`magFilter` 為 `NearestFilter`、`wrap` 為 `RepeatWrapping`，
+tiling 隨物理範圍縮放），讓地面看起來是草而不是一塊平色。草地貼圖的 `minFilter` SHALL 是一個**會使用 mipmap** 的
+filter、`generateMipmaps` SHALL 為真 —— 草地是地板主表面，低有效 DPR 下不用 mipmap 的 minification 會讓它在相機移動時
+爬行、閃（與 `S02` 的一般像素貼圖同因）；`magFilter` 維持 `NearestFilter`，近看的硬像素外觀不變。
+
+草地貼圖 SHALL **經 `world-design-system` 的共用 resource factory 取得**，場景元件（`WorldShell`）
+**MUST NOT** 自己 `new CanvasTexture` —— 沿用 `world-environment`「場景元件 MUST NOT 直接建立 GPU 資源」
+與「誰負責釋放」的既有契約；貼圖與草地 plane 共用的 geometry SHALL 是 factory 擁有的不可變快取實例，
+場景元件 MUST NOT 對它 `dispose()`。
+
+#### Scenario: [FE-W14-S04] 地面有像素草地、貼圖來自共用 factory
+
+- **WHEN** 進入 Guild Hall
+- **THEN** 主地板上 SHALL 疊一張像素草地 plane，其貼圖的 `magFilter` 是 `NearestFilter`、`minFilter` 走 mipmap（`generateMipmaps` 為真）、`wrap` 是 `RepeatWrapping`
+- **AND** 該貼圖 SHALL 由共用 resource factory 產生（`WorldShell` 不直接 `new CanvasTexture`）
+- **AND** `WorldShell` 卸載時 SHALL NOT 對草地貼圖或其 geometry 呼叫 `dispose()`（factory 擁有）
