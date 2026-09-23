@@ -120,8 +120,9 @@ try {
     else bad('image-rendering 不是 pixelated', String(m.imageRendering))
   }
 
-  // antialias 要在 renderer 建立時就**開**（change fe-w14-motion-stability：在 1/16 低解析 buffer 上做 MSAA，
-  // 讓移動中的幾何邊緣覆蓋率漸變而非二元跳動 —— 治「走動時整片＋人物閃」）。`FE-W14-S05`。
+  // antialias 要在 renderer 建立時就**關**（`FE-W14-S05` 維持既有）。曾一度改開 MSAA 治「走動時幾何邊緣閃」，
+  // 但 `dpr 0.25` 下 MSAA 把角色的硬像素邊緣軟化成柔邊（靜止糊），兩模型一致後撤回、改回關閉；只靠貼圖 mipmap
+  // 消閃（見 change fe-w14-motion-stability 的 design.md〈撤回 MSAA〉）。
   const aa = await page.evaluate(() => {
     const c = document.querySelector('canvas')
     try {
@@ -132,8 +133,8 @@ try {
       return null
     }
   })
-  if (aa && aa.requested === true) ok(`renderer 的 antialias 已開啟（實得 SAMPLES=${aa.samples}；真 GPU 應 > 1，swiftshader 可能回 0）`)
-  else bad('antialias 沒有開啟', String(aa === null ? null : JSON.stringify(aa)))
+  if (aa && aa.requested === false) ok(`renderer 的 antialias 已關閉（硬邊像素、消閃靠貼圖 mipmap；SAMPLES=${aa.samples}）`)
+  else bad('antialias 沒有關閉', String(aa === null ? null : JSON.stringify(aa)))
 
   // 截圖：整個像素世界（草地＋角色描邊／髮型＋硬邊點陣）—— 可讀性（`FE-W14-S01`）人眼判。
   await page.screenshot({ path: `${SHOTS}/world-pixel-after.png` })
