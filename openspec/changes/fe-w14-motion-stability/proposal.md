@@ -11,19 +11,22 @@
 同一種傷害 —— 使用者不會想待在裡面，前面所有功能都掛在一個看了難受的畫面上。這是使用者主動回報、要求「想辦法
 解決」的具體病灶，不是預防性優化。
 
-**為什麼要動規格**：`FE-W14-S05` 明訂「antialias SHALL 關閉」、`S02` 明訂貼圖 `NearestFilter`（未區分 min／mag）。
-消閃需要**開多重取樣**與**貼圖走 mipmap**，兩者都與現行 locked 規格的字面衝突 —— 依 rule 4，先改規格談定，才碰
-產品碼。
+**為什麼要動規格**：`S02` 明訂貼圖 `NearestFilter`（未區分 min／mag）。治 (A) 需要**貼圖走 mipmap**（只動 `minFilter`），
+與現行 locked 規格的字面衝突 —— 依 rule 4，先改規格談定，才碰產品碼。
+
+**（B）怎麼收：一度開 MSAA、實測後撤回。** 這個 change 曾把 `S05` 的「antialias 關閉」改述成「開啟多重取樣」來治 (B)，
+部署後發現在 `dpr 0.25` 下 MSAA 把**角色的硬像素邊緣軟化成柔邊**（角色純方塊、無貼圖，靜止看起來糊、臉部 1–2px 細節被抹）。
+取捨評估（codex gpt-5.6-terra ＋ gemini 3.1 Pro 一致）後**撤回 MSAA、`S05` 維持既有「antialias 關閉」不變**：造成頭暈的主因
+是 (A) 大面積貼圖爬行、已由 mipmap 治好；(B) 殘留的幾何邊緣抖動在 (A) 消失後不足以致暈，而靜止時角色讀成清晰硬邊像素
+才是不可退讓的。詳見 `design.md`〈撤回 MSAA〉。
 
 ## What Changes
 
 - **MODIFIED `world-visual-polish` 的〈場景材質⋯像素貼圖〉**：貼圖 `magFilter` 維持 `NearestFilter`（近看硬像素不變），
   但 `minFilter` 改成**走 mipmap** 的 filter、`generateMipmaps` 為真 —— 治 (A) 貼圖爬行。材質快取契約（同 token 同實例、
   不可變、不每幀新建、SSR 退化純色）**完全不變**；`S02` 補上 min／mag／mipmap 的斷言。
-- **MODIFIED `world-visual-polish` 的〈以低有效 DPR 做像素化渲染〉**：DPR `0.25` ＋ `pixelated` ＋ 1/16 著色預算
-  **全部不變**，但 renderer 的 `antialias` 由**關改開** —— 在低解析 backing store 上做 MSAA，讓移動中的幾何邊緣覆蓋率
-  漸變而非二元跳動，治 (B) 整片閃。像素格（最近鄰放大的方塊）不因 MSAA 消失。`S05` 改述、並加 `S09` 失敗路徑
-  （缺 MSAA／mipmap 時退化、不白屏不拋錯）。
+- **〈以低有效 DPR 做像素化渲染〉維持不變**：DPR `0.25` ＋ `pixelated` ＋ 1/16 著色預算 ＋ `antialias` 關閉 —— `S05` 一字不動。
+  （曾一度改述為「開啟 MSAA」治 (B)，實測後撤回，見上「為什麼要動規格」與 `design.md`〈撤回 MSAA〉。）
 
 ## Non-goals
 
@@ -31,9 +34,9 @@
   弱裝置預算，是昂貴的半解。著色維持 1/16。
 - **不做 grid-snap（相機／角色 snap 到像素格）。** 它能完全消閃且零成本，但把平滑移動換成一格一格跳（`0.25` 下一格＝
   螢幕 4px，很明顯）。使用者要的是不閃、不是頓；本 change 選「保平滑移動」的路。grid-snap 留作未來若仍不足時的選項。
-- **不換渲染架構、不引入後處理相依。** 選定實作是**原生 canvas 多重取樣**（`antialias:true` 在既有 dpr 0.25 canvas 上，
-  同一顆 `<Canvas>`），非手動 render target ＋ 全螢幕 pass。手動 MSAA-FBO 是**後備**（原生 MSAA 不足時才上），記在
-  `design.md`。規格只寫可觀察結果（低解析 buffer 上多重取樣＋最近鄰放大＋貼圖 mipmap），不綁實作手法。
+- **不換渲染架構、不引入後處理相依。** (A) 的解是純貼圖旗標（`minFilter`／mipmap），零新相依、同一顆 `<Canvas>`。
+  (B) 曾試原生 canvas MSAA（`antialias:true`）後撤回；不上手動 MSAA-FBO、不上任何後處理 pass —— 殘留幾何邊緣抖動
+  在 (A) 消失後可接受，清晰的靜止角色優先。若未來仍不足，grid-snap 或 motion-gated AA 是**後備**（見 `design.md`），非本 change。
 - **不改 `world-canvas` 的 DPR 契約。** canvas 仍 dpr `0.25`、上限 `2`；低解析在 canvas 自己的 backing store，不搬到
   render target，所以 `world-canvas` 一字不動。
 - **不改調色盤、貼圖內容、角色外觀、相機、動畫、坐姿。** 只動 `minFilter`／mipmap 與 `antialias` 兩個渲染旗標。
