@@ -15,7 +15,7 @@ import { AvatarPicker } from './AvatarPicker'
 
 export function AppHeader() {
   return (
-    <header data-testid="app-header" className="bg-glass text-glass-ink hud-legible border-glass-line p-gutter relative flex shrink-0 items-center gap-gutter border-b backdrop-blur-md">
+    <header data-testid="app-header" className="text-glass-ink hud-legible border-glass-line p-gutter relative flex shrink-0 items-center gap-gutter border-b">
       <h1 {...TITLE}>GuildHub</h1>
       <div data-testid="app-header-entries" className="ml-auto flex items-center gap-gutter">
         <IdentityBadge />
@@ -23,6 +23,12 @@ export function AppHeader() {
         <AvatarPicker />
         <ReturnToHallButton />
       </div>
+      {/* ⚠️ **玻璃底獨立成一層、不掛在 `<header>` 本身上（#5 回歸修正，2026-09-23）。**
+          `backdrop-filter` 會讓元素成為 stacking context。掛在 `<header>` 上時，`AvatarPicker` 的彈出層（渲染在標題列裡、`z=panel`）
+          被關進標題列這個 context；而標題列在 DOM 早於世界區、自身無 z-index，彈出層往下延伸到世界區就被 3D canvas 蓋住 —— 點了像沒反應。
+          改掛在這個無子節點的背景層：標題列本身不再是 stacking context，彈出層回到 root stacking context、用 `z=panel` 蓋過畫布。視覺完全不變。
+          **放最後一個子節點＋`-z-10`**：`FE-X16-S19` 的測試要 `firstElementChild` 是品牌 H1，所以玻璃層不能排第一；`-z-10` 讓它疊在內容之後（標題列非 stacking context，負 z 回到 root、只在標題列這條無世界重疊的帶狀區生效）。 */}
+      <div aria-hidden className="bg-glass backdrop-blur-md pointer-events-none absolute inset-0 -z-10" />
     </header>
   )
 }
