@@ -148,7 +148,8 @@ RM
 run() {
   local want="$1" desc="$2" needle="$3"
   local out rc
-  out="$(cd "$W" && bash "$SCRIPT" --check 2>&1)"; rc=$?
+  # `ASOF=YYYY-MM-DD run …`：把「今天」換掉（週次錨點的測試用；不准依賴真實時鐘）
+  out="$(cd "$W" && bash "$SCRIPT" --check ${ASOF:+--as-of "$ASOF"} 2>&1)"; rc=$?
   if [ "$rc" != "$want" ]; then
     echo "✗ ${desc} —— 期望退出碼 ${want}，實際 ${rc}"
     bump_fail; return
@@ -222,6 +223,16 @@ run_all_absent() {
   echo "✓ $desc"; PASS=$((PASS + 1))
 }
 
+# run_trace_has <說明> <輸出裡要有的字>：`--trace` 的輸出（里程碑可追溯性的細節）
+run_trace_has() {
+  local desc="$1" needle="$2"
+  if (cd "$W" && bash "$SCRIPT" --trace ${ASOF:+--as-of "$ASOF"} 2>&1) | grep -q -- "$needle"; then
+    echo "✓ $desc"; PASS=$((PASS + 1)); return
+  fi
+  echo "✗ ${desc} —— --trace 的輸出裡沒有「${needle}」"
+  bump_fail
+}
+
 # run_json_top <說明> <頂層鍵> <期望值（字串比對）>：--json 的頂層欄位
 #
 # `run_field_has` 只看 `items[]`。有些事實不屬於任何一個項目 ——
@@ -254,7 +265,7 @@ print("yes" if str(d.get(sys.argv[1])) == sys.argv[2] else "no:" + str(d.get(sys
 # 而這個 repo 的判準是「共用 oracle 越少越好、每個都要走過失敗路徑」。
 run_expr() {
   local desc="$1" expr="$2" out
-  out="$(cd "$W" && bash "$SCRIPT" --json 2>/dev/null | python3 -c '
+  out="$(cd "$W" && bash "$SCRIPT" --json ${ASOF:+--as-of "$ASOF"} 2>/dev/null | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 m, meta = d.get("milestones"), d.get("milestones_meta")
@@ -586,6 +597,10 @@ selftest_count "run_setup 自測"        run_setup        "自測（不計入）
 selftest_count "run_field_has 自測"    run_field_has    "自測（不計入）" "NO-SUCH-ITEM" "state" "不可能的值"
 selftest_count "run_no_item 自測"      run_no_item      "自測（不計入）" "FE-C01"
 selftest_count "run_blockers_has 自測" run_blockers_has "自測（不計入）" "FE-C01" "NO-SUCH-BLOCKER"
+# run_expr 是 P0 加的共用 oracle，當時漏了這一行 —— 「每個共用 oracle 都要走過一次
+# 失敗路徑」是這支測試自己的規矩，漏登記的 oracle 等於沒被驗過它會不會判紅。
+selftest_count "run_expr 自測"         run_expr         "自測（不計入）" "False"
+selftest_count "run_trace_has 自測"    run_trace_has    "自測（不計入）" "這串字絕不會出現在輸出裡"
 
 selftest "run 自測：退出碼不符時判紅" "期望退出碼 1，實際 0" \
          run 1 "自測（不計入）" ""
@@ -2226,6 +2241,155 @@ edit "| 這一項 | 依賴 |" "已知的跨項依賴：
 | 這一項 | 依賴 |"
 xdep "| FE-P03 | FE-C01 | 全部 | 正本 |"
 run 1 "正本與舊表並存要紅（兩份會漂）" "同時有〈跨項依賴〉正本表與舊的"
+
+# ── 里程碑可追溯性（2026-09-25）──────────────────────────────────
+#
+# **報告，不擋**：沒被指到的工作再多，`--check` 都是 0。但**預設就印一行**
+# （含 --check）——一份沒有人跑的報告，就是「機制沒起作用、沒人知道」的形狀。
+# 單位是 WBS ID；不算 Cancelled／Regular；不用週次截斷。
+
+baseline
+run 0 "可追溯性：預設輸出（含 --check）就有一行摘要" "里程碑可追溯性：① 0 項已排週次"
+run_expr "baseline 的可追溯性：BE-G01 沒排週次也沒被指到；FE-O10（常態）不算" \
+  "d['milestone_trace']['status']=='available' and d['milestone_trace']['pool']==3 \
+   and d['milestone_trace']['covered']==['FE-C01','FE-P03'] \
+   and d['milestone_trace']['uncovered_scheduled']==[] \
+   and d['milestone_trace']['uncovered_unscheduled']==['BE-G01'] \
+   and d['milestone_trace']['excluded']==['FE-O10']"
+
+baseline
+edit "| FE-C01、FE-P03 |" "| FE-C01 |"
+run 0 "已排週次卻沒被指到：只是報告，--check 仍是 0" "① 1 項已排週次，卻沒有被任何里程碑指到"
+run_expr "沒被指到的那一項進了 ①" "d['milestone_trace']['uncovered_scheduled']==['FE-P03']"
+# 抓 `↳` 前綴，不抓 ID：`--trace` 也印一般狀態表，那裡本來就有 FE-P03。
+run_trace_has "--trace 列出是哪一項" "↳ FE-P03"
+
+baseline
+edit "| FE-C01、FE-P03 |" "| FE-C01、FE-P03、BE-G01 |"
+run 0 "全部被指到也要講（不然跟「沒有看」長得一樣）" "3 項全部被某個里程碑指到"
+
+# 單位是 WBS ID：Cancelled 的不算進分母，也不會出現在未涵蓋裡。
+baseline
+edit "| FE-C01、FE-P03 |" "| FE-C01 |"
+edit "| FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | |" "| FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | Cancelled｜不做了 |"
+run_expr "Cancelled 的項目不算未涵蓋" \
+  "d['milestone_trace']['uncovered_scheduled']==[] and 'FE-P03' in d['milestone_trace']['excluded']"
+
+# 舊的兩欄里程碑：**未評估，不是全部被指到、也不是全部沒被指到。**
+baseline
+edit "| 里程碑 | 目標週 | 驗收結果 | 靠哪些 |
+|---|---|---|---|
+| M1 一個人跑完主流程 | W2 | 進來、看到、做完一件事 | FE-C01、FE-P03 |" "| 週 | 這一週結束時，使用者能做什麼 |
+|---|---|
+| **W1** | 骨架立起來 |"
+run 0 "舊格式的里程碑：摘要明說「未評估」" "里程碑可追溯性：未評估（〈里程碑〉是舊的兩欄格式"
+run_expr "舊格式：status unavailable、清單是 None（不是 []）" \
+  "d['milestone_trace']['status']=='unavailable' and d['milestone_trace']['uncovered_scheduled'] is None \
+   and d['milestone_trace']['covered'] is None"
+
+baseline
+python3 - "$W/docs/WBS.md" <<'PY2'
+import io, sys
+p = sys.argv[1]
+t = io.open(p, encoding="utf-8").read()
+i, j = t.index("## 里程碑"), t.index("> 這一節底下")
+io.open(p, "w", encoding="utf-8").write(t[:i] + t[j:])
+PY2
+run 0 "沒有〈里程碑〉：摘要明說「未評估」" "docs/WBS.md 沒有〈里程碑〉"
+run_expr "沒有〈里程碑〉的原因碼" "d['milestone_trace']['reason']=='no_milestone_section'"
+
+# --json 不准多出那一行摘要（下游在解析 stdout）。
+baseline
+run_json_parses "--json 的 stdout 還是合法 JSON（摘要不准混進去）"
+
+
+# ── 週次錨點（2026-09-25）──────────────────────────────────────────
+#
+# **純報告，exit 0**：時間不能進 `--check` 的退出碼。所有案例都用 `--as-of`
+# （`ASOF=…`）把「今天」釘住 —— 測試不准依賴真實時鐘。
+# 缺口「已裁決」看缺口算出來的狀態（Done／Cancelled），不看阻塞邊的類型字面。
+
+# anchor [日期 時區]：在 fixture 頂端加一行週次錨點（預設 2026-10-05 Asia/Taipei，星期一）
+anchor() { edit "# 測試用的工作分解" "# 測試用的工作分解
+
+<!-- wbs:week1 ${1:-2026-10-05 Asia/Taipei} -->"; }
+
+baseline
+run 0 "沒設錨點、有決策期限：講「未設定」，不擋" "週次錨點：未設定"
+run_expr "沒設錨點：calendar 是 disabled＋原因，不是空陣列" \
+  "d['calendar']['status']=='disabled' and d['calendar']['reason']=='no_anchor' \
+   and d['calendar']['deadline_gaps']==1"
+
+# 完全沒有決策期限的專案不講（不然對不想用這功能的專案是永久雜訊）。
+baseline
+edit "| BE-G01 \`BE-缺\` | Pending" "| | Pending"
+edit "| 決策≤W1 | — | \`BE-缺\` |" "| — | — | \`BE-缺\` |"
+run_absent 0 "沒有任何決策期限：不印錨點提示" "週次錨點"
+
+baseline
+anchor
+ASOF=2026-10-11 run 0 "錨點起第 6 天是 W1：期限內" "週次：今天 W1"
+ASOF=2026-10-11 run_expr "W1 最後一天：決策≤W1 的缺口還在 waiting" \
+  "d['calendar']['current_week']==1 and d['calendar']['gaps'][0]['calendar_state']=='waiting'"
+ASOF=2026-10-12 run 0 "第 7 天是 W2：過了決策≤W1 —— 只是報告，--check 仍是 0" "1 個缺口已過決策期限"
+ASOF=2026-10-12 run_expr "W2 第一天：fallback 自 W2 起生效" \
+  "d['calendar']['current_week']==2 and d['calendar']['gaps'][0]['calendar_state']=='fallback_effective' \
+   and d['calendar']['gaps'][0]['effective_since_week']==2"
+ASOF=2026-10-12 run_trace_has "--trace 列出是哪個缺口、從哪一週起生效" "↳ BE-G01"
+ASOF=2026-10-04 run_expr "錨點之前是 W0：還在期限內" \
+  "d['calendar']['current_week']==0 and d['calendar']['gaps'][0]['calendar_state']=='waiting'"
+
+# 錨點往後挪七天，同一個「今天」的週次剛好少一（codex 訂的停止條件之一）。
+baseline
+anchor "2026-10-12 Asia/Taipei"
+ASOF=2026-10-12 run_expr "錨點往後挪七天：同一天從 W2 變 W1" "d['calendar']['current_week']==1"
+
+# 已裁決：缺口標 Done（理由寫答案）或 Cancelled。
+baseline
+anchor
+edit "Alarm｜這是核心價值" "Done｜答案：對方會提供，W3 上線"
+ASOF=2026-10-12 run_expr "標 Done 的缺口是 decided，過期也不報" \
+  "d['calendar']['gaps'][0]['calendar_state']=='decided' and d['calendar']['counts']['fallback_effective']==0"
+ASOF=2026-10-12 run 0 "decided 之後摘要說沒有逾期" "沒有缺口過了決策期限還沒答案"
+
+baseline
+anchor
+edit "Alarm｜這是核心價值" "Cancelled｜對方明文不做"
+ASOF=2026-10-12 run_expr "標 Cancelled 的缺口是 decided" "d['calendar']['gaps'][0]['calendar_state']=='decided'"
+
+# 錨點的文法：看不懂的不准靜靜跳過。
+baseline
+anchor
+anchor "2026-11-02 Asia/Taipei"
+run 1 "錨點只能有一個" "只能有一個"
+
+baseline
+anchor "2026-10-05"
+run 1 "錨點沒寫時區要紅" "週次錨點格式不對"
+
+baseline
+anchor "2026-10-05 Mars/Olympus"
+run 1 "錨點時區認不出來要紅" "時區認不出來"
+
+baseline
+anchor "2026-02-30 Asia/Taipei"
+run 1 "錨點日期不存在要紅" "日期不存在"
+
+baseline
+edit "# 測試用的工作分解" "# 測試用的工作分解
+
+\`\`\`markdown
+<!-- wbs:week1 2026-10-05 Asia/Taipei -->
+\`\`\`"
+run_expr "圍籬裡的錨點範例不算" "d['calendar']['status']=='disabled' and d['calendar']['reason']=='no_anchor'"
+
+baseline
+ASOF=2026-02-30 run 2 "--as-of 不是真的日期：參數錯誤（2），不准默默改用真實時鐘" "要是 YYYY-MM-DD 而且是真的日期"
+ASOF=20261012 run 2 "--as-of 格式不對：參數錯誤（2）" "要是 YYYY-MM-DD 而且是真的日期"
+
+baseline
+anchor
+ASOF=2026-10-12 run_json_parses "--json 的 stdout 還是合法 JSON（週次摘要不准混進去）"
 
 echo
 if [ "$FAIL" -gt 0 ]; then
