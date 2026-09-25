@@ -7,6 +7,8 @@
 #     bash .github/scripts/progress.sh --blocked  # 不在自己手上的，以及誰依賴它
 #     bash .github/scripts/progress.sh --check    # 有規則違規就以非零結束
 #     bash .github/scripts/progress.sh --render   # 更新 docs/WBS.md 的進度區塊
+#     bash .github/scripts/progress.sh --trace    # 哪些工作沒有被任何里程碑指到（報告，不擋）
+#     bash .github/scripts/progress.sh --as-of 2026-10-12  # 把「今天」當成這一天（週次錨點用）
 #
 # **這份是算出來的，不是寫出來的。** 沒有任何人維護它。
 #
@@ -88,6 +90,11 @@
 #
 # 標記 `Cancelled`（決定不做）的缺口不受第 4 條約束。
 #
+#   6. 依賴圖（2026-09-25）。阻塞欄：不准繞成一圈（缺口擋缺口）；已完成的項目
+#      不准還掛著指向「待裁決」缺口的邊。〈跨項依賴〉正本表：被依賴的最晚週
+#      ≤ 這一項最早週（同週合法）、不准繞成一圈、已完成的項目前置要先完成。
+#      舊的自由文字表不驗、不猜，但每次都講它沒被驗。分母在 `--json` 的 `dep_graph`。
+#
 # 另外一整類是**解析本身要 fail-closed** —— 看起來像資料、卻解析不了，
 # 一律報錯，不准安靜地跳過。下面每一條都實測繞過成功過，才被補起來：
 #
@@ -117,6 +124,8 @@ ONLY_BLOCKED=0
 CHECK=0
 JSON=0
 RENDER=0
+TRACE=0
+AS_OF=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --all)     SHOW_ALL=1 ;;
@@ -124,8 +133,11 @@ while [ $# -gt 0 ]; do
     --check)   CHECK=1 ;;
     --json)    JSON=1 ;;
     --render)  RENDER=1 ;;
-    --week)    shift; ONLY_WEEK="${1:-}" ;;
-    -h|--help) sed -n '2,10p' "$0" | sed 's/^#[[:space:]]\{0,1\}//'; exit 0 ;;
+    --trace)   TRACE=1 ;;
+    --as-of)   shift; [ $# -gt 0 ] || { echo "--as-of 要接日期（YYYY-MM-DD）" >&2; exit 2; }; AS_OF="$1" ;;
+    # 要接值的參數**沒帶值就停**：`${1:-}` 會把「忘了寫」吞成空字串，然後照常跑。
+    --week)    shift; [ $# -gt 0 ] || { echo "--week 要接週次（例如 W3）" >&2; exit 2; }; ONLY_WEEK="$1" ;;
+    -h|--help) sed -n '2,12p' "$0" | sed 's/^#[[:space:]]\{0,1\}//'; exit 0 ;;
     *) echo "不認得的參數：$1" >&2; exit 2 ;;
   esac
   shift
@@ -151,7 +163,7 @@ elif ! git fetch -q origin 2>/dev/null; then
 fi
 
 SHOW_ALL="$SHOW_ALL" ONLY_WEEK="$ONLY_WEEK" ONLY_BLOCKED="$ONLY_BLOCKED" CHECK="$CHECK" JSON="$JSON" \
-RENDER="$RENDER" REMOTE_FRESH="$REMOTE_FRESH" REMOTE_WHY="$REMOTE_WHY" python3 - <<'PY'
+RENDER="$RENDER" TRACE="$TRACE" AS_OF="$AS_OF" REMOTE_FRESH="$REMOTE_FRESH" REMOTE_WHY="$REMOTE_WHY" python3 - <<'PY'
 import os, re, sys, subprocess, pathlib, collections, unicodedata
 
 SHOW_ALL = os.environ.get("SHOW_ALL") == "1"
@@ -159,6 +171,19 @@ ONLY_BLOCKED = os.environ.get("ONLY_BLOCKED") == "1"
 CHECK = os.environ.get("CHECK") == "1"
 JSON = os.environ.get("JSON") == "1"
 RENDER = os.environ.get("RENDER") == "1"
+TRACE = os.environ.get("TRACE") == "1"
+AS_OF = os.environ.get("AS_OF") or ""
+if AS_OF:
+    # `--as-of` 是測試與回放用的「今天」。**格式錯就停**，不要默默改用真實時鐘 ——
+    # 那樣測試會在某一天突然開始依賴日期，而且看起來還是綠的。
+    import datetime as _dt0
+    try:
+        _dt0.date.fromisoformat(AS_OF)
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", AS_OF):
+            raise ValueError
+    except ValueError:
+        print(f"--as-of 要是 YYYY-MM-DD 而且是真的日期，現在是「{AS_OF}」", file=sys.stderr)
+        raise SystemExit(2)
 ONLY_WEEK = os.environ.get("ONLY_WEEK") or ""
 # 遠端 refs 是不是這一次抓下來的。**不新鮮的時候要說**，見上面 shell 那段。
 REMOTE_FRESH = os.environ.get("REMOTE_FRESH") == "1"
@@ -631,6 +656,11 @@ _groups, _milestones, _deps = [], [], []
 # 沒有這一節、有這一節但讀不出來、讀出來的是舊格式，三件事的處置不一樣。
 _ms_meta = {"found_heading": False, "schema": None, "rows": 0,
             "coverage_status": "unavailable", "reason": "no_milestone_section"}
+# 〈跨項依賴〉的適用範圍。舊的自由文字表 `ordering_status` 永遠是 unavailable ——
+# **不驗就要講出來**，不能讓「沒有逆序」跟「沒有看」長得一樣。
+_xdep_meta = {"found_heading": False, "schema": None, "rows": 0,
+              "ordering_status": "unavailable", "reason": "no_cross_dep_table"}
+_xdep_rows = []
 
 def parse_mark(mark: str):
     """回傳 (標記集合, 理由)。格式是 `標記｜理由`，標記之間用 ＋ 串。"""
@@ -1109,6 +1139,18 @@ if wbs_path.exists():
             violations.extend(_ce)
             if len(covers) != len(set(covers)):
                 violations.append(f"里程碑 {mid or cc[0]} 的「靠哪些」裡有重複的 ID")
+            # 群組不是涵蓋。`scan_ids` 認得群組、也驗了它存在，但原本收完就丟 ——
+            # 寫 `APP-C` 的里程碑於是被當成「沒有指到 APP-C01」，可追溯性報它未涵蓋，
+            # 而 `--check` 是綠的（實測）。「靠哪些」逐項列出工作項目 ID。
+            for _g in _cg:
+                violations.append(f"里程碑 {mid or cc[0]} 的「靠哪些」寫了群組 {_g}："
+                                  f"只收工作項目 ID，要逐項列出（例如 `{_g}01`）")
+            # 目標週：網頁按週分組靠它配對（`m.w === "W2"`），格式錯那個里程碑就在
+            # 週視圖上靜靜變成「尚未排程」。文法跟工作表的週欄一致：範圍用 en dash。
+            _tw = re.sub(r"[*`]", "", cc_raw[1]).strip()
+            if not re.fullmatch(r"W[0-9]+(–W[0-9]+)?|—", _tw):
+                violations.append(f"里程碑 {mid or cc[0]} 的「目標週」要是 `W3`、`W3–W4`（en dash）"
+                                  f"或 `—`，現在是「{cc_raw[1]}」")
             _milestones.append({
                 "id": mid, "name": cc_raw[0], "target_week": cc[1], "text": cc_raw[2],
                 "covers": sorted(set(covers)), "coverage_status": "available",
@@ -1139,14 +1181,137 @@ if wbs_path.exists():
         violations.append(
             "docs/WBS.md 有〈里程碑〉這一節，但一列里程碑都解析不出來"
             f"（表頭：{_ms_head or '認不出來'}）")
-    _di = _text.find("已知的跨項依賴")
-    if _di > 0:
-        for line in _text[_di:_di + 2000].splitlines():
-            if not line.startswith("| `"):
-                continue
-            cc = [x.strip() for x in line.strip().strip("|").split("|")]
-            if len(cc) == 2:
-                _deps.append({"a": cc[0], "b": cc[1]})
+    # ── 〈跨項依賴〉────────────────────────────────────────────────
+    # 工作項目彼此的先後寫在這裡（阻塞欄只放缺口，見下面「阻塞欄只放缺口」）。
+    # **它以前完全沒有驗**，只抽成字串給網頁顯示。GuildHub 的 WBS 自己寫著
+    # 「`--check` 不驗前端項目彼此之間的先後……只有人讀得出來」，實測 9 條裡
+    # 4 條逆序，其中一條規格已合併、排 W4，依賴的項目排 W9。
+    #
+    # 正本：`## 跨項依賴` 底下第一張表，表頭固定四欄
+    #   | 這一項 | 依賴 | 關係 | 說明 |
+    #   這一項  **恰好一個**工作項目 ID。只指某一條驗收的依賴不能寫在項目層級 ——
+    #           週次是項目的，驗收沒有週次，排程根本驗不了。同一項可以有多列，每列都要成立
+    #   依賴    一個以上 ID，用 `、` 分隔。**不收 `→` 與 `或`**：
+    #           `任一` 寫在「關係」；`A → B` 是兩件事，拆成「B 依賴 A」與「這一項依賴 B」
+    #   關係    `全部`（每一個都要先完成）／`任一`（至少一個）
+    #   說明    自由文字。**這一欄的 ID 不是依賴**（出處、背景寫這裡）
+    #
+    # 舊的「已知的跨項依賴」兩欄自由文字表是**相容層**：照舊抽給網頁顯示，
+    # 但**不驗、不猜** —— 自由文字裡的 ID 不全是依賴（實測：GuildHub 一列的右欄
+    # 提到的 `FE-A01` 是那條驗收的出處），照字面抽會誤報。它沒被驗這件事每次跑都會講。
+    _XD_CANON = ["這一項", "依賴", "關係", "說明"]
+    _xd_head, _in_xd, _xd_done, _xd_bad = None, False, False, False
+    for lineno, raw in _wbs_vis:
+        bare = raw.strip()
+        s = plain(bare)
+        if s.startswith("## "):
+            _in_xd = s[3:].strip() == "跨項依賴"
+            if _in_xd:
+                _xdep_meta["found_heading"] = True
+            continue
+        if not _in_xd or _xd_done:
+            continue
+        if not bare.startswith("|"):
+            if _xdep_meta["rows"]:
+                _xd_done = True
+            continue
+        cc_raw = [x.strip() for x in bare.strip("|").split("|")]
+        cc = [plain(x) for x in cc_raw]
+        if all(re.fullmatch(r":?-{2,}:?", c) for c in cc if c):
+            continue
+        if _xd_head is None:
+            if cc == _XD_CANON:
+                _xd_head = "canonical"
+            else:
+                violations.append(
+                    f"docs/WBS.md 第 {lineno} 行是〈跨項依賴〉的表頭，但欄位認不出來"
+                    f"（{cc}）。正本是 `| 這一項 | 依賴 | 關係 | 說明 |`")
+                _xd_bad, _in_xd = True, False
+            continue
+        where = f"docs/WBS.md 第 {lineno} 行（〈跨項依賴〉）"
+        if len(cc) != 4:
+            violations.append(f"{where}有 {len(cc)} 欄，表頭是 4 欄")
+            continue
+        _xdep_meta["rows"] += 1
+        src = cc[0]
+        if not re.fullmatch(ID_RE, src):
+            violations.append(
+                f"{where}的「這一項」要恰好是一個工作項目 ID，現在是「{src}」—— "
+                "只指某一條驗收的依賴不能寫在項目層級：拆成有自己週次的項目，或移到驗收層級")
+            continue
+        if re.search(r"→|->|或", cc[1]):
+            violations.append(
+                f"{where}的「依賴」不收 `→` 與 `或`：「至少一個」寫在「關係」欄的 `任一`；"
+                "`A → B` 是兩件事，拆成「B 依賴 A」與「這一項依賴 B」兩列")
+            continue
+        parts = [p.strip() for p in cc[1].split("、")]
+        if any(not re.fullmatch(ID_RE, p) for p in parts):
+            violations.append(
+                f"{where}的「依賴」只能是工作項目 ID、用 `、` 分隔，現在是「{cc[1]}」"
+                "（說明與出處寫在「說明」欄）")
+            continue
+        if len(parts) != len(set(parts)):
+            violations.append(f"{where}的「依賴」裡有重複的 ID")
+        if src in parts:
+            violations.append(f"{where}：{src} 依賴自己")
+        if cc[2] not in ("全部", "任一"):
+            violations.append(f"{where}的「關係」只能是 `全部` 或 `任一`，現在是「{cc[2]}」")
+            continue
+        _xdep_rows.append({"src": src, "deps": sorted(set(parts) - {src}),
+                           "rel": cc[2], "line": lineno})
+        _deps.append({"a": cc_raw[0],
+                      "b": cc_raw[1] + (f"（{cc_raw[3]}）" if cc_raw[3] else "")})
+    if _xdep_meta["found_heading"] and not _xd_bad and not _xdep_meta["rows"]:
+        violations.append("docs/WBS.md 有〈跨項依賴〉這一節，但一列都解析不出來")
+
+    # 相容層：舊的「已知的跨項依賴」兩欄自由文字表。照舊抽給網頁顯示，不驗。
+    # **認表頭，不認散文**（跟〈里程碑〉同一個做法）：那一句話之後、下一個標題之前的
+    # **第一張表**，表頭要是 `| 這一項 | 依賴 |`。原本是「原始檔找這個詞＋往後 2000 字元
+    # 裡任何 `| \`` 開頭的兩欄列」—— 一句提到這個詞的散文，加上後面一張無關的兩欄表
+    # （例如舊 ID 對照），就被當成舊表；旁邊有正本表時因此誤報「兩份並存」（實測）。
+    _legacy, _lg = 0, None          # None 還沒看到那句；seek 找第一張表；in 表內；done
+    for lineno, raw in _wbs_vis:
+        bare = raw.strip()
+        s = plain(bare)
+        if _lg is None:
+            if "已知的跨項依賴" in s and not bare.startswith("|"):
+                _lg = "seek"
+            continue
+        # 那句話底下沒有舊表（遇到標題、或第一張表的表頭不對）：它只是一段提到這個詞的
+        # 散文，**往後繼續找**，不要整份放棄。原本遇到就 break —— 前面一段說明先提了
+        # 「底下那張已知的跨項依賴表」，真正的表就靜靜消失、連「沒有被驗」都不講（實測）。
+        if s.startswith("#"):
+            if _lg == "in":
+                break
+            _lg = None
+            continue
+        if not bare.startswith("|"):
+            if _lg == "in":
+                break
+            continue
+        cc_raw = [x.strip() for x in bare.strip("|").split("|")]
+        cc = [plain(x) for x in cc_raw]
+        if all(re.fullmatch(r":?-{2,}:?", c) for c in cc if c):
+            continue
+        if _lg == "seek":
+            _lg = "in" if cc == ["這一項", "依賴"] else None
+            continue
+        if len(cc_raw) == 2:
+            _legacy += 1
+            if not _xd_head:
+                _deps.append({"a": cc_raw[0], "b": cc_raw[1]})
+    if _legacy and _xd_head:
+        violations.append(
+            "docs/WBS.md 同時有〈跨項依賴〉正本表與舊的「已知的跨項依賴」表 —— "
+            "兩份會漂，遷完就刪掉舊的那張")
+    elif _legacy:
+        _xdep_meta.update(schema="legacy_free_text", rows=_legacy,
+                          reason="legacy_cross_dep_table_is_free_text")
+    if _xd_head == "canonical":
+        _xdep_meta.update(schema="canonical", ordering_status="available", reason=None)
+    elif _xdep_meta["found_heading"] and _xdep_meta["schema"] is None:
+        # 有這一節、卻解析不出來：跟「沒有這張表」是兩件事（網頁要講的話也不同）。
+        _xdep_meta["reason"] = "cross_dep_table_not_parsed"
 
 # ── OpenSpec 的實際狀態 ────────────────────────────────────────────
 def tasks_progress(d: pathlib.Path):
@@ -1286,6 +1451,7 @@ _state_of = {}
 # repo 沒有新 commit，那個狀態當下就過期。把它寫進版控等於把一個當下的
 # 東西凍成一份紀錄，所以 WBS 的機器區塊只放這一份。
 _durable_of = {}
+_week_ids = set()        # `--week` 之下落在那一週的項目（只給顯示用；狀態照樣每一項都算）
 for wid in order:
     info = wbs[wid]
     wk = sorted(info["weeks"])
@@ -1299,8 +1465,11 @@ for wid in order:
         if m and re.fullmatch(r"W(\d+)", want):
             return int(m.group(1)) <= int(want[1:]) <= int(m.group(2))
         return False
-    if ONLY_WEEK and not any(covers(t, ONLY_WEEK) for t in wk):
-        continue
+    # **`--week` 只是顯示篩選，不准在算出狀態之前 `continue`。** 原本這裡直接跳過，
+    # 於是不在那一週的項目在 `_state_of`、`blocks` 裡不存在 —— 依賴圖、週次日曆、
+    # 缺口規則全部拿到殘缺的表：`--week W2 --check` 對同一份 WBS 紅、不加 `--week`
+    # 綠（實測），`--week W1 --json` 直接 KeyError。狀態對每一項都算，篩選只管顯示。
+    _in_week = not ONLY_WEEK or any(covers(t, ONLY_WEEK) for t in wk)
 
     # 人為決定 —— 機器算不出來的那些。理由寫在同一格，用 ｜ 隔開。
     # 標記可以複合：`Alarm+Pending｜理由`。Alarm 是風險訊號，**跟其他標記並存**，
@@ -1408,9 +1577,12 @@ for wid in order:
     if len(detail) > 44:
         detail = detail[:43] + "…"
 
-    tally[state] += 1
     _state_of[wid] = state
     _durable_of[wid] = durable if durable is not None else state
+    if not _in_week:
+        continue
+    _week_ids.add(wid)
+    tally[state] += 1
     by_group[re.sub(r"[0-9]+$", "", wid)][state] += 1
     if ONLY_BLOCKED and state not in ("等外部", "待裁決"):
         continue
@@ -1492,6 +1664,334 @@ for wid in order:
                     f"{wid}（W{start} 那一列）排在 {gap} 的決策期限"
                     f"（決策≤W{dl}）之前或同週 —— 要嘛提前裁決，要嘛把工作往後挪")
 
+# ── 依賴圖（2026-09-25）────────────────────────────────────────────
+# 兩張圖、各自的檢查，**分母都要講出來**：一個今天評估 0 條邊的檢查，
+# 在真實 repo 上「通過」跟「根本沒看」長得一模一樣（`--json` 的 `dep_graph`）。
+def week_max(wk):
+    """一個項目最晚的週次。`W1–W5` 取 5。"""
+    ns = [int(m) for tok in wk for m in re.findall(r"W([0-9]+)", tok)]
+    return max(ns) if ns else None
+
+
+def find_cycles(g):
+    """圖裡的環，各轉到最小節點開頭、去重。DFS 每條回邊給一個環 ——
+    不是列出所有簡單環，但**有環就一定至少報一個**，這裡要的只是這個保證。"""
+    found, out, colour, stack = set(), [], {}, []
+
+    def dfs(n):
+        colour[n] = 1
+        stack.append(n)
+        for m in sorted(g.get(n, ())):
+            c = colour.get(m, 0)
+            if c == 1:
+                cyc = stack[stack.index(m):]
+                k = cyc.index(min(cyc))
+                cyc = cyc[k:] + cyc[:k]
+                if tuple(cyc) not in found:
+                    found.add(tuple(cyc))
+                    out.append(cyc)
+            elif c == 0:
+                dfs(m)
+        stack.pop()
+        colour[n] = 2
+
+    for n in sorted(g):
+        if colour.get(n, 0) == 0:
+            dfs(n)
+    return out
+
+
+# 「完成」：有 change 的項目看**所有** change 都封存（上面的聚合已經是這樣算的，
+# 一個封存、一個還在做會落在「實作中」）；沒有 change 的治理項目看 `Done`。
+# 兩者互斥 —— 有 change 的項目不准標 `Done`。
+DONE_STATES = ("已封存", "已完成")
+
+# (1) 阻塞欄：自環與環。阻塞欄只放缺口（上面那條），兩端都有週次的邊在這裡
+#     **結構上不可能** —— 所以排程逆序不在這裡驗，在〈跨項依賴〉驗。
+#     但沒有規則禁止「缺口擋缺口」，繞成一圈就是誰都等不到的死結。
+_bedges = sorted({(w, g) for w in order for g in wbs[w]["blockers"] if g in wbs})
+_bg = collections.defaultdict(set)
+_bself = 0
+for w, g in _bedges:
+    if w == g:
+        _bself += 1
+        violations.append(f"{w}：阻塞欄指向自己")
+    else:
+        _bg[w].add(g)
+_bcycles = find_cycles(_bg)
+for cyc in _bcycles:
+    violations.append("阻塞欄繞成一圈：" + " → ".join(cyc + [cyc[0]])
+                      + "（缺口擋缺口，誰都等不到）")
+
+# (2) 阻塞欄：已完成，卻還掛著指向「待裁決」缺口的邊。
+#     **只看「待裁決」。** 共識原文是「已完成項目仍掛著**未裁決**缺口」。
+#     `待銜接`（本地做完、真後端之後對齊）的邊掛在已封存的項目上是正常狀態，
+#     不是忘了刪 —— GuildHub 實測已封存又掛著邊的 5 項裡，4 項是這種。
+#     缺口裁決之後，那條 `待裁決` 邊要刪或改寫；沒裁決，就表示這一項其實沒做完。
+_bd7 = 0
+for w in order:
+    if _state_of.get(w) not in DONE_STATES:
+        continue
+    for g in sorted(wbs[w]["blockers"]):
+        if g != w and _state_of.get(g) == "待裁決":
+            _bd7 += 1
+            violations.append(
+                f"{w}：狀態是「{_state_of[w]}」，阻塞欄卻還指向「待裁決」的 {g} —— "
+                f"{g} 裁決了就刪掉或改寫這條邊；還沒裁決，就表示 {w} 其實還沒做完")
+
+# (3) 〈跨項依賴〉（只有正本表）：排程逆序、環、已完成而前置沒完成。
+#     判準：被依賴者最晚週 <= 依賴者最早週。**同週合法** —— 一週是排程桶，
+#     不是順序。`W13–W16` 被 `W16` 依賴合法，被 `W15` 依賴不合法。
+#     每一條邊恰好落進一個桶：評估、或下面其中一種。加總要等於邊數（測試釘住）。
+#
+#     「這一項」自己沒有工作週次（第十五～十八輪，codex＋Gemini 一致）。判準：
+#     **一條還重要的邊，不准沒被驗過就以綠燈結束。**
+#       這一項已取消         → 跳過、--check 列出（**先於週次判斷**：取消跟有沒有週次無關）
+#       依賴已取消           → 跳過（第十四輪；也先於「這一項沒週次」）
+#       這一項是缺口         → 錯誤：決策期限是「最晚」，不是開工週 —— 實際 W2 就裁決、
+#                              依賴 W3 才做完、期限 W4，拿期限比會綠，順序其實是反的
+#       這一項是常態         → 錯誤：永遠沒有起點，這一列永遠是空殼
+#       這一項已完成、沒週次 → 錯誤：不然「還沒排 → 沒排就直接做完」這條路從頭到尾沒被驗過
+#       這一項還沒排週次     → 跳過、--check 列出：一排上週次同一列就被驗；
+#                              離開這個狀態的每一條路（排週次／取消／完成）都會被驗或被擋
+_xd = {"edges": 0, "evaluated": 0, "skipped_dep_missing": 0,
+       "skipped_src_cancelled": 0, "skipped_dep_cancelled": 0,
+       "pending_src_unscheduled": 0, "src_no_week_error": 0,
+       "skipped_dep_no_week": 0, "reversed": [], "cycles": [], "done_before_deps": 0}
+_xd_listed = []      # (列號, 這一項, 為什麼沒比)：--check 要點名，不能只給數字
+_xd_src_err = set()  # 每一列只報一次
+_xg = collections.defaultdict(set)
+for r in _xdep_rows:
+    src, deps, rel = r["src"], r["deps"], r["rel"]
+    smin = week_min(wbs[src]["weeks"]) if src in wbs else None
+    ok_any, bad_here, evaluated_here = False, [], 0
+    for dep in deps:
+        _xg[src].add(dep)
+        _xd["edges"] += 1
+        if dep not in wbs or src not in wbs:
+            _xd["skipped_dep_missing"] += 1        # 不存在的 ID 由引用掃描報，這裡不重複
+            continue
+        if "Cancelled" in parse_mark(wbs[src].get("mark", ""))[0]:
+            _xd["skipped_src_cancelled"] += 1
+            if (r["line"], src, "已取消") not in _xd_listed:
+                _xd_listed.append((r["line"], src, "已取消"))
+            continue
+        if "Cancelled" in parse_mark(wbs[dep].get("mark", ""))[0]:
+            _xd["skipped_dep_cancelled"] += 1
+            continue
+        if smin is None:
+            _sm = parse_mark(wbs[src].get("mark", ""))[0]
+            if wbs[src].get("deadline") is not None:
+                _why = (f"這一項 {src} 是缺口（決策≤W{wbs[src]['deadline']}、沒有工作週次）—— "
+                        f"決策期限是「最晚」，不是開工週，比不出先後；「裁決要等某個工作做完」"
+                        f"寫在 {src} 的理由裡，這一張只放工作項目彼此的先後")
+            elif "Regular" in _sm:
+                _why = (f"這一項 {src} 是常態，沒有起點，排不出先後 —— "
+                        f"拆出一個有週次的一次性項目，讓它依賴 {'、'.join(deps)}")
+            elif _state_of.get(src) in DONE_STATES:
+                _why = (f"{src} {_state_of[src]}，卻沒有工作週次，這條先後從沒被驗過 —— "
+                        f"補上它實際做的週次，或刪掉這一列")
+            else:
+                _xd["pending_src_unscheduled"] += 1
+                if (r["line"], src, "還沒排週次") not in _xd_listed:
+                    _xd_listed.append((r["line"], src, "還沒排週次"))
+                continue
+            _xd["src_no_week_error"] += 1
+            if r["line"] not in _xd_src_err:
+                _xd_src_err.add(r["line"])
+                violations.append(f"〈跨項依賴〉第 {r['line']} 行：{_why}")
+            continue
+        dmax = week_max(wbs[dep]["weeks"])
+        if dmax is None:
+            _xd["skipped_dep_no_week"] += 1
+            # 缺口（沒有工作週次、有 `決策≤Wn`）寫在這裡會繞過不變量 5 —— 同一條依賴
+            # 寫在阻塞欄會被抓到「工作排在決策期限之前或同週」。跟「阻塞欄只放缺口」
+            # 對稱：這一張只放工作→工作。
+            if wbs[dep].get("deadline") is not None:
+                violations.append(
+                    f"〈跨項依賴〉第 {r['line']} 行：{dep} 是缺口（決策≤W{wbs[dep]['deadline']}、"
+                    f"沒有工作週次）—— 缺口寫在 {src} 的阻塞欄，這一張只放工作項目彼此的先後")
+            else:
+                # 沒有週次、也不是缺口（沒排週次的項目、或常態 Regular）：排不出先後，
+                # 原本靜靜落進這個桶，同一列另一條邊被評估到時連分母那行都不印（實測）。
+                # 常態的東西沒有完成點 —— 真的要依賴，拆出一個有週次的一次性項目
+                # （例如「管線可用」）再依賴它（第十四輪兩位一致）。
+                violations.append(
+                    f"〈跨項依賴〉第 {r['line']} 行：{dep} 沒有工作週次，排不出先後 —— "
+                    f"先替它排週次；常態的東西拆出一個有週次的一次性項目再依賴它")
+            continue
+        _xd["evaluated"] += 1
+        evaluated_here += 1
+        if dmax <= smin:
+            ok_any = True
+        else:
+            bad_here.append((dep, dmax))
+    rev = bad_here if rel == "全部" else (bad_here if evaluated_here and not ok_any else [])
+    for dep, dmax in rev:
+        _xd["reversed"].append({"src": src, "dep": dep, "src_min": smin,
+                                "dep_max": dmax, "rel": rel, "line": r["line"]})
+        violations.append(
+            f"{src}（最早 W{smin}）依賴 {dep}（最晚 W{dmax}）—— 被依賴的要在同一週或更早"
+            f"（〈跨項依賴〉第 {r['line']} 行"
+            + ("；關係是「任一」，沒有一個來得及" if rel == "任一" else "") + "）")
+    if _state_of.get(src) in DONE_STATES:
+        done = [d for d in deps if _state_of.get(d) in DONE_STATES]
+        missing = [d for d in deps if d in wbs and _state_of.get(d) not in DONE_STATES]
+        if missing and (rel == "全部" or not done):
+            _xd["done_before_deps"] += 1
+            # 前置「已取消」跟「還沒完成」是兩件事，處置也不同：取消了還做完，
+            # 通常是改用別的做法 —— 那這一列的依賴已經過時，要改寫，不是去補做前置。
+            _cx = [d for d in missing if _state_of.get(d) == "已取消"]
+            _nd = [d for d in missing if d not in _cx]
+            _why = "、".join(
+                ([f"它依賴的 {'、'.join(_nd)} 還沒完成"] if _nd else [])
+                + ([f"它依賴的 {'、'.join(_cx)} 已取消（改用別的做法完成的話，改寫這一列："
+                    f"刪掉或換成實際依賴的項目）"] if _cx else []))
+            violations.append(
+                f"{src}：狀態是「{_state_of[src]}」，但{_why}"
+                f"（〈跨項依賴〉第 {r['line']} 行，關係「{rel}」）—— 兩邊的紀錄有一邊是錯的")
+_xd["cycles"] = find_cycles(_xg)
+for cyc in _xd["cycles"]:
+    violations.append("〈跨項依賴〉繞成一圈：" + " → ".join(cyc + [cyc[0]]))
+
+_dep_graph = {
+    "blockers": {"edges_scanned": len(_bedges),
+                 "gap_to_gap_candidates": sum(1 for w, g in _bedges if not wbs[w]["weeks"]),
+                 "self_loops": _bself, "cycles": _bcycles,
+                 "done_with_undecided_gap": _bd7},
+    "cross_deps": dict(_xdep_meta, **(_xd if _xdep_meta["schema"] == "canonical" else {})),
+}
+
+# ── 里程碑可追溯性（2026-09-25）────────────────────────────────────
+# **報告，不擋。** 哪些 WBS ID 沒有被任何一個里程碑的「靠哪些」指到。
+# 它不是「100% 法則」—— 只證明有一條引用邊，證明不了語意上真的涵蓋，
+# 更證明不了沒有漏掉還沒寫進 WBS 的範圍。
+#
+# 單位是 **WBS ID**，不是每一列：續行列沒有 ID，引用不到它。
+# 不算 `Cancelled`（決定不做）與 `Regular`（常態、沒有完成點）。
+# **不用週次截斷**：已經細化、只是還沒排週次的工作，截掉就被靜默排除了。
+# 分兩組：① 已排週次卻沒被指到（該處理的）；② 沒排週次／遠期粗粒度而沒被指到。
+#
+# 舊的兩欄里程碑沒有「靠哪些」：`status: unavailable`，清單是 `None`，
+# **不是 `[]`** —— 「不知道」與「全部被指到」是兩件事；也不是「全部未涵蓋」。
+def _excluded_from_trace(w):
+    ms, _ = parse_mark(wbs[w].get("mark", ""))
+    return bool({"Cancelled", "Regular"} & set(ms))
+
+
+if _ms_meta["schema"] == "canonical":
+    _covered = set().union(*(set(m["covers"] or []) for m in _milestones))
+    _pool = [w for w in order if not _excluded_from_trace(w)]
+    _unc = [w for w in _pool if w not in _covered]
+    _trace = {
+        "status": "available", "reason": None, "unit": "wbs_id",
+        "pool": len(_pool), "covered": [w for w in _pool if w in _covered],
+        "uncovered_scheduled": [w for w in _unc if week_min(wbs[w]["weeks"]) is not None],
+        "uncovered_unscheduled": [w for w in _unc if week_min(wbs[w]["weeks"]) is None],
+        "excluded": [w for w in order if _excluded_from_trace(w)],
+    }
+else:
+    _trace = {"status": "unavailable", "reason": _ms_meta["reason"], "unit": "wbs_id",
+              "pool": None, "covered": None, "uncovered_scheduled": None,
+              "uncovered_unscheduled": None, "excluded": None}
+
+# ── 週次錨點（2026-09-25）──────────────────────────────────────────
+# **純報告，exit 0。** 時間不能進 `--check` 的退出碼：同一份程式碼今天測跟明天測
+# 結果要一樣（CI 冪等性）；放一個週末，無關的 PR 會突然變紅；人會學會把錨點往後推。
+#
+# 週次（W1、決策≤W5）本來沒有錨：W1 是哪一天沒人知道，所以 `決策≤W5` 在期限**過了之後**
+# 永遠不會出聲。一張放了三個月的地圖，每條規則都綠，期限全是過去式。
+#
+#   <!-- wbs:week1 2026-10-05 Asia/Taipei -->
+#
+# 人設一次、只能有一個、**時區寫明**（台北與 UTC 的 CI 在換日那幾小時會差一天）。
+# 不從 git 第一個 commit 推：匯入歷史、rebase、shallow clone 都會讓它無聲失真；
+# 人改日期至少 diff 看得見。W1 是錨點起的七天；`決策≤W1` 在 W2 第一天才算過期。
+# `--as-of YYYY-MM-DD` 把「今天」換掉 —— 測試不准依賴真實時鐘。
+#
+# 缺口三態。**「已裁決」看缺口算出來的狀態**：終態是 `已完成`（`Done`，理由欄寫答案）
+# 或 `已取消`（`Cancelled`）。其他（等外部、待裁決、未開始）都追：截止前 `waiting`，
+# 截止後 `fallback_effective`。fallback（`【沒答案就】…`）是強制寫的，期限到了語意上
+# 就生效了 —— 報告講的是「fallback 已自 Wn 起生效」，不是永遠叫「未決」。
+# （曾經定成「看 `待裁決` 類型的阻塞邊消失」：GuildHub 26 個有期限的缺口，指向它們的
+# 邊沒有一條是 `待裁決` 類型 —— 全部會被判成已裁決，這個機制永遠不出聲。）
+import datetime as _dt
+try:
+    import zoneinfo as _zi
+except ImportError:                                   # Python < 3.9
+    _zi = None
+_cal = {"status": "disabled", "reason": "no_anchor", "anchor": None, "tz": None,
+        "as_of": None, "current_week": None, "gaps": [],
+        "counts": {"waiting": 0, "decided": 0, "fallback_effective": 0}}
+_deadline_gaps = [w for w in order if wbs[w].get("deadline") is not None]
+_cal["deadline_gaps"] = len(_deadline_gaps)
+_ANCHOR = re.compile(r"^<!--\s*wbs:week1\s+(\d{4}-\d{2}-\d{2})\s+(\S+)\s*-->$")
+_alines = []
+if wbs_path.is_file():
+    # HTML 註解：`visible_lines()` 會把它拿掉，所以這裡讀原文。圍籬裡的不算。
+    _fence = None
+    for _ln, _raw in enumerate(wbs_path.read_text(encoding="utf-8").splitlines(), 1):
+        _m = _FENCE.match(_raw.strip())
+        if _m and _fence is None:
+            _fence = _m.group(1)
+            continue
+        if _fence is not None:
+            if _FENCE_CLOSE.match(_raw.strip()) and _raw.strip().startswith(_fence[0] * len(_fence)):
+                _fence = None
+            continue
+        if "wbs:week1" in _raw:
+            _alines.append((_ln, _raw.strip()))
+if len(_alines) > 1:
+    violations.append("docs/WBS.md 有 " + str(len(_alines)) + " 行週次錨點（第 "
+                      + "、".join(str(l) for l, _ in _alines) + " 行）——只能有一個")
+    _cal["reason"] = "multiple_anchors"
+elif _alines:
+    _ln, _raw = _alines[0]
+    _m = _ANCHOR.match(_raw)
+    _anchor_date = _tz = None
+    if not _m:
+        violations.append(f"docs/WBS.md 第 {_ln} 行的週次錨點格式不對："
+                          "要是 `<!-- wbs:week1 YYYY-MM-DD 時區 -->`（時區寫 IANA 名稱，例如 Asia/Taipei）")
+        _cal["reason"] = "anchor_malformed"
+    else:
+        try:
+            _anchor_date = _dt.date.fromisoformat(_m.group(1))
+        except ValueError:
+            violations.append(f"docs/WBS.md 第 {_ln} 行的週次錨點日期不存在：{_m.group(1)}")
+            _cal["reason"] = "anchor_malformed"
+        try:
+            _tz = _zi.ZoneInfo(_m.group(2)) if _zi else None
+        except Exception:
+            _tz = None
+        if _tz is None:
+            violations.append(f"docs/WBS.md 第 {_ln} 行的週次錨點時區認不出來：{_m.group(2)}"
+                              "（要 IANA 名稱，例如 Asia/Taipei、UTC）")
+            _cal["reason"] = "anchor_malformed"
+    if _anchor_date and _tz:
+        if AS_OF:
+            _today = _dt.date.fromisoformat(AS_OF)   # 開頭已經驗過格式
+        else:
+            _today = _dt.datetime.now(_tz).date()
+        _days = (_today - _anchor_date).days
+        _cw = _days // 7 + 1 if _days >= 0 else 0    # 錨點之前是 W0（還沒開始）
+        _cal.update(status="enabled", reason=None, anchor=_anchor_date.isoformat(),
+                    tz=_m.group(2), as_of=_today.isoformat(), current_week=_cw)
+        for _g in _deadline_gaps:
+            _n = wbs[_g]["deadline"]
+            _st = _state_of.get(_g)
+            # 終態跟依賴圖的「完成」同一個定義（有 change 的看全部封存、沒有的看 Done），
+            # 再加已取消。原本只認 Done／Cancelled：有 change 的項目不准標 Done，
+            # 於是用 change 做掉的缺口永遠不會被判已裁決（實測）。
+            if _st in DONE_STATES + ("已取消",):
+                _cs, _since = "decided", None
+            elif _cw <= _n:
+                _cs, _since = "waiting", None
+            else:
+                _cs, _since = "fallback_effective", _n + 1
+            _cal["counts"][_cs] += 1
+            _cal["gaps"].append({"id": _g, "deadline": _n, "state": _st,
+                                 "calendar_state": _cs, "effective_since_week": _since})
+
 # ── 對不上任何 WBS ID 的 change（2026-09-12 起是 violation，不只是紅字）────
 #
 # **為什麼從提示升成違規**：有地圖的專案裡，一個 change 開了、id 對不上任何
@@ -1522,6 +2022,84 @@ if not REMOTE_FRESH and not JSON:
           f"用的是上一次的 refs。{X}")
     print(f"{D}  「已封存」「規格已合併」「未開始」不受影響 —— 那些只看這份 tree。{X}")
 
+# 〈跨項依賴〉還是舊的自由文字表：**不驗就要講出來**，每次跑都講（含 --check，
+# CI 的紀錄裡看得到）。不講的話，「沒有逆序」跟「根本沒看」長得一模一樣。
+if _xdep_meta["schema"] == "legacy_free_text" and not JSON:
+    print()
+    print(f"{Y}⚠ 〈跨項依賴〉還是舊的自由文字表：{_xdep_meta['rows']} 列的排程與環都沒有被驗。{X}")
+    print(f"{D}  改成正本 `## 跨項依賴`（`| 這一項 | 依賴 | 關係 | 說明 |`，見 AGENTS.md）才會驗。"
+          f"遷移時若有逆序，那是規劃要裁決的事，不是格式轉換。{X}")
+elif _xdep_meta["schema"] == "canonical" and not JSON and _xd["edges"] and not _xd["evaluated"]:
+    print()
+    print(f"{D}〈跨項依賴〉{_xd['edges']} 條邊，這次沒有一條比得了排程"
+          f"（這一項還沒排週次 {_xd['pending_src_unscheduled']}、這一項已取消 {_xd['skipped_src_cancelled']}、"
+          f"依賴已取消 {_xd['skipped_dep_cancelled']}）。{X}")
+# 沒比排程、又不算錯的列：**點名**，含 --check（CI 紀錄看得到）。只給數字的話，
+# 同一張表別的邊有被評估時，這幾列就跟「驗過沒問題」長得一樣。
+if _xdep_meta["schema"] == "canonical" and not JSON and _xd_listed:
+    print()
+    print(f"{D}〈跨項依賴〉沒有比排程的列："
+          + "；".join(f"{s_}（第 {ln} 行）{why}" for ln, s_, why in sorted(_xd_listed)) + f"{X}")
+    if any(why == "還沒排週次" for _, _, why in _xd_listed):
+        print(f"{D}  還沒排週次的：排上週次就會驗；沒排週次就標完成會被擋。{X}")
+
+# 里程碑可追溯性：**預設就印一行**（含 --check）。一份沒有人跑的報告，就是
+# 「機制沒起作用、沒人知道」的形狀；零項、舊格式、沒有〈里程碑〉也各自明說 ——
+# 不然「全部被指到」跟「沒有看」長得一樣。`--json` 不印（別弄壞下游的解析）。
+if wbs and not JSON:
+    _tr = _trace
+    print()
+    if _tr["status"] == "available":
+        _n, _m = len(_tr["uncovered_scheduled"]), len(_tr["uncovered_unscheduled"])
+        if not _n and not _m:
+            print(f"{D}里程碑可追溯性：{_tr['pool']} 項全部被某個里程碑指到。{X}")
+        else:
+            print(f"{Y if _n else D}里程碑可追溯性：① {_n} 項已排週次，卻沒有被任何里程碑指到；"
+                  f"② {_m} 項沒排週次／遠期而沒被指到{X}{D}（--trace 看是哪些）{X}")
+    else:
+        _why = {"legacy_milestone_schema_has_no_covers_column": "〈里程碑〉是舊的兩欄格式，沒有「靠哪些」",
+                "milestone_table_not_parsed": "〈里程碑〉解析不出來，見違規",
+                "no_milestone_section": "docs/WBS.md 沒有〈里程碑〉"}.get(_tr["reason"], _tr["reason"])
+        print(f"{D}里程碑可追溯性：未評估（{_why}）。{X}")
+    if TRACE and _tr["status"] == "available":
+        for _title, _ids in (("① 已排週次，卻沒有被任何里程碑指到", _tr["uncovered_scheduled"]),
+                             ("② 沒排週次／遠期，沒有被指到", _tr["uncovered_unscheduled"])):
+            print(f"{B}  {_title}（{len(_ids)}）{X}")
+            for _w in _ids:
+                _wk = "、".join(sorted(wbs[_w]["weeks"])) or (
+                    f"決策≤W{wbs[_w]['deadline']}" if wbs[_w].get("deadline") else "—")
+                # 前綴 `↳` 是給人看、也給測試抓的：`--trace` 同時會印一般的狀態表，
+                # 只抓 ID 的話，狀態表那一列就讓斷言恆真（突變實測存活過）。
+                print(f"    ↳ {_w:<9} {re.sub(r'[*`]', '', wbs[_w]['name'])[:20]:<20} {_wk}")
+        if _tr["excluded"]:
+            print(f"{D}  不算（Cancelled／Regular）：{'、'.join(_tr['excluded'])}{X}")
+
+# 週次錨點：設了就每次講今天是第幾週、幾個缺口的 fallback 已經生效；
+# 沒設、但有 `決策≤Wn` 的缺口，要講「沒設所以判斷不了」；什麼期限都沒有的專案不講。
+if wbs and not JSON:
+    _c = _cal
+    if _c["status"] == "enabled":
+        _f = _c["counts"]["fallback_effective"]
+        print()
+        if _f:
+            print(f"{Y}週次：今天 W{_c['current_week']}（錨點 {_c['anchor']} {_c['tz']}）；"
+                  f"{_f} 個缺口已過決策期限、還沒有答案 —— fallback 已生效{X}{D}（--trace 看是哪些）{X}")
+        else:
+            print(f"{D}週次：今天 W{_c['current_week']}（錨點 {_c['anchor']} {_c['tz']}）；"
+                  f"沒有缺口過了決策期限還沒答案。{X}")
+        if TRACE:
+            for _g in _c["gaps"]:
+                if _g["calendar_state"] == "decided":
+                    continue
+                _tag = (f"fallback 自 W{_g['effective_since_week']} 起生效"
+                        if _g["calendar_state"] == "fallback_effective" else "還在期限內")
+                print(f"    ↳ {_g['id']:<9} 決策≤W{_g['deadline']:<3} {_g['state']:<6} {_tag}")
+    elif _c["deadline_gaps"] and _c["reason"] == "no_anchor":
+        print()
+        print(f"{D}週次錨點：未設定 —— {_c['deadline_gaps']} 個缺口的決策期限（決策≤Wn）"
+              f"判斷不了有沒有過期。在 docs/WBS.md 加一行 "
+              f"`<!-- wbs:week1 YYYY-MM-DD Asia/Taipei -->`（W1 第一天、時區）。{X}")
+
 _todo = setup_todo()
 if _todo and not JSON and not CHECK:
     print()
@@ -1543,6 +2121,8 @@ if JSON:
     # **把從遠端推出來的狀態當成事實寫進版控，是把一個當下的東西凍成一份紀錄。**
     out = {"items": [], "groups": _groups, "affects": {},
            "milestones": _milestones, "milestones_meta": _ms_meta, "deps": _deps,
+           "deps_meta": _xdep_meta, "dep_graph": _dep_graph,
+           "milestone_trace": _trace, "calendar": _cal,
            "remote_fresh": REMOTE_FRESH, "remote_why": REMOTE_WHY}
     _aff = collections.defaultdict(list)
     for wid in order:
@@ -1763,11 +2343,16 @@ if total:
             c = by_group[g]
             n = sum(c.values())
             print(f"{D}  {g:<6} {n:>3} 項：" + "、".join(f"{k} {v}" for k, v in c.most_common()) + X)
-    if blocks:
+    # `--week` 之下只算落在那一週的依賴者 —— 上面的統計是篩過的，這一段不篩的話，
+    # 同一個畫面兩種範圍（實測：「WBS 共 14 項」底下列出影響五十幾項）。
+    _shown_blocks = {g: (ids & _week_ids if ONLY_WEEK else ids) for g, ids in blocks.items()}
+    _shown_blocks = {g: ids for g, ids in _shown_blocks.items() if ids}
+    if _shown_blocks:
         # 「這個缺口解掉，會解鎖幾件事」—— 這是決定先問哪一個的依據。
         print()
-        print(f"{B}哪些項目依賴外部{X}（依影響範圍排序）：")
-        for gap, ids in sorted(blocks.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+        print(f"{B}哪些項目依賴外部{X}（依影響範圍排序"
+              + (f"，只算 {ONLY_WEEK} 的項目" if ONLY_WEEK else "") + "）：")
+        for gap, ids in sorted(_shown_blocks.items(), key=lambda kv: (-len(kv[1]), kv[0])):
             names = "、".join(sorted(ids))
             print(f"{R}  {gap:<8}{X} 影響 {len(ids)} 項：{D}{names}{X}")
         print()

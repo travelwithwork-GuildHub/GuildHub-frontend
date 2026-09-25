@@ -148,7 +148,10 @@ RM
 run() {
   local want="$1" desc="$2" needle="$3"
   local out rc
-  out="$(cd "$W" && bash "$SCRIPT" --check 2>&1)"; rc=$?
+  # `ASOF=YYYY-MM-DD run …`：把「今天」換掉（週次錨點的測試用；不准依賴真實時鐘）
+  # `WEEK=W2 run …`：加 `--week`；`RUN_ARGS=… run …`：原樣接在最後（測「參數沒帶值」用）
+  # shellcheck disable=SC2086
+  out="$(cd "$W" && bash "$SCRIPT" --check ${ASOF:+--as-of "$ASOF"} ${WEEK:+--week "$WEEK"} ${RUN_ARGS:-} 2>&1)"; rc=$?
   if [ "$rc" != "$want" ]; then
     echo "✗ ${desc} —— 期望退出碼 ${want}，實際 ${rc}"
     bump_fail; return
@@ -169,7 +172,7 @@ run() {
 run_absent() {
   local want="$1" desc="$2" needle="$3"
   local out rc
-  out="$(cd "$W" && bash "$SCRIPT" --check 2>&1)"; rc=$?
+  out="$(cd "$W" && bash "$SCRIPT" --check ${WEEK:+--week "$WEEK"} 2>&1)"; rc=$?
   if [ "$rc" != "$want" ]; then
     echo "✗ ${desc} —— 期望退出碼 ${want}，實際 ${rc}"
     bump_fail; return
@@ -222,6 +225,16 @@ run_all_absent() {
   echo "✓ $desc"; PASS=$((PASS + 1))
 }
 
+# run_trace_has <說明> <輸出裡要有的字>：`--trace` 的輸出（里程碑可追溯性的細節）
+run_trace_has() {
+  local desc="$1" needle="$2"
+  if (cd "$W" && bash "$SCRIPT" --trace ${ASOF:+--as-of "$ASOF"} 2>&1) | grep -q -- "$needle"; then
+    echo "✓ $desc"; PASS=$((PASS + 1)); return
+  fi
+  echo "✗ ${desc} —— --trace 的輸出裡沒有「${needle}」"
+  bump_fail
+}
+
 # run_json_top <說明> <頂層鍵> <期望值（字串比對）>：--json 的頂層欄位
 #
 # `run_field_has` 只看 `items[]`。有些事實不屬於任何一個項目 ——
@@ -241,8 +254,9 @@ print("yes" if str(d.get(sys.argv[1])) == sys.argv[2] else "no:" + str(d.get(sys
   fi
 }
 
-# run_ms <說明> <python 表達式>：里程碑那一節的斷言。
-# 表達式裡 `m` 是 `milestones`、`meta` 是 `milestones_meta`。
+# run_expr <說明> <python 表達式>：對 `--json` 的任意斷言。
+# 表達式裡 `d` 是整份 json；`m` 是 `milestones`、`meta` 是 `milestones_meta`；
+# `g` 是 `dep_graph`（依賴圖的分母與結果）、`x` 是 `deps_meta`。
 #
 # 為什麼要看 json 而不是只看 `--check` 的退出碼：這個 bug 的形狀就是
 # **退出碼是 0、資料是空的**。只斷言「乾淨的表不紅」永遠抓不到它。
@@ -251,18 +265,19 @@ print("yes" if str(d.get(sys.argv[1])) == sys.argv[2] else "no:" + str(d.get(sys
 # 不來自 WBS、不來自環境、不來自任何被測資料；被測資料只經過 `json.load`
 # 綁到 `m` 與 `meta` 上。要換成 key-path 比對就得為每種斷言各加一個 helper，
 # 而這個 repo 的判準是「共用 oracle 越少越好、每個都要走過失敗路徑」。
-run_ms() {
+run_expr() {
   local desc="$1" expr="$2" out
-  out="$(cd "$W" && bash "$SCRIPT" --json 2>/dev/null | python3 -c '
+  out="$(cd "$W" && bash "$SCRIPT" --json ${ASOF:+--as-of "$ASOF"} ${WEEK:+--week "$WEEK"} 2>/dev/null | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 m, meta = d.get("milestones"), d.get("milestones_meta")
+g, x = d.get("dep_graph"), d.get("deps_meta")
 try:
     ok = bool(eval(sys.argv[1]))
 except Exception as e:
     print("no:表達式炸了 " + repr(e)); raise SystemExit
 print("yes" if ok else "no:" + json.dumps(
-    {"milestones": m, "milestones_meta": meta}, ensure_ascii=False)[:400])' "$expr")"
+    {"milestones": m, "milestones_meta": meta, "dep_graph": g}, ensure_ascii=False)[:500])' "$expr")"
   if [ "$out" = yes ]; then
     echo "✓ $desc"; PASS=$((PASS + 1))
   else
@@ -584,6 +599,10 @@ selftest_count "run_setup 自測"        run_setup        "自測（不計入）
 selftest_count "run_field_has 自測"    run_field_has    "自測（不計入）" "NO-SUCH-ITEM" "state" "不可能的值"
 selftest_count "run_no_item 自測"      run_no_item      "自測（不計入）" "FE-C01"
 selftest_count "run_blockers_has 自測" run_blockers_has "自測（不計入）" "FE-C01" "NO-SUCH-BLOCKER"
+# run_expr 是 P0 加的共用 oracle，當時漏了這一行 —— 「每個共用 oracle 都要走過一次
+# 失敗路徑」是這支測試自己的規矩，漏登記的 oracle 等於沒被驗過它會不會判紅。
+selftest_count "run_expr 自測"         run_expr         "自測（不計入）" "False"
+selftest_count "run_trace_has 自測"    run_trace_has    "自測（不計入）" "這串字絕不會出現在輸出裡"
 
 selftest "run 自測：退出碼不符時判紅" "期望退出碼 1，實際 0" \
          run 1 "自測（不計入）" ""
@@ -1900,17 +1919,17 @@ run_blockers_has "阻塞欄的範圍中間真的進了 blockers" "FE-P03" "BE-G0
 
 baseline
 run 0 "里程碑正本四欄：乾淨的表是綠的" ""
-run_ms "正本四欄真的進了 json（含 covers 與目標週）" \
+run_expr "正本四欄真的進了 json（含 covers 與目標週）" \
   "meta['schema']=='canonical' and meta['coverage_status']=='available' \
    and len(m)==1 and m[0]['id']=='M1' and m[0]['covers']==['FE-C01','FE-P03'] \
    and m[0]['target_week']=='W2'"
-run_ms "同一節的第二張兩欄表不准被吃成里程碑" "len(m)==1 and meta['rows']==1"
+run_expr "同一節的第二張兩欄表不准被吃成里程碑" "len(m)==1 and meta['rows']==1"
 
 # 顯示欄位留原文：網頁是 `md(m.text)` 渲染的，被 plain() 洗過就掉粗體、
 # en dash 也會變成 ASCII。**結構看正規化後的字串，顯示留原文。**
 baseline
 edit "進來、看到、做完一件事" "**進來**、看到、做完一件事"
-run_ms "里程碑敘述保留原文（粗體不准被正規化洗掉）" "m[0]['text'].startswith('**進來**')"
+run_expr "里程碑敘述保留原文（粗體不准被正規化洗掉）" "m[0]['text'].startswith('**進來**')"
 
 # 舊的兩欄「每週一句話」（GuildHub 現狀）：讀得懂，但要講出它沒有涵蓋資料。
 # **`covers` 是 `None`，不是 `[]`** —— 「不知道涵蓋了什麼」跟「涵蓋了零項」
@@ -1922,7 +1941,7 @@ edit "| 里程碑 | 目標週 | 驗收結果 | 靠哪些 |
 |---|---|
 | **W1** | 骨架立起來、清單列得出來 |"
 run 0 "舊的兩欄格式仍然是綠的（相容層）" ""
-run_ms "舊格式要報 unavailable、covers 是 None（不是空陣列）" \
+run_expr "舊格式要報 unavailable、covers 是 None（不是空陣列）" \
   "meta['schema']=='legacy_week_goal' and meta['coverage_status']=='unavailable' \
    and meta['reason']=='legacy_milestone_schema_has_no_covers_column' \
    and m[0]['covers'] is None"
@@ -1945,7 +1964,7 @@ edit "| 里程碑 | 目標週 | 驗收結果 | 靠哪些 |
 |---|---|---|---|
 | M1 一個人跑完主流程 | W2 | 進來、看到、做完一件事 | FE-C01、FE-P03 |" "（正本那張表先拿掉，只留下面那張兩欄的跨項依賴表。）"
 run 1 "一節裡只有一張別的兩欄表時，不准把它當成舊格式的里程碑" "欄位認不出來"
-run_ms "那張兩欄表不准進 milestones" "len(m)==0 and meta['schema'] is None"
+run_expr "那張兩欄表不准進 milestones" "len(m)==0 and meta['schema'] is None"
 
 # 表頭認不出來（例如舊文件教的三欄）要紅，不可以安靜地當成沒有里程碑。
 baseline
@@ -1983,7 +2002,7 @@ edit "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |" "| \`FE-P03\` 清單 | \`FE-C01
 | 週 | 點數 |
 |---|---|
 | **W9** | 41 |"
-run_ms "後面章節的 | **W9** | 不准被吃成里程碑" \
+run_expr "後面章節的 | **W9** | 不准被吃成里程碑" \
   "len(m)==1 and all(x['id']!='W9' for x in m) and all(x['text']!='41' for x in m)"
 
 # 圍籬裡的格式範例不是資料。這一段原本讀的是原始檔，不是 visible_lines()。
@@ -1994,7 +2013,7 @@ edit "| 里程碑 | 目標週 | 驗收結果 | 靠哪些 |" "\`\`\`markdown
 
 | 里程碑 | 目標週 | 驗收結果 | 靠哪些 |"
 run 0 "圍籬裡的里程碑範例不准被當成表頭" ""
-run_ms "圍籬裡的里程碑範例不准進 json" "len(m)==1 and m[0]['id']=='M1'"
+run_expr "圍籬裡的里程碑範例不准進 json" "len(m)==1 and m[0]['id']=='M1'"
 
 # 〈里程碑〉剛好在檔首：原本 `_mi > 0` 為假，整段跳過。
 baseline
@@ -2005,7 +2024,591 @@ t = io.open(p, encoding="utf-8").read()
 i, j = t.index("## 里程碑"), t.index("> 這一節底下")
 io.open(p, "w", encoding="utf-8").write(t[i:j] + "\n" + t[:i] + t[j:])
 PY
-run_ms "〈里程碑〉在檔首也要解析得到" "len(m)==1 and m[0]['id']=='M1'"
+run_expr "〈里程碑〉在檔首也要解析得到" "len(m)==1 and m[0]['id']=='M1'"
+
+# ── 依賴圖（2026-09-25）────────────────────────────────────────────
+#
+# 兩張圖。**阻塞欄只放缺口**（既有規則），所以兩端都有週次的邊在那裡結構上
+# 不可能 —— 排程逆序只在〈跨項依賴〉驗。GuildHub 實測：阻塞欄 47 條邊、排程
+# 可評估 0 條；〈跨項依賴〉9 條裡 4 條逆序，而那張表以前完全沒有驗。
+#
+# 每個檢查都有「會紅」與「不該紅」一對；分母另外釘住（一個永遠跳過的檢查，
+# 在真實 repo 上「通過」跟「沒看」長得一模一樣）。
+
+# xdep <資料列>：在 fixture 尾端加一節正本〈跨項依賴〉。
+xdep() {
+  edit "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |" "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |
+
+## 跨項依賴
+
+| 這一項 | 依賴 | 關係 | 說明 |
+|---|---|---|---|
+$1"
+}
+# same_week：把 FE-C01 兩列都挪到 W2，跟 FE-P03 同一週。
+same_week() {
+  edit "專案骨架 | W1" "專案骨架 | W2"
+  edit "全域 Layout | W1" "全域 Layout | W2"
+}
+
+baseline
+run 0 "依賴圖：乾淨的 baseline 是綠的" ""
+run_expr "阻塞欄的分母講出來：掃了幾條邊、缺口→缺口候選幾條" \
+  "g['blockers']['edges_scanned']==1 and g['blockers']['gap_to_gap_candidates']==0 \
+   and g['blockers']['cycles']==[] and g['blockers']['self_loops']==0"
+run_expr "沒有〈跨項依賴〉表要講「沒有」，不是「驗過沒問題」" \
+  "x['schema'] is None and x['ordering_status']=='unavailable' and x['reason']=='no_cross_dep_table'"
+
+# ── 阻塞欄：自環、環 ──
+
+baseline
+edit "| 決策≤W1 | — | \`BE-缺\` | Alarm" "| 決策≤W1 | — | BE-G01 \`BE-缺\` | Alarm"
+run 1 "阻塞欄指向自己要紅" "阻塞欄指向自己"
+
+# 缺口擋缺口繞成一圈：沒有規則禁止缺口擋缺口，但繞成一圈就誰都等不到。
+baseline
+edit "| 決策≤W1 | — | \`BE-缺\` | Alarm" "| 決策≤W1 | — | BE-G02 \`BE-缺\` | Alarm"
+edit "| FE-C01 | AppShell |" "| BE-G02 | 另一個缺口 | 去問。**【沒答案就】**先不做 | 決策≤W1 | — | BE-G01 \`BE-缺\` | Alarm｜測試用 |
+| FE-C01 | AppShell |"
+run 1 "阻塞欄的缺口互相擋（環）要紅" "阻塞欄繞成一圈"
+run_expr "環與缺口→缺口候選邊真的進了 json" \
+  "g['blockers']['cycles']==[['BE-G01','BE-G02']] and g['blockers']['gap_to_gap_candidates']==2"
+
+# ── 阻塞欄 D7：已完成，卻還掛著指向「待裁決」缺口的邊 ──
+#
+# **只看「待裁決」。** `待銜接`（本地做完、真後端之後對齊）的邊掛在已封存的項目上
+# 是正常狀態 —— GuildHub 已封存又掛著邊的 5 項裡，4 項是這種。對照組釘住它不報。
+
+baseline
+edit "Alarm｜這是核心價值" "TBD｜語意還沒定"
+mkarchived fe-p03-list
+run 1 "已封存的項目還掛著「待裁決」缺口要紅" "阻塞欄卻還指向「待裁決」的 BE-G01"
+run_expr "D7 計數進了 json" "g['blockers']['done_with_undecided_gap']==1"
+
+baseline
+mkarchived fe-p03-list
+run_absent 0 "對照：已封存＋指向「等外部」缺口是合法狀態，不報" "阻塞欄卻還指向"
+
+baseline
+edit "Alarm｜這是核心價值" "TBD｜語意還沒定"
+run_absent 0 "對照：「待裁決」缺口擋著的項目還沒完成，不報" "阻塞欄卻還指向"
+
+# 已封存＋指向「已取消」缺口（`BE-拒` 那種牆）：記錄的是「做完了但永遠上不了線」，
+# 是仍然成立的資訊。報了，團隊只能刪邊，就沒有地方記得這一項上不了線（第八輪共識）。
+baseline
+edit "Alarm｜這是核心價值" "Cancelled｜對方明文不做"
+mkarchived fe-p03-list
+run_absent 0 "對照：已封存＋指向「已取消」缺口不報（「上不了線」是真的資訊）" "阻塞欄卻還指向"
+
+# ── 〈跨項依賴〉正本 ──
+
+baseline
+xdep "| FE-P03 | FE-C01 | 全部 | 清單要先有骨架 |"
+run 0 "〈跨項依賴〉正本：排程順的是綠的" ""
+run_expr "正本表進了 json：可驗、評估 1 條、沒有逆序" \
+  "x['schema']=='canonical' and x['ordering_status']=='available' \
+   and g['cross_deps']['edges']==1 and g['cross_deps']['evaluated']==1 and g['cross_deps']['reversed']==[]"
+
+baseline
+xdep "| FE-C01 | FE-P03 | 全部 | 骨架反過來依賴清單 |"
+run 1 "〈跨項依賴〉逆序要紅（W1 依賴 W2）" "被依賴的要在同一週或更早"
+run_expr "逆序真的進了 json" \
+  "g['cross_deps']['reversed'][0]['src']=='FE-C01' and g['cross_deps']['reversed'][0]['dep']=='FE-P03'"
+
+# 同週合法：一週是排程桶，不是順序。
+baseline
+same_week
+xdep "| FE-C01 | FE-P03 | 全部 | 同一週 |"
+run 0 "〈跨項依賴〉同週合法" ""
+run_expr "同週那條真的被評估了（不是被跳過才綠）" \
+  "g['cross_deps']['evaluated']==1 and g['cross_deps']['reversed']==[]"
+
+baseline
+xdep "| FE-C01 | FE-P03、FE-O10 | 任一 | 兩個都來不及 |"
+run 1 "「任一」但沒有一個來得及要紅" "沒有一個來得及"
+run_expr "「常態」項目沒有週次：算進跳過、不算評估（它另外是文法錯誤，見後面）" \
+  "g['cross_deps']['evaluated']==1 and g['cross_deps']['skipped_dep_no_week']==1"
+
+baseline
+xdep "| FE-P03 | FE-C01 | 任一 | 骨架來得及就夠 |"
+run 0 "「任一」只要一個來得及就是綠的" ""
+
+# 「任一」要有一個來得及、一個來不及，而且兩個都**真的被評估**才分得出跟「全部」的差別。
+# 上面那條的另一個是「常態」（被跳過），把「任一」寫成「全部」照樣綠（突變實測存活過）。
+baseline
+edit "| FE-O10 | 文件維護 |" "| FE-C02 | 晚一點的東西 | 排在清單之後 | W3 | 1 | | |
+| FE-O10 | 文件維護 |"
+xdep "| FE-P03 | FE-C01、FE-C02 | 任一 | 一個來得及（W1）、一個來不及（W3） |"
+run 0 "「任一」：一個來得及、一個來不及，是綠的" ""
+run_expr "…而且兩條都被評估了" "g['cross_deps']['evaluated']==2 and g['cross_deps']['reversed']==[]"
+edit "| 任一 | 一個來得及" "| 全部 | 一個來得及"
+run 1 "同一列改成「全部」就要紅" "FE-C02（最晚 W3）"
+
+# 分母守恆：每條邊恰好落進一個桶。把規則寫成永遠跳過，「至少評估一條」會紅；
+# 把某種跳過漏算，加總會對不上。fixture 要**合法**：會被跳過又合法的只剩「依賴已取消的項目」
+# （沒有週次的依賴是文法錯誤，見後面）。
+baseline
+edit "| FE-O10 | 文件維護 |" "| FE-C03 | 舊做法 | 改用別的了 | W1 | 1 | | Cancelled｜改用 FE-C01 的做法 |
+| FE-O10 | 文件維護 |"
+xdep "| FE-P03 | FE-C01、FE-C03 | 全部 | 一條可比、一條依賴已取消的項目 |"
+run 0 "分母守恆那份 fixture 本身是合法的" ""
+run_expr "分母守恆：evaluated＋各類 skipped＝edges，而且至少評估一條" \
+  "(lambda c: c['edges']==2 and c['evaluated']==1 and c['skipped_dep_cancelled']==1 \
+   and c['evaluated']+c['skipped_dep_missing']+c['pending_src_unscheduled']+c['skipped_src_cancelled'] \
+   +c['skipped_dep_cancelled']+c['skipped_dep_no_week']+c['src_no_week_error']==c['edges'])(g['cross_deps'])"
+
+# 說明欄的 ID 是出處，不是依賴（GuildHub 的舊表就是這樣誤判的）。
+baseline
+xdep "| FE-P03 | FE-C01 | 全部 | 這條驗收從 FE-O10 轉來 |"
+run_expr "說明欄裡的 ID 不算依賴" "g['cross_deps']['edges']==1"
+
+# 同週互相依賴：排程不紅（同週合法），但環要紅。
+baseline
+same_week
+xdep "| FE-C01 | FE-P03 | 全部 | 同週互相依賴 |
+| FE-P03 | FE-C01 | 全部 | 同週互相依賴 |"
+run 1 "〈跨項依賴〉同週互相依賴：環要紅" "〈跨項依賴〉繞成一圈"
+run_absent 1 "…而且不是被當成逆序抓到的" "被依賴的要在同一週或更早"
+
+baseline
+xdep "| FE-P03 | FE-P03 | 全部 | 自己 |"
+run 1 "〈跨項依賴〉依賴自己要紅" "依賴自己"
+
+# 已完成而前置沒完成（兩邊的紀錄有一邊是錯的）。
+baseline
+mkarchived fe-p03-list
+xdep "| FE-P03 | FE-C01 | 全部 | 清單要先有骨架 |"
+run 1 "〈跨項依賴〉：已封存而前置還沒完成要紅" "但它依賴的 FE-C01 還沒完成"
+
+baseline
+mkarchived fe-p03-list fe-c01-shell
+xdep "| FE-P03 | FE-C01 | 全部 | 清單要先有骨架 |"
+run 0 "對照：前置也封存了就是綠的" ""
+
+# ── 〈跨項依賴〉文法：看不懂的不准靜靜跳過 ──
+
+baseline
+xdep "| FE-P03 | FE-C01 → FE-O10 | 全部 | 鏈 |"
+run 1 "依賴欄不收 →（A → B 是兩件事，拆成兩列）" "不收 \`→\` 與 \`或\`"
+
+baseline
+xdep "| FE-P03 | FE-C01 或 FE-O10 | 全部 | 或 |"
+run 1 "依賴欄不收「或」（寫在關係欄的「任一」）" "不收 \`→\` 與 \`或\`"
+
+baseline
+xdep "| FE-P03 的「搜尋與篩選」 | FE-C01 | 全部 | 只指其中一條驗收 |"
+run 1 "只指某一條驗收的依賴不准寫在項目層級" "只指某一條驗收"
+
+baseline
+xdep "| FE-P03 | FE-C01 | 都要 | 關係寫錯 |"
+run 1 "關係只能是「全部」或「任一」" "只能是 \`全部\` 或 \`任一\`"
+
+baseline
+xdep "| FE-P03 | FE-C01 骨架 | 全部 | 依賴欄夾了說明 |"
+run 1 "依賴欄只能是 ID（說明寫在說明欄）" "只能是工作項目 ID"
+
+baseline
+xdep "| FE-P03 | FE-C01 | 全部 |"
+run 1 "〈跨項依賴〉欄數對不上要紅" "表頭是 4 欄"
+
+baseline
+edit "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |" "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |
+
+## 跨項依賴
+
+| 這一項 | 依賴 |
+|---|---|
+| FE-P03 | FE-C01 |"
+run 1 "〈跨項依賴〉表頭認不出來要紅（正本是四欄）" "〈跨項依賴〉的表頭，但欄位認不出來"
+
+baseline
+edit "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |" "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |
+
+## 跨項依賴
+
+還沒整理。"
+run 1 "有〈跨項依賴〉標題卻一列都讀不出來要紅" "〈跨項依賴〉這一節，但一列都解析不出來"
+
+# ── 舊的自由文字表：相容層，不驗、不猜，但每次都講 ──
+
+baseline
+edit "| 這一項 | 依賴 |" "已知的跨項依賴（改動時要一起看）：
+
+| 這一項 | 依賴 |"
+edit "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |" "| \`FE-C01\` 骨架 | \`FE-P03\` 清單（反過來，逆序） |"
+run 0 "舊的〈跨項依賴〉就算逆序也不驗（不猜自由文字）" "排程與環都沒有被驗"
+run_expr "舊表標 legacy_free_text、ordering unavailable、deps 照舊給網頁" \
+  "x['schema']=='legacy_free_text' and x['ordering_status']=='unavailable' \
+   and x['rows']==1 and len(d['deps'])==1"
+
+baseline
+edit "| 這一項 | 依賴 |" "已知的跨項依賴：
+
+| 這一項 | 依賴 |"
+xdep "| FE-P03 | FE-C01 | 全部 | 正本 |"
+run 1 "正本與舊表並存要紅（兩份會漂）" "同時有〈跨項依賴〉正本表與舊的"
+
+# ── 里程碑可追溯性（2026-09-25）──────────────────────────────────
+#
+# **報告，不擋**：沒被指到的工作再多，`--check` 都是 0。但**預設就印一行**
+# （含 --check）——一份沒有人跑的報告，就是「機制沒起作用、沒人知道」的形狀。
+# 單位是 WBS ID；不算 Cancelled／Regular；不用週次截斷。
+
+baseline
+run 0 "可追溯性：預設輸出（含 --check）就有一行摘要" "里程碑可追溯性：① 0 項已排週次"
+run_expr "baseline 的可追溯性：BE-G01 沒排週次也沒被指到；FE-O10（常態）不算" \
+  "d['milestone_trace']['status']=='available' and d['milestone_trace']['pool']==3 \
+   and d['milestone_trace']['covered']==['FE-C01','FE-P03'] \
+   and d['milestone_trace']['uncovered_scheduled']==[] \
+   and d['milestone_trace']['uncovered_unscheduled']==['BE-G01'] \
+   and d['milestone_trace']['excluded']==['FE-O10']"
+
+baseline
+edit "| FE-C01、FE-P03 |" "| FE-C01 |"
+run 0 "已排週次卻沒被指到：只是報告，--check 仍是 0" "① 1 項已排週次，卻沒有被任何里程碑指到"
+run_expr "沒被指到的那一項進了 ①" "d['milestone_trace']['uncovered_scheduled']==['FE-P03']"
+# 抓 `↳` 前綴，不抓 ID：`--trace` 也印一般狀態表，那裡本來就有 FE-P03。
+run_trace_has "--trace 列出是哪一項" "↳ FE-P03"
+
+baseline
+edit "| FE-C01、FE-P03 |" "| FE-C01、FE-P03、BE-G01 |"
+run 0 "全部被指到也要講（不然跟「沒有看」長得一樣）" "3 項全部被某個里程碑指到"
+
+# 單位是 WBS ID：Cancelled 的不算進分母，也不會出現在未涵蓋裡。
+baseline
+edit "| FE-C01、FE-P03 |" "| FE-C01 |"
+edit "| FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | |" "| FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | Cancelled｜不做了 |"
+run_expr "Cancelled 的項目不算未涵蓋" \
+  "d['milestone_trace']['uncovered_scheduled']==[] and 'FE-P03' in d['milestone_trace']['excluded']"
+
+# 舊的兩欄里程碑：**未評估，不是全部被指到、也不是全部沒被指到。**
+baseline
+edit "| 里程碑 | 目標週 | 驗收結果 | 靠哪些 |
+|---|---|---|---|
+| M1 一個人跑完主流程 | W2 | 進來、看到、做完一件事 | FE-C01、FE-P03 |" "| 週 | 這一週結束時，使用者能做什麼 |
+|---|---|
+| **W1** | 骨架立起來 |"
+run 0 "舊格式的里程碑：摘要明說「未評估」" "里程碑可追溯性：未評估（〈里程碑〉是舊的兩欄格式"
+run_expr "舊格式：status unavailable、清單是 None（不是 []）" \
+  "d['milestone_trace']['status']=='unavailable' and d['milestone_trace']['uncovered_scheduled'] is None \
+   and d['milestone_trace']['covered'] is None"
+
+baseline
+python3 - "$W/docs/WBS.md" <<'PY2'
+import io, sys
+p = sys.argv[1]
+t = io.open(p, encoding="utf-8").read()
+i, j = t.index("## 里程碑"), t.index("> 這一節底下")
+io.open(p, "w", encoding="utf-8").write(t[:i] + t[j:])
+PY2
+run 0 "沒有〈里程碑〉：摘要明說「未評估」" "docs/WBS.md 沒有〈里程碑〉"
+run_expr "沒有〈里程碑〉的原因碼" "d['milestone_trace']['reason']=='no_milestone_section'"
+
+# --json 不准多出那一行摘要（下游在解析 stdout）。
+baseline
+run_json_parses "--json 的 stdout 還是合法 JSON（摘要不准混進去）"
+
+
+# ── 週次錨點（2026-09-25）──────────────────────────────────────────
+#
+# **純報告，exit 0**：時間不能進 `--check` 的退出碼。所有案例都用 `--as-of`
+# （`ASOF=…`）把「今天」釘住 —— 測試不准依賴真實時鐘。
+# 缺口「已裁決」看缺口算出來的狀態（Done／Cancelled），不看阻塞邊的類型字面。
+
+# anchor [日期 時區]：在 fixture 頂端加一行週次錨點（預設 2026-10-05 Asia/Taipei，星期一）
+anchor() { edit "# 測試用的工作分解" "# 測試用的工作分解
+
+<!-- wbs:week1 ${1:-2026-10-05 Asia/Taipei} -->"; }
+
+baseline
+run 0 "沒設錨點、有決策期限：講「未設定」，不擋" "週次錨點：未設定"
+run_expr "沒設錨點：calendar 是 disabled＋原因，不是空陣列" \
+  "d['calendar']['status']=='disabled' and d['calendar']['reason']=='no_anchor' \
+   and d['calendar']['deadline_gaps']==1"
+
+# 完全沒有決策期限的專案不講（不然對不想用這功能的專案是永久雜訊）。
+baseline
+edit "| BE-G01 \`BE-缺\` | Pending" "| | Pending"
+edit "| 決策≤W1 | — | \`BE-缺\` |" "| — | — | \`BE-缺\` |"
+run_absent 0 "沒有任何決策期限：不印錨點提示" "週次錨點"
+
+baseline
+anchor
+ASOF=2026-10-11 run 0 "錨點起第 6 天是 W1：期限內" "週次：今天 W1"
+ASOF=2026-10-11 run_expr "W1 最後一天：決策≤W1 的缺口還在 waiting" \
+  "d['calendar']['current_week']==1 and d['calendar']['gaps'][0]['calendar_state']=='waiting'"
+ASOF=2026-10-12 run 0 "第 7 天是 W2：過了決策≤W1 —— 只是報告，--check 仍是 0" "1 個缺口已過決策期限"
+ASOF=2026-10-12 run_expr "W2 第一天：fallback 自 W2 起生效" \
+  "d['calendar']['current_week']==2 and d['calendar']['gaps'][0]['calendar_state']=='fallback_effective' \
+   and d['calendar']['gaps'][0]['effective_since_week']==2"
+ASOF=2026-10-12 run_trace_has "--trace 列出是哪個缺口、從哪一週起生效" "↳ BE-G01"
+ASOF=2026-10-04 run_expr "錨點之前是 W0：還在期限內" \
+  "d['calendar']['current_week']==0 and d['calendar']['gaps'][0]['calendar_state']=='waiting'"
+
+# 錨點往後挪七天，同一個「今天」的週次剛好少一（codex 訂的停止條件之一）。
+baseline
+anchor "2026-10-12 Asia/Taipei"
+ASOF=2026-10-12 run_expr "錨點往後挪七天：同一天從 W2 變 W1" "d['calendar']['current_week']==1"
+
+# 已裁決：缺口標 Done（理由寫答案）或 Cancelled。
+baseline
+anchor
+edit "Alarm｜這是核心價值" "Done｜答案：對方會提供，W3 上線"
+ASOF=2026-10-12 run_expr "標 Done 的缺口是 decided，過期也不報" \
+  "d['calendar']['gaps'][0]['calendar_state']=='decided' and d['calendar']['counts']['fallback_effective']==0"
+ASOF=2026-10-12 run 0 "decided 之後摘要說沒有逾期" "沒有缺口過了決策期限還沒答案"
+
+baseline
+anchor
+edit "Alarm｜這是核心價值" "Cancelled｜對方明文不做"
+ASOF=2026-10-12 run_expr "標 Cancelled 的缺口是 decided" "d['calendar']['gaps'][0]['calendar_state']=='decided'"
+
+# 錨點的文法：看不懂的不准靜靜跳過。
+baseline
+anchor
+anchor "2026-11-02 Asia/Taipei"
+run 1 "錨點只能有一個" "只能有一個"
+
+baseline
+anchor "2026-10-05"
+run 1 "錨點沒寫時區要紅" "週次錨點格式不對"
+
+baseline
+anchor "2026-10-05 Mars/Olympus"
+run 1 "錨點時區認不出來要紅" "時區認不出來"
+
+baseline
+anchor "2026-02-30 Asia/Taipei"
+run 1 "錨點日期不存在要紅" "日期不存在"
+
+baseline
+edit "# 測試用的工作分解" "# 測試用的工作分解
+
+\`\`\`markdown
+<!-- wbs:week1 2026-10-05 Asia/Taipei -->
+\`\`\`"
+run_expr "圍籬裡的錨點範例不算" "d['calendar']['status']=='disabled' and d['calendar']['reason']=='no_anchor'"
+
+baseline
+ASOF=2026-02-30 run 2 "--as-of 不是真的日期：參數錯誤（2），不准默默改用真實時鐘" "要是 YYYY-MM-DD 而且是真的日期"
+ASOF=20261012 run 2 "--as-of 格式不對：參數錯誤（2）" "要是 YYYY-MM-DD 而且是真的日期"
+
+baseline
+anchor
+ASOF=2026-10-12 run_json_parses "--json 的 stdout 還是合法 JSON（週次摘要不准混進去）"
+
+
+# ── 第三位審查者（Fable）找到、重現過的（2026-09-25）────────────────────
+
+# `--week` 是顯示篩選，**不准改變 `--check` 的結論**。原本它在算出狀態之前就跳過，
+# 不在那一週的項目在狀態表裡不存在：`--week W2 --check` 紅、不加綠，`--week W1 --json` KeyError。
+baseline
+edit "| FE-C01 | AppShell | 專案骨架 | W1 | 3 | | |" "| FE-C01 | AppShell | 專案骨架 | W1 | 3 | | Done｜PR #1 |"
+edit "| FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | |" "| FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | Done｜PR #2 |"
+xdep "| FE-P03 | FE-C01 | 全部 | 清單要先有骨架 |"
+run 0 "兩項都完成：綠" ""
+WEEK=W2 run 0 "--week W2 不改變 --check 的結論（依賴圖要看得到 W1 的項目）" ""
+WEEK=W1 run_expr "--week W1 --json 不炸，依賴圖用的是全部項目的狀態" \
+  "g['cross_deps']['done_before_deps']==0 and len(d['items'])==4"
+
+# 舊「已知的跨項依賴」表認表頭，不認散文：提到這個詞的一句話＋後面一張無關的兩欄表，不是舊表。
+baseline
+edit "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |" "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |
+
+## 跨項依賴
+
+原本的「已知的跨項依賴」表已經遷成正本。
+
+| 這一項 | 依賴 | 關係 | 說明 |
+|---|---|---|---|
+| FE-P03 | FE-C01 | 全部 | 正本 |
+
+## 對照
+
+| 舊 | 新 |
+|---|---|
+| \`FE-O10\` | FE-C01 |"
+run 0 "散文提到「已知的跨項依賴」＋後面一張無關的兩欄表：不是舊表，不誤報並存" ""
+
+baseline
+edit "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |" "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |
+
+## 對照
+
+我們不再用已知的跨項依賴那張表了。
+
+| 舊 | 新 |
+|---|---|
+| \`FE-O10\` | FE-C01 |"
+run_expr "那句話後面第一張表的表頭不是「這一項｜依賴」：不當舊表、也不送給網頁" \
+  "x['schema'] is None and d['deps']==[]"
+
+# 要接值的參數沒帶值就停（原本被吞成空字串、照常跑）。
+baseline
+RUN_ARGS=--as-of run 2 "--as-of 沒帶值：參數錯誤（2）" "要接日期"
+RUN_ARGS=--week run 2 "--week 沒帶值：參數錯誤（2）" "要接週次"
+
+# 已完成而前置「已取消」：說「已取消、改寫這一列」，不說「還沒完成」。
+baseline
+edit "| FE-C01 | AppShell | 專案骨架 | W1 | 3 | | |" "| FE-C01 | AppShell | 專案骨架 | W1 | 3 | | Cancelled｜改用別的做法 |"
+edit "| FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | |" "| FE-P03 | BoardShell | 列表與翻頁 | W2 | 5 | | Done｜PR #2 |"
+xdep "| FE-P03 | FE-C01 | 全部 | 清單要先有骨架 |"
+run 1 "已完成而前置已取消：講清楚是「已取消、改寫這一列」" "它依賴的 FE-C01 已取消（改用別的做法完成的話"
+run_absent 1 "…而且不說它「還沒完成」" "FE-C01 還沒完成"
+
+
+# 「靠哪些」寫群組：群組不是涵蓋，原本被靜靜吞掉、可追溯性報它的成員未涵蓋。
+baseline
+edit "| FE-C01、FE-P03 |" "| FE-C、FE-P03 |"
+run 1 "「靠哪些」寫群組要紅（逐項列出）" "寫了群組 FE-C"
+
+# 目標週的形狀：網頁按週分組靠它配對，錯了那個里程碑在週視圖上靜靜消失。
+baseline
+edit "| M1 一個人跑完主流程 | W2 |" "| M1 一個人跑完主流程 | 第2週 |"
+run 1 "目標週不是 Wn 要紅" "的「目標週」要是"
+baseline
+edit "| M1 一個人跑完主流程 | W2 |" "| M1 一個人跑完主流程 | W2–W3 |"
+run 0 "目標週可以是範圍（en dash）" ""
+baseline
+edit "| M1 一個人跑完主流程 | W2 |" "| M1 一個人跑完主流程 | W2-W3 |"
+run 1 "目標週範圍打成 ASCII 連字號要紅（跟週欄同一個文法）" "的「目標週」要是"
+baseline
+edit "| M1 一個人跑完主流程 | W2 |" "| M1 一個人跑完主流程 | — |"
+run 0 "目標週可以是 —（還沒排）" ""
+
+# 〈跨項依賴〉的依賴寫成缺口：繞過不變量 5。缺口寫在阻塞欄。
+baseline
+xdep "| FE-C01 | BE-G01 | 全部 | 應該寫在阻塞欄 |"
+run 1 "〈跨項依賴〉的依賴是缺口要紅" "BE-G01 是缺口"
+
+# 用 change 做掉的缺口（全部封存）也是已裁決 —— 有 change 的項目不准標 Done。
+baseline
+anchor
+mkarchived be-g01-search
+ASOF=2026-10-12 run_expr "已封存的缺口是 decided" \
+  "d['calendar']['gaps'][0]['state']=='已封存' and d['calendar']['gaps'][0]['calendar_state']=='decided'"
+
+
+# ── Fable 複審找到的（2026-09-25）────────────────────────────────
+
+# 前面一段說明先提到「已知的跨項依賴」，真正的舊表在後面：不准因為第一次提到的地方
+# 底下沒有表，就整份放棄（原本會 break，那張表靜靜消失、連「沒有被驗」都不講）。
+baseline
+edit "## 工作項目" "## 說明
+
+先後關係見底下「已知的跨項依賴」那張表。
+
+## 工作項目"
+edit "| 這一項 | 依賴 |" "已知的跨項依賴（改動時要一起看）：
+
+| 這一項 | 依賴 |"
+run 0 "前面先提到那個詞、真正的舊表在後面：照樣認得，而且講「沒有被驗」" "排程與環都沒有被驗"
+run_expr "…而且舊表進了 deps_meta 與 deps" "x['schema']=='legacy_free_text' and x['rows']==1 and len(d['deps'])==1"
+
+# `--week` 之下「哪些項目依賴外部」只算那一週的依賴者（跟上面的統計同一個範圍）。
+baseline
+run 0 "對照：不加 --week 有「哪些項目依賴外部」（BE-G01 擋著 W2 的 FE-P03）" "哪些項目依賴外部"
+WEEK=W1 run_absent 0 "--week W1：W2 的依賴者不算，那一段不出現" "哪些項目依賴外部"
+WEEK=W2 run 0 "--week W2：那一段標明只算 W2" "只算 W2 的項目"
+
+# 有〈跨項依賴〉這一節卻解析不出來：原因碼跟「沒有這張表」分開（網頁講的話不同）。
+baseline
+edit "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |" "| \`FE-P03\` 清單 | \`FE-C01\` 骨架 |
+
+## 跨項依賴
+
+| 項目 | 依賴 | 關係 | 說明 |
+|---|---|---|---|
+| FE-P03 | FE-C01 | 全部 | 表頭寫錯 |"
+run_expr "表頭認不出來：reason 是 cross_dep_table_not_parsed，不是 no_cross_dep_table" \
+  "x['reason']=='cross_dep_table_not_parsed'"
+
+
+# 〈跨項依賴〉的依賴沒有工作週次（不是缺口、也不是已取消）：排不出先後，文法錯誤。
+# 原本靜靜落進「沒有週次」的桶，同一列另一條邊被評估到時連分母那行都不印（Fable 複審實測）。
+baseline
+edit "| FE-O10 | 文件維護 |" "| FE-O11 | 佈署 | 等平台 | — | — | | Pending｜平台還沒開 |
+| FE-O10 | 文件維護 |"
+xdep "| FE-P03 | FE-O11、FE-C01 | 全部 | 要先有平台 |"
+run 1 "依賴一個沒排週次的項目要紅（先排週次）" "FE-O11 沒有工作週次，排不出先後"
+
+baseline
+xdep "| FE-P03 | FE-O10 | 全部 | 依賴常態維運 |"
+run 1 "依賴一個常態（Regular）項目要紅（拆出有週次的一次性項目再依賴）" "FE-O10 沒有工作週次，排不出先後"
+
+# ── 〈跨項依賴〉「這一項」自己沒有工作週次（第十五～十八輪）────────────
+# 原本一律靜靜落進 skipped_src_no_week，只在整張表 0 條被評估時才印一行。
+# 判準：**一條還重要的邊，不准沒被驗過就以綠燈結束。**
+#   缺口／常態 → 永遠不會有週次，錯誤；還沒排週次 → 跳過、--check 列出
+#   （一排上週次就被驗）；已完成而沒有週次 → 錯誤（堵住「沒排就直接做完」）；
+#   這一項已取消 → 跳過、列出（**先於週次判斷**，有週次的已取消項目也跳過）。
+
+# S1：這一項是缺口。決策期限不是起始週，拿來比證明不了先後。
+baseline
+xdep "| BE-G01 | FE-C01 | 全部 | 裁決要等骨架 |"
+run 1 "這一項是缺口要紅（決策期限不能當起始週）" "這一項 BE-G01 是缺口"
+run_expr "…計進 src_no_week_error（不是待排），加總仍等於邊數" \
+  "(lambda c: c['edges']==1 and c['src_no_week_error']==1 and c['pending_src_unscheduled']==0)(g['cross_deps'])"
+
+# S2：這一項是常態：永遠沒有起點。
+baseline
+xdep "| FE-O10 | FE-C01 | 全部 | 維運要先有骨架 |"
+run 1 "這一項是常態要紅（拆出有週次的一次性項目）" "這一項 FE-O10 是常態"
+
+# S3：這一項還沒排週次：不紅，但 --check 列出來——就算同一張表別的邊有被評估。
+baseline
+edit "| FE-O10 | 文件維護 |" "| FE-O11 | 佈署 | 等平台 | — | — | | Pending｜平台還沒開 |
+| FE-O10 | 文件維護 |"
+xdep "| FE-P03 | FE-C01 | 全部 | 正常的一條 |
+| FE-O11 | FE-P03 | 全部 | 佈署要等清單 |"
+run 0 "這一項還沒排週次：不紅，但 --check 點名（別的邊有評估也要講）" "FE-O11（第 [0-9]* 行）還沒排週次"
+run_expr "…計進 pending_src_unscheduled，評估的是另外那一條" \
+  "g['cross_deps']['pending_src_unscheduled']==1 and g['cross_deps']['evaluated']==1"
+# 一排上週次，同一列就被驗：排在它依賴的東西之前要紅。
+edit "| FE-O11 | 佈署 | 等平台 | — |" "| FE-O11 | 佈署 | 等平台 | W1 |"
+run 1 "…排上週次之後同一列自動被驗（W1 依賴 W2 要紅）" "FE-O11（最早 W1）依賴 FE-P03（最晚 W2）"
+
+# S5：已完成卻沒有工作週次：堵住「沒排週次就直接做完」這條沒被驗過的綠燈路徑。
+# 依賴那一邊也做完了，D7 不會叫 —— 紅的只能是這一條。
+baseline
+mkarchived fe-c01-skeleton
+edit "| FE-O10 | 文件維護 |" "| FE-O12 | 治理文件 | 寫好了 | — | — | | Done｜PR #1 |
+| FE-O10 | 文件維護 |"
+xdep "| FE-O12 | FE-C01 | 全部 | 文件要等骨架 |"
+run 1 "這一項已完成卻沒有週次要紅（補實際週次，或刪掉這一列）" "FE-O12 已完成，卻沒有工作週次"
+run_absent 1 "…而且不是 D7 叫的" "兩邊的紀錄有一邊是錯的"
+
+# S4：這一項已取消 —— 有週次也跳過（取消與週次無關），列出來。
+baseline
+edit "| FE-O10 | 文件維護 |" "| FE-C03 | 舊做法 | 改用別的了 | W1 | 1 | | Cancelled｜改用 FE-C01 的做法 |
+| FE-O10 | 文件維護 |"
+xdep "| FE-C03 | FE-P03 | 全部 | 原本 W1 等 W2，逆序 |"
+run 0 "這一項已取消：逆序也不紅（不受排程約束），但 --check 點名" "FE-C03（第 [0-9]* 行）已取消"
+run_expr "…計進 skipped_src_cancelled，沒有被評估" \
+  "g['cross_deps']['skipped_src_cancelled']==1 and g['cross_deps']['evaluated']==0"
+
+# 判定順序：依賴已取消先算，不因這一項沒週次而報錯或列為待排。
+baseline
+edit "| FE-O10 | 文件維護 |" "| FE-C03 | 舊做法 | 改用別的了 | W1 | 1 | | Cancelled｜改用 FE-C01 的做法 |
+| FE-O11 | 佈署 | 等平台 | — | — | | Pending｜平台還沒開 |
+| FE-O10 | 文件維護 |"
+xdep "| FE-O11 | FE-C03 | 全部 | 依賴的已取消 |"
+run_expr "依賴已取消先算：skipped_dep_cancelled，不是待排" \
+  "g['cross_deps']['skipped_dep_cancelled']==1 and g['cross_deps']['pending_src_unscheduled']==0"
+
+# 分母守恆（新桶）：每條邊恰好落進一個桶。
+baseline
+edit "| FE-O10 | 文件維護 |" "| FE-C03 | 舊做法 | 改用別的了 | W1 | 1 | | Cancelled｜改用 FE-C01 的做法 |
+| FE-O11 | 佈署 | 等平台 | — | — | | Pending｜平台還沒開 |
+| FE-O10 | 文件維護 |"
+xdep "| FE-P03 | FE-C01 | 全部 | 評估 |
+| FE-O11 | FE-P03 | 全部 | 待排 |
+| FE-C03 | FE-C01 | 全部 | 這一項已取消 |"
+run_expr "分母守恆：評估 1、待排 1、這一項已取消 1，加總等於邊數" \
+  "(lambda c: c['edges']==3 and c['evaluated']==1 and c['pending_src_unscheduled']==1 \
+   and c['skipped_src_cancelled']==1 and c['evaluated']+c['skipped_dep_missing'] \
+   +c['pending_src_unscheduled']+c['skipped_src_cancelled']+c['skipped_dep_cancelled'] \
+   +c['skipped_dep_no_week']+c['src_no_week_error']==c['edges'])(g['cross_deps'])"
 
 echo
 if [ "$FAIL" -gt 0 ]; then
